@@ -50,7 +50,8 @@ struct CPU65C816
   //  CPU State
   enum class State {
     None,
-    Reset
+    Reset,
+    FetchExecute
   };
   State state;
   unsigned stateCycles; // Number of cycles the state has been in.
@@ -74,8 +75,37 @@ uint16_t set_reg_hi8(uint16_t hi)
 }
 
 
-uint32_t emulate(CPU65C816& cpu, uint32_t cycleCounter)
+//  Concepts
+//    Interrupts:
+//      - Value of PC is either read from (RESET) or written to the stack
+//      (EVERYTHING ELSE) 2 memory cycles
+//      - Value of P is again either read or written to the stack (1 memory
+//        cycle)
+//      - Read two bytes of the interrupt vector from the vector address
+//
+
+//  Components
+//    EMUBUS <-> CPU
+//    EMUBUS <-> FPI
+//    EMUBUS <-> MEGA2
+//
+//  Emulation
+//    emulate(EMUBUS)
+//
+//  Idea, the EmulatorBuf runs all of the components CPU, FPI, MEGA2
+//
+//  EmulatorBus
+/*
+uint32_t emulate(EmulatorBus& emuBus, CPU65C816& cpu, ComponentFPI& fpi, ComponentMega2& mega2)
 {
+
+}
+*/
+
+uint32_t emulate(CPU65C816& cpu, EmulationBus& emubus)
+{
+  const uint32_t kClockStep = 1000;   // 1hz = 1000 units
+  uint32_t clocksSpent = 0;
   // interpret input pins
   if (!cpu.pins.resbIn) {
     //  RESB must be set at least two cycles before releasing for a valid CPU
@@ -104,12 +134,47 @@ uint32_t emulate(CPU65C816& cpu, uint32_t cycleCounter)
       // TODO: The eponimous B flag... assumption here
       //  http://visual6502.org/wiki/index.php?title=6502_BRK_and_B_bit
       cpu.brk = false;
+      cpu.pins.emulationOut = true;
+      cpu.pins.memIdxSelOut = true;
+      cpu.pins.rwbOut = true;
+      cpu.pins.vpbOut = true;
+      cpu.pins.vdaOut = false;
+      cpu.pins.vpaOut = false;
+      clocksSpent += kClockStep;
     }
   } else {
     if (cpu.state == CPU65C816::State::Reset) {
-      //  resbIn back to 1 - initiate reset
+      //  resbIn back to 1 - initiate reset and interrupt sequence
+      //  TODO: clear STP and WAI
+      //        RWB high during stack address cycle
+      //        Set PC to the contents of Reset vector address 0xFFFC,D
+
+      //  Normally we push the PC and P registers to the stack
+      //  RESET is an exceptional case, as we are reading values while
+      //    incrementing the stack pointer.  RESET doesn't use these values any
+      //    way, but we include the microcode so we can at least accumalate the
+      //    cycles, and for educational purposes
+      uint16_t SP = cpu.regs.S;
+      emubus.read(cpu, SP, 0x00);
+      if (cpu.emulation) {
+        SP = (SP & 0xff00) | ((SP & 0x00ff) - 1);
+      } else {
+        ++SP;
+      }
+      emubus.read(SP, 0x00);
+      cpu.decS2();
+      SP = cpu.regs.S;
+      emubus.read(SP, 0x00);
+      cpu.decS();
+      cpu.pins.vpbOut = true;
+      cpu.regs.PC = emubus.read(0xFFFC, 0x00) | (
+        (uint16_t)emubus.read(0xFFFD, 0x00) << 8);
+      cpu.pins.vpbOut = false;
+      cpu.state = CPU65C816::State::FetchExecute;
     }
   }
+
+  return clocksSpent;
 }
 
 } // namespace clements
@@ -139,16 +204,17 @@ int main(int argc, const char* argv[])
 {
   clements::CPU65C816 cpu;
   bool systemPowerOn = true;
-  uint32_t cycleCounter = 0;
-
+  uint32_t clocksCounter = 0;
+  uint32_t stepCounter = 0;
   cpu.state = clements::CPU65C816::State::None;
 
   //  Assuming systemPowerOn is true
   cpu.pins.resbIn = false;    // active low
 
   while (systemPowerOn) {
-    cycleCounter = clements::emulate(cpu, cycleCounter);
-    if (cycleCounter >= 1000) {
+    clocksCounter += clements::emulate(cpu);
+    ++stepCounter;
+    if (clocksCounter >= 1000) {
       break;
     }
   }
