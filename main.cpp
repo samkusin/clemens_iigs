@@ -5,6 +5,16 @@ namespace clements
 
 struct CPU65C816
 {
+  enum {
+    kProcessorStatus_Carry              = (1 << 0),     // C
+    kProcessorStatus_Zero               = (1 << 1),     // Z
+    kProcessorStatus_IRQDisable         = (1 << 2),     // I
+    kProcessorStatus_Decimal            = (1 << 3),     // D
+    kProcessorStatus_Index              = (1 << 4),     // X,
+    kProcessorStatus_MemoryAccumulator  = (1 << 5),     // M,
+    kProcessorStatus_Overflow           = (1 << 6),     // V
+    kProcessorStatus_Negative           = (1 << 7)      // N
+  };
   struct {
     uint16_t A;
     uint16_t X;
@@ -43,7 +53,10 @@ struct CPU65C816
     Reset
   };
   State state;
-  unsigned stateCycles;         // Number of cycles the state has been in.
+  unsigned stateCycles; // Number of cycles the state has been in.
+  bool emulation;
+  bool brk;
+
 
   State setState(State s) {
     state = s;
@@ -75,10 +88,26 @@ uint32_t emulate(CPU65C816& cpu, uint32_t cycleCounter)
       cpu.regs.S = set_reg_hi8(0x0100);
       cpu.regs.X = set_reg_hi8(0x0000);
       cpu.regs.Y = set_reg_hi8(0x0000);
-
-    } else if (cpu.stateCycles >= 2) {
-
-
+      //  Only M=1, X=1, D=0, I, C/E=1 are set
+      cpu.regs.P = cpu.regs.P & ~(
+        CPU65C816::kProcessorStatus_MemoryAccumulator |
+        CPU65C816::kProcessorStatus_Index |
+        CPU65C816::kProcessorStatus_Decimal |
+        CPU65C816::kProcessorStatus_IRQDisable |
+        CPU65C816::kProcessorStatus_Carry);
+      cpu.regs.P |= (
+        CPU65C816::kProcessorStatus_MemoryAccumulator |
+        CPU65C816::kProcessorStatus_Index |
+        CPU65C816::kProcessorStatus_IRQDisable |
+        CPU65C816::kProcessorStatus_Carry);
+      cpu.emulation = true;
+      // TODO: The eponimous B flag... assumption here
+      //  http://visual6502.org/wiki/index.php?title=6502_BRK_and_B_bit
+      cpu.brk = false;
+    }
+  } else {
+    if (cpu.state == CPU65C816::State::Reset) {
+      //  resbIn back to 1 - initiate reset
     }
   }
 }
