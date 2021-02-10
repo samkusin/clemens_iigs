@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <assert.h>
 
 
 /*
@@ -35,6 +36,9 @@
  *      - ???
  */
 
+#define CLEM_65816_RESET_VECTOR_LO_ADDR  (0xFFFC)
+#define CLEM_65816_RESET_VECTOR_HI_ADDR  (0xFFFD)
+
 
 enum {
     kClemensCPUStatus_Carry              = (1 << 0),     // C
@@ -58,11 +62,14 @@ struct ClemensCPURegs {
     uint8_t P;                          // Processor Status
     uint8_t DBR;                        // Data Bank (Memory)
     uint8_t PBR;                        // Program Bank (Memory)
+
+    //  Specialized for emulation
+    uint16_t PC_NEXT;                   // PC for the next instruction
 };
 
 struct ClemensCPUPins {
     uint16_t adr;                       // A0-A15 Address
-    uint8_t data;                       // Data (8-bit)
+    uint8_t databank;                   // Bank when clockHi, else data
     bool abortIn;                       // ABORTB In
     bool busEnableIn;                   // Bus Enable
     bool emulationOut;                  // Emulation Status
@@ -80,40 +87,79 @@ struct ClemensCPUPins {
 
 enum ClemensCPUStateType {
     kClemensCPUStateType_None,
-    kClemensCPUStateType_Reset
+    kClemensCPUStateType_Reset,
+    kClemensCPUStateType_Execute
 };
 
-struct ClemensCPU65C816 {
+struct Clemens65C816 {
     struct ClemensCPURegs regs;
     struct ClemensCPUPins pins;
     enum ClemensCPUStateType state_type;
+    uint16_t PC_NEXT;
     bool emulation;
     bool intr_brk;
 };
 
 
 typedef struct {
-    struct ClemensCPU65C816 cpu;
+    struct Clemens65C816 cpu;
     uint32_t clocks_step;
     bool interrupt_reset_b;             // signal to CPU: resb
 } ClemensMachine;
 
 
-static
-
-
-uint32_t emulate(
-    struct ClemensCPU65C816* cpu,
-    uint32_t clocks_to_run,
-    uint32_t clocks_step
+static inline uint32_t clem_mem_read(
+    ClemensMachine* clem,
+    uint8_t* data,
+    uint16_t adr,
+    uint8_t bank
 ) {
+    clem->cpu.pins.adr = adr;
+    clem->cpu.pins.databank = bank;
+    *data = 0x00;
+    return 1;
+}
+
+static inline uint32_t clem_mem_write(
+    ClemensMachine* clem,
+    uint8_t data,
+    uint16_t adr,
+    uint8_t bank
+) {
+    clem->cpu.pins.adr = adr;
+    clem->cpu.pins.databank = bank;
+    return 1;
+}
+
+static inline void cpu_sp_dec2(
+    struct Clemens65C816* cpu
+) {
+    uint16_t tmp = cpu->regs.S - 2;
+    if (cpu->emulation) {
+        tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
+    }
+}
+
+static inline void cpu_sp_dec(
+    struct Clemens65C816* cpu
+) {
+    uint16_t tmp = cpu->regs.S - 1;
+    if (cpu->emulation) {
+        tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
+    }
+}
+
+uint32_t emulate(ClemensMachine* clem) {
     uint32_t clocks_used = 0;
+    struct Clemens65C816* cpu = &clem->cpu;
 
     if (!cpu->pins.resbIn) {
-        //  the reset interrupt overrides any other state
-        //  start in emulation mode, 65C02 stack, regs, etc.
+        /*  the reset interrupt overrides any other state
+            start in emulation mode, 65C02 stack, regs, etc.
+        */
         if (cpu->state_type != kClemensCPUStateType_Reset) {
             cpu->state_type = kClemensCPUStateType_Reset;
+
             cpu->regs.D = 0x0000;
             cpu->regs.DBR = 0x00;
             cpu->regs.PBR = 0x00;
@@ -140,14 +186,67 @@ uint32_t emulate(
             cpu->pins.vpbOut = true;
             cpu->pins.vdaOut = false;
             cpu->pins.vpaOut = false;
-            clocks_used += clocks_step * 2;
+            clocks_used += 2;
+        } else {
+            ++clocks_used;
         }
-    } else {
-        //  RESB high during reset invokes our interrupt microcode
-        if (cpu->state_type == kClemensCPUStateType_Reset) {
-
-        }
+        return clocks_used;
     }
 
+    //  RESB high during reset invokes our interrupt microcode
+    if (cpu->state_type == kClemensCPUStateType_Reset) {
+        uint16_t tmp_addr;
+        uint16_t tmp_reg;
+        uint8_t tmp_data;
+        uint8_t tmp_datahi;
 
+        clem_mem_read(clem, &tmp_data, cpu->regs.S, 0x00);
+        tmp_addr = cpu->regs.S - 1;
+        if (cpu->emulation) {
+            tmp_addr = (
+                (cpu->regs.S & 0xff00) | (tmp_addr & 0x00ff));
+        }
+        clem_mem_read(clem, &tmp_datahi, tmp_addr, 0x00);
+        cpu_sp_dec2(cpu);
+        clem_mem_read(clem, &tmp_data, cpu->regs.S, 0x00);
+        cpu_sp_dec(cpu);
+        clem_mem_read(clem, &tmp_data, CLEM_65816_RESET_VECTOR_LO_ADDR, 0x00);
+        clem_mem_read(clem, &tmp_datahi, CLEM_65816_RESET_VECTOR_HI_ADDR, 0x00);
+        cpu->PC_NEXT = (uint16_t)(tmp_datahi << 8) | tmp_data;
+        cpu->state_type = kClemensCPUStateType_Execute;
+        return clocks_used;
+    }
+
+    assert(cpu->state_type == kClemensCPUStateType_Execute);
+    /*
+        Execute all cycles of an instruction here
+    */
+    cpu->regs.PC = cpu->PC_NEXT;
+
+    return clocks_used;
+}
+
+/**
+ *  The Apple //gs Clements Emulator
+ *
+ *  CPU
+ *  Mega II emulation
+ *  Memory
+ *    ROM
+ *    RAM
+ *  I/O
+ *    IWM
+ *    ADB (keyboard + mouse)
+ *    Ports 1-7
+ *    Ensoniq
+ *
+ * Approach:
+ *
+ */
+
+
+
+int main(int argc, char* argv[])
+{
+  return 0;
 }

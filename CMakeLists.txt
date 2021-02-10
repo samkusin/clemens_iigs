@@ -35,7 +35,7 @@ endfunction()
 
 
 set(EMULATOR_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/emulator.c")
 
 add_executable(clements_iigs
     ${EMULATOR_SOURCES})
