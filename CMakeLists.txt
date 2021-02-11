@@ -34,6 +34,8 @@ function(project_create_assets_target ARG_TARGET_NAME)
 endfunction()
 
 
+set(PROJECT_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}-run")
+
 set(EMULATOR_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/emulator.c")
 

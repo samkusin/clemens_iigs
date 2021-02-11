@@ -1,5 +1,8 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <assert.h>
 
 
@@ -36,9 +39,10 @@
  *      - ???
  */
 
-#define CLEM_65816_RESET_VECTOR_LO_ADDR  (0xFFFC)
-#define CLEM_65816_RESET_VECTOR_HI_ADDR  (0xFFFD)
-
+#define CLEM_65816_RESET_VECTOR_LO_ADDR     (0xFFFC)
+#define CLEM_65816_RESET_VECTOR_HI_ADDR     (0xFFFD)
+#define CLEM_IIGS_BANK_SIZE                 (64 * 1024)
+#define CLEM_IIGS_ROM3_SIZE                 (CLEM_IIGS_BANK_SIZE * 4)
 
 enum {
     kClemensCPUStatus_Carry              = (1 << 0),     // C
@@ -62,9 +66,6 @@ struct ClemensCPURegs {
     uint8_t P;                          // Processor Status
     uint8_t DBR;                        // Data Bank (Memory)
     uint8_t PBR;                        // Program Bank (Memory)
-
-    //  Specialized for emulation
-    uint16_t PC_NEXT;                   // PC for the next instruction
 };
 
 struct ClemensCPUPins {
@@ -92,9 +93,10 @@ enum ClemensCPUStateType {
 };
 
 struct Clemens65C816 {
-    struct ClemensCPURegs regs;
     struct ClemensCPUPins pins;
+    struct ClemensCPURegs regs;
     enum ClemensCPUStateType state_type;
+    uint32_t cycles_spent_in_frame;
     uint16_t PC_NEXT;
     bool emulation;
     bool intr_brk;
@@ -104,11 +106,41 @@ struct Clemens65C816 {
 typedef struct {
     struct Clemens65C816 cpu;
     uint32_t clocks_step;
-    bool interrupt_reset_b;             // signal to CPU: resb
+    uint32_t clocks_spent_in_frame;
+    uint8_t* fpi_bank_map[256];
 } ClemensMachine;
 
 
-static inline uint32_t clem_mem_read(
+int clemens_init(
+    ClemensMachine* machine,
+    uint32_t clocks_step,
+    void* rom,
+    size_t romSize
+) {
+    machine->clocks_step = clocks_step;
+    machine->clocks_spent_in_frame = 0;
+    if (romSize != CLEM_IIGS_ROM3_SIZE) {
+        return -1;
+    }
+
+    /* memory organization for the FPI */
+    machine->fpi_bank_map[0xfc] = (uint8_t*)rom;
+    machine->fpi_bank_map[0xfd] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE;
+    machine->fpi_bank_map[0xfe] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE * 2;
+    machine->fpi_bank_map[0xff] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE * 3;
+
+    return 0;
+}
+
+
+static inline void _clem_nop(
+    ClemensMachine* clem,
+    uint32_t cycle_count
+) {
+    clem->clocks_spent_in_frame += clem->clocks_step * cycle_count;
+}
+
+static inline void _clem_mem_read(
     ClemensMachine* clem,
     uint8_t* data,
     uint16_t adr,
@@ -116,11 +148,19 @@ static inline uint32_t clem_mem_read(
 ) {
     clem->cpu.pins.adr = adr;
     clem->cpu.pins.databank = bank;
-    *data = 0x00;
-    return 1;
+    if (clem->cpu.pins.emulationOut) {
+        //  TODO: optimize
+        if (adr >= 0xd000) {
+            *data = clem->fpi_bank_map[0xff][adr];
+        } else {
+            *data = 0x00;
+        }
+    }
+
+    clem->clocks_spent_in_frame += clem->clocks_step;
 }
 
-static inline uint32_t clem_mem_write(
+static inline void _clem_mem_write(
     ClemensMachine* clem,
     uint8_t data,
     uint16_t adr,
@@ -128,30 +168,35 @@ static inline uint32_t clem_mem_write(
 ) {
     clem->cpu.pins.adr = adr;
     clem->cpu.pins.databank = bank;
-    return 1;
+    clem->clocks_spent_in_frame += clem->clocks_step;
 }
 
-static inline void cpu_sp_dec2(
+static inline void _cpu_sp_dec2(
     struct Clemens65C816* cpu
 ) {
     uint16_t tmp = cpu->regs.S - 2;
     if (cpu->emulation) {
         tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
     }
+    cpu->regs.S = tmp;
 }
 
-static inline void cpu_sp_dec(
+static inline void _cpu_sp_dec(
     struct Clemens65C816* cpu
 ) {
     uint16_t tmp = cpu->regs.S - 1;
     if (cpu->emulation) {
         tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
     }
+    cpu->regs.S = tmp;
 }
 
-uint32_t emulate(ClemensMachine* clem) {
-    uint32_t clocks_used = 0;
+void emulate(ClemensMachine* clem) {
     struct Clemens65C816* cpu = &clem->cpu;
+    uint16_t tmp_addr;
+    uint16_t tmp_reg;
+    uint8_t tmp_data;
+    uint8_t tmp_datahi;
 
     if (!cpu->pins.resbIn) {
         /*  the reset interrupt overrides any other state
@@ -186,35 +231,28 @@ uint32_t emulate(ClemensMachine* clem) {
             cpu->pins.vpbOut = true;
             cpu->pins.vdaOut = false;
             cpu->pins.vpaOut = false;
-            clocks_used += 2;
-        } else {
-            ++clocks_used;
+            _clem_nop(clem, 1);
         }
-        return clocks_used;
+        _clem_nop(clem, 1);
+        return;
     }
-
     //  RESB high during reset invokes our interrupt microcode
     if (cpu->state_type == kClemensCPUStateType_Reset) {
-        uint16_t tmp_addr;
-        uint16_t tmp_reg;
-        uint8_t tmp_data;
-        uint8_t tmp_datahi;
-
-        clem_mem_read(clem, &tmp_data, cpu->regs.S, 0x00);
+        _clem_mem_read(clem, &tmp_data, cpu->regs.S, 0x00);
         tmp_addr = cpu->regs.S - 1;
         if (cpu->emulation) {
             tmp_addr = (
                 (cpu->regs.S & 0xff00) | (tmp_addr & 0x00ff));
         }
-        clem_mem_read(clem, &tmp_datahi, tmp_addr, 0x00);
-        cpu_sp_dec2(cpu);
-        clem_mem_read(clem, &tmp_data, cpu->regs.S, 0x00);
-        cpu_sp_dec(cpu);
-        clem_mem_read(clem, &tmp_data, CLEM_65816_RESET_VECTOR_LO_ADDR, 0x00);
-        clem_mem_read(clem, &tmp_datahi, CLEM_65816_RESET_VECTOR_HI_ADDR, 0x00);
+        _clem_mem_read(clem, &tmp_datahi, tmp_addr, 0x00);
+        _cpu_sp_dec2(cpu);
+        _clem_mem_read(clem, &tmp_data, cpu->regs.S, 0x00);
+        _cpu_sp_dec(cpu);
+        _clem_mem_read(clem, &tmp_data, CLEM_65816_RESET_VECTOR_LO_ADDR, 0x00);
+        _clem_mem_read(clem, &tmp_datahi, CLEM_65816_RESET_VECTOR_HI_ADDR, 0x00);
         cpu->PC_NEXT = (uint16_t)(tmp_datahi << 8) | tmp_data;
         cpu->state_type = kClemensCPUStateType_Execute;
-        return clocks_used;
+        return;
     }
 
     assert(cpu->state_type == kClemensCPUStateType_Execute);
@@ -222,8 +260,15 @@ uint32_t emulate(ClemensMachine* clem) {
         Execute all cycles of an instruction here
     */
     cpu->regs.PC = cpu->PC_NEXT;
-
-    return clocks_used;
+    _clem_mem_read(clem, &tmp_data, cpu->regs.PC, cpu->regs.PBR);
+    printf("%02x\n", tmp_data);
+    ++cpu->regs.PC;
+    _clem_mem_read(clem, &tmp_data, cpu->regs.PC, cpu->regs.PBR);
+    printf("%02x\n", tmp_data);
+    ++cpu->regs.PC;
+    _clem_mem_read(clem, &tmp_data, cpu->regs.PC, cpu->regs.PBR);
+    printf("%02x\n", tmp_data);
+    ++cpu->regs.PC;
 }
 
 /**
@@ -248,5 +293,30 @@ uint32_t emulate(ClemensMachine* clem) {
 
 int main(int argc, char* argv[])
 {
-  return 0;
+    ClemensMachine machine;
+
+    /*  ROM 3 only */
+    FILE* fp = fopen("gs_rom_3.rom", "rb");
+    void* rom = NULL;
+    if (fp == NULL) {
+        fprintf(stderr, "No ROM\n");
+        return 1;
+    }
+    rom = malloc(CLEM_IIGS_ROM3_SIZE);
+    if (fread(rom, 1, CLEM_IIGS_ROM3_SIZE, fp) != CLEM_IIGS_ROM3_SIZE) {
+        fprintf(stderr, "Bad ROM\n");
+        return 1;
+    }
+    fclose(fp);
+
+    memset(&machine, 0, sizeof(machine));
+    clemens_init(&machine, 1000, rom, 256 * 1024);
+
+    machine.cpu.pins.resbIn = false;
+    emulate(&machine);
+    machine.cpu.pins.resbIn = true;
+    emulate(&machine);
+    emulate(&machine);
+
+    return 0;
 }
