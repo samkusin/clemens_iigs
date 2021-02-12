@@ -62,8 +62,19 @@
 
 #define CLEM_ADR_MODE_01_IMMEDIATE          (0x08)
 
+/* Attempt to mimic VDA and VPA per memory access */
+#define CLEM_MEM_FLAG_OPCODE_FETCH          (0x3)
+#define CLEM_MEM_FLAG_DATA                  (0x2)
+#define CLEM_MEM_FLAG_PROGRAM               (0x1)
+#define CLEM_MEM_FLAG_NULL                  (0x0)
+
 #define CLEM_UTIL_set16_lo(_v16_, _v8_) \
     (((_v16_) & 0xff00) | ((_v8_) & 0xff))
+
+
+#define CLEM_I_PRINTF(_clem_, _fmt_, ...) \
+    printf("%02X:%04X " _fmt_ "\n", \
+        (_clem_)->cpu.regs.PBR, (_clem_)->cpu. regs.PC, ##__VA_ARGS__)
 
 
 enum {
@@ -97,15 +108,17 @@ struct ClemensCPUPins {
     bool busEnableIn;                   // Bus Enable
     bool emulationOut;                  // Emulation Status
     bool irqIn;                         // Interrupt Request
-    bool mlbOut;                        // Memory Lock
     bool memIdxSelOut;                  // Memory/Index Select
     bool nmiIn;                         // Non-Maskable Interrupt
-    bool rwbOut;                        // Read/Write byte
     bool readyInOut;                    // Ready CPU
     bool resbIn;                        // RESET
+    bool vpbOut;                        // Vector Pull
+    /*
+    bool rwbOut;                        // Read/Write byte
     bool vdaOut;                        // Valid Data Address
     bool vpaOut;                        // Valid Program Address
-    bool vpbOut;                        // Vector Pull
+    bool mlbOut;                        // Memory Lock
+    */
 };
 
 enum ClemensCPUStateType {
@@ -186,7 +199,8 @@ static inline void _clem_mem_read(
     ClemensMachine* clem,
     uint8_t* data,
     uint16_t adr,
-    uint8_t bank
+    uint8_t bank,
+    uint8_t flags
 ) {
     clem->cpu.pins.adr = adr;
     clem->cpu.pins.databank = bank;
@@ -207,13 +221,24 @@ static inline void _clem_mem_write(
     ClemensMachine* clem,
     uint8_t data,
     uint16_t adr,
-    uint8_t bank
+    uint8_t bank,
+    uint8_t flags
 ) {
     clem->cpu.pins.adr = adr;
     clem->cpu.pins.databank = bank;
     clem->fpi_bank_map[bank][adr] = data;
     clem->clocks_spent += clem->clocks_step;
     ++clem->cpu.cycles_spent;
+}
+
+static inline void _cpu_sp_dec3(
+    struct Clemens65C816* cpu
+) {
+    uint16_t tmp = cpu->regs.S - 3;
+    if (cpu->emulation) {
+        tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
+    }
+    cpu->regs.S = tmp;
 }
 
 static inline void _cpu_sp_dec2(
@@ -230,6 +255,36 @@ static inline void _cpu_sp_dec(
     struct Clemens65C816* cpu
 ) {
     uint16_t tmp = cpu->regs.S - 1;
+    if (cpu->emulation) {
+        tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
+    }
+    cpu->regs.S = tmp;
+}
+
+static inline void _cpu_sp_inc3(
+    struct Clemens65C816* cpu
+) {
+    uint16_t tmp = cpu->regs.S + 3;
+    if (cpu->emulation) {
+        tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
+    }
+    cpu->regs.S = tmp;
+}
+
+static inline void _cpu_sp_inc2(
+    struct Clemens65C816* cpu
+) {
+    uint16_t tmp = cpu->regs.S + 2;
+    if (cpu->emulation) {
+        tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
+    }
+    cpu->regs.S = tmp;
+}
+
+static inline void _cpu_sp_inc(
+    struct Clemens65C816* cpu
+) {
+    uint16_t tmp = cpu->regs.S + 1;
     if (cpu->emulation) {
         tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
     }
@@ -253,13 +308,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
     /*
         Execute all cycles of an instruction here
     */
-    cpu->pins.mlbOut = true;
     cpu->pins.vpbOut = true;
-    cpu->pins.vdaOut = true;
-    cpu->pins.vpaOut = true;
-    cpu->pins.rwbOut = true;
     tmp_pc = cpu->regs.PC;
-    _clem_mem_read(clem, &cpu->regs.IR, tmp_pc++, cpu->regs.PBR);
+    _clem_mem_read(clem, &cpu->regs.IR, tmp_pc++, cpu->regs.PBR,
+                   CLEM_MEM_FLAG_OPCODE_FETCH);
     tmp_pc_operand = tmp_pc;
 
     /*
@@ -277,12 +329,16 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
         //  6502 opcodes, IR_bbb indicates an addressing mode
         switch (IR_bbb) {
             case CLEM_ADR_MODE_01_IMMEDIATE:
-                cpu->pins.vdaOut = false;
-                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR);
+                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR,
+                               CLEM_MEM_FLAG_PROGRAM);
                 tmp_value = tmp_data;
                 if (!m_status) {
-                    _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR);
+                    _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR,
+                                   CLEM_MEM_FLAG_PROGRAM);
                     tmp_value = ((uint16_t)tmp_data << 8) | tmp_value;
+                    CLEM_I_PRINTF(clem, "LDA #$%04X", tmp_value);
+                } else {
+                    CLEM_I_PRINTF(clem, "LDA #$%02X", tmp_value);
                 }
                 if (IR_aaa == CLEM_OPC_LDA_MODE_01) {
                     if (m_status) {
@@ -302,22 +358,21 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
         switch (cpu->regs.IR) {
             case CLEM_OPC_TSB_ABS:
                 //  Test and Set value in memory against accumulator
-                cpu->pins.vdaOut = false;
-                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR);
+                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR,
+                               CLEM_MEM_FLAG_PROGRAM);
                 tmp_addr = tmp_data;
-                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR);
+                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR,
+                               CLEM_MEM_FLAG_PROGRAM);
                 tmp_addr = ((uint16_t)tmp_data << 8) | tmp_addr;
-                cpu->pins.vdaOut = true;
-                cpu->pins.vpaOut = false;
-                cpu->pins.mlbOut = false;
-                _clem_mem_read(clem, &tmp_data, tmp_addr, cpu->regs.DBR);
+                CLEM_I_PRINTF(clem, "TSB $%04X", tmp_addr);
+                _clem_mem_read(clem, &tmp_data, tmp_addr, cpu->regs.DBR,
+                               CLEM_MEM_FLAG_DATA);
                 tmp_value = tmp_data;
                 if (!m_status) {
-                    _clem_mem_read(
-                        clem, &tmp_data, tmp_addr + 1, cpu->regs.DBR);
+                    _clem_mem_read(clem, &tmp_data, tmp_addr + 1,
+                                   cpu->regs.DBR, CLEM_MEM_FLAG_DATA);
                     tmp_value = ((uint16_t)tmp_data << 8) | tmp_value;
                 }
-                cpu->pins.rwbOut = false;
                 tmp_value |= cpu->regs.A;
                 if (!(tmp_value & cpu->regs.A)) {
                     cpu->regs.P |= kClemensCPUStatus_Zero;
@@ -326,15 +381,15 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 }
                 _clem_cycle(clem, 1);
                 if (!m_status) {
-                    _clem_mem_write(
-                        clem, tmp_value >> 8, tmp_addr + 1, cpu->regs.DBR);
+                    _clem_mem_write(clem, tmp_value >> 8, tmp_addr + 1,
+                                    cpu->regs.DBR, CLEM_MEM_FLAG_DATA);
                 }
-                _clem_mem_write(
-                        clem, (uint8_t)tmp_value, tmp_addr, cpu->regs.DBR);
+                _clem_mem_write(clem, (uint8_t)tmp_value, tmp_addr,
+                                cpu->regs.DBR, CLEM_MEM_FLAG_DATA);
+
                 break;
             case CLEM_OPC_TCS:
-                cpu->pins.vdaOut = false;
-                cpu->pins.vpaOut = false;
+                CLEM_I_PRINTF(clem, "TSC");
                 if (cpu->emulation) {
                     cpu->regs.S = CLEM_UTIL_set16_lo(cpu->regs.S, cpu->regs.A);
                 } else {
@@ -343,32 +398,27 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 _clem_cycle(clem, 1);
                 break;
             case CLEM_OPC_SEI:
-                cpu->pins.vdaOut = false;
-                cpu->pins.vpaOut = false;
+                CLEM_I_PRINTF(clem, "SEI");
                 cpu->regs.P |= kClemensCPUStatus_IRQDisable;
                 _clem_cycle(clem, 1);
                 break;
             case CLEM_OPC_CLC:
-                cpu->pins.vdaOut = false;
-                cpu->pins.vpaOut = false;
+                CLEM_I_PRINTF(clem, "CLC");
                 cpu->regs.P &= ~kClemensCPUStatus_Carry;
                 _clem_cycle(clem, 1);
                 break;
             case CLEM_OPC_SEC:
-                cpu->pins.vdaOut = false;
-                cpu->pins.vpaOut = false;
+                CLEM_I_PRINTF(clem, "SEC");
                 cpu->regs.P |= kClemensCPUStatus_Carry;
                 _clem_cycle(clem, 1);
                 break;
             case CLEM_OPC_CLD:
-                cpu->pins.vdaOut = false;
-                cpu->pins.vpaOut = false;
+                CLEM_I_PRINTF(clem, "CLD");
                 cpu->regs.P &= ~kClemensCPUStatus_Decimal;
                 _clem_cycle(clem, 1);
                 break;
             case CLEM_OPC_XCE:
-                cpu->pins.vdaOut = false;
-                cpu->pins.vpaOut = false;
+                CLEM_I_PRINTF(clem, "XCE");
                 tmp_value = cpu->emulation;
                 cpu->emulation = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
                 if (tmp_value != cpu->emulation) {
@@ -391,81 +441,92 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 break;
             case CLEM_OPC_JSR:
                 // Stack [PCH, PCL]
-                cpu->pins.vdaOut = false;
-                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR);
+                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR,
+                               CLEM_MEM_FLAG_PROGRAM);
                 tmp_addr = tmp_data;
-                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR);
+                _clem_mem_read(clem, &tmp_data, tmp_pc, cpu->regs.PBR,
+                               CLEM_MEM_FLAG_PROGRAM);
                 tmp_addr = ((uint16_t)tmp_data << 8) | tmp_addr;
-                cpu->pins.vpaOut = false;
+                CLEM_I_PRINTF(clem, "JSR %04X", tmp_addr);
                 _clem_cycle(clem, 1);
-                cpu->pins.vdaOut = true;
-                cpu->pins.rwbOut = false;
-                _clem_mem_write(
-                    clem, (uint8_t)(tmp_pc >> 8), cpu->regs.S, 0x00);
+                //  stack receives last address of operand
+                _clem_mem_write(clem, (uint8_t)(tmp_pc >> 8), cpu->regs.S,
+                                0x00, CLEM_MEM_FLAG_DATA);
                 tmp_value = cpu->regs.S - 1;
                 if (cpu->emulation) {
                     tmp_value = CLEM_UTIL_set16_lo(cpu->regs.S, tmp_value);
                 }
-                _clem_mem_write(clem, (uint8_t)tmp_pc, tmp_value, 0x00);
+                _clem_mem_write(clem, (uint8_t)tmp_pc, tmp_value, 0x00,
+                                CLEM_MEM_FLAG_DATA);
                 tmp_pc = tmp_addr;      // set next PC to the JSR routine
                 break;
             case CLEM_OPC_JSL:
                 // Stack [PBR, PCH, PCL]
-                cpu->pins.vdaOut = false;
-                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR);
+                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR,
+                               CLEM_MEM_FLAG_PROGRAM);
                 tmp_addr = tmp_data;
-                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR);
+                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR,
+                               CLEM_MEM_FLAG_PROGRAM);
                 tmp_addr = ((uint16_t)tmp_data << 8) | tmp_addr;
                 //  push old PBR
-                cpu->pins.vdaOut = true;
-                cpu->pins.vpaOut = false;
-                cpu->pins.rwbOut = false;
-                _clem_mem_write(clem, cpu->regs.PBR, cpu->regs.S, 0x00);
-                _cpu_sp_dec(cpu);
-                cpu->pins.vdaOut = false;
-                cpu->pins.rwbOut = true;
+                _clem_mem_write(clem, cpu->regs.PBR, cpu->regs.S, 0x00,
+                                CLEM_MEM_FLAG_DATA);
                 _clem_cycle(clem, 1);
-                cpu->pins.vpaOut = true;
                 //  new PBR
-                _clem_mem_read(clem, &tmp_data, tmp_pc++, cpu->regs.PBR);
+                _clem_mem_read(clem, &tmp_data, tmp_pc, cpu->regs.PBR,
+                               CLEM_MEM_FLAG_PROGRAM);
+                CLEM_I_PRINTF(clem, "JSL %02X%04X", tmp_data, tmp_addr);
                 cpu->regs.PBR = tmp_data;
-                _clem_mem_write(
-                    clem, (uint8_t)(tmp_pc >> 8), cpu->regs.S, 0x00);
+                //  JSL stack overrun will not wrap to 0x1ff (65816 quirk)
+                //  SP will still wrap
+                //  tmp_pc will be tha address of the last operand
+                _clem_mem_write(clem, (uint8_t)(tmp_pc >> 8), cpu->regs.S - 1,
+                                0x00, CLEM_MEM_FLAG_DATA);
                 tmp_value = cpu->regs.S - 1;
-                if (cpu->emulation) {
-                    //  TODO: should this be an error? JSL in emulation?
-                    tmp_value = CLEM_UTIL_set16_lo(cpu->regs.S, tmp_value);
-                }
-                _clem_mem_write(clem, (uint8_t)tmp_pc, tmp_value, 0x00);
-                _cpu_sp_dec2(cpu);
+                _clem_mem_write(clem, (uint8_t)tmp_pc, cpu->regs.S - 2, 0x00,
+                                CLEM_MEM_FLAG_DATA);
+                _cpu_sp_dec3(cpu);
                 tmp_pc = tmp_addr;      // set next PC to the JSL routine
                 break;
             case CLEM_OPC_RTS:
                 //  Stack [PCH, PCL]
-                cpu->pins.vdaOut = false;
-                cpu->pins.vpaOut = false;
+                CLEM_I_PRINTF(clem, "RTS");
                 _clem_cycle(clem, 2);
-                cpu->pins.vdaOut = true;
                 tmp_value = cpu->regs.S + 1;
                 if (cpu->emulation) {
                     tmp_value = CLEM_UTIL_set16_lo(cpu->regs.S, tmp_value);
                 }
-                _clem_mem_read(clem, &tmp_data, tmp_value, 0x00);
+                _clem_mem_read(clem, &tmp_data, tmp_value, 0x00,
+                               CLEM_MEM_FLAG_DATA);
                 tmp_addr = tmp_data;
                 ++tmp_value;
                 if (cpu->emulation) {
                     tmp_value = CLEM_UTIL_set16_lo(cpu->regs.S, tmp_value);
                 }
-                _clem_mem_read(clem, &tmp_data, tmp_value, 0x00);
+                _clem_mem_read(clem, &tmp_data, tmp_value, 0x00,
+                               CLEM_MEM_FLAG_DATA);
                 tmp_addr = ((uint16_t)tmp_data << 8) | tmp_addr;
-                cpu->pins.vdaOut = false;
                 _clem_cycle(clem, 1);
+                _cpu_sp_inc2(cpu);
                 tmp_pc = tmp_addr + 1;  //  point to next instruction
                 break;
             case CLEM_OPC_RTL:
+                CLEM_I_PRINTF(clem, "RTL");
+                _clem_cycle(clem, 2);
+                //  again, 65816 quirk where RTL will read from over the top
+                //  in emulation mode even
+                _clem_mem_read(clem, &tmp_data, cpu->regs.S + 1, 0x00,
+                               CLEM_MEM_FLAG_DATA);
+                tmp_addr = tmp_data;
+                _clem_mem_read(clem, &tmp_data, cpu->regs.S + 2, 0x00,
+                               CLEM_MEM_FLAG_DATA);
+                tmp_addr = ((uint16_t)tmp_data << 8) | tmp_addr;
+                _clem_mem_read(clem, &tmp_data, cpu->regs.S + 3, 0x00,
+                               CLEM_MEM_FLAG_DATA);
+                cpu->regs.PBR = tmp_data;
+                _cpu_sp_inc3(cpu);
+                tmp_pc = tmp_addr + 1;
                 break;
-
-
         }
     }
 
@@ -504,11 +565,6 @@ void emulate(ClemensMachine* clem) {
             cpu->emulation = true;
             cpu->pins.emulationOut = true;
             cpu->pins.memIdxSelOut = true;
-            cpu->pins.rwbOut = true;
-            cpu->pins.vpbOut = true;
-            cpu->pins.vdaOut = false;
-            cpu->pins.vpaOut = false;
-            cpu->pins.mlbOut = true;
             _clem_cycle(clem, 1);
         }
         _clem_cycle(clem, 1);
@@ -521,20 +577,22 @@ void emulate(ClemensMachine* clem) {
         uint8_t tmp_data;
         uint8_t tmp_datahi;
 
-        _clem_mem_read(clem, &tmp_data, cpu->regs.S, 0x00);
+        _clem_mem_read(clem, &tmp_data, cpu->regs.S, 0x00, CLEM_MEM_FLAG_NULL);
         tmp_addr = cpu->regs.S - 1;
         if (cpu->emulation) {
             tmp_addr = CLEM_UTIL_set16_lo(cpu->regs.S, tmp_addr);
         }
-        _clem_mem_read(clem, &tmp_datahi, tmp_addr, 0x00);
+        _clem_mem_read(clem, &tmp_datahi, tmp_addr, 0x00, CLEM_MEM_FLAG_NULL);
         _cpu_sp_dec2(cpu);
-        _clem_mem_read(clem, &tmp_data, cpu->regs.S, 0x00);
+        _clem_mem_read(clem, &tmp_data, cpu->regs.S, 0x00, CLEM_MEM_FLAG_NULL);
         _cpu_sp_dec(cpu);
 
         // vector pull low signal while the PC is being loaded
         cpu->pins.vpbOut = false;
-        _clem_mem_read(clem, &tmp_data, CLEM_65816_RESET_VECTOR_LO_ADDR, 0x00);
-        _clem_mem_read(clem, &tmp_datahi, CLEM_65816_RESET_VECTOR_HI_ADDR, 0x00);
+        _clem_mem_read(clem, &tmp_data, CLEM_65816_RESET_VECTOR_LO_ADDR, 0x00,
+                       CLEM_MEM_FLAG_PROGRAM);
+        _clem_mem_read(clem, &tmp_datahi, CLEM_65816_RESET_VECTOR_HI_ADDR,
+                       0x00, CLEM_MEM_FLAG_NULL);
         cpu->regs.PC = (uint16_t)(tmp_datahi << 8) | tmp_data;
 
         cpu->state_type = kClemensCPUStateType_Execute;
