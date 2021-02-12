@@ -8,4 +8,5 @@ And a couple important opcodes, like JSR, RTS
 2. Set Interrupt Disable
 3. Set Stack Pointer to 0x01fb
 4. Invoke a native mode ROM subroutine
-5.
+5. Native ROM routine
+   1.
