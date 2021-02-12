@@ -8,3 +8,9 @@ http://visual6502.org/wiki/index.php?title=6502_BRK_and_B_bit
 
 ROM Chip Select Apple //c and FPI for //gs
 https://retrocomputing.stackexchange.com/questions/11044/why-does-the-apple-iigs-fpi-chip-buffer-the-a14-address-signal-to-the-rom
+
+
+Registers:
+
+$c029 - new video register: Page 89-90 - Apple IIgs Hardware Reference
+$c035 - shadow Register
