@@ -9,4 +9,5 @@ And a couple important opcodes, like JSR, RTS
 3. Set Stack Pointer to 0x01fb
 4. Invoke a native mode ROM subroutine
 5. Native ROM routine
-   1.
+   1. Seems to be writing into bank 1 and e1
+   2. unknown why, but we return quickly
