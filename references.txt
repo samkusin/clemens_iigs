@@ -1,3 +1,8 @@
+6502/65816:
+http://nparker.llx.com/a2/opcodes.html
+http://archive.6502.org/datasheets/wdc_65816_programming_manual.pdf
+
+
 Interrupts:
 http://6502.org/tutorials/interrupts.html
 https://www.pagetable.com/?p=410
