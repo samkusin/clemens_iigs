@@ -5,6 +5,14 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
 
 /*
  * The Clemens Emulator
@@ -61,6 +69,7 @@
 #define CLEM_OPC_RTL                        (0x6B)
 #define CLEM_OPC_STA_MODE                   (0x80)
 #define CLEM_OPC_REP                        (0xC2)
+#define CLEM_OPC_SEP                        (0xE2)
 
 /* derived from http://nparker.llx.com/a2/opcodes.html */
 #define CLEM_ADR_MODE_IR_IMMEDIATE          (0x08)
@@ -79,8 +88,52 @@
 
 
 #define CLEM_I_PRINTF(_clem_, _fmt_, ...) \
-    printf("%02X:%04X " _fmt_ "\n", \
+    printf(ANSI_COLOR_CYAN "%02X:%04X " _fmt_ ANSI_COLOR_RESET "\n", \
         (_clem_)->cpu.regs.PBR, (_clem_)->cpu. regs.PC, ##__VA_ARGS__)
+
+#define CLEM_I_PRINT_STATS(_clem_) do {\
+    struct Clemens65C816* _cpu_ = &(_clem_)->cpu; \
+    uint8_t _P_ = _cpu_->regs.P; \
+    if (_cpu_->emulation) { \
+        printf(ANSI_COLOR_GREEN "Clocks.... Cycles...." ANSI_COLOR_RESET \
+            " NV_BDIZC PC=%04X, PBR=%02X, DBR=%02X, S=%04X, D=%04X, " \
+            "B=%02X A=%02X, X=%02X, Y=%02X\n", \
+            _cpu_->regs.PC, _cpu_->regs.PBR, _cpu_->regs.DBR, _cpu_->regs.S, \
+            _cpu_->regs.D, \
+            (_cpu_->regs.A & 0xff00) >> 8, _cpu_->regs.A & 0x00ff, \
+            _cpu_->regs.X & 0x00ff, _cpu_->regs.Y & 0x00ff); \
+        printf(ANSI_COLOR_GREEN "%10.2f %10u" ANSI_COLOR_RESET \
+            " %c%c%c%c%c%c%c%c\n", \
+            (_clem_)->clocks_spent / (float)(_clem_)->clocks_step, \
+            (_cpu_)->cycles_spent, \
+            (_P_ & kClemensCPUStatus_Negative) ? '1' : '0', \
+            (_P_ & kClemensCPUStatus_Overflow) ? '1' : '0', \
+            (_P_ & kClemensCPUStatus_MemoryAccumulator) ? '1' : '0', \
+            _cpu_->intr_brk ? '1' : '0', \
+            (_P_ & kClemensCPUStatus_Decimal) ? '1' : '0', \
+            (_P_ & kClemensCPUStatus_IRQDisable) ? '1' : '0', \
+            (_P_ & kClemensCPUStatus_Zero) ? '1' : '0', \
+            (_P_ & kClemensCPUStatus_Carry) ? '1' : '0'); \
+    } else { \
+        printf(ANSI_COLOR_GREEN "Clocks.... Cycles...." ANSI_COLOR_RESET \
+            " NVMXDIZC PC=%04X, PBR=%02X, DBR=%02X, S=%04X, D=%04X, " \
+            "A=%04X, X=%04X, Y=%04X\n", \
+            _cpu_->regs.PC, _cpu_->regs.PBR, _cpu_->regs.DBR, _cpu_->regs.S, \
+            _cpu_->regs.D, _cpu_->regs.A, _cpu_->regs.X, _cpu_->regs.Y); \
+        printf(ANSI_COLOR_GREEN "%10.2f %10u" ANSI_COLOR_RESET \
+            " %c%c%c%c%c%c%c%c\n", \
+            (_clem_)->clocks_spent / (float)(_clem_)->clocks_step, \
+            (_cpu_)->cycles_spent, \
+            (_P_ & kClemensCPUStatus_Negative) ? '1' : '0', \
+            (_P_ & kClemensCPUStatus_Overflow) ? '1' : '0', \
+            (_P_ & kClemensCPUStatus_MemoryAccumulator) ? '1' : '0', \
+            (_P_ & kClemensCPUStatus_Index) ? '1' : '0', \
+            (_P_ & kClemensCPUStatus_Decimal) ? '1' : '0', \
+            (_P_ & kClemensCPUStatus_IRQDisable) ? '1' : '0', \
+            (_P_ & kClemensCPUStatus_Zero) ? '1' : '0', \
+            (_P_ & kClemensCPUStatus_Carry) ? '1' : '0'); \
+    } \
+} while(0)
 
 
 enum {
@@ -144,18 +197,22 @@ struct Clemens65C816 {
 typedef struct {
     struct Clemens65C816 cpu;
     uint32_t clocks_step;
+    uint32_t clocks_step_mega2;     /* typically FPI speed mhz * clocks_step */
     uint32_t clocks_spent;
-    uint8_t* fpi_bank_map[256];
+    uint8_t* fpi_bank_map[256];     /* $00 - $ff */
+    uint8_t* mega2_bank_map[2];     /* $e0 - $e1 */
 } ClemensMachine;
 
 
 int clemens_init(
     ClemensMachine* machine,
+    uint32_t speed_factor,
     uint32_t clocks_step,
     void* rom,
     size_t romSize
 ) {
     machine->clocks_step = clocks_step;
+    machine->clocks_step_mega2 = speed_factor;
     machine->clocks_spent = 0;
     if (romSize != CLEM_IIGS_ROM3_SIZE) {
         return -1;
@@ -177,6 +234,10 @@ int clemens_init(
     machine->fpi_bank_map[0x03] = (uint8_t*)malloc(CLEM_IIGS_BANK_SIZE);
     memset(machine->fpi_bank_map[0x03], 0, CLEM_IIGS_BANK_SIZE);
 
+    machine->mega2_bank_map[0x00] = (uint8_t*)malloc(CLEM_IIGS_BANK_SIZE);
+    memset(machine->fpi_bank_map[0x00], 0, CLEM_IIGS_BANK_SIZE);
+    machine->mega2_bank_map[0x01] = (uint8_t*)malloc(CLEM_IIGS_BANK_SIZE);
+    memset(machine->mega2_bank_map[0x01], 0, CLEM_IIGS_BANK_SIZE);
     return 0;
 }
 
@@ -208,17 +269,18 @@ static inline void _clem_mem_read(
 ) {
     clem->cpu.pins.adr = adr;
     clem->cpu.pins.databank = bank;
-    if (clem->cpu.emulation) {
-        //  TODO: optimize
+    if (bank == 0x00) {
         if (adr >= 0xd000) {
             *data = clem->fpi_bank_map[0xff][adr];
         } else {
-            *data = 0x00;
+            *data = clem->fpi_bank_map[0x00][adr];
         }
+    } else if (bank == 0xe0 || bank == 0xe1) {
+        *data = clem->mega2_bank_map[bank & 0x1][adr];
     } else {
         *data = clem->fpi_bank_map[bank][adr];
     }
-
+    // TODO: account for slow/fast memory access
     clem->clocks_spent += clem->clocks_step;
     ++clem->cpu.cycles_spent;
 }
@@ -254,7 +316,12 @@ static inline void _clem_mem_write(
 ) {
     clem->cpu.pins.adr = adr;
     clem->cpu.pins.databank = bank;
-    clem->fpi_bank_map[bank][adr] = data;
+    if (bank == 0xe0 || bank == 0xe1) {
+        clem->mega2_bank_map[bank & 0x1][adr] = data;
+    } else {
+        clem->fpi_bank_map[bank][adr] = data;
+    }
+    // TODO: account for slow/fast memory access
     clem->clocks_spent += clem->clocks_step;
     ++clem->cpu.cycles_spent;
 }
@@ -586,14 +653,29 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 cpu->regs.P &= (~tmp_data); // all 1 bits are turned OFF in P
                 _clem_cycle(clem, 1);
                 break;
+            case CLEM_OPC_SEP:
+                // Reset Status Bits
+                _clem_mem_read_pba(clem, &tmp_data, tmp_pc++);
+                CLEM_I_PRINTF(clem, "SEP #$%02X", tmp_data);
+                if (cpu->emulation) {
+                    tmp_data &= ~kClemensCPUStatus_MemoryAccumulator;
+                    tmp_data &= ~kClemensCPUStatus_Index;
+                }
+                cpu->regs.P |= tmp_data;    // all 1 bits are turned ON in P
+                _clem_cycle(clem, 1);
+                break;
         }
     }
+
+    assert(last_cycles_spent < cpu->cycles_spent);
 
     cpu->regs.PC = tmp_pc;
 }
 
 void emulate(ClemensMachine* clem) {
     struct Clemens65C816* cpu = &clem->cpu;
+
+    CLEM_I_PRINT_STATS(clem);
 
     if (!cpu->pins.resbIn) {
         /*  the reset interrupt overrides any other state
@@ -698,7 +780,7 @@ int main(int argc, char* argv[])
     fclose(fp);
 
     memset(&machine, 0, sizeof(machine));
-    clemens_init(&machine, 1000, rom, 256 * 1024);
+    clemens_init(&machine, 1000, 1000, rom, 256 * 1024);
 
     machine.cpu.pins.resbIn = false;
     emulate(&machine);
