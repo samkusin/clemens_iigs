@@ -10,12 +10,18 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
+* Implement ADC and all addressing modes
+* Implement LDA like ADC
+* Implement ORA, etc.
 * More debuggint utility
 * What is going on with the ROM writing to 01 and e1 banks (shadowing)
 * Stronger memory mapping
   * (using I/O switches)
   * shadowing
 * Data accesses across banks are allowed (but not stack accesses?)
+* Emulation vs Native on some microinstructions (i.e. choosing a long address
+  mode while in emulation does... what?)
+
 ## DONE
 
 * RESET handling and CPU initialization
