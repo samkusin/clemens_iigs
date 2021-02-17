@@ -117,6 +117,9 @@
 #define CLEM_UTIL_set16_lo(_v16_, _v8_) \
     (((_v16_) & 0xff00) | ((_v8_) & 0xff))
 
+#define CLEM_UTIL_CROSSED_PAGE_BOUNDARY(_adr0_, _adr1_) \
+    (((_adr0_) ^ (_adr1_)) & 0xff00)
+
 #define CLEM_I_PRINT_STATS(_clem_) do {\
     struct Clemens65C816* _cpu_ = &(_clem_)->cpu; \
     uint8_t _P_ = _cpu_->regs.P; \
@@ -591,6 +594,35 @@ static inline void _cpu_sp_inc(
     cpu->regs.S = tmp;
 }
 
+static inline void _cpu_adc(
+    struct Clemens65C816* cpu,
+    uint16_t value,
+    bool is8
+) {
+    uint32_t adc;
+    uint8_t p = cpu->regs.P;
+    bool carry = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
+    if (is8) {
+        adc = (cpu->regs.A & 0xff) + value + carry;
+        if (!(adc & 0xff)) p |= kClemensCPUStatus_Zero;
+        if (adc & 0x80) p |= kClemensCPUStatus_Negative;
+        if (((cpu->regs.A & 0xff) ^ adc) & (value ^ adc) & 0x80) {
+            p |= kClemensCPUStatus_Overflow;
+        }
+        if (adc & 0x100) p |= kClemensCPUStatus_Carry;
+        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, (uint8_t)adc);
+    } else {
+        adc = cpu->regs.A + value + carry;
+        if (!(adc & 0xffff)) p |= kClemensCPUStatus_Zero;
+        if (adc & 0x8000) p |= kClemensCPUStatus_Negative;
+        if ((cpu->regs.A ^ adc) & (value ^ adc) & 0x8000) {
+            p |= kClemensCPUStatus_Overflow;
+        }
+        if (adc & 0x10000) p |= kClemensCPUStatus_Carry;
+        cpu->regs.A = (uint16_t)adc;
+    }
+}
+
 static inline void _clem_cycle(
     ClemensMachine* clem,
     uint32_t cycle_count
@@ -757,7 +789,7 @@ static inline void _clem_read_data_indexed_816(
     } else {
         dbr_actual = dbr;
     }
-    if (!is_index_8 || ((addr ^ eff_addr) & 0xff00)) {
+    if (!is_index_8 || CLEM_UTIL_CROSSED_PAGE_BOUNDARY(addr, eff_addr)) {
         //  indexed address crossing a page boundary adds a cycle
         _clem_cycle(clem, 1);
     }
@@ -856,35 +888,6 @@ static inline void _clem_opc_pull_reg_8(
     _clem_read(clem, data, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
 }
 
-static inline void _cpu_adc(
-    struct Clemens65C816* cpu,
-    uint16_t value,
-    bool is8
-) {
-    uint32_t adc;
-    uint8_t p = cpu->regs.P;
-    bool carry = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
-    if (is8) {
-        adc = (cpu->regs.A & 0xff) + value + carry;
-        if (!(adc & 0xff)) p |= kClemensCPUStatus_Zero;
-        if (adc & 0x80) p |= kClemensCPUStatus_Negative;
-        if (((cpu->regs.A & 0xff) ^ adc) & (value ^ adc) & 0x80) {
-            p |= kClemensCPUStatus_Overflow;
-        }
-        if (adc & 0x100) p |= kClemensCPUStatus_Carry;
-        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, (uint8_t)adc);
-    } else {
-        adc = cpu->regs.A + value + carry;
-        if (!(adc & 0xffff)) p |= kClemensCPUStatus_Zero;
-        if (adc & 0x8000) p |= kClemensCPUStatus_Negative;
-        if ((cpu->regs.A ^ adc) & (value ^ adc) & 0x8000) {
-            p |= kClemensCPUStatus_Overflow;
-        }
-        if (adc & 0x10000) p |= kClemensCPUStatus_Carry;
-        cpu->regs.A = (uint16_t)adc;
-    }
-}
-
 
 void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
     uint16_t tmp_addr;
@@ -902,6 +905,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
     uint8_t carry;
     bool m_status;
     bool x_status;
+    bool zero_flag;
+    bool overflow_flag;
 
     assert(cpu->state_type == kClemensCPUStateType_Execute);
     /*
@@ -926,6 +931,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
     m_status = (cpu->regs.P & kClemensCPUStatus_MemoryAccumulator) != 0;
     x_status = (cpu->regs.P & kClemensCPUStatus_Index) != 0;
     carry = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
+    zero_flag = (cpu->regs.P & kClemensCPUStatus_Zero) != 0;
+    overflow_flag = (cpu->regs.P & kClemensCPUStatus_Overflow) != 0;
 
     switch (IR) {
         //
@@ -1038,6 +1045,30 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         //  End ADC
         //
+        case CLEM_OPC_BRA:
+            _clem_read_pba(clem, &tmp_data, &tmp_pc);
+            tmp_addr = cpu->regs.PC + (int8_t)tmp_data;
+            if (cpu->emulation &&
+                CLEM_UTIL_CROSSED_PAGE_BOUNDARY(cpu->regs.PC, tmp_addr)) {
+                _clem_cycle(clem, 1);
+            }
+            _clem_cycle(clem, 1);       // branch always taken cycle
+            tmp_pc = tmp_addr;
+            _opcode_instruction_define(&opc_inst, IR, tmp_data, false);
+            break;
+        case CLEM_OPC_BNE:
+            _clem_read_pba(clem, &tmp_data, &tmp_pc);
+            tmp_addr = cpu->regs.PC + (int8_t)tmp_data;
+            if (!zero_flag) {
+                if (cpu->emulation &&
+                    CLEM_UTIL_CROSSED_PAGE_BOUNDARY(cpu->regs.PC, tmp_addr)) {
+                    _clem_cycle(clem, 1);
+                }
+                _clem_cycle(clem, 1);
+                tmp_pc = tmp_addr;
+            }
+            _opcode_instruction_define(&opc_inst, IR, tmp_data, false);
+            break;
         case CLEM_OPC_CLC:
             cpu->regs.P &= ~kClemensCPUStatus_Carry;
             _clem_cycle(clem, 1);
@@ -1045,6 +1076,50 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
         case CLEM_OPC_CLD:
             cpu->regs.P &= ~kClemensCPUStatus_Decimal;
             _clem_cycle(clem, 1);
+            break;
+        case CLEM_OPC_DEX:
+            tmp_value = cpu->regs.X - 1;
+            if (x_status) {
+                cpu->regs.X = CLEM_UTIL_set16_lo(cpu->regs.X, (uint8_t)tmp_value);
+                _cpu_p_flags_n_z_data(cpu, (uint8_t)tmp_value);
+            } else {
+                cpu->regs.X = tmp_value;
+                _cpu_p_flags_n_z_data_16(cpu, tmp_value);
+            }
+            _opcode_instruction_define_simple(&opc_inst, IR);
+            break;
+        case CLEM_OPC_DEY:
+            tmp_value = cpu->regs.Y - 1;
+            if (x_status) {
+                cpu->regs.Y = CLEM_UTIL_set16_lo(cpu->regs.Y, (uint8_t)tmp_value);
+                _cpu_p_flags_n_z_data(cpu, (uint8_t)tmp_value);
+            } else {
+                cpu->regs.Y = tmp_value;
+                _cpu_p_flags_n_z_data_16(cpu, tmp_value);
+            }
+            _opcode_instruction_define_simple(&opc_inst, IR);
+            break;
+        case CLEM_OPC_INX:
+            tmp_value = cpu->regs.X + 1;
+            if (x_status) {
+                cpu->regs.X = CLEM_UTIL_set16_lo(cpu->regs.X, (uint8_t)tmp_value);
+                _cpu_p_flags_n_z_data(cpu, (uint8_t)tmp_value);
+            } else {
+                cpu->regs.X = tmp_value;
+                _cpu_p_flags_n_z_data_16(cpu, tmp_value);
+            }
+            _opcode_instruction_define_simple(&opc_inst, IR);
+            break;
+        case CLEM_OPC_INY:
+            tmp_value = cpu->regs.Y + 1;
+            if (x_status) {
+                cpu->regs.Y = CLEM_UTIL_set16_lo(cpu->regs.Y, (uint8_t)tmp_value);
+                _cpu_p_flags_n_z_data(cpu, (uint8_t)tmp_value);
+            } else {
+                cpu->regs.Y = tmp_value;
+                _cpu_p_flags_n_z_data_16(cpu, tmp_value);
+            }
+            _opcode_instruction_define_simple(&opc_inst, IR);
             break;
         case CLEM_OPC_LDA_IMM:
             _clem_read_pba_816(clem, &tmp_value, &tmp_pc, m_status);
