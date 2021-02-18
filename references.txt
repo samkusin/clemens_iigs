@@ -19,3 +19,8 @@ Registers:
 
 $c029 - new video register: Page 89-90 - Apple IIgs Hardware Reference
 $c035 - shadow Register
+
+
+Build ROM:
+
+D:\Apps\6502Tools\64tass\64tass.exe --long-address --nostart --m65816 .\testrom.65816.asm -o data\testrom.rom

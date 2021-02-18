@@ -1,26 +1,27 @@
-.P816
-.ORG $fc0000
-.WORD $dead
-.ORG $fd0000
-.WORD $beef
-.ORG $fe0000
-.WORD $dead
-.ORG $ff0000
-.WORD $beef
-.ORG $fffa00
-.I8
- Start:         clc
-                lda #$10
-                sta $2000
-                ldx #$10
- @Adder:        adc #$02
-                sta $3009, X
-                dex
-                bne @Adder
-End:            brk
-.ORG $fffe00
-                brk
-.ORG $fffffc
-.WORD $fa00
-.WORD $fe00
-.End
+*           = $fc0000
+            .word $dead
+*           = $fd0000
+            .word $beef
+*           = $fe0000
+            .word $dead
+*           = $ff0000
+            .byte $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0A
+*           = $fffa00
+
+start       .block
+            .databank $00
+            .as
+            clc
+            lda #$10
+            sta $002000
+            ldx #10
+loop        adc $ff0000, X
+            dex
+            bne loop
+            brk
+end         .bend
+*           = $fffe00
+            brk
+*           = $fffffc
+            .word $fa00
+            .word $fe00
