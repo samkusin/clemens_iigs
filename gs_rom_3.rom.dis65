@@ -38,9 +38,16 @@
 {
 "Low":260706,
 "High":260706,
+"Hint":"Code"},
+
+{
+"Low":261993,
+"High":261993,
 "Hint":"Code"}],
 "StatusFlagOverrides":{
-"260706":19922944},
+"249856":19922944,
+"260706":19922944,
+"261993":19922944},
 
 "Comments":{
 },
@@ -56,7 +63,19 @@
 },
 
 "UserLabels":{
-},
+"261993":{
+"Label":"MONITOR",
+"Value":16777065,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"260706":{
+"Label":"RESET",
+"Value":16775778,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"}},
 
 "OperandFormats":{
 },

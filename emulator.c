@@ -976,11 +976,13 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
         //
         // Start ADC
         case CLEM_OPC_ADC_IMM:
+            _clem_read_pba_imm_816()
             _clem_read_pba_816(clem, &tmp_value, &tmp_pc, m_status);
             _cpu_adc(cpu, tmp_value, m_status);
             _opcode_instruction_define(&opc_inst, IR, tmp_value, m_status);
             break;
         case CLEM_OPC_ADC_ABS:
+            _clem_read_pba_abs()
             _clem_read_pba_16(clem, &tmp_addr, &tmp_pc);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
             _cpu_adc(cpu, tmp_value, m_status);
@@ -988,6 +990,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_ADC_ABSL:
             //  TODO: emulation mode
+            _clem_read_pba_absl();
             _clem_read_pba_16(clem, &tmp_addr, &tmp_pc);
             _clem_read_pba(clem, &tmp_dbr, &tmp_pc);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
@@ -1001,6 +1004,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_ADC_DP_INDIRECT:
+            _clem_read_pba_dp_indirect()
             _clem_read_pba_dp_addr(clem, &tmp_addr, &tmp_pc, &tmp_data, 0);
             _clem_read_addr_dp_indirect(clem, &tmp_eaddr, tmp_addr);
             _clem_read_data_816(clem, &tmp_value, tmp_eaddr, cpu->regs.DBR, m_status);
@@ -1008,6 +1012,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_ADC_DP_INDIRECTL:
+            _clem_read_pba_dp_indirectl();
             _clem_read_pba_dp_addr(clem, &tmp_addr, &tmp_pc, &tmp_data, 0);
             _clem_read_addr_dp_indirect_long(clem, &tmp_eaddr, &tmp_dbr, tmp_addr);
             _clem_read_data_816(clem, &tmp_value, tmp_eaddr, tmp_dbr, m_status);
