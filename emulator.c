@@ -46,103 +46,7 @@
  *      - if triggered, set the CPU state accordingly
  *      - ???
  */
-
-#define CLEM_65816_RESET_VECTOR_LO_ADDR     (0xFFFC)
-#define CLEM_65816_RESET_VECTOR_HI_ADDR     (0xFFFD)
-#define CLEM_IIGS_BANK_SIZE                 (64 * 1024)
-#define CLEM_IIGS_ROM3_SIZE                 (CLEM_IIGS_BANK_SIZE * 4)
-
-#define CLEM_OPC_ADC_IMM                    (0x69)
-#define CLEM_OPC_ADC_ABS                    (0x6D)
-#define CLEM_OPC_ADC_ABSL                   (0x6F)
-#define CLEM_OPC_ADC_DP                     (0x65)
-#define CLEM_OPC_ADC_DP_INDIRECT            (0x72)
-#define CLEM_OPC_ADC_DP_INDIRECTL           (0x67)
-#define CLEM_OPC_ADC_ABS_IDX                (0x7D)
-#define CLEM_OPC_ADC_ABSL_IDX               (0x7F)
-#define CLEM_OPC_ADC_ABS_IDY                (0x79)
-#define CLEM_OPC_ADC_DP_IDX                 (0x75)
-#define CLEM_OPC_ADC_DP_IDX_INDIRECT        (0x61)
-#define CLEM_OPC_ADC_DP_INDIRECT_IDY        (0x71)
-#define CLEM_OPC_ADC_DP_INDIRECTL_IDY       (0x77)
-#define CLEM_OPC_ADC_STACK_REL              (0x63)
-#define CLEM_OPC_ADC_STACK_REL_INDIRECT_IDY (0x73)
-#define CLEM_OPC_BRA                        (0x80)
-#define CLEM_OPC_BNE                        (0xD0)
-#define CLEM_OPC_CLC                        (0x18)
-#define CLEM_OPC_CLD                        (0xD8)
-#define CLEM_OPC_DEX                        (0xCA)
-#define CLEM_OPC_DEY                        (0x88)
-#define CLEM_OPC_INX                        (0xE8)
-#define CLEM_OPC_INY                        (0xC8)
-#define CLEM_OPC_JSL                        (0x22)
-#define CLEM_OPC_JSR                        (0x20)
-#define CLEM_OPC_LDA_IMM                    (0xA9)
-#define CLEM_OPC_LDA_ABS                    (0xAD)
-#define CLEM_OPC_LDA_ABSL                   (0xAF)
-#define CLEM_OPC_LDA_DP                     (0xA5)
-#define CLEM_OPC_LDA_DP_INDIRECT            (0xB2)
-#define CLEM_OPC_LDA_DP_INDIRECTL           (0xA7)
-#define CLEM_OPC_LDA_ABS_IDX                (0xBD)
-#define CLEM_OPC_LDA_ABSL_IDX               (0xBF)
-#define CLEM_OPC_LDA_ABS_IDY                (0xB9)
-#define CLEM_OPC_LDA_DP_IDX                 (0xB5)
-#define CLEM_OPC_LDA_DP_IDX_INDIRECT        (0xA1)
-#define CLEM_OPC_LDA_DP_INDIRECT_IDY        (0xB1)
-#define CLEM_OPC_LDA_DP_INDIRECTL_IDY       (0xB7)
-#define CLEM_OPC_LDA_STACK_REL              (0xA3)
-#define CLEM_OPC_LDA_STACK_REL_INDIRECT_IDY (0xB3)
-#define CLEM_OPC_LDY_IMM                    (0xA0)
-#define CLEM_OPC_LDX_IMM                    (0xA2)
-#define CLEM_OPC_PHA                        (0x48)
-#define CLEM_OPC_PHB                        (0x8B)
-#define CLEM_OPC_PHD                        (0x0B)
-#define CLEM_OPC_PHK                        (0x4B)
-#define CLEM_OPC_PHP                        (0x08)
-#define CLEM_OPC_PHX                        (0xDA)
-#define CLEM_OPC_PHY                        (0x5A)
-#define CLEM_OPC_PLA                        (0x68)
-#define CLEM_OPC_PLB                        (0xAB)
-#define CLEM_OPC_PLD                        (0x2B)
-#define CLEM_OPC_PLP                        (0x28)
-#define CLEM_OPC_PLX                        (0xFA)
-#define CLEM_OPC_PLY                        (0x7A)
-#define CLEM_OPC_REP                        (0xC2)
-#define CLEM_OPC_RTL                        (0x6B)
-#define CLEM_OPC_RTS                        (0x60)
-#define CLEM_OPC_SEC                        (0x38)
-#define CLEM_OPC_SEI                        (0x78)
-#define CLEM_OPC_SEP                        (0xE2)
-#define CLEM_OPC_STA_ABS                    (0x8D)
-#define CLEM_OPC_STA_ABSL                   (0x8F)
-#define CLEM_OPC_STA_DP                     (0x85)
-#define CLEM_OPC_STA_DP_INDIRECT            (0x92)
-#define CLEM_OPC_STA_DP_INDIRECTL           (0x87)
-#define CLEM_OPC_STA_ABS_IDX                (0x9D)
-#define CLEM_OPC_STA_ABSL_IDX               (0x9F)
-#define CLEM_OPC_STA_ABS_IDY                (0x99)
-#define CLEM_OPC_STA_DP_IDX                 (0x95)
-#define CLEM_OPC_STA_DP_IDX_INDIRECT        (0x81)
-#define CLEM_OPC_STA_DP_INDIRECT_IDY        (0x91)
-#define CLEM_OPC_STA_DP_INDIRECTL_IDY       (0x97)
-#define CLEM_OPC_STA_STACK_REL              (0x83)
-#define CLEM_OPC_STA_STACK_REL_INDIRECT_IDY (0x93)
-#define CLEM_OPC_TCS                        (0x1B)
-#define CLEM_OPC_TSB_ABS                    (0x0C)
-#define CLEM_OPC_XCE                        (0xFB)
-
-
-/* Attempt to mimic VDA and VPA per memory access */
-#define CLEM_MEM_FLAG_OPCODE_FETCH          (0x3)
-#define CLEM_MEM_FLAG_DATA                  (0x2)
-#define CLEM_MEM_FLAG_PROGRAM               (0x1)
-#define CLEM_MEM_FLAG_NULL                  (0x0)
-
-#define CLEM_UTIL_set16_lo(_v16_, _v8_) \
-    (((_v16_) & 0xff00) | ((_v8_) & 0xff))
-
-#define CLEM_UTIL_CROSSED_PAGE_BOUNDARY(_adr0_, _adr1_) \
-    (((_adr0_) ^ (_adr1_)) & 0xff00)
+#include "clemens_defs.h"
 
 #define CLEM_I_PRINT_STATS(_clem_) do {\
     struct Clemens65C816* _cpu_ = &(_clem_)->cpu; \
@@ -445,6 +349,7 @@ int clemens_init(
     for (unsigned i = 0; i < 256; ++i) {
         _opcode_description((uint8_t)i, "...", kClemensCPUAddrMode_None);
     }
+
     _opcode_description(CLEM_OPC_ADC_IMM, "ADC", kClemensCPUAddrMode_Immediate);
     _opcode_description(CLEM_OPC_ADC_ABS, "ADC", kClemensCPUAddrMode_Absolute);
     _opcode_description(CLEM_OPC_ADC_ABSL, "ADC",
@@ -566,6 +471,7 @@ int clemens_init(
     _opcode_description(CLEM_OPC_TSB_ABS, "TSB", kClemensCPUAddrMode_Absolute);
     _opcode_description(CLEM_OPC_TCS,     "TCS", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_XCE,     "XCE", kClemensCPUAddrMode_None);
+
 
     return 0;
 }
@@ -718,6 +624,83 @@ static inline void _cpu_lda(
     }
 }
 
+static inline void _clem_next_dbr(
+    ClemensMachine* clem,
+    uint8_t* next_dbr,
+    uint8_t dbr
+) {
+    if (!clem->cpu.emulation) {
+        *next_dbr = dbr + 1;
+    } else {
+        *next_dbr = dbr;
+    }
+}
+
+static inline void _clem_write(
+    ClemensMachine* clem,
+    uint8_t data,
+    uint16_t adr,
+    uint8_t bank
+) {
+    clem->cpu.pins.adr = adr;
+    clem->cpu.pins.databank = bank;
+    if (bank == 0xe0 || bank == 0xe1) {
+        clem->mega2_bank_map[bank & 0x1][adr] = data;
+    } else {
+        clem->fpi_bank_map[bank][adr] = data;
+    }
+    // TODO: account for slow/fast memory access
+    clem->clocks_spent += clem->clocks_step;
+    ++clem->cpu.cycles_spent;
+}
+
+static inline void _clem_write_16(
+    ClemensMachine* clem,
+    uint16_t data,
+    uint16_t adr,
+    uint8_t bank
+) {
+    _clem_write(clem, (uint8_t)data, adr, bank);
+    _clem_write(clem, (uint8_t)(data >> 8), adr + 1, bank);
+}
+
+static inline void _clem_sta(
+    ClemensMachine* clem,
+    uint8_t dbr,
+    uint16_t addr,
+    bool is8
+) {
+    uint16_t A = clem->cpu.regs.A;
+    if (is8) {
+        _clem_write(clem, (uint8_t)A, addr, dbr);
+    } else {
+        _clem_write_16(clem, A, addr, dbr);
+    }
+}
+
+static inline void _clem_sta_indexed(
+    ClemensMachine* clem,
+    uint8_t dbr,
+    uint16_t addr,
+    uint16_t index,
+    bool is_data_8,
+    bool is_index_8
+) {
+    uint16_t A = clem->cpu.regs.A;
+    uint16_t eff_addr = addr + index;
+    uint8_t dbr_actual;
+    if (eff_addr < addr && !clem->cpu.emulation) {
+        _clem_next_dbr(clem, &dbr_actual, dbr);
+    } else {
+        dbr_actual = dbr;
+    }
+    if (is_data_8) {
+        _clem_write(clem, (uint8_t)A, eff_addr, dbr_actual);
+    } else {
+        _clem_write_16(clem, A, eff_addr, dbr_actual);
+    }
+}
+
 static inline void _clem_cycle(
     ClemensMachine* clem,
     uint32_t cycle_count
@@ -831,18 +814,6 @@ static inline void _clem_read_pba_dp_addr(
     }
 }
 
-static inline void _clem_next_dbr(
-    ClemensMachine* clem,
-    uint8_t* next_dbr,
-    uint8_t dbr
-) {
-    if (!clem->cpu.emulation) {
-        *next_dbr = dbr + 1;
-    } else {
-        *next_dbr = dbr;
-    }
-}
-
 static inline void _clem_read_data_816(
     ClemensMachine* clem,
     uint16_t* out,
@@ -910,34 +881,6 @@ static inline void _clem_read_addr_dp_indirect_long(
     _clem_read_16(clem, out_addr, addr, 0x00, CLEM_MEM_FLAG_DATA);
     //  TODO: direct page wrap? (DH, DL=255 + 1 = DH, 0)?
     _clem_read(clem, out_dbr, addr + 1, 0x00, CLEM_MEM_FLAG_DATA);
-}
-
-static inline void _clem_write(
-    ClemensMachine* clem,
-    uint8_t data,
-    uint16_t adr,
-    uint8_t bank
-) {
-    clem->cpu.pins.adr = adr;
-    clem->cpu.pins.databank = bank;
-    if (bank == 0xe0 || bank == 0xe1) {
-        clem->mega2_bank_map[bank & 0x1][adr] = data;
-    } else {
-        clem->fpi_bank_map[bank][adr] = data;
-    }
-    // TODO: account for slow/fast memory access
-    clem->clocks_spent += clem->clocks_step;
-    ++clem->cpu.cycles_spent;
-}
-
-static inline void _clem_write_16(
-    ClemensMachine* clem,
-    uint16_t data,
-    uint16_t adr,
-    uint8_t bank
-) {
-    _clem_write(clem, (uint8_t)data, adr, bank);
-    _clem_write(clem, (uint8_t)(data >> 8), adr + 1, bank);
 }
 
 static inline void _clem_opc_push_reg_816(
@@ -1465,99 +1408,79 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             //  absolute long read
             //  TODO: what about emulation mode?
             _clem_read_pba_16(clem, &tmp_addr, &tmp_pc);
-            _clem_read_pba(clem, &tmp_data, &tmp_pc);
-            if (m_status) {
-                _clem_write(clem, (uint8_t)cpu->regs.A, tmp_addr,
-                                tmp_data);
-            } else {
-                _clem_write_16(clem, cpu->regs.A, tmp_addr, tmp_data);
-            }
+            _clem_read_pba(clem, &tmp_dbr, &tmp_pc);
+            _clem_sta(clem, tmp_dbr, tmp_addr, m_status);
             _opcode_instruction_define_long(&opc_inst, IR, tmp_data, tmp_addr);
             break;
         case CLEM_OPC_STA_DP:
             _clem_read_pba_dp_addr(clem, &tmp_addr, &tmp_pc, &tmp_data, 0);
-            _cpu_sta(cpu, cpu->regs.DBR, tmp_addr, m_status);
+            _clem_sta(clem, cpu->regs.DBR, tmp_addr, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_STA_DP_INDIRECT:
             _clem_read_pba_dp_addr(clem, &tmp_addr, &tmp_pc, &tmp_data, 0);
             _clem_read_addr_dp_indirect(clem, &tmp_eaddr, tmp_addr);
-            _cpu_sta(cpu, cpu->regs.DBR, tmp_eaddr, m_status);
+            _clem_sta(clem, cpu->regs.DBR, tmp_eaddr, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
-        case CLEM_OPC_LDA_DP_INDIRECTL:
+        case CLEM_OPC_STA_DP_INDIRECTL:
             _clem_read_pba_dp_addr(clem, &tmp_addr, &tmp_pc, &tmp_data, 0);
             _clem_read_addr_dp_indirect_long(clem, &tmp_eaddr, &tmp_dbr, tmp_addr);
-            _clem_read_data_816(clem, &tmp_value, tmp_eaddr, tmp_dbr, m_status);
-            _cpu_lda(cpu, tmp_value, m_status);
+            _clem_sta(clem, tmp_dbr, tmp_eaddr, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
-        case CLEM_OPC_LDA_ABS_IDX:
+        case CLEM_OPC_STA_ABS_IDX:
             _clem_read_pba_16(clem, &tmp_addr, &tmp_pc);
             tmp_eaddr = x_status ? (cpu->regs.X & 0xff) : cpu->regs.X;
-            _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, tmp_eaddr, cpu->regs.DBR, m_status, x_status);
-            _cpu_lda(cpu, tmp_value, m_status);
+            _clem_sta_indexed(clem, cpu->regs.DBR, tmp_addr, tmp_eaddr, m_status, x_status);
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
-        case CLEM_OPC_LDA_ABSL_IDX:
+        case CLEM_OPC_STA_ABSL_IDX:
             _clem_read_pba_16(clem, &tmp_addr, &tmp_pc);
             _clem_read_pba(clem, &tmp_dbr, &tmp_pc);
             tmp_eaddr = x_status ? (cpu->regs.X & 0xff) : cpu->regs.X;
-            _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, tmp_eaddr, tmp_dbr, m_status, x_status);
-            _cpu_lda(cpu, tmp_value, m_status);
+            _clem_sta_indexed(clem, tmp_dbr, tmp_addr, tmp_eaddr, m_status, x_status);
             _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
             break;
-        case CLEM_OPC_LDA_ABS_IDY:      // $addr + Y
+        case CLEM_OPC_STA_ABS_IDY:      // $addr + Y
             _clem_read_pba_16(clem, &tmp_addr, &tmp_pc);
             tmp_eaddr = x_status ? (cpu->regs.Y & 0xff) : cpu->regs.Y;
-            _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, tmp_eaddr, cpu->regs.DBR, m_status, x_status);
-            _cpu_lda(cpu, tmp_value, m_status);
+            _clem_sta_indexed(clem, cpu->regs.DBR, tmp_addr, tmp_eaddr, m_status, x_status);
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
-        case CLEM_OPC_LDA_DP_IDX:
+        case CLEM_OPC_STA_DP_IDX:
             _clem_read_pba_dp_addr(clem, &tmp_addr, &tmp_pc, &tmp_data,
                  x_status ? (cpu->regs.X & 0xff) : cpu->regs.X);
             _clem_cycle(clem, 1);             // extra IO cycle for d,x
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
-            _cpu_lda(cpu, tmp_value, m_status);
+            _clem_sta(clem, cpu->regs.DBR, tmp_addr, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
-        case CLEM_OPC_LDA_DP_IDX_INDIRECT:
+        case CLEM_OPC_STA_DP_IDX_INDIRECT:
             _clem_read_pba_dp_addr(clem, &tmp_addr, &tmp_pc, &tmp_data,
                 x_status ? (cpu->regs.X & 0xff) : cpu->regs.X);
             _clem_cycle(clem, 1);       // extra IO for (d, X)
             _clem_read_addr_dp_indirect(clem, &tmp_eaddr, tmp_addr);
-            _clem_read_data_816(clem, &tmp_value, tmp_eaddr, cpu->regs.DBR, m_status);
-            _cpu_lda(cpu, tmp_value, m_status);
+            _clem_sta(clem, cpu->regs.DBR, tmp_eaddr, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
-        case CLEM_OPC_LDA_DP_INDIRECT_IDY:
+        case CLEM_OPC_STA_DP_INDIRECT_IDY:
             _clem_read_pba_dp_addr(clem, &tmp_addr, &tmp_pc, &tmp_data, 0);
             _clem_read_addr_dp_indirect(clem, &tmp_eaddr, tmp_addr);
-            _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_eaddr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
-            _cpu_lda(cpu, tmp_value, m_status);
+            _clem_sta_indexed(clem, cpu->regs.DBR, tmp_eaddr, cpu->regs.Y, m_status, x_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
-        case CLEM_OPC_LDA_STACK_REL:
+        case CLEM_OPC_STA_STACK_REL:
             _clem_read_pba(clem, &tmp_data, &tmp_pc);
             _clem_cycle(clem, 1);   //  extra IO
-            _clem_read_data_816(
-                clem, &tmp_value, cpu->regs.S + tmp_data, 0x00, m_status);
-            _cpu_lda(cpu, tmp_value, m_status);
+            _clem_sta(clem, 0x00, cpu->regs.S + tmp_data, m_status);
             _opcode_instruction_define(&opc_inst, IR, tmp_data, m_status);
             break;
-        case CLEM_OPC_LDA_STACK_REL_INDIRECT_IDY:
+        case CLEM_OPC_STA_STACK_REL_INDIRECT_IDY:
             _clem_read_pba(clem, &tmp_data, &tmp_pc);
             _clem_cycle(clem, 1);   //  extra IO
             _clem_read_16(clem, &tmp_addr, cpu->regs.S + tmp_data, 0x00, CLEM_MEM_FLAG_DATA);
             _clem_cycle(clem, 1);   //  extra IO
-            _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
-            _cpu_lda(cpu, tmp_value, m_status);
+            _clem_sta_indexed(clem, cpu->regs.DBR, tmp_addr, cpu->regs.Y, m_status, x_status);
             _opcode_instruction_define(&opc_inst, IR, tmp_data, m_status);
             break;
         //  End STA
