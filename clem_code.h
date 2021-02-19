@@ -604,29 +604,29 @@ static inline void _cpu_lda(
     }
 }
 
-static inline void _clem_sta(
+static inline void _clem_write_816(
     ClemensMachine* clem,
+    uint16_t value,
     uint8_t dbr,
     uint16_t addr,
     bool is8
 ) {
-    uint16_t A = clem->cpu.regs.A;
     if (is8) {
-        _clem_write(clem, (uint8_t)A, addr, dbr);
+        _clem_write(clem, (uint8_t)value, addr, dbr);
     } else {
-        _clem_write_16(clem, A, addr, dbr);
+        _clem_write_16(clem, value, addr, dbr);
     }
 }
 
-static inline void _clem_sta_indexed(
+static inline void _clem_write_indexed_816(
     ClemensMachine* clem,
+    uint16_t value,
     uint8_t dbr,
     uint16_t addr,
     uint16_t index,
     bool is_data_8,
     bool is_index_8
 ) {
-    uint16_t A = clem->cpu.regs.A;
     uint16_t eff_index = is_index_8 ? (index & 0xff) : index;
     uint16_t eff_addr = addr + eff_index;
     uint8_t dbr_actual;
@@ -636,8 +636,8 @@ static inline void _clem_sta_indexed(
         dbr_actual = dbr;
     }
     if (is_data_8) {
-        _clem_write(clem, (uint8_t)A, eff_addr, dbr_actual);
+        _clem_write(clem, (uint8_t)value, eff_addr, dbr_actual);
     } else {
-        _clem_write_16(clem, A, eff_addr, dbr_actual);
+        _clem_write_16(clem, value, eff_addr, dbr_actual);
     }
 }
