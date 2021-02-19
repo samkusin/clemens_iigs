@@ -10,8 +10,6 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Implement ADC and all addressing modes
-* Implement LDA like ADC
 * Implement ORA, etc.
 * More debuggint utility
 * What is going on with the ROM writing to 01 and e1 banks (shadowing)
@@ -21,6 +19,7 @@ This is a running todo list.
 * Data accesses across banks are allowed (but not stack accesses?)
 * Emulation vs Native on some microinstructions (i.e. choosing a long address
   mode while in emulation does... what?)
+* Decimal math
 
 ## DONE
 
@@ -28,3 +27,5 @@ This is a running todo list.
 * Load ROM into an accessible region by emulated instructions
 * Handle first batch of instructions based on ROM code
 * XCE -> ROM bank conflict (PBR = bank 0, but on switch to native, what happens)
+* Implement ADC and all addressing modes
+* Implement LDA like ADC

@@ -274,13 +274,102 @@ int clemens_init(
     _opcode_description(CLEM_OPC_ADC_STACK_REL_INDIRECT_IDY,  "ADC",
                         kClemensCPUAddrMode_Stack_Relative_Indirect_Y);
 
+    _opcode_description(CLEM_OPC_AND_IMM, "AND", kClemensCPUAddrMode_Immediate);
+    _opcode_description(CLEM_OPC_AND_ABS, "AND", kClemensCPUAddrMode_Absolute);
+    _opcode_description(CLEM_OPC_AND_ABSL, "AND",
+                        kClemensCPUAddrMode_AbsoluteLong);
+    _opcode_description(CLEM_OPC_AND_DP,  "AND",
+                        kClemensCPUAddrMode_DirectPage);
+    _opcode_description(CLEM_OPC_AND_DP_INDIRECT,  "AND",
+                        kClemensCPUAddrMode_DirectPageIndirect);
+    _opcode_description(CLEM_OPC_AND_DP_INDIRECTL,  "AND",
+                        kClemensCPUAddrMode_DirectPageIndirectLong);
+    _opcode_description(CLEM_OPC_AND_ABS_IDX,  "AND",
+                        kClemensCPUAddrMode_Absolute_X);
+    _opcode_description(CLEM_OPC_AND_ABSL_IDX,  "AND",
+                        kClemensCPUAddrMode_AbsoluteLong_X);
+    _opcode_description(CLEM_OPC_AND_ABS_IDY,  "AND",
+                        kClemensCPUAddrMode_Absolute_Y);
+    _opcode_description(CLEM_OPC_AND_DP_IDX,  "AND",
+                        kClemensCPUAddrMode_DirectPage_X);
+    _opcode_description(CLEM_OPC_AND_DP_IDX_INDIRECT,  "AND",
+                        kClemensCPUAddrMode_DirectPage_X_Indirect);
+    _opcode_description(CLEM_OPC_AND_DP_INDIRECT_IDY,  "AND",
+                        kClemensCPUAddrMode_DirectPage_Indirect_Y);
+    _opcode_description(CLEM_OPC_AND_DP_INDIRECTL_IDY,  "AND",
+                        kClemensCPUAddrMode_DirectPage_IndirectLong_Y);
+    _opcode_description(CLEM_OPC_AND_STACK_REL,  "AND",
+                        kClemensCPUAddrMode_Stack_Relative);
+    _opcode_description(CLEM_OPC_AND_STACK_REL_INDIRECT_IDY,  "AND",
+                        kClemensCPUAddrMode_Stack_Relative_Indirect_Y);
+
     _opcode_description(CLEM_OPC_BRA,     "BRA", kClemensCPUAddrMode_PCRelative);
     _opcode_description(CLEM_OPC_BNE,     "BNE", kClemensCPUAddrMode_PCRelative);
 
     _opcode_description(CLEM_OPC_CLC,     "CLC", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_CLD,     "CLD", kClemensCPUAddrMode_None);
+
+    _opcode_description(CLEM_OPC_CMP_IMM, "CMP", kClemensCPUAddrMode_Immediate);
+    _opcode_description(CLEM_OPC_CMP_ABS, "CMP", kClemensCPUAddrMode_Absolute);
+    _opcode_description(CLEM_OPC_CMP_ABSL, "CMP",
+                        kClemensCPUAddrMode_AbsoluteLong);
+    _opcode_description(CLEM_OPC_CMP_DP,  "CMP",
+                        kClemensCPUAddrMode_DirectPage);
+    _opcode_description(CLEM_OPC_CMP_DP_INDIRECT,  "CMP",
+                        kClemensCPUAddrMode_DirectPageIndirect);
+    _opcode_description(CLEM_OPC_CMP_DP_INDIRECTL,  "CMP",
+                        kClemensCPUAddrMode_DirectPageIndirectLong);
+    _opcode_description(CLEM_OPC_CMP_ABS_IDX,  "CMP",
+                        kClemensCPUAddrMode_Absolute_X);
+    _opcode_description(CLEM_OPC_CMP_ABSL_IDX,  "CMP",
+                        kClemensCPUAddrMode_AbsoluteLong_X);
+    _opcode_description(CLEM_OPC_CMP_ABS_IDY,  "CMP",
+                        kClemensCPUAddrMode_Absolute_Y);
+    _opcode_description(CLEM_OPC_CMP_DP_IDX,  "CMP",
+                        kClemensCPUAddrMode_DirectPage_X);
+    _opcode_description(CLEM_OPC_CMP_DP_IDX_INDIRECT,  "CMP",
+                        kClemensCPUAddrMode_DirectPage_X_Indirect);
+    _opcode_description(CLEM_OPC_CMP_DP_INDIRECT_IDY,  "CMP",
+                        kClemensCPUAddrMode_DirectPage_Indirect_Y);
+    _opcode_description(CLEM_OPC_CMP_DP_INDIRECTL_IDY,  "CMP",
+                        kClemensCPUAddrMode_DirectPage_IndirectLong_Y);
+    _opcode_description(CLEM_OPC_CMP_STACK_REL,  "CMP",
+                        kClemensCPUAddrMode_Stack_Relative);
+    _opcode_description(CLEM_OPC_CMP_STACK_REL_INDIRECT_IDY,  "CMP",
+                        kClemensCPUAddrMode_Stack_Relative_Indirect_Y);
+
     _opcode_description(CLEM_OPC_DEX,     "DEX", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_DEY,     "DEY", kClemensCPUAddrMode_None);
+
+    _opcode_description(CLEM_OPC_EOR_IMM, "EOR", kClemensCPUAddrMode_Immediate);
+    _opcode_description(CLEM_OPC_EOR_ABS, "EOR", kClemensCPUAddrMode_Absolute);
+    _opcode_description(CLEM_OPC_EOR_ABSL, "EOR",
+                        kClemensCPUAddrMode_AbsoluteLong);
+    _opcode_description(CLEM_OPC_EOR_DP,  "EOR",
+                        kClemensCPUAddrMode_DirectPage);
+    _opcode_description(CLEM_OPC_EOR_DP_INDIRECT,  "EOR",
+                        kClemensCPUAddrMode_DirectPageIndirect);
+    _opcode_description(CLEM_OPC_EOR_DP_INDIRECTL,  "EOR",
+                        kClemensCPUAddrMode_DirectPageIndirectLong);
+    _opcode_description(CLEM_OPC_EOR_ABS_IDX,  "EOR",
+                        kClemensCPUAddrMode_Absolute_X);
+    _opcode_description(CLEM_OPC_EOR_ABSL_IDX,  "EOR",
+                        kClemensCPUAddrMode_AbsoluteLong_X);
+    _opcode_description(CLEM_OPC_EOR_ABS_IDY,  "EOR",
+                        kClemensCPUAddrMode_Absolute_Y);
+    _opcode_description(CLEM_OPC_EOR_DP_IDX,  "EOR",
+                        kClemensCPUAddrMode_DirectPage_X);
+    _opcode_description(CLEM_OPC_EOR_DP_IDX_INDIRECT,  "EOR",
+                        kClemensCPUAddrMode_DirectPage_X_Indirect);
+    _opcode_description(CLEM_OPC_EOR_DP_INDIRECT_IDY,  "EOR",
+                        kClemensCPUAddrMode_DirectPage_Indirect_Y);
+    _opcode_description(CLEM_OPC_EOR_DP_INDIRECTL_IDY,  "EOR",
+                        kClemensCPUAddrMode_DirectPage_IndirectLong_Y);
+    _opcode_description(CLEM_OPC_EOR_STACK_REL,  "EOR",
+                        kClemensCPUAddrMode_Stack_Relative);
+    _opcode_description(CLEM_OPC_EOR_STACK_REL_INDIRECT_IDY,  "EOR",
+                        kClemensCPUAddrMode_Stack_Relative_Indirect_Y);
+
     _opcode_description(CLEM_OPC_INX,     "INX", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_INY,     "INY", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_JSL,     "JSL", kClemensCPUAddrMode_AbsoluteLong);
@@ -288,6 +377,8 @@ int clemens_init(
 
     _opcode_description(CLEM_OPC_LDA_IMM, "LDA", kClemensCPUAddrMode_Immediate);
     _opcode_description(CLEM_OPC_LDA_ABS, "LDA", kClemensCPUAddrMode_Absolute);
+    _opcode_description(CLEM_OPC_LDA_ABSL, "LDA",
+                        kClemensCPUAddrMode_AbsoluteLong);
     _opcode_description(CLEM_OPC_LDA_DP,  "LDA",
                         kClemensCPUAddrMode_DirectPage);
     _opcode_description(CLEM_OPC_LDA_DP_INDIRECT,  "LDA",
@@ -312,10 +403,40 @@ int clemens_init(
                         kClemensCPUAddrMode_Stack_Relative);
     _opcode_description(CLEM_OPC_LDA_STACK_REL_INDIRECT_IDY,  "LDA",
                         kClemensCPUAddrMode_Stack_Relative_Indirect_Y);
-    _opcode_description(CLEM_OPC_LDA_ABSL, "LDA", kClemensCPUAddrMode_AbsoluteLong);
+
 
     _opcode_description(CLEM_OPC_LDX_IMM, "LDX", kClemensCPUAddrMode_Immediate);
     _opcode_description(CLEM_OPC_LDY_IMM, "LDY", kClemensCPUAddrMode_Immediate);
+
+    _opcode_description(CLEM_OPC_ORA_IMM, "ORA", kClemensCPUAddrMode_Immediate);
+    _opcode_description(CLEM_OPC_ORA_ABS, "ORA", kClemensCPUAddrMode_Absolute);
+    _opcode_description(CLEM_OPC_ORA_ABSL, "ORA",
+                        kClemensCPUAddrMode_AbsoluteLong);
+    _opcode_description(CLEM_OPC_ORA_DP,  "ORA",
+                        kClemensCPUAddrMode_DirectPage);
+    _opcode_description(CLEM_OPC_ORA_DP_INDIRECT,  "ORA",
+                        kClemensCPUAddrMode_DirectPageIndirect);
+    _opcode_description(CLEM_OPC_ORA_DP_INDIRECTL,  "ORA",
+                        kClemensCPUAddrMode_DirectPageIndirectLong);
+    _opcode_description(CLEM_OPC_ORA_ABS_IDX,  "ORA",
+                        kClemensCPUAddrMode_Absolute_X);
+    _opcode_description(CLEM_OPC_ORA_ABSL_IDX,  "ORA",
+                        kClemensCPUAddrMode_AbsoluteLong_X);
+    _opcode_description(CLEM_OPC_ORA_ABS_IDY,  "ORA",
+                        kClemensCPUAddrMode_Absolute_Y);
+    _opcode_description(CLEM_OPC_ORA_DP_IDX,  "ORA",
+                        kClemensCPUAddrMode_DirectPage_X);
+    _opcode_description(CLEM_OPC_ORA_DP_IDX_INDIRECT,  "ORA",
+                        kClemensCPUAddrMode_DirectPage_X_Indirect);
+    _opcode_description(CLEM_OPC_ORA_DP_INDIRECT_IDY,  "ORA",
+                        kClemensCPUAddrMode_DirectPage_Indirect_Y);
+    _opcode_description(CLEM_OPC_ORA_DP_INDIRECTL_IDY,  "ORA",
+                        kClemensCPUAddrMode_DirectPage_IndirectLong_Y);
+    _opcode_description(CLEM_OPC_ORA_STACK_REL,  "ORA",
+                        kClemensCPUAddrMode_Stack_Relative);
+    _opcode_description(CLEM_OPC_ORA_STACK_REL_INDIRECT_IDY,  "ORA",
+                        kClemensCPUAddrMode_Stack_Relative_Indirect_Y);
+
     _opcode_description(CLEM_OPC_PHA,     "PHA", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_PHB,     "PHB", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_PHD,     "PHD", kClemensCPUAddrMode_None);
@@ -332,6 +453,36 @@ int clemens_init(
     _opcode_description(CLEM_OPC_REP,     "REP", kClemensCPUAddrMode_Immediate);
     _opcode_description(CLEM_OPC_RTL,     "RTL", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_RTS,     "RTS", kClemensCPUAddrMode_None);
+
+    _opcode_description(CLEM_OPC_SBC_IMM, "SBC", kClemensCPUAddrMode_Immediate);
+    _opcode_description(CLEM_OPC_SBC_ABS, "SBC", kClemensCPUAddrMode_Absolute);
+    _opcode_description(CLEM_OPC_SBC_ABSL, "SBC",
+                        kClemensCPUAddrMode_AbsoluteLong);
+    _opcode_description(CLEM_OPC_SBC_DP,  "SBC",
+                        kClemensCPUAddrMode_DirectPage);
+    _opcode_description(CLEM_OPC_SBC_DP_INDIRECT,  "SBC",
+                        kClemensCPUAddrMode_DirectPageIndirect);
+    _opcode_description(CLEM_OPC_SBC_DP_INDIRECTL,  "SBC",
+                        kClemensCPUAddrMode_DirectPageIndirectLong);
+    _opcode_description(CLEM_OPC_SBC_ABS_IDX,  "SBC",
+                        kClemensCPUAddrMode_Absolute_X);
+    _opcode_description(CLEM_OPC_SBC_ABSL_IDX,  "SBC",
+                        kClemensCPUAddrMode_AbsoluteLong_X);
+    _opcode_description(CLEM_OPC_SBC_ABS_IDY,  "SBC",
+                        kClemensCPUAddrMode_Absolute_Y);
+    _opcode_description(CLEM_OPC_SBC_DP_IDX,  "SBC",
+                        kClemensCPUAddrMode_DirectPage_X);
+    _opcode_description(CLEM_OPC_SBC_DP_IDX_INDIRECT,  "SBC",
+                        kClemensCPUAddrMode_DirectPage_X_Indirect);
+    _opcode_description(CLEM_OPC_SBC_DP_INDIRECT_IDY,  "SBC",
+                        kClemensCPUAddrMode_DirectPage_Indirect_Y);
+    _opcode_description(CLEM_OPC_SBC_DP_INDIRECTL_IDY,  "SBC",
+                        kClemensCPUAddrMode_DirectPage_IndirectLong_Y);
+    _opcode_description(CLEM_OPC_SBC_STACK_REL,  "SBC",
+                        kClemensCPUAddrMode_Stack_Relative);
+    _opcode_description(CLEM_OPC_SBC_STACK_REL_INDIRECT_IDY,  "SBC",
+                        kClemensCPUAddrMode_Stack_Relative_Indirect_Y);
+
     _opcode_description(CLEM_OPC_SEC,     "SCE", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_SEI,     "SEI", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_SEP,     "SEP", kClemensCPUAddrMode_Immediate);
@@ -527,6 +678,112 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         //  End ADC
         //
+        //  Start AND
+        case CLEM_OPC_AND_IMM:
+            _clem_read_pba_mode_imm_816(clem, &tmp_value, &tmp_pc, m_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_value, m_status);
+            break;
+        case CLEM_OPC_AND_ABS:
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_AND_ABSL:
+            //  TODO: emulation mode
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            break;
+        case CLEM_OPC_AND_DP:
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_AND_DP_INDIRECT:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_AND_DP_INDIRECTL:
+            _clem_read_pba_mode_dp_indirectl(
+                clem, &tmp_addr, &tmp_dbr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_AND_ABS_IDX:
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.X, cpu->regs.DBR,
+                m_status, x_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_AND_ABSL_IDX:
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_dbr, m_status, x_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            break;
+        case CLEM_OPC_AND_ABS_IDY:      // $addr + Y
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_indexed_816(clem, &tmp_value, tmp_addr, cpu->regs.Y,
+                cpu->regs.DBR, m_status, x_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_AND_DP_IDX:
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data,
+                cpu->regs.X, x_status);
+            _clem_cycle(clem, 1);             // extra IO cycle for d,x
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_AND_DP_IDX_INDIRECT:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data,
+                cpu->regs.X, x_status);
+            _clem_cycle(clem, 1);       // extra IO for (d, X)
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_AND_DP_INDIRECT_IDY:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_AND_DP_INDIRECTL_IDY:
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+                &tmp_data, 0, false);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_dbr, m_status, x_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_AND_STACK_REL:
+            _clem_read_pba_mode_stack_rel(clem, &tmp_addr, &tmp_pc, &tmp_data);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_data, m_status);
+            break;
+        case CLEM_OPC_AND_STACK_REL_INDIRECT_IDY:
+            _clem_read_pba_mode_stack_rel_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
+            _cpu_and(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_data, m_status);
+            break;
+        //  End ADC
+        //
         case CLEM_OPC_BRA:
             _clem_read_pba(clem, &tmp_data, &tmp_pc);
             tmp_addr = tmp_pc + (int8_t)tmp_data;
@@ -559,6 +816,113 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             cpu->regs.P &= ~kClemensCPUStatus_Decimal;
             _clem_cycle(clem, 1);
             break;
+        //
+        //  Start CMP
+        case CLEM_OPC_CMP_IMM:
+            _clem_read_pba_mode_imm_816(clem, &tmp_value, &tmp_pc, m_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_value, m_status);
+            break;
+        case CLEM_OPC_CMP_ABS:
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_CMP_ABSL:
+            //  TODO: emulation mode
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            break;
+        case CLEM_OPC_CMP_DP:
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_CMP_DP_INDIRECT:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_CMP_DP_INDIRECTL:
+            _clem_read_pba_mode_dp_indirectl(
+                clem, &tmp_addr, &tmp_dbr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_CMP_ABS_IDX:
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.X, cpu->regs.DBR,
+                m_status, x_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_CMP_ABSL_IDX:
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_dbr, m_status, x_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            break;
+        case CLEM_OPC_CMP_ABS_IDY:      // $addr + Y
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_indexed_816(clem, &tmp_value, tmp_addr, cpu->regs.Y,
+                cpu->regs.DBR, m_status, x_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_CMP_DP_IDX:
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data,
+                cpu->regs.X, x_status);
+            _clem_cycle(clem, 1);             // extra IO cycle for d,x
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_CMP_DP_IDX_INDIRECT:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data,
+                cpu->regs.X, x_status);
+            _clem_cycle(clem, 1);       // extra IO for (d, X)
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_CMP_DP_INDIRECT_IDY:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_CMP_DP_INDIRECTL_IDY:
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+                &tmp_data, 0, false);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_dbr, m_status, x_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_CMP_STACK_REL:
+            _clem_read_pba_mode_stack_rel(clem, &tmp_addr, &tmp_pc, &tmp_data);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_data, m_status);
+            break;
+        case CLEM_OPC_CMP_STACK_REL_INDIRECT_IDY:
+            _clem_read_pba_mode_stack_rel_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
+            _cpu_cmp(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_data, m_status);
+            break;
+        //  End CMP
+        //
         case CLEM_OPC_DEX:
             tmp_value = cpu->regs.X - 1;
             if (x_status) {
@@ -581,6 +945,113 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             }
             _opcode_instruction_define_simple(&opc_inst, IR);
             break;
+        //
+        //  Start EOR
+        case CLEM_OPC_EOR_IMM:
+            _clem_read_pba_mode_imm_816(clem, &tmp_value, &tmp_pc, m_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_value, m_status);
+            break;
+        case CLEM_OPC_EOR_ABS:
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_EOR_ABSL:
+            //  TODO: emulation mode
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            break;
+        case CLEM_OPC_EOR_DP:
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_EOR_DP_INDIRECT:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_EOR_DP_INDIRECTL:
+            _clem_read_pba_mode_dp_indirectl(
+                clem, &tmp_addr, &tmp_dbr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_EOR_ABS_IDX:
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.X, cpu->regs.DBR,
+                m_status, x_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_EOR_ABSL_IDX:
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_dbr, m_status, x_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            break;
+        case CLEM_OPC_EOR_ABS_IDY:      // $addr + Y
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_indexed_816(clem, &tmp_value, tmp_addr, cpu->regs.Y,
+                cpu->regs.DBR, m_status, x_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_EOR_DP_IDX:
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data,
+                cpu->regs.X, x_status);
+            _clem_cycle(clem, 1);             // extra IO cycle for d,x
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_EOR_DP_IDX_INDIRECT:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data,
+                cpu->regs.X, x_status);
+            _clem_cycle(clem, 1);       // extra IO for (d, X)
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_EOR_DP_INDIRECT_IDY:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_EOR_DP_INDIRECTL_IDY:
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+                &tmp_data, 0, false);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_dbr, m_status, x_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_EOR_STACK_REL:
+            _clem_read_pba_mode_stack_rel(clem, &tmp_addr, &tmp_pc, &tmp_data);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_data, m_status);
+            break;
+        case CLEM_OPC_EOR_STACK_REL_INDIRECT_IDY:
+            _clem_read_pba_mode_stack_rel_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
+            _cpu_eor(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_data, m_status);
+            break;
+        //  End EOR
+        //
         case CLEM_OPC_INX:
             tmp_value = cpu->regs.X + 1;
             if (x_status) {
@@ -727,6 +1198,113 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             }
             _opcode_instruction_define(&opc_inst, IR, tmp_value, x_status);
             break;
+        //
+        //  Start ORA
+        case CLEM_OPC_ORA_IMM:
+            _clem_read_pba_mode_imm_816(clem, &tmp_value, &tmp_pc, m_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_value, m_status);
+            break;
+        case CLEM_OPC_ORA_ABS:
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_ORA_ABSL:
+            //  TODO: emulation mode
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            break;
+        case CLEM_OPC_ORA_DP:
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_ORA_DP_INDIRECT:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_ORA_DP_INDIRECTL:
+            _clem_read_pba_mode_dp_indirectl(
+                clem, &tmp_addr, &tmp_dbr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_ORA_ABS_IDX:
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.X, cpu->regs.DBR,
+                m_status, x_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_ORA_ABSL_IDX:
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_dbr, m_status, x_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            break;
+        case CLEM_OPC_ORA_ABS_IDY:      // $addr + Y
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_indexed_816(clem, &tmp_value, tmp_addr, cpu->regs.Y,
+                cpu->regs.DBR, m_status, x_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_ORA_DP_IDX:
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data,
+                cpu->regs.X, x_status);
+            _clem_cycle(clem, 1);             // extra IO cycle for d,x
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_ORA_DP_IDX_INDIRECT:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data,
+                cpu->regs.X, x_status);
+            _clem_cycle(clem, 1);       // extra IO for (d, X)
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_ORA_DP_INDIRECT_IDY:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_ORA_DP_INDIRECTL_IDY:
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+                &tmp_data, 0, false);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_dbr, m_status, x_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_ORA_STACK_REL:
+            _clem_read_pba_mode_stack_rel(clem, &tmp_addr, &tmp_pc, &tmp_data);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_data, m_status);
+            break;
+        case CLEM_OPC_ORA_STACK_REL_INDIRECT_IDY:
+            _clem_read_pba_mode_stack_rel_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
+            _cpu_ora(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_data, m_status);
+            break;
+        //  End ORA
+        //
         case CLEM_OPC_PHA:
             _clem_opc_push_reg_816(clem, cpu->regs.A, m_status);
             _opcode_instruction_define_simple(&opc_inst, IR);
@@ -810,6 +1388,113 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_cycle(clem, 1);
             _opcode_instruction_define(&opc_inst, IR, tmp_data, false);
             break;
+        //
+        // Start SBC
+        case CLEM_OPC_SBC_IMM:
+            _clem_read_pba_mode_imm_816(clem, &tmp_value, &tmp_pc, m_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_value, m_status);
+            break;
+        case CLEM_OPC_SBC_ABS:
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_SBC_ABSL:
+            //  TODO: emulation mode
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            break;
+        case CLEM_OPC_SBC_DP:
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_SBC_DP_INDIRECT:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_SBC_DP_INDIRECTL:
+            _clem_read_pba_mode_dp_indirectl(
+                clem, &tmp_addr, &tmp_dbr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_SBC_ABS_IDX:
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.X, cpu->regs.DBR,
+                m_status, x_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_SBC_ABSL_IDX:
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_dbr, m_status, x_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            break;
+        case CLEM_OPC_SBC_ABS_IDY:      // $addr + Y
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_indexed_816(clem, &tmp_value, tmp_addr, cpu->regs.Y,
+                cpu->regs.DBR, m_status, x_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_SBC_DP_IDX:
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data,
+                cpu->regs.X, x_status);
+            _clem_cycle(clem, 1);             // extra IO cycle for d,x
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_SBC_DP_IDX_INDIRECT:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data,
+                cpu->regs.X, x_status);
+            _clem_cycle(clem, 1);       // extra IO for (d, X)
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_SBC_DP_INDIRECT_IDY:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_SBC_DP_INDIRECTL_IDY:
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+                &tmp_data, 0, false);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_dbr, m_status, x_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_SBC_STACK_REL:
+            _clem_read_pba_mode_stack_rel(clem, &tmp_addr, &tmp_pc, &tmp_data);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_data, m_status);
+            break;
+        case CLEM_OPC_SBC_STACK_REL_INDIRECT_IDY:
+            _clem_read_pba_mode_stack_rel_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data);
+            _clem_read_data_indexed_816(
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
+            _cpu_sbc(cpu, tmp_value, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_data, m_status);
+            break;
+        //  End ADC
+        //
         case CLEM_OPC_SEC:
             cpu->regs.P |= kClemensCPUStatus_Carry;
             _clem_cycle(clem, 1);
