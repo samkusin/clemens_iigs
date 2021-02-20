@@ -548,8 +548,83 @@ static inline void _cpu_asl(
     cpu->regs.P = p;
 }
 
+static inline void _cpu_rol(
+    struct Clemens65C816* cpu,
+    uint16_t *value,
+    bool is8
+) {
+    uint8_t p = cpu->regs.P;
+    if (is8) {
+        uint8_t v = (uint8_t)(*value);
+        if (v & 0x80) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
+        v <<= 1;
+        if (p & kClemensCPUStatus_Carry) v |= 0x01;
+        else v &= 0xfe;
+        _cpu_p_flags_n_z_data(cpu, v);
+        *value = CLEM_UTIL_set16_lo(*value, v);
+    } else {
+        if (*value & 0x8000) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
+        *value <<= 1;
+        if (p & kClemensCPUStatus_Carry) *value |= 0x0001;
+        else *value &= 0xfffe;
+        _cpu_p_flags_n_z_data_16(cpu, *value);
+    }
+    cpu->regs.P = p;
+}
+
+static inline void _cpu_lsr(
+    struct Clemens65C816* cpu,
+    uint16_t *value,
+    bool is8
+) {
+    uint8_t p = cpu->regs.P;
+    if (is8) {
+        uint8_t v = (uint8_t)(*value);
+        if (v & 0x01) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
+        v >>= 1;
+        _cpu_p_flags_n_z_data(cpu, v);
+        *value = CLEM_UTIL_set16_lo(*value, v);
+    } else {
+        if (*value & 0x0001) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
+        *value >>= 1;
+        _cpu_p_flags_n_z_data_16(cpu, *value);
+    }
+    cpu->regs.P = p;
+}
+
+static inline void _cpu_ror(
+    struct Clemens65C816* cpu,
+    uint16_t *value,
+    bool is8
+) {
+    uint8_t p = cpu->regs.P;
+    if (is8) {
+        uint8_t v = (uint8_t)(*value);
+        if (v & 0x01) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
+        v >>= 1;
+        if (p & kClemensCPUStatus_Carry) v |= 0x80;
+        else v &= 0x7f;
+        _cpu_p_flags_n_z_data(cpu, v);
+        *value = CLEM_UTIL_set16_lo(*value, v);
+    } else {
+        if (*value & 0x0001) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
+        *value >>= 1;
+        if (p & kClemensCPUStatus_Carry) *value |= 0x8000;
+        else *value &= 0x7fff;
+        _cpu_p_flags_n_z_data_16(cpu, *value);
+    }
+    cpu->regs.P = p;
+}
+
 static inline void _cpu_cmp(
     struct Clemens65C816* cpu,
+    uint16_t reg,
     uint16_t value,
     bool is8
 ) {
@@ -557,15 +632,16 @@ static inline void _cpu_cmp(
     uint8_t p = cpu->regs.P;
     if (is8) {
         value = value & 0xff;
-        cmp = (cpu->regs.A & 0xff);
+        cmp = (reg & 0xff);
         if (cmp >= value) p |= kClemensCPUStatus_Carry;
         else p &= ~kClemensCPUStatus_Carry;
         cmp -= value;
         _cpu_p_flags_n_z_data(cpu, (uint8_t)cmp);
     } else {
-        if (cpu->regs.A >= value) p |= kClemensCPUStatus_Carry;
+        if (reg >= value) p |= kClemensCPUStatus_Carry;
         else p &= ~kClemensCPUStatus_Carry;
-        cmp = cpu->regs.A - value;
+        cmp = reg;
+        cmp -= value;
         _cpu_p_flags_n_z_data_16(cpu, (uint16_t)cmp);
     }
     cpu->regs.P = p;
@@ -646,6 +722,36 @@ static inline void _cpu_bit(
     }
 }
 
+static inline void _cpu_inc(
+    struct Clemens65C816* cpu,
+    uint16_t value,
+    bool is8
+) {
+    if (is8) {
+        uint8_t v = (uint8_t)(value);
+        ++v;
+        _cpu_p_flags_n_z_data(cpu, v);
+    } else {
+        ++value;
+        _cpu_p_flags_n_z_data_16(cpu, value);
+    }
+}
+
+static inline void _cpu_dec(
+    struct Clemens65C816* cpu,
+    uint16_t value,
+    bool is8
+) {
+    if (is8) {
+        uint8_t v = (uint8_t)(value);
+        --v;
+        _cpu_p_flags_n_z_data(cpu, v);
+    } else {
+        --value;
+        _cpu_p_flags_n_z_data_16(cpu, value);
+    }
+}
+
 static inline void _cpu_lda(
     struct Clemens65C816* cpu,
     uint16_t value,
@@ -657,6 +763,21 @@ static inline void _cpu_lda(
     } else {
         _cpu_p_flags_n_z_data_16(cpu, value);
         cpu->regs.A = value;
+    }
+}
+
+static inline void _cpu_ldxy(
+    struct Clemens65C816* cpu,
+    uint16_t* reg,
+    uint16_t value,
+    bool is8
+) {
+    if (is8) {
+        _cpu_p_flags_n_z_data(cpu, (uint8_t)value);
+        *reg = CLEM_UTIL_set16_lo(*reg, value);
+    } else {
+        _cpu_p_flags_n_z_data_16(cpu, value);
+        *reg = value;
     }
 }
 
