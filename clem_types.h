@@ -30,6 +30,7 @@ enum ClemensCPUAddrMode {
     kClemensCPUAddrMode_AbsoluteLong_X,
     kClemensCPUAddrMode_Absolute_Y,
     kClemensCPUAddrMode_DirectPage_X,
+    kClemensCPUAddrMode_DirectPage_Y,
     kClemensCPUAddrMode_DirectPage_X_Indirect,
     kClemensCPUAddrMode_DirectPage_Indirect_Y,
     kClemensCPUAddrMode_DirectPage_IndirectLong_Y,
