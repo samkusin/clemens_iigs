@@ -171,6 +171,16 @@
 #define CLEM_OPC_PLX                        (0xFA)
 #define CLEM_OPC_PLY                        (0x7A)
 #define CLEM_OPC_REP                        (0xC2)
+#define CLEM_OPC_ROL_A                      (0x2A)
+#define CLEM_OPC_ROL_ABS                    (0x2E)
+#define CLEM_OPC_ROL_DP                     (0x26)
+#define CLEM_OPC_ROL_ABS_IDX                (0x3E)
+#define CLEM_OPC_ROL_ABS_DP_IDX             (0x36)
+#define CLEM_OPC_ROR_A                      (0x6A)
+#define CLEM_OPC_ROR_ABS                    (0x6E)
+#define CLEM_OPC_ROR_DP                     (0x66)
+#define CLEM_OPC_ROR_ABS_IDX                (0x7E)
+#define CLEM_OPC_ROR_ABS_DP_IDX             (0x76)
 #define CLEM_OPC_RTL                        (0x6B)
 #define CLEM_OPC_RTS                        (0x60)
 #define CLEM_OPC_SBC_IMM                    (0xE9)
@@ -205,6 +215,16 @@
 #define CLEM_OPC_STA_DP_INDIRECTL_IDY       (0x97)
 #define CLEM_OPC_STA_STACK_REL              (0x83)
 #define CLEM_OPC_STA_STACK_REL_INDIRECT_IDY (0x93)
+#define CLEM_OPC_STX_ABS                    (0x8E)
+#define CLEM_OPC_STX_DP                     (0x86)
+#define CLEM_OPC_STX_DP_IDY                 (0x96)
+#define CLEM_OPC_STY_ABS                    (0x8C)
+#define CLEM_OPC_STY_DP                     (0x84)
+#define CLEM_OPC_STY_DP_IDX                 (0x94)
+#define CLEM_OPC_STZ_ABS                    (0x9C)
+#define CLEM_OPC_STZ_DP                     (0x64)
+#define CLEM_OPC_STZ_ABS_IDX                (0x9E)
+#define CLEM_OPC_STZ_DP_IDX                 (0x74)
 #define CLEM_OPC_TCS                        (0x1B)
 #define CLEM_OPC_TSB_ABS                    (0x0C)
 #define CLEM_OPC_XCE                        (0xFB)
@@ -225,11 +245,49 @@
 
 /* TODO */
 #define CLEM_OPC_CLI                        (0x58)
+#define CLEM_OPC_RTI                        (0x40)
+#define CLEM_OPC_STP                        (0xDB)
+#define CLEM_OPC_WAI                        (0xCB)
+#define CLEM_OPC_WDM                        (0x42)
+
 
 #define CLEM_OPC_JMP_ABS                    (0x4C)
 #define CLEM_OPC_JMP_INDIRECT               (0x6C)
 #define CLEM_OPC_JMP_IDX_INDIRECT           (0x7C)
 #define CLEM_OPC_JMP_ABSL                   (0x5C)
 #define CLEM_OPC_JMP_ABSL_INDIRECT          (0xDC)
+
+#define CLEM_OPC_MVN                        (0x54)
+#define CLEM_OPC_MVP                        (0x44)
+
+#define CLEM_OPC_NOP                        (0xEA)
+
+#define CLEM_OPC_PEA_ABS                    (0xF4)
+#define CLEM_OPC_PEI_DP_INDIRECT            (0xD4)
+#define CLEM_OPC_PER                        (0x62)
+
+//  RMW
+
+#define CLEM_OPC_SED                        (0xF8)
+
+//  Transfer
+#define CLEM_OPC_TAX                        (0xAA)
+#define CLEM_OPC_TAY                        (0xA8)
+#define CLEM_OPC_TCD                        (0x5B)
+#define CLEM_OPC_TDC                        (0x7B)
+#define CLEM_OPC_TSC                        (0x3B)
+#define CLEM_OPC_TSX                        (0xBA)
+#define CLEM_OPC_TXA                        (0x8A)
+#define CLEM_OPC_TXS                        (0x9A)
+#define CLEM_OPC_TXY                        (0x9B)
+#define CLEM_OPC_TYA                        (0x98)
+#define CLEM_OPC_TYX                        (0xBB)
+
+#define CLEM_OPC_TRB_ABS                    (0x1C)
+#define CLEM_OPC_TRB_DP                     (0x14)
+#define CLEM_OPC_TSB_DP                     (0x04)
+
+#define CLEM_OPC_XBA                        (0xEB)
+
 
 #endif

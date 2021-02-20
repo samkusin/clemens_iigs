@@ -10,18 +10,19 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Implement remaining opcodes
+* Implement remaining opcodes (T??, JMP, stragglers)
 * Implement interrupt opcodes (COP, BRK, CLI, RTI, etc)
-* More debugging utility
+* Test ROM 1
+* More debugging utilities
+* Data accesses across banks are allowed (but not stack accesses?)
+* Emulation vs Native on some microinstructions (i.e. choosing a long address mode while in emulation does... what?)
+* Test ROM iteration?
 * What is going on with the ROM writing to 01 and e1 banks (shadowing)
 * Stronger memory mapping
   * (using I/O switches)
   * shadowing
-* Data accesses across banks are allowed (but not stack accesses?)
-* Emulation vs Native on some microinstructions (i.e. choosing a long address
-  mode while in emulation does... what?)
 * Decimal math
-
+* Test ROM display and validate with an existing //gs emulator
 ## DONE
 
 * RESET handling and CPU initialization
@@ -33,3 +34,4 @@ This is a running todo list.
 * Implement ORA, etc (primary group)
 * Implement branches
 * Implement ASL, BIT
+* Implement ROL, ROR, STX, STY, STZ
