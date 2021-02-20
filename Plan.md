@@ -10,8 +10,9 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Implement ORA, etc.
-* More debuggint utility
+* Implement remaining opcodes
+* Implement interrupt opcodes (COP, BRK, CLI, RTI, etc)
+* More debugging utility
 * What is going on with the ROM writing to 01 and e1 banks (shadowing)
 * Stronger memory mapping
   * (using I/O switches)
@@ -29,3 +30,6 @@ This is a running todo list.
 * XCE -> ROM bank conflict (PBR = bank 0, but on switch to native, what happens)
 * Implement ADC and all addressing modes
 * Implement LDA like ADC
+* Implement ORA, etc (primary group)
+* Implement branches
+* Implement ASL, BIT

@@ -42,8 +42,21 @@
 #define CLEM_OPC_ASL_DP                     (0x06)
 #define CLEM_OPC_ASL_ABS_IDX                (0x1E)
 #define CLEM_OPC_ASL_ABS_DP_IDX             (0x16)
-#define CLEM_OPC_BRA                        (0x80)
+#define CLEM_OPC_BCC                        (0x90)
+#define CLEM_OPC_BCS                        (0xB0)
+#define CLEM_OPC_BEQ                        (0xF0)
+#define CLEM_OPC_BIT_IMM                    (0x89)
+#define CLEM_OPC_BIT_ABS                    (0x2C)
+#define CLEM_OPC_BIT_DP                     (0x24)
+#define CLEM_OPC_BIT_ABS_IDX                (0x3C)
+#define CLEM_OPC_BIT_DP_IDX                 (0x34)
+#define CLEM_OPC_BMI                        (0x30)
 #define CLEM_OPC_BNE                        (0xD0)
+#define CLEM_OPC_BPL                        (0x10)
+#define CLEM_OPC_BRA                        (0x80)
+#define CLEM_OPC_BRL                        (0x82)
+#define CLEM_OPC_BVC                        (0x50)
+#define CLEM_OPC_BVS                        (0x70)
 #define CLEM_OPC_CLC                        (0x18)
 #define CLEM_OPC_CLD                        (0xD8)
 #define CLEM_OPC_CMP_IMM                    (0xC9)
@@ -179,5 +192,35 @@
 #define CLEM_UTIL_CROSSED_PAGE_BOUNDARY(_adr0_, _adr1_) \
     (((_adr0_) ^ (_adr1_)) & 0xff00)
 
+
+/* TODO */
+#define CLEM_OPC_CLV                        (0xB8)
+
+#define CLEM_OPC_CPX_IMM                    (0xE0)
+#define CLEM_OPC_CPX_ABS                    (0xEC)
+#define CLEM_OPC_CPX_DP                     (0xE4)
+
+#define CLEM_OPC_CPY_IMM                    (0xC0)
+#define CLEM_OPC_CPY_ABS                    (0xCC)
+#define CLEM_OPC_CPY_DP                     (0xC4)
+
+//  RMW
+#define CLEM_OPC_DEC_A                      (0x3A)
+#define CLEM_OPC_DEC_ABS                    (0xCE)
+#define CLEM_OPC_DEC_DP                     (0xC6)
+#define CLEM_OPC_DEC_ABS_IDX                (0xDE)
+#define CLEM_OPC_DEC_ABS_DP_IDX             (0xD6)
+
+#define CLEM_OPC_INC_A                      (0x1A)
+#define CLEM_OPC_INC_ABS                    (0xEE)
+#define CLEM_OPC_INC_DP                     (0xE6)
+#define CLEM_OPC_INC_ABS_IDX                (0xFE)
+#define CLEM_OPC_INC_ABS_DP_IDX             (0xF6)
+
+#define CLEM_OPC_JMP_ABS                    (0x4C)
+#define CLEM_OPC_JMP_INDIRECT               (0x6C)
+#define CLEM_OPC_JMP_IDX_INDIRECT           (0x7C)
+#define CLEM_OPC_JMP_ABSL                   (0x5C)
+#define CLEM_OPC_JMP_ABSL_INDIRECT          (0xDC)
 
 #endif
