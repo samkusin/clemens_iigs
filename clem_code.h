@@ -343,7 +343,7 @@ static inline void _clem_opc_pull_reg_816(
     if (!is8) {
         _cpu_sp_inc(cpu);
         _clem_read(clem, &data8, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
-        *data = CLEM_UTIL_set16_lo((uint16_t)(data8) << 8, (uint8_t)(*data));
+        *data = CLEM_UTIL_set16_lo((uint16_t)(data8) << 8, *data);
     }
 }
 
@@ -479,7 +479,7 @@ static inline void _cpu_adc(
         else p &= ~kClemensCPUStatus_Overflow;
         if (adc & 0x100) p |= kClemensCPUStatus_Carry;
         else p &= ~kClemensCPUStatus_Carry;
-        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, (uint8_t)adc);
+        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, adc);
     } else {
         adc = cpu->regs.A + value + carry;
         _cpu_p_flags_n_z_data_16(cpu, (uint16_t)adc);
@@ -512,7 +512,7 @@ static inline void _cpu_sbc(
         else p &= ~kClemensCPUStatus_Overflow;
         if (adc & 0x100) p |= kClemensCPUStatus_Carry;
         else p &= ~kClemensCPUStatus_Carry;
-        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, (uint8_t)adc);
+        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, adc);
     } else {
         value = value ^ 0xffff; // negative
         adc = cpu->regs.A + value + carry;
@@ -657,7 +657,7 @@ static inline void _cpu_and(
         value = value & 0xff;
         and = (cpu->regs.A & 0xff) & value;
         _cpu_p_flags_n_z_data(cpu, (uint8_t)and);
-        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, (uint8_t)and);
+        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, and);
     } else {
         and = cpu->regs.A & value;
         _cpu_p_flags_n_z_data_16(cpu, and);
@@ -675,7 +675,7 @@ static inline void _cpu_eor(
         value = value & 0xff;
         eor = (cpu->regs.A & 0xff) ^ value;
         _cpu_p_flags_n_z_data(cpu, (uint8_t)eor);
-        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, (uint8_t)eor);
+        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, eor);
     } else {
         eor = cpu->regs.A ^ value;
         _cpu_p_flags_n_z_data_16(cpu, eor);
@@ -693,7 +693,7 @@ static inline void _cpu_ora(
         value = value & 0xff;
         ora = (cpu->regs.A & 0xff) | value;
         _cpu_p_flags_n_z_data(cpu, (uint8_t)ora);
-        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, (uint8_t)ora);
+        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, ora);
     } else {
         ora = cpu->regs.A | value;
         _cpu_p_flags_n_z_data_16(cpu, ora);
@@ -724,31 +724,33 @@ static inline void _cpu_bit(
 
 static inline void _cpu_inc(
     struct Clemens65C816* cpu,
-    uint16_t value,
+    uint16_t* value,
     bool is8
 ) {
     if (is8) {
-        uint8_t v = (uint8_t)(value);
+        uint8_t v = (uint8_t)(*value);
         ++v;
         _cpu_p_flags_n_z_data(cpu, v);
+        *value = CLEM_UTIL_set16_lo(*value, v);
     } else {
-        ++value;
-        _cpu_p_flags_n_z_data_16(cpu, value);
+        *value += 1;
+        _cpu_p_flags_n_z_data_16(cpu, *value);
     }
 }
 
 static inline void _cpu_dec(
     struct Clemens65C816* cpu,
-    uint16_t value,
+    uint16_t* value,
     bool is8
 ) {
     if (is8) {
-        uint8_t v = (uint8_t)(value);
+        uint8_t v = (uint8_t)(*value);
         --v;
         _cpu_p_flags_n_z_data(cpu, v);
+        *value = CLEM_UTIL_set16_lo(*value, v);
     } else {
-        --value;
-        _cpu_p_flags_n_z_data_16(cpu, value);
+        *value -= 1;
+        _cpu_p_flags_n_z_data_16(cpu, *value);
     }
 }
 
