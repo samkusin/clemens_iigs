@@ -37,7 +37,12 @@ enum ClemensCPUAddrMode {
     kClemensCPUAddrMode_Stack_Relative,
     kClemensCPUAddrMode_Stack_Relative_Indirect_Y,
     kClemensCPUAddrMode_PCRelative,
-    kClemensCPUAddrMode_PCRelativeLong
+    kClemensCPUAddrMode_PCRelativeLong,
+    kClemensCPUAddrMode_PC,
+    kClemensCPUAddrMode_PCIndirect,
+    kClemensCPUAddrMode_PCIndirect_X,
+    kClemensCPUAddrMode_PCLong,
+    kClemensCPUAddrMode_PCLongIndirect
 };
 
 struct ClemensOpcodeDesc {

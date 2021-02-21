@@ -110,11 +110,11 @@
 #define CLEM_OPC_INC_ABS_DP_IDX             (0xF6)
 #define CLEM_OPC_INX                        (0xE8)
 #define CLEM_OPC_INY                        (0xC8)
-#define CLEM_OPC_LSR_A                      (0x4A)
-#define CLEM_OPC_LSR_ABS                    (0x4E)
-#define CLEM_OPC_LSR_DP                     (0x46)
-#define CLEM_OPC_LSR_ABS_IDX                (0x5E)
-#define CLEM_OPC_LSR_ABS_DP_IDX             (0x56)
+#define CLEM_OPC_JMP_ABS                    (0x4C)
+#define CLEM_OPC_JMP_INDIRECT               (0x6C)
+#define CLEM_OPC_JMP_INDIRECT_IDX           (0x7C)
+#define CLEM_OPC_JMP_ABSL                   (0x5C)
+#define CLEM_OPC_JMP_ABSL_INDIRECT          (0xDC)
 #define CLEM_OPC_JSL                        (0x22)
 #define CLEM_OPC_JSR                        (0x20)
 #define CLEM_OPC_LDA_IMM                    (0xA9)
@@ -142,6 +142,12 @@
 #define CLEM_OPC_LDY_DP                     (0xA4)
 #define CLEM_OPC_LDY_ABS_IDX                (0xBC)
 #define CLEM_OPC_LDY_DP_IDX                 (0xB4)
+#define CLEM_OPC_LSR_A                      (0x4A)
+#define CLEM_OPC_LSR_ABS                    (0x4E)
+#define CLEM_OPC_LSR_DP                     (0x46)
+#define CLEM_OPC_LSR_ABS_IDX                (0x5E)
+#define CLEM_OPC_LSR_ABS_DP_IDX             (0x56)
+#define CLEM_OPC_NOP                        (0xEA)
 #define CLEM_OPC_ORA_IMM                    (0x09)
 #define CLEM_OPC_ORA_ABS                    (0x0D)
 #define CLEM_OPC_ORA_ABSL                   (0x0F)
@@ -199,6 +205,7 @@
 #define CLEM_OPC_SBC_STACK_REL              (0xE3)
 #define CLEM_OPC_SBC_STACK_REL_INDIRECT_IDY (0xF3)
 #define CLEM_OPC_SEC                        (0x38)
+#define CLEM_OPC_SED                        (0xF8)
 #define CLEM_OPC_SEI                        (0x78)
 #define CLEM_OPC_SEP                        (0xE2)
 #define CLEM_OPC_STA_ABS                    (0x8D)
@@ -227,6 +234,17 @@
 #define CLEM_OPC_STZ_DP_IDX                 (0x74)
 #define CLEM_OPC_TCS                        (0x1B)
 #define CLEM_OPC_TSB_ABS                    (0x0C)
+#define CLEM_OPC_TAX                        (0xAA)
+#define CLEM_OPC_TAY                        (0xA8)
+#define CLEM_OPC_TCD                        (0x5B)
+#define CLEM_OPC_TDC                        (0x7B)
+#define CLEM_OPC_TSC                        (0x3B)
+#define CLEM_OPC_TSX                        (0xBA)
+#define CLEM_OPC_TXA                        (0x8A)
+#define CLEM_OPC_TXS                        (0x9A)
+#define CLEM_OPC_TXY                        (0x9B)
+#define CLEM_OPC_TYA                        (0x98)
+#define CLEM_OPC_TYX                        (0xBB)
 #define CLEM_OPC_XCE                        (0xFB)
 
 
@@ -251,40 +269,20 @@
 #define CLEM_OPC_WDM                        (0x42)
 
 
-#define CLEM_OPC_JMP_ABS                    (0x4C)
-#define CLEM_OPC_JMP_INDIRECT               (0x6C)
-#define CLEM_OPC_JMP_IDX_INDIRECT           (0x7C)
-#define CLEM_OPC_JMP_ABSL                   (0x5C)
-#define CLEM_OPC_JMP_ABSL_INDIRECT          (0xDC)
 
 #define CLEM_OPC_MVN                        (0x54)
 #define CLEM_OPC_MVP                        (0x44)
-
-#define CLEM_OPC_NOP                        (0xEA)
 
 #define CLEM_OPC_PEA_ABS                    (0xF4)
 #define CLEM_OPC_PEI_DP_INDIRECT            (0xD4)
 #define CLEM_OPC_PER                        (0x62)
 
-//  RMW
-
-#define CLEM_OPC_SED                        (0xF8)
-
 //  Transfer
-#define CLEM_OPC_TAX                        (0xAA)
-#define CLEM_OPC_TAY                        (0xA8)
-#define CLEM_OPC_TCD                        (0x5B)
-#define CLEM_OPC_TDC                        (0x7B)
-#define CLEM_OPC_TSC                        (0x3B)
-#define CLEM_OPC_TSX                        (0xBA)
-#define CLEM_OPC_TXA                        (0x8A)
-#define CLEM_OPC_TXS                        (0x9A)
-#define CLEM_OPC_TXY                        (0x9B)
-#define CLEM_OPC_TYA                        (0x98)
-#define CLEM_OPC_TYX                        (0xBB)
+
 
 #define CLEM_OPC_TRB_ABS                    (0x1C)
 #define CLEM_OPC_TRB_DP                     (0x14)
+
 #define CLEM_OPC_TSB_DP                     (0x04)
 
 #define CLEM_OPC_XBA                        (0xEB)
