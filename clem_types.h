@@ -7,6 +7,15 @@
 #include "clem_defs.h"
 
 
+/* Note that in emulation mode, the EmulatedBrk flag should be
+   stored in the status register - for our purposes we mock this
+   behvaior only when the application has access to the status
+   register in emulation mode (i.e. PHP, PLP)
+
+   We do this to limit the number of conditional checks for the
+   X status register in instructions (always set to 1 in emulation
+   mode, better than a check for two flags - emulation and x_status)
+*/
 enum {
     kClemensCPUStatus_Carry              = (1 << 0),     // C
     kClemensCPUStatus_Zero               = (1 << 1),     // Z
@@ -14,6 +23,7 @@ enum {
     kClemensCPUStatus_Decimal            = (1 << 3),     // D
     kClemensCPUStatus_Index              = (1 << 4),     // X,
     kClemensCPUStatus_MemoryAccumulator  = (1 << 5),     // M,
+    kClemensCPUStatus_EmulatedBrk        = (1 << 5),     // B on 6502
     kClemensCPUStatus_Overflow           = (1 << 6),     // V
     kClemensCPUStatus_Negative           = (1 << 7)      // N
 };

@@ -10,6 +10,7 @@
 #define CLEM_OPC_ADC_IMM                    (0x69)
 #define CLEM_OPC_ADC_ABS                    (0x6D)
 #define CLEM_OPC_ADC_ABSL                   (0x6F)
+#define CLEM_OPC_BRK                        (0x00)
 #define CLEM_OPC_ADC_DP                     (0x65)
 #define CLEM_OPC_ADC_DP_INDIRECT            (0x72)
 #define CLEM_OPC_ADC_DP_INDIRECTL           (0x67)
@@ -276,7 +277,6 @@
 #define CLEM_OPC_STP                        (0xDB)
 #define CLEM_OPC_WAI                        (0xCB)
 #define CLEM_OPC_WDM                        (0x42)
-#define CLEM_OPC_BRK                        (0x00)
 
 
 
