@@ -147,6 +147,8 @@
 #define CLEM_OPC_LSR_DP                     (0x46)
 #define CLEM_OPC_LSR_ABS_IDX                (0x5E)
 #define CLEM_OPC_LSR_ABS_DP_IDX             (0x56)
+#define CLEM_OPC_MVN                        (0x54)
+#define CLEM_OPC_MVP                        (0x44)
 #define CLEM_OPC_NOP                        (0xEA)
 #define CLEM_OPC_ORA_IMM                    (0x09)
 #define CLEM_OPC_ORA_ABS                    (0x0D)
@@ -163,6 +165,9 @@
 #define CLEM_OPC_ORA_DP_INDIRECTL_IDY       (0x17)
 #define CLEM_OPC_ORA_STACK_REL              (0x03)
 #define CLEM_OPC_ORA_STACK_REL_INDIRECT_IDY (0x13)
+#define CLEM_OPC_PEA_ABS                    (0xF4)
+#define CLEM_OPC_PEI_DP_INDIRECT            (0xD4)
+#define CLEM_OPC_PER                        (0x62)
 #define CLEM_OPC_PHA                        (0x48)
 #define CLEM_OPC_PHB                        (0x8B)
 #define CLEM_OPC_PHD                        (0x0B)
@@ -233,7 +238,10 @@
 #define CLEM_OPC_STZ_ABS_IDX                (0x9E)
 #define CLEM_OPC_STZ_DP_IDX                 (0x74)
 #define CLEM_OPC_TCS                        (0x1B)
+#define CLEM_OPC_TRB_ABS                    (0x1C)
+#define CLEM_OPC_TRB_DP                     (0x14)
 #define CLEM_OPC_TSB_ABS                    (0x0C)
+#define CLEM_OPC_TSB_DP                     (0x04)
 #define CLEM_OPC_TAX                        (0xAA)
 #define CLEM_OPC_TAY                        (0xA8)
 #define CLEM_OPC_TCD                        (0x5B)
@@ -245,6 +253,7 @@
 #define CLEM_OPC_TXY                        (0x9B)
 #define CLEM_OPC_TYA                        (0x98)
 #define CLEM_OPC_TYX                        (0xBB)
+#define CLEM_OPC_XBA                        (0xEB)
 #define CLEM_OPC_XCE                        (0xFB)
 
 
@@ -267,25 +276,11 @@
 #define CLEM_OPC_STP                        (0xDB)
 #define CLEM_OPC_WAI                        (0xCB)
 #define CLEM_OPC_WDM                        (0x42)
+#define CLEM_OPC_BRK                        (0x00)
 
 
 
-#define CLEM_OPC_MVN                        (0x54)
-#define CLEM_OPC_MVP                        (0x44)
 
-#define CLEM_OPC_PEA_ABS                    (0xF4)
-#define CLEM_OPC_PEI_DP_INDIRECT            (0xD4)
-#define CLEM_OPC_PER                        (0x62)
-
-//  Transfer
-
-
-#define CLEM_OPC_TRB_ABS                    (0x1C)
-#define CLEM_OPC_TRB_DP                     (0x14)
-
-#define CLEM_OPC_TSB_DP                     (0x04)
-
-#define CLEM_OPC_XBA                        (0xEB)
 
 
 #endif
