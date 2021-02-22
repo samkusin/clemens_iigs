@@ -515,6 +515,8 @@ int clemens_init(
                         kClemensCPUAddrMode_Absolute_X);
     _opcode_description(CLEM_OPC_LSR_ABS_DP_IDX,  "LSR",
                         kClemensCPUAddrMode_DirectPage_X);
+    _opcode_description(CLEM_OPC_MVN,     "MVN", kClemensCPUAddrMode_MoveBlock);
+    _opcode_description(CLEM_OPC_MVP,     "MVP", kClemensCPUAddrMode_MoveBlock);
 
     _opcode_description(CLEM_OPC_NOP,     "NOP", kClemensCPUAddrMode_None);
 
@@ -547,6 +549,11 @@ int clemens_init(
     _opcode_description(CLEM_OPC_ORA_STACK_REL_INDIRECT_IDY,  "ORA",
                         kClemensCPUAddrMode_Stack_Relative_Indirect_Y);
 
+    _opcode_description(CLEM_OPC_PEA_ABS, "PEA", kClemensCPUAddrMode_Absolute);
+    _opcode_description(CLEM_OPC_PEI_DP_INDIRECT, "PEI",
+                        kClemensCPUAddrMode_DirectPageIndirect);
+    _opcode_description(CLEM_OPC_PER,     "PER",
+                        kClemensCPUAddrMode_PCRelativeLong);
     _opcode_description(CLEM_OPC_PHA,     "PHA", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_PHB,     "PHB", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_PHD,     "PHD", kClemensCPUAddrMode_None);
@@ -659,8 +666,13 @@ int clemens_init(
     _opcode_description(CLEM_OPC_STZ_DP_IDX, "STZ",
                         kClemensCPUAddrMode_DirectPage_X);
 
+    _opcode_description(CLEM_OPC_TRB_ABS, "TRB", kClemensCPUAddrMode_Absolute);
+    _opcode_description(CLEM_OPC_TRB_DP,  "TRB", kClemensCPUAddrMode_DirectPage);
     _opcode_description(CLEM_OPC_TSB_ABS, "TSB", kClemensCPUAddrMode_Absolute);
+    _opcode_description(CLEM_OPC_TSB_DP,  "TSB", kClemensCPUAddrMode_DirectPage);
+
     _opcode_description(CLEM_OPC_TCS,     "TCS", kClemensCPUAddrMode_None);
+    _opcode_description(CLEM_OPC_XBA,     "XBA", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_XCE,     "XCE", kClemensCPUAddrMode_None);
 
 
@@ -676,7 +688,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
     uint16_t tmp_value;
     uint16_t tmp_pc;
     uint8_t tmp_data;
-    uint8_t tmp_dbr;
+    uint8_t tmp_bnk0;
+    uint8_t tmp_bnk1;
     uint8_t IR;
 
     struct ClemensInstruction opc_inst;
@@ -731,10 +744,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_ADC_ABSL:
             //  TODO: emulation mode
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_adc(cpu, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_ADC_DP:
             _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
@@ -750,8 +763,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_ADC_DP_INDIRECTL:
             _clem_read_pba_mode_dp_indirectl(
-                clem, &tmp_addr, &tmp_dbr, &tmp_pc, &tmp_data, 0, false);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+                clem, &tmp_addr, &tmp_bnk0, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_adc(cpu, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -764,11 +777,11 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_ADC_ABSL_IDX:
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_bnk0, m_status, x_status);
             _cpu_adc(cpu, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_ADC_ABS_IDY:      // $addr + Y
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
@@ -801,10 +814,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_ADC_DP_INDIRECTL_IDY:
-            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc,
                 &tmp_data, 0, false);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_bnk0, m_status, x_status);
             _cpu_adc(cpu, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -837,10 +850,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_AND_ABSL:
             //  TODO: emulation mode
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_and(cpu, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_AND_DP:
             _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
@@ -856,8 +869,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_AND_DP_INDIRECTL:
             _clem_read_pba_mode_dp_indirectl(
-                clem, &tmp_addr, &tmp_dbr, &tmp_pc, &tmp_data, 0, false);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+                clem, &tmp_addr, &tmp_bnk0, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_and(cpu, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -870,11 +883,11 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_AND_ABSL_IDX:
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_bnk0, m_status, x_status);
             _cpu_and(cpu, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_AND_ABS_IDY:      // $addr + Y
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
@@ -907,10 +920,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_AND_DP_INDIRECTL_IDY:
-            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc,
                 &tmp_data, 0, false);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_bnk0, m_status, x_status);
             _cpu_and(cpu, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -943,7 +956,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_ASL_DP:
-            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, m_status);
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
             _cpu_asl(cpu, &tmp_value, m_status);
             _clem_cycle(clem, 1);
@@ -987,7 +1000,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_BIT_DP:
-            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, m_status);
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
             _cpu_bit(cpu, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
@@ -1095,10 +1108,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_CMP_ABSL:
             //  TODO: emulation mode
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_cmp(cpu, cpu->regs.A, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_CMP_DP:
             _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
@@ -1114,8 +1127,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_CMP_DP_INDIRECTL:
             _clem_read_pba_mode_dp_indirectl(
-                clem, &tmp_addr, &tmp_dbr, &tmp_pc, &tmp_data, 0, false);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+                clem, &tmp_addr, &tmp_bnk0, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_cmp(cpu, cpu->regs.A, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -1128,11 +1141,11 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_CMP_ABSL_IDX:
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_bnk0, m_status, x_status);
             _cpu_cmp(cpu, cpu->regs.A, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_CMP_ABS_IDY:      // $addr + Y
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
@@ -1165,10 +1178,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_CMP_DP_INDIRECTL_IDY:
-            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc,
                 &tmp_data, 0, false);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_bnk0, m_status, x_status);
             _cpu_cmp(cpu, cpu->regs.A, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -1236,7 +1249,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_DEC_DP:
-            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, m_status);
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
             _cpu_dec(cpu, &tmp_value, m_status);
             _clem_cycle(clem, 1);
@@ -1302,10 +1315,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_EOR_ABSL:
             //  TODO: emulation mode
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_eor(cpu, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_EOR_DP:
             _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
@@ -1321,8 +1334,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_EOR_DP_INDIRECTL:
             _clem_read_pba_mode_dp_indirectl(
-                clem, &tmp_addr, &tmp_dbr, &tmp_pc, &tmp_data, 0, false);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+                clem, &tmp_addr, &tmp_bnk0, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_eor(cpu, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -1335,11 +1348,11 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_EOR_ABSL_IDX:
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_bnk0, m_status, x_status);
             _cpu_eor(cpu, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_EOR_ABS_IDY:      // $addr + Y
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
@@ -1372,10 +1385,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_EOR_DP_INDIRECTL_IDY:
-            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc,
                 &tmp_data, 0, false);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_bnk0, m_status, x_status);
             _cpu_eor(cpu, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -1408,7 +1421,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_INC_DP:
-            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, m_status);
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
             _cpu_inc(cpu, &tmp_value, m_status);
             _clem_cycle(clem, 1);
@@ -1486,17 +1499,17 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_JMP_ABSL:
             _clem_read_pba_16(clem, &tmp_addr, &tmp_pc);
-            _clem_read_pba(clem, &tmp_dbr, &tmp_pc);
+            _clem_read_pba(clem, &tmp_bnk0, &tmp_pc);
             tmp_pc = tmp_addr;
-            cpu->regs.PBR = tmp_dbr;
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            cpu->regs.PBR = tmp_bnk0;
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_JMP_ABSL_INDIRECT:
             _clem_read_pba_16(clem, &tmp_addr, &tmp_pc);
             _clem_read_16(clem, &tmp_eaddr, tmp_addr, 0x00, CLEM_MEM_FLAG_DATA);
-            _clem_read(clem, &tmp_dbr, tmp_addr + 2, 0x00, CLEM_MEM_FLAG_DATA);
+            _clem_read(clem, &tmp_bnk0, tmp_addr + 2, 0x00, CLEM_MEM_FLAG_DATA);
             tmp_pc = tmp_eaddr;
-            cpu->regs.PBR = tmp_dbr;
+            cpu->regs.PBR = tmp_bnk0;
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         //  End JMP
@@ -1515,10 +1528,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_LDA_ABSL:
             //  TODO: emulation mode
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_lda(cpu, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_LDA_DP:
             _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
@@ -1533,9 +1546,9 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_LDA_DP_INDIRECTL:
-            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc,
                 &tmp_data, 0, false);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_lda(cpu, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -1547,11 +1560,11 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_LDA_ABSL_IDX:
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_bnk0, m_status, x_status);
             _cpu_lda(cpu, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_LDA_ABS_IDY:      // $addr + Y
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
@@ -1583,10 +1596,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_LDA_DP_INDIRECTL_IDY:
-            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc,
                 &tmp_data, 0, false);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_bnk0, m_status, x_status);
             _cpu_lda(cpu, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -1682,7 +1695,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_LSR_DP:
-            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, m_status);
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
             _cpu_lsr(cpu, &tmp_value, m_status);
             _clem_cycle(clem, 1);
@@ -1713,6 +1726,44 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         //  End LSR
         //
+        case CLEM_OPC_MVN:
+            //  copy X -> Y, incrementing X, Y, decrement C
+            _clem_read_pba(clem, &tmp_bnk1, &tmp_pc);   // dest
+            _clem_read_pba(clem, &tmp_bnk0, &tmp_pc);    // src
+            _clem_read(clem, &tmp_data, cpu->regs.X, tmp_bnk0, CLEM_MEM_FLAG_DATA);
+            _clem_write(clem, tmp_data, cpu->regs.Y, tmp_bnk1);
+            if (x_status) {
+                cpu->regs.X = CLEM_UTIL_set16_lo(cpu->regs.X, cpu->regs.X + 1);
+                cpu->regs.Y = CLEM_UTIL_set16_lo(cpu->regs.Y, cpu->regs.Y + 1);
+            } else {
+                ++cpu->regs.X;
+                ++cpu->regs.Y;
+            }
+            _clem_cycle(clem, 2);
+            --cpu->regs.A;
+            if (cpu->regs.A != 0xffff) {
+                tmp_pc = cpu->regs.PC;  // repeat
+            }
+            break;
+        case CLEM_OPC_MVP:
+            //  copy X -> Y, decrementing X, Y, decrement C
+            _clem_read_pba(clem, &tmp_bnk1, &tmp_pc);   // dest
+            _clem_read_pba(clem, &tmp_bnk0, &tmp_pc);    // src
+            _clem_read(clem, &tmp_data, cpu->regs.X, tmp_bnk0, CLEM_MEM_FLAG_DATA);
+            _clem_write(clem, tmp_data, cpu->regs.Y, tmp_bnk1);
+            if (x_status) {
+                cpu->regs.X = CLEM_UTIL_set16_lo(cpu->regs.X, cpu->regs.X - 1);
+                cpu->regs.Y = CLEM_UTIL_set16_lo(cpu->regs.Y, cpu->regs.Y - 1);
+            } else {
+                --cpu->regs.X;
+                --cpu->regs.Y;
+            }
+            _clem_cycle(clem, 2);
+            --cpu->regs.A;
+            if (cpu->regs.A != 0xffff) {
+                tmp_pc = cpu->regs.PC;  // repeat
+            }
+            break;
         case CLEM_OPC_NOP:
             _clem_cycle(clem, 1);
             break;
@@ -1731,10 +1782,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_ORA_ABSL:
             //  TODO: emulation mode
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_ora(cpu, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_ORA_DP:
             _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
@@ -1750,8 +1801,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_ORA_DP_INDIRECTL:
             _clem_read_pba_mode_dp_indirectl(
-                clem, &tmp_addr, &tmp_dbr, &tmp_pc, &tmp_data, 0, false);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+                clem, &tmp_addr, &tmp_bnk0, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_ora(cpu, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -1764,11 +1815,11 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_ORA_ABSL_IDX:
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_bnk0, m_status, x_status);
             _cpu_ora(cpu, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_ORA_ABS_IDY:      // $addr + Y
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
@@ -1801,10 +1852,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_ORA_DP_INDIRECTL_IDY:
-            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc,
                 &tmp_data, 0, false);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_bnk0, m_status, x_status);
             _cpu_ora(cpu, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -1823,6 +1874,27 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         //  End ORA
         //
+        case CLEM_OPC_PEA_ABS:
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _cpu_sp_dec2(cpu);
+            _clem_write_16(clem, tmp_addr, cpu->regs.S + 1, 0x00);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_PEI_DP_INDIRECT:
+            _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data,
+                0, false);
+
+            _cpu_sp_dec2(cpu);
+            _clem_write_16(clem, tmp_addr, cpu->regs.S + 1, 0x00);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_PER:
+            _clem_read_pba_16(clem, &tmp_value, &tmp_pc);
+            tmp_addr = tmp_pc + (int16_t)tmp_value;
+            _clem_cycle(clem, 1);
+            _cpu_sp_dec2(cpu);
+            _clem_write_16(clem, tmp_addr, cpu->regs.S + 1, 0x00);
+            break;
         case CLEM_OPC_PHA:
             _clem_opc_push_reg_816(clem, cpu->regs.A, m_status);
             break;
@@ -1909,7 +1981,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_ROL_DP:
-            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, m_status);
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
             _cpu_rol(cpu, &tmp_value, m_status);
             _clem_cycle(clem, 1);
@@ -1954,7 +2026,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_ROR_DP:
-            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, m_status);
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
             _cpu_ror(cpu, &tmp_value, m_status);
             _clem_cycle(clem, 1);
@@ -1999,10 +2071,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_SBC_ABSL:
             //  TODO: emulation mode
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_sbc(cpu, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_SBC_DP:
             _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
@@ -2018,8 +2090,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_SBC_DP_INDIRECTL:
             _clem_read_pba_mode_dp_indirectl(
-                clem, &tmp_addr, &tmp_dbr, &tmp_pc, &tmp_data, 0, false);
-            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_dbr, m_status);
+                clem, &tmp_addr, &tmp_bnk0, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, tmp_bnk0, m_status);
             _cpu_sbc(cpu, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -2032,11 +2104,11 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_SBC_ABSL_IDX:
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.X, tmp_bnk0, m_status, x_status);
             _cpu_sbc(cpu, tmp_value, m_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_SBC_ABS_IDY:      // $addr + Y
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
@@ -2069,10 +2141,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_SBC_DP_INDIRECTL_IDY:
-            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc,
                 &tmp_data, 0, false);
             _clem_read_data_indexed_816(
-                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_dbr, m_status, x_status);
+                clem, &tmp_value, tmp_addr, cpu->regs.Y, tmp_bnk0, m_status, x_status);
             _cpu_sbc(cpu, tmp_value, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -2125,8 +2197,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
         case CLEM_OPC_STA_ABSL:
             //  absolute long read
             //  TODO: what about emulation mode?
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
-            _clem_write_816(clem, cpu->regs.A, tmp_dbr, tmp_addr, m_status);
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
+            _clem_write_816(clem, cpu->regs.A, tmp_bnk0, tmp_addr, m_status);
             _opcode_instruction_define_long(&opc_inst, IR, tmp_data, tmp_addr);
             break;
         case CLEM_OPC_STA_DP:
@@ -2140,9 +2212,9 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_STA_DP_INDIRECTL:
-            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc,
                 &tmp_data, 0, false);
-            _clem_write_816(clem, cpu->regs.A, tmp_dbr, tmp_addr, m_status);
+            _clem_write_816(clem, cpu->regs.A, tmp_bnk0, tmp_addr, m_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_STA_ABS_IDX:
@@ -2152,10 +2224,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_STA_ABSL_IDX:
-            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_dbr, &tmp_pc);
-            _clem_write_indexed_816(clem, cpu->regs.A, tmp_dbr, tmp_addr,
+            _clem_read_pba_mode_absl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc);
+            _clem_write_indexed_816(clem, cpu->regs.A, tmp_bnk0, tmp_addr,
                 cpu->regs.X, m_status, x_status);
-            _opcode_instruction_define_long(&opc_inst, IR, tmp_dbr, tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             break;
         case CLEM_OPC_STA_ABS_IDY:      // $addr + Y
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
@@ -2185,9 +2257,9 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_STA_DP_INDIRECTL_IDY:
-            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_dbr, &tmp_pc,
+            _clem_read_pba_mode_dp_indirectl(clem, &tmp_addr, &tmp_bnk0, &tmp_pc,
                 &tmp_data, 0, false);
-            _clem_write_indexed_816(clem, cpu->regs.A, tmp_dbr, tmp_addr, cpu->regs.Y,
+            _clem_write_indexed_816(clem, cpu->regs.A, tmp_bnk0, tmp_addr, cpu->regs.Y,
                 m_status, x_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
@@ -2365,6 +2437,22 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         //  End Transfer
         //
+        case CLEM_OPC_TRB_ABS:
+            _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _cpu_trb(cpu, &tmp_value, m_status);
+            _clem_cycle(clem, 1);
+            _clem_write_816(clem, tmp_value, tmp_addr, cpu->regs.DBR, m_status);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_TRB_DP:
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
+            _cpu_trb(cpu, &tmp_value, m_status);
+            _clem_cycle(clem, 1);
+            _clem_write_816(clem, tmp_value, tmp_addr, 0x00, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
         case CLEM_OPC_TSB_ABS:
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
@@ -2372,6 +2460,21 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_cycle(clem, 1);
             _clem_write_816(clem, tmp_value, tmp_addr, cpu->regs.DBR, m_status);
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+            break;
+        case CLEM_OPC_TSB_DP:
+            _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
+            _cpu_tsb(cpu, &tmp_value, m_status);
+            _clem_cycle(clem, 1);
+            _clem_write_816(clem, tmp_value, tmp_addr, 0x00, m_status);
+            _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
+            break;
+        case CLEM_OPC_XBA:
+            tmp_value = cpu->regs.A;
+            cpu->regs.A = (tmp_value & 0xff00) >> 8;
+            cpu->regs.A = (tmp_value & 0x00ff) << 8 | cpu->regs.A;
+            _cpu_p_flags_n_z_data(cpu, (uint8_t)(cpu->regs.A & 0x00ff));
+            _clem_cycle(clem, 2);
             break;
         case CLEM_OPC_XCE:
             tmp_value = cpu->emulation;

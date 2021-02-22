@@ -783,6 +783,23 @@ static inline void _cpu_ldxy(
     }
 }
 
+static inline void _cpu_trb(
+    struct Clemens65C816* cpu,
+    uint16_t* value,
+    bool is8
+) {
+    if (is8) {
+        uint8_t v = (uint8_t)(*value);
+        uint8_t a = (uint8_t)(cpu->regs.A);
+        v &= ~a;
+        _cpu_p_flags_z_data(cpu, v & a);
+        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, v);
+    } else {
+         *value &= ~cpu->regs.A;
+        _cpu_p_flags_z_data_16(cpu, *value & cpu->regs.A);
+    }
+}
+
 static inline void _cpu_tsb(
     struct Clemens65C816* cpu,
     uint16_t* value,
@@ -796,7 +813,7 @@ static inline void _cpu_tsb(
         cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, v);
     } else {
          *value |= cpu->regs.A;
-        _cpu_p_flags_n_z_data_16(cpu, *value & cpu->regs.A);
+        _cpu_p_flags_z_data_16(cpu, *value & cpu->regs.A);
     }
 }
 

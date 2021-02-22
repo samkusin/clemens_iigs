@@ -10,8 +10,8 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Implement remaining opcodes (T??, JMP, stragglers)
 * Implement interrupt opcodes (COP, BRK, CLI, RTI, etc)
+* Very emulation <-> native switch initializes everything correctly
 * Test ROM 1
 * More debugging utilities
 * Data accesses across banks are allowed (but not stack accesses?)
@@ -23,6 +23,7 @@ This is a running todo list.
   * shadowing
 * Decimal math
 * Test ROM display and validate with an existing //gs emulator
+
 ## DONE
 
 * RESET handling and CPU initialization
@@ -35,3 +36,4 @@ This is a running todo list.
 * Implement branches
 * Implement ASL, BIT
 * Implement ROL, ROR, STX, STY, STZ
+* Implement remaining opcodes (T??, JMP, stragglers)
