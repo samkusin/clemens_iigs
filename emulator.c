@@ -172,7 +172,7 @@ static void _opcode_print(
             printf(ANSI_COLOR_YELLOW " $%04X, X", inst->value);
             break;
         case kClemensCPUAddrMode_Absolute_Y:
-            printf(ANSI_COLOR_YELLOW, " $%04X, Y", inst->value);
+            printf(ANSI_COLOR_YELLOW " $%04X, Y", inst->value);
             break;
         case kClemensCPUAddrMode_AbsoluteLong_X:
             printf(ANSI_COLOR_YELLOW " $%02X%04X, X", inst->bank, inst->value);
@@ -211,19 +211,19 @@ static void _opcode_print(
             printf(ANSI_COLOR_YELLOW " $%04X", inst->value);
             break;
         case kClemensCPUAddrMode_PCIndirect:
-            printf(ANSI_COLOR_YELLOW, " ($%04X)", inst->value);
+            printf(ANSI_COLOR_YELLOW " ($%04X)", inst->value);
             break;
         case kClemensCPUAddrMode_PCIndirect_X:
-            printf(ANSI_COLOR_YELLOW, " ($%04X, X)", inst->value);
+            printf(ANSI_COLOR_YELLOW " ($%04X, X)", inst->value);
             break;
         case kClemensCPUAddrMode_PCLong:
-            printf(ANSI_COLOR_YELLOW, " $%02X%04X", inst->bank, inst->value);
+            printf(ANSI_COLOR_YELLOW " $%02X%04X", inst->bank, inst->value);
             break;
         case kClemensCPUAddrMode_PCLongIndirect:
-            printf(ANSI_COLOR_YELLOW, " [$%04X]", inst->bank, inst->value);
+            printf(ANSI_COLOR_YELLOW " [$%04X]", inst->bank, inst->value);
             break;
         case kClemensCPUAddrMode_Operand:
-            printf(ANSI_COLOR_YELLOW, " %02X", inst->value);
+            printf(ANSI_COLOR_YELLOW " %02X", inst->value);
             break;
     }
     printf(ANSI_COLOR_RESET "\n");
@@ -261,7 +261,7 @@ int clemens_init(
     memset(machine->fpi_bank_map[0x03], 0, CLEM_IIGS_BANK_SIZE);
 
     machine->mega2_bank_map[0x00] = (uint8_t*)malloc(CLEM_IIGS_BANK_SIZE);
-    memset(machine->fpi_bank_map[0x00], 0, CLEM_IIGS_BANK_SIZE);
+    memset(machine->mega2_bank_map[0x00], 0, CLEM_IIGS_BANK_SIZE);
     machine->mega2_bank_map[0x01] = (uint8_t*)malloc(CLEM_IIGS_BANK_SIZE);
     memset(machine->mega2_bank_map[0x01], 0, CLEM_IIGS_BANK_SIZE);
 
