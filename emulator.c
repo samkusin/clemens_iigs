@@ -1921,16 +1921,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_PHP:
             _clem_cycle(clem, 1);
-            tmp_data = cpu->regs.P;
-            if (cpu->emulation) {
-                if (cpu->intr_brk) {
-                    tmp_data |= kClemensCPUStatus_EmulatedBrk;
-                } else {
-                    tmp_data &= ~kClemensCPUStatus_EmulatedBrk;
-                }
-            }
-            _clem_write(clem, tmp_data, cpu->regs.S, 0x00);
-            _cpu_sp_dec(cpu);
+            _clem_opc_push_status(clem);
             break;
         case CLEM_OPC_PHX:
             _clem_opc_push_reg_816(clem, cpu->regs.X, x_status);
@@ -2605,7 +2596,19 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             //  irq_disable is set
             //  reset P:decimal flag to 0 (assuming before running BRK program)
             //  PC <- use native or emulation mode vector
-
+            //  TODO: what to do if we are already in a brk?
+            cpu->intr_brk = true;
+            //  native mode push PBR
+            if (!cpu->emulation) {
+                _cpu_sp_dec(cpu);
+                _clem_write(clem, (uint8_t)cpu->regs.PBR, cpu->regs.S + 1, 0x00);
+            }
+            //  push PC and status
+            _cpu_sp_dec2(cpu);
+            _clem_write_16(clem, tmp_pc, cpu->regs.S + 1, 0x00);
+            _clem_opc_push_status(clem);
+            cpu->regs.P |= kClemensCPUStatus_IRQDisable;
+            cpu->regs.P &= ~kClemensCPUStatus_Decimal;
             break;
 
         default:
