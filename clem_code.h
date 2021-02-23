@@ -357,6 +357,21 @@ static inline void _clem_opc_pull_reg_8(
     _clem_read(clem, data, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
 }
 
+static inline void _clem_opc_push_status(
+    ClemensMachine* clem
+) {
+    uint8_t tmp_data = clem->cpu.regs.P;
+    if (clem->cpu.emulation) {
+        if (cpu->intr_brk) {
+            tmp_data |= kClemensCPUStatus_EmulatedBrk;
+        } else {
+            tmp_data &= ~kClemensCPUStatus_EmulatedBrk;
+        }
+    }
+    _clem_write(clem, tmp_data, clem->cpu.regs.S, 0x00);
+    _cpu_sp_dec(&clem->cpu);
+}
+
 /*  Handle opcode addressing modes
 */
 static inline void _clem_read_pba_mode_imm_816(

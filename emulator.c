@@ -353,6 +353,8 @@ int clemens_init(
     _opcode_description(CLEM_OPC_BVC,     "BVC", kClemensCPUAddrMode_PCRelative);
     _opcode_description(CLEM_OPC_BVS,     "BVS", kClemensCPUAddrMode_PCRelative);
 
+    _opcode_description(CLEM_OPC_BRK,     "BRK", kClemensCPUStateType_None);
+
     _opcode_description(CLEM_OPC_CLC,     "CLC", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_CLD,     "CLD", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_CLV,     "CLV", kClemensCPUAddrMode_None);
@@ -1919,8 +1921,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_PHP:
             _clem_cycle(clem, 1);
-            _clem_write(clem, cpu->regs.P, cpu->regs.S, 0x00);
-            _cpu_sp_dec(cpu);
+            _clem_opc_push_status(clem);
             break;
         case CLEM_OPC_PHX:
             _clem_opc_push_reg_816(clem, cpu->regs.X, x_status);
@@ -1945,7 +1946,15 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _cpu_sp_inc2(cpu);
             break;
         case CLEM_OPC_PLP:
-            _clem_opc_pull_reg_8(clem, &cpu->regs.P);
+            // In emulation, the B flag is not restored - it should
+            // instead set x_status to 1? (can we set x_status to 0 in
+            // emulation?)
+            _clem_opc_pull_reg_8(clem, &tmp_data);
+            if (cpu->emulation) {
+                // TODO: are 16-bit index registers possible in emulation mode?
+                tmp_data |= kClemensCPUStatus_Index;
+            }
+            cpu->regs.P = tmp_data;
             break;
         case CLEM_OPC_PLX:
             _clem_opc_push_reg_816(clem, cpu->regs.X, x_status);
@@ -2574,6 +2583,34 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _cpu_sp_inc3(cpu);
             tmp_pc = tmp_addr + 1;
             break;
+
+        //  interrupt opcodes (RESET is handled separately)
+        case CLEM_OPC_BRK:
+            //  ignore irq disable
+            _clem_read_pba(clem, &tmp_data, &tmp_pc);
+
+            //  set intr_brk = true
+            //  push PBR (native)
+            //  push PC
+            //  push P - move PHP code into common utility for this
+            //  irq_disable is set
+            //  reset P:decimal flag to 0 (assuming before running BRK program)
+            //  PC <- use native or emulation mode vector
+            //  TODO: what to do if we are already in a brk?
+            cpu->intr_brk = true;
+            //  native mode push PBR
+            if (!cpu->emulation) {
+                _cpu_sp_dec(cpu);
+                _clem_write(clem, (uint8_t)cpu->regs.PBR, cpu->regs.S + 1, 0x00);
+            }
+            //  push PC and status
+            _cpu_sp_dec2(cpu);
+            _clem_write_16(clem, tmp_pc, cpu->regs.S + 1, 0x00);
+            _clem_opc_push_status(clem);
+            cpu->regs.P |= kClemensCPUStatus_IRQDisable;
+            cpu->regs.P &= ~kClemensCPUStatus_Decimal;
+            break;
+
         default:
             printf("Unknown IR = %x\n", IR);
             assert(false);
