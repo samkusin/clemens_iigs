@@ -53,7 +53,8 @@ enum ClemensCPUAddrMode {
     kClemensCPUAddrMode_PCIndirect,
     kClemensCPUAddrMode_PCIndirect_X,
     kClemensCPUAddrMode_PCLong,
-    kClemensCPUAddrMode_PCLongIndirect
+    kClemensCPUAddrMode_PCLongIndirect,
+    kClemensCPUAddrMode_Operand
 };
 
 struct ClemensOpcodeDesc {
@@ -90,10 +91,10 @@ struct ClemensCPUPins {
     bool busEnableIn;                   // Bus Enable
     bool irqIn;                         // Interrupt Request
     bool nmiIn;                         // Non-Maskable Interrupt
-    bool readyInOut;                    // Ready CPU
+    bool readyOut;                      // if false, then WAIT
     bool resbIn;                        // RESET
-    bool vpbOut;                        // Vector Pull
     /*
+    bool vpbOut;                        // Vector Pull
     bool rwbOut;                        // Read/Write byte
     bool vdaOut;                        // Valid Data Address
     bool vpaOut;                        // Valid Program Address
@@ -112,8 +113,8 @@ struct Clemens65C816 {
     struct ClemensCPURegs regs;
     enum ClemensCPUStateType state_type;
     uint32_t cycles_spent;
-    bool emulation;
-    bool intr_brk;
+    bool emulation;         // used when a BRK occurs during emulation
+    bool enabled;           // set to false by STP, and true by RESET
 };
 
 

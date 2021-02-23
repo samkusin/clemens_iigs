@@ -10,7 +10,6 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Implement interrupt opcodes (COP, BRK, CLI, RTI, etc)
 * Very emulation <-> native switch initializes everything correctly
 * Test ROM 1
 * More debugging utilities
@@ -37,3 +36,4 @@ This is a running todo list.
 * Implement ASL, BIT
 * Implement ROL, ROR, STX, STY, STZ
 * Implement remaining opcodes (T??, JMP, stragglers)
+* Implement interrupt opcodes (COP, BRK, CLI, RTI, etc)

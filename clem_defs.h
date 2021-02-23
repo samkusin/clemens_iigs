@@ -2,8 +2,20 @@
 #define CLEMENS_DEFS_H
 
 
-#define CLEM_65816_RESET_VECTOR_LO_ADDR     (0xFFFC)
-#define CLEM_65816_RESET_VECTOR_HI_ADDR     (0xFFFD)
+#define CLEM_6502_COP_VECTOR_LO_ADDR        (0xFFF4)
+#define CLEM_6502_COP_VECTOR_HI_ADDR        (0xFFF5)
+#define CLEM_6502_RESET_VECTOR_LO_ADDR      (0xFFFC)
+#define CLEM_6502_RESET_VECTOR_HI_ADDR      (0xFFFD)
+#define CLEM_6502_IRQBRK_VECTOR_LO_ADDR     (0xFFFE)
+#define CLEM_6502_IRQBRK_VECTOR_HI_ADDR     (0xFFFF)
+
+#define CLEM_65816_COP_VECTOR_LO_ADDR       (0xFFE4)
+#define CLEM_65816_COP_VECTOR_HI_ADDR       (0xFFE5)
+#define CLEM_65816_BRK_VECTOR_LO_ADDR       (0xFFE6)
+#define CLEM_65816_BRK_VECTOR_HI_ADDR       (0xFFE7)
+#define CLEM_65816_IRQB_VECTOR_LO_ADDR      (0xFFEE)
+#define CLEM_65816_IRQB_VECTOR_HI_ADDR      (0xFFEF)
+
 #define CLEM_IIGS_BANK_SIZE                 (64 * 1024)
 #define CLEM_IIGS_ROM3_SIZE                 (CLEM_IIGS_BANK_SIZE * 4)
 
@@ -60,6 +72,7 @@
 #define CLEM_OPC_BVS                        (0x70)
 #define CLEM_OPC_CLC                        (0x18)
 #define CLEM_OPC_CLD                        (0xD8)
+#define CLEM_OPC_CLI                        (0x58)
 #define CLEM_OPC_CLV                        (0xB8)
 #define CLEM_OPC_CMP_IMM                    (0xC9)
 #define CLEM_OPC_CMP_ABS                    (0xCD)
@@ -76,6 +89,7 @@
 #define CLEM_OPC_CMP_DP_INDIRECTL_IDY       (0xD7)
 #define CLEM_OPC_CMP_STACK_REL              (0xC3)
 #define CLEM_OPC_CMP_STACK_REL_INDIRECT_IDY (0xD3)
+#define CLEM_OPC_COP                        (0x02)
 #define CLEM_OPC_CPX_IMM                    (0xE0)
 #define CLEM_OPC_CPX_ABS                    (0xEC)
 #define CLEM_OPC_CPX_DP                     (0xE4)
@@ -193,6 +207,7 @@
 #define CLEM_OPC_ROR_DP                     (0x66)
 #define CLEM_OPC_ROR_ABS_IDX                (0x7E)
 #define CLEM_OPC_ROR_ABS_DP_IDX             (0x76)
+#define CLEM_OPC_RTI                        (0x40)
 #define CLEM_OPC_RTL                        (0x6B)
 #define CLEM_OPC_RTS                        (0x60)
 #define CLEM_OPC_SBC_IMM                    (0xE9)
@@ -228,6 +243,7 @@
 #define CLEM_OPC_STA_DP_INDIRECTL_IDY       (0x97)
 #define CLEM_OPC_STA_STACK_REL              (0x83)
 #define CLEM_OPC_STA_STACK_REL_INDIRECT_IDY (0x93)
+#define CLEM_OPC_STP                        (0xDB)
 #define CLEM_OPC_STX_ABS                    (0x8E)
 #define CLEM_OPC_STX_DP                     (0x86)
 #define CLEM_OPC_STX_DP_IDY                 (0x96)
@@ -254,6 +270,8 @@
 #define CLEM_OPC_TXY                        (0x9B)
 #define CLEM_OPC_TYA                        (0x98)
 #define CLEM_OPC_TYX                        (0xBB)
+#define CLEM_OPC_WAI                        (0xCB)
+#define CLEM_OPC_WDM                        (0x42)
 #define CLEM_OPC_XBA                        (0xEB)
 #define CLEM_OPC_XCE                        (0xFB)
 
@@ -269,18 +287,5 @@
 
 #define CLEM_UTIL_CROSSED_PAGE_BOUNDARY(_adr0_, _adr1_) \
     (((_adr0_) ^ (_adr1_)) & 0xff00)
-
-
-/* TODO */
-#define CLEM_OPC_CLI                        (0x58)
-#define CLEM_OPC_RTI                        (0x40)
-#define CLEM_OPC_STP                        (0xDB)
-#define CLEM_OPC_WAI                        (0xCB)
-#define CLEM_OPC_WDM                        (0x42)
-
-
-
-
-
 
 #endif

@@ -358,11 +358,12 @@ static inline void _clem_opc_pull_reg_8(
 }
 
 static inline void _clem_opc_push_status(
-    ClemensMachine* clem
+    ClemensMachine* clem,
+    bool is_brk
 ) {
     uint8_t tmp_data = clem->cpu.regs.P;
     if (clem->cpu.emulation) {
-        if (cpu->intr_brk) {
+        if (is_brk) {
             tmp_data |= kClemensCPUStatus_EmulatedBrk;
         } else {
             tmp_data &= ~kClemensCPUStatus_EmulatedBrk;
@@ -370,6 +371,20 @@ static inline void _clem_opc_push_status(
     }
     _clem_write(clem, tmp_data, clem->cpu.regs.S, 0x00);
     _cpu_sp_dec(&clem->cpu);
+}
+
+static inline void _clem_opc_pull_status(
+    ClemensMachine* clem
+) {
+    uint8_t tmp_p;
+    _cpu_sp_inc(&clem->cpu);
+    _clem_read(clem, &tmp_p, clem->cpu.regs.S, 0x00, CLEM_MEM_FLAG_DATA);
+
+    if (clem->cpu.emulation) {
+        // TODO: are 16-bit index registers possible in emulation mode?
+        tmp_p |= kClemensCPUStatus_Index;
+    }
+    clem->cpu.regs.P = tmp_p;
 }
 
 /*  Handle opcode addressing modes
@@ -835,8 +850,8 @@ static inline void _cpu_tsb(
 static inline void _clem_write_816(
     ClemensMachine* clem,
     uint16_t value,
-    uint8_t dbr,
     uint16_t addr,
+    uint8_t dbr,
     bool is8
 ) {
     if (is8) {
@@ -849,9 +864,9 @@ static inline void _clem_write_816(
 static inline void _clem_write_indexed_816(
     ClemensMachine* clem,
     uint16_t value,
-    uint8_t dbr,
     uint16_t addr,
     uint16_t index,
+    uint8_t dbr,
     bool is_data_8,
     bool is_index_8
 ) {
