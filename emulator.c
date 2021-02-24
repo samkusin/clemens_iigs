@@ -91,6 +91,48 @@
     } \
 } while(0)
 
+#define CLEM_CPU_I_JSR_LOG(_clem_cpu_, _adr_) do { \
+    fprintf(stderr, "%02X:%04X: JSR $%04X\n", \
+        (_clem_cpu_)->regs.PBR, (_clem_cpu_)->regs.PC, _adr_); \
+    fflush(stderr); \
+} while(0)
+
+#define CLEM_CPU_I_JSL_LOG(_clem_cpu_, _adr_, _bank_) do { \
+    fprintf(stderr, "%02X:%04X: JSL $%02X%04X\n", \
+        (_clem_cpu_)->regs.PBR, (_clem_cpu_)->regs.PC, _bank_, _adr_); \
+    fflush(stderr); \
+} while(0)
+
+#define CLEM_CPU_I_RTS_LOG(_clem_cpu_, _adr_) do { \
+    fprintf(stderr, "%02X:%04X: RTS (%04X)\n", \
+        (_clem_cpu_)->regs.PBR, (_clem_cpu_)->regs.PC, _adr_); \
+    fflush(stderr); \
+} while(0)
+
+#define CLEM_CPU_I_RTL_LOG(_clem_cpu_, _adr_, _bank_) do { \
+    fprintf(stderr, "%02X:%04X: RTL (%02X%04X)\n", \
+        (_clem_cpu_)->regs.PBR, (_clem_cpu_)->regs.PC, _bank_, _adr_); \
+    fflush(stderr); \
+} while(0)
+
+#define CLEM_CPU_I_INTR_LOG(_clem_cpu_, _name_) do { \
+    fprintf(stderr, "%02X:%04X: INTR %s\n", \
+        (_clem_cpu_)->regs.PBR, (_clem_cpu_)->regs.PC, _name_); \
+    fflush(stderr); \
+} while(0)
+
+#define CLEM_CPU_I_RTI_LOG(_clem_cpu_, _adr_, _bank_) do { \
+    if ((_clem_cpu_)->emulation) { \
+        fprintf(stderr, "%02X:%04X: RTI (%04X)\n", \
+            (_clem_cpu_)->regs.PBR, (_clem_cpu_)->regs.PC, _adr_); \
+    } else { \
+        fprintf(stderr, "%02X:%04X: RTI (%02X%04X)\n", \
+            (_clem_cpu_)->regs.PBR, (_clem_cpu_)->regs.PC, _bank_, _adr_); \
+    } \
+    fflush(stderr); \
+} while(0)
+
+
 static inline void _opcode_instruction_define(
     struct ClemensInstruction* instr,
     uint8_t opcode,
@@ -229,6 +271,35 @@ static void _opcode_print(
     printf(ANSI_COLOR_RESET "\n");
 }
 
+
+void _clem_debug_memory_dump(
+    ClemensMachine* clem,
+    uint8_t mem_page,
+    uint8_t mem_bank,
+    uint8_t page_count
+) {
+    char filename[64];
+    snprintf(filename, sizeof(filename), "mem_%02x_%04x_%u.bin",
+             (uint16_t)mem_page << 8, mem_bank, page_count);
+    filename[63] = '\0';
+    FILE* fp = fopen(filename, "wb");
+    if (fp) {
+        uint16_t mem_addr = (uint16_t)mem_page << 8;
+        while (page_count > 0) {
+            uint8_t mem_next_bank = mem_bank;
+            fwrite(_clem_get_memory_bank(clem, mem_bank) + mem_addr, 256, 1, fp);
+            if (mem_addr + 0x0100 < mem_addr) {
+                _clem_next_dbr(clem, &mem_next_bank, mem_bank);
+            }
+            mem_addr += 0x0100;
+            mem_bank = mem_next_bank;
+            --page_count;
+        }
+        fclose(fp);
+    } else {
+        printf("Failed to dump memory %s", filename);
+    }
+}
 
 int clemens_init(
     ClemensMachine* machine,
@@ -2522,8 +2593,18 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_WDM:
             _clem_read_pba(clem, &tmp_data, &tmp_pc);
-            //  effective NOP, but 2 bytes instead of one - no operation,
-            //  but included here for completeness
+            //  TODO: add option for wdm custom ops vs NOP
+            //        right now, always a custom op
+            if (tmp_data == 0x01) {
+                // memory dump
+                // byte 0 = pages to print (0-255)
+                // byte 1 = bank
+                // byte 2,3 = adrlo, hi
+                _clem_read_pba(clem, &tmp_data, &tmp_pc);
+                _clem_read_pba(clem, &tmp_bnk0, &tmp_pc);
+                _clem_read_pba(clem, &tmp_bnk1, &tmp_pc);
+                _clem_debug_memory_dump(clem, tmp_bnk1, tmp_bnk0, tmp_data);
+            }
             break;
         //  Jump, JSR,
         case CLEM_OPC_JSR:
@@ -2541,6 +2622,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_write(clem, (uint8_t)tmp_pc, tmp_value, 0x00);
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, false);
             _cpu_sp_dec2(cpu);
+            CLEM_CPU_I_JSR_LOG(cpu, tmp_addr);
             tmp_pc = tmp_addr;      // set next PC to the JSR routine
             break;
         case CLEM_OPC_RTS:
@@ -2563,6 +2645,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_cycle(clem, 1);
             _cpu_sp_inc2(cpu);
             tmp_pc = tmp_addr + 1;  //  point to next instruction
+            CLEM_CPU_I_RTS_LOG(cpu, tmp_pc);
             break;
         case CLEM_OPC_JSL:
             // Stack [PBR, PCH, PCL]
@@ -2573,7 +2656,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             //  new PBR
             _clem_read_pba(clem, &tmp_data, &tmp_pc);
             --tmp_pc;        // point to last byte in operand
-            cpu->regs.PBR = tmp_data;
+            tmp_bnk0 = tmp_data;
             //  JSL stack overrun will not wrap to 0x1ff (65816 quirk)
             //  SP will still wrap
             //  tmp_pc will be tha address of the last operand
@@ -2584,7 +2667,9 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _cpu_sp_dec3(cpu);
             _opcode_instruction_define_long(&opc_inst, IR, cpu->regs.PBR,
                                             tmp_addr);
+            CLEM_CPU_I_JSL_LOG(cpu, tmp_addr, tmp_bnk0);
             tmp_pc = tmp_addr;      // set next PC to the JSL routine
+            cpu->regs.PBR = tmp_bnk0;
             break;
         case CLEM_OPC_RTL:
             _clem_cycle(clem, 2);
@@ -2598,15 +2683,17 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             tmp_addr = ((uint16_t)tmp_data << 8) | tmp_addr;
             _clem_read(clem, &tmp_data, cpu->regs.S + 3, 0x00,
                             CLEM_MEM_FLAG_DATA);
-            cpu->regs.PBR = tmp_data;
             _cpu_sp_inc3(cpu);
             tmp_pc = tmp_addr + 1;
+            CLEM_CPU_I_RTL_LOG(cpu, tmp_pc, tmp_data);
+            cpu->regs.PBR = tmp_data;
             break;
 
         //  interrupt opcodes (RESET is handled separately)
         case CLEM_OPC_BRK:
             //  ignore irq disable
             _clem_read_pba(clem, &tmp_data, &tmp_pc);
+            CLEM_CPU_I_INTR_LOG(cpu, "BRK");
             tmp_value = tmp_data;
             //  push PBR (native)
             //  push PC
@@ -2698,7 +2785,9 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             if (!cpu->emulation) {
                 _clem_read(clem, &tmp_bnk0, cpu->regs.S + 1, 0x00, CLEM_MEM_FLAG_DATA);
                 _cpu_sp_inc(cpu);
+                cpu->regs.PBR = tmp_bnk0;
             }
+            tmp_pc = tmp_addr;
             break;
         case CLEM_OPC_WAI:
             //  the calling application should interpret ReadyOut
