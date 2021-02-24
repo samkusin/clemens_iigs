@@ -161,19 +161,28 @@ static inline void _clem_next_dbr(
     }
 }
 
+static inline uint8_t* _clem_get_memory_bank(
+    ClemensMachine* clem,
+    uint8_t bank
+) {
+    if (bank == 0xe0 || bank == 0xe1) {
+        return clem->mega2_bank_map[bank & 0x1];
+    }
+    return clem->fpi_bank_map[bank];
+}
+
 static inline void _clem_write(
     ClemensMachine* clem,
     uint8_t data,
     uint16_t adr,
     uint8_t bank
 ) {
+    uint8_t* bank_mem;
+
     clem->cpu.pins.adr = adr;
     clem->cpu.pins.databank = bank;
-    if (bank == 0xe0 || bank == 0xe1) {
-        clem->mega2_bank_map[bank & 0x1][adr] = data;
-    } else {
-        clem->fpi_bank_map[bank][adr] = data;
-    }
+    bank_mem = _clem_get_memory_bank(clem, bank);
+    bank_mem[adr] = data;
     // TODO: account for slow/fast memory access
     clem->clocks_spent += clem->clocks_step;
     ++clem->cpu.cycles_spent;
