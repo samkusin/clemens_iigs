@@ -13,6 +13,7 @@ This is a running todo list.
 * Very emulation <-> native switch initializes everything correctly
 * Test ROM 1
 * More debugging utilities
+* Video Controller
 * Data accesses across banks are allowed (but not stack accesses?)
 * Emulation vs Native on some microinstructions (i.e. choosing a long address mode while in emulation does... what?)
 * Test ROM iteration?
@@ -37,3 +38,15 @@ This is a running todo list.
 * Implement ROL, ROR, STX, STY, STZ
 * Implement remaining opcodes (T??, JMP, stragglers)
 * Implement interrupt opcodes (COP, BRK, CLI, RTI, etc)
+
+
+## Video Controller (VDC)
+
+The host program is responsible for rendering video.  At a certain frequency
+the host polls for video data.   The host will have buffer-like access to the
+mega2 banks (e0, e1):
+  40 column page (main)
+  80 column page (aux)
+  hires pages(0,1)
+  Double hires pages(0,1)
+  Super hires pages
