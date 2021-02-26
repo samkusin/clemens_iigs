@@ -40,14 +40,18 @@ int main(int argc, char* argv[])
     fclose(fp);
 
     memset(&machine, 0, sizeof(machine));
-    clemens_init(&machine, 1000, 1000, rom, 256 * 1024);
+    clemens_init(&machine, 1000, 1000, rom, 256 * 1024,
+                 malloc(CLEM_IIGS_BANK_SIZE),
+                 malloc(CLEM_IIGS_BANK_SIZE),
+                 malloc(CLEM_IIGS_BANK_SIZE * 16),
+                 16);
 
     machine.cpu.pins.resbIn = false;
-    emulate(&machine);
+    clemens_emulate(&machine);
     machine.cpu.pins.resbIn = true;
 
     while (machine.cpu.cycles_spent < 1024) {
-        emulate(&machine);
+        clemens_emulate(&machine);
     }
 
     return 0;

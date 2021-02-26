@@ -7,7 +7,6 @@ And a couple important opcodes, like JSR, RTS
 1. Set $c029 bit 0 to 1
 2. Set Interrupt Disable
 3. Set Stack Pointer to 0x01fb
-4. Invoke a native mode ROM subroutine
-5. Native ROM routine
-   1. Seems to be writing into bank 1 and e1
-   2. unknown why, but we return quickly
+4. Some video/key code
+   1. Invoke a native mode ROM routine at ff/7600
+5. Set STATEREG c068 bits 3 and 4
