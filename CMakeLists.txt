@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(clements_iigs LANGUAGES C)
+project(clements_65816 LANGUAGES C)
 
 function(project_create_assets_target ARG_TARGET_NAME)
     set(_TARGET_RUNTIME_OUTPUT_DIRECTORY
@@ -39,12 +39,17 @@ set(PROJECT_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}-run")
 set(EMULATOR_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/emulator.c")
 
-add_library(clements_65816 STATIC
+add_library(clemens_65816 STATIC
     ${EMULATOR_SOURCES})
 
-add_executable(clements_iigs
+target_include_directories(clemens_65816
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+
+add_executable(clemens_65816_emulator
     "${CMAKE_CURRENT_SOURCE_DIR}/app.c")
 
-target_link_libraries(clements_iigs PRIVATE clements_65816)
+target_link_libraries(clemens_65816_emulator PRIVATE clements_65816)
 
-project_create_assets_target(clements_iigs)
+project_create_assets_target(clemens_65816_emulator)
+
+add_subdirectory(host)

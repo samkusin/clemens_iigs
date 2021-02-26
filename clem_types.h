@@ -127,5 +127,4 @@ typedef struct {
     uint8_t* mega2_bank_map[2];     /* $e0 - $e1 */
 } ClemensMachine;
 
-
 #endif

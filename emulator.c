@@ -301,20 +301,51 @@ void _clem_debug_memory_dump(
     }
 }
 
+
+bool clemens_is_initialized_simple(ClemensMachine* machine) {
+    return (machine->fpi_bank_map[0xff] != NULL);
+}
+
+bool clemens_is_initialized(ClemensMachine* machine) {
+    if (!clemens_is_initialized_simple(machine)) {
+        return false;
+    }
+    if (!machine->fpi_bank_map[0] || !machine->fpi_bank_map[1]) {
+        return false;
+    }
+    if (!machine->mega2_bank_map[0] || !machine->mega2_bank_map[1]) {
+        return false;
+    }
+    if (!machine->clocks_step ||
+        machine->clocks_step > machine->clocks_step_mega2) {
+        return false;
+    }
+    return true;
+}
+
 int clemens_init(
     ClemensMachine* machine,
     uint32_t speed_factor,
     uint32_t clocks_step,
     void* rom,
-    size_t romSize
+    size_t romSize,
+    void* e0bank,
+    void* e1bank,
+    void* fpiRAM,
+    unsigned int fpiRAMBankCount
 ) {
+    machine->cpu.pins.resbIn = true;
     machine->clocks_step = clocks_step;
     machine->clocks_step_mega2 = speed_factor;
     machine->clocks_spent = 0;
-    if (romSize != CLEM_IIGS_ROM3_SIZE) {
+    if (romSize != CLEM_IIGS_ROM3_SIZE || rom == NULL) {
         return -1;
     }
-
+    if (fpiRAMBankCount < 4 || fpiRAM == NULL ||
+        e0bank == NULL || e1bank == NULL
+    ) {
+        return -2;
+    }
     /* memory organization for the FPI */
     machine->fpi_bank_map[0xfc] = (uint8_t*)rom;
     machine->fpi_bank_map[0xfd] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE;
@@ -322,18 +353,18 @@ int clemens_init(
     machine->fpi_bank_map[0xff] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE * 3;
 
     /* TODO: clear memory according to spec 0x00, 0xff, etc (look it up) */
-    machine->fpi_bank_map[0x00] = (uint8_t*)malloc(CLEM_IIGS_BANK_SIZE);
-    memset(machine->fpi_bank_map[0x00], 0, CLEM_IIGS_BANK_SIZE);
-    machine->fpi_bank_map[0x01] = (uint8_t*)malloc(CLEM_IIGS_BANK_SIZE);
-    memset(machine->fpi_bank_map[0x01], 0, CLEM_IIGS_BANK_SIZE);
-    machine->fpi_bank_map[0x02] = (uint8_t*)malloc(CLEM_IIGS_BANK_SIZE);
-    memset(machine->fpi_bank_map[0x02], 0, CLEM_IIGS_BANK_SIZE);
-    machine->fpi_bank_map[0x03] = (uint8_t*)malloc(CLEM_IIGS_BANK_SIZE);
-    memset(machine->fpi_bank_map[0x03], 0, CLEM_IIGS_BANK_SIZE);
+    if (fpiRAMBankCount > 128) fpiRAMBankCount = 128;
 
-    machine->mega2_bank_map[0x00] = (uint8_t*)malloc(CLEM_IIGS_BANK_SIZE);
+    for (uint8_t i  = 0; i < (uint8_t)fpiRAMBankCount; ++i) {
+        machine->fpi_bank_map[i] = ((uint8_t*)fpiRAM) + (i * CLEM_IIGS_BANK_SIZE);
+        memset(machine->fpi_bank_map[i], 0, CLEM_IIGS_BANK_SIZE);
+    }
+    /* TODO: remap non used banks to used banks per the wrapping mechanism on
+       the IIgs
+    */
+    machine->mega2_bank_map[0x00] = (uint8_t*)e0bank;
     memset(machine->mega2_bank_map[0x00], 0, CLEM_IIGS_BANK_SIZE);
-    machine->mega2_bank_map[0x01] = (uint8_t*)malloc(CLEM_IIGS_BANK_SIZE);
+    machine->mega2_bank_map[0x01] = (uint8_t*)e1bank;;
     memset(machine->mega2_bank_map[0x01], 0, CLEM_IIGS_BANK_SIZE);
 
     for (unsigned i = 0; i < 256; ++i) {
@@ -759,7 +790,6 @@ int clemens_init(
 
     _opcode_description(CLEM_OPC_XBA,     "XBA", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_XCE,     "XCE", kClemensCPUAddrMode_None);
-
 
     return 0;
 }
@@ -2811,7 +2841,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
     cpu->regs.PC = tmp_pc;
 }
 
-void emulate(ClemensMachine* clem) {
+void clemens_emulate(ClemensMachine* clem) {
     struct Clemens65C816* cpu = &clem->cpu;
 
     if (!cpu->pins.resbIn) {
