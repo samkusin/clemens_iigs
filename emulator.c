@@ -189,86 +189,93 @@ static void _opcode_description(
 }
 
 static void _opcode_print(
-    struct ClemensInstruction* inst,
-    uint8_t pbr,
-    uint16_t addr
+    ClemensMachine* clem,
+    struct ClemensInstruction* inst
 ) {
-    printf(ANSI_COLOR_BLUE "%02X:%04X "
-           ANSI_COLOR_CYAN "%s",
-           pbr, addr, inst->desc->name);
+    char operand[24];
+    operand[0] = '\0';
+
     switch (inst->desc->addr_mode) {
         case kClemensCPUAddrMode_Immediate:
             if (inst->opc_8) {
-                printf(ANSI_COLOR_YELLOW " #$%02X", (uint8_t)inst->value);
+                snprintf(operand, sizeof(operand), "#$%02X", (uint8_t)inst->value);
             } else {
-                printf(ANSI_COLOR_YELLOW " #$%04X", inst->value);
+                snprintf(operand, sizeof(operand), "#$%04X", inst->value);
             }
             break;
         case kClemensCPUAddrMode_Absolute:
-            printf(ANSI_COLOR_YELLOW " $%04X", inst->value);
+            snprintf(operand, sizeof(operand), "$%04X", inst->value);
             break;
         case kClemensCPUAddrMode_AbsoluteLong:
-            printf(ANSI_COLOR_YELLOW " $%02X%04X", inst->bank, inst->value);
+            snprintf(operand, sizeof(operand), "$%02X%04X", inst->bank, inst->value);
             break;
         case kClemensCPUAddrMode_Absolute_X:
-            printf(ANSI_COLOR_YELLOW " $%04X, X", inst->value);
+            snprintf(operand, sizeof(operand), "$%04X, X", inst->value);
             break;
         case kClemensCPUAddrMode_Absolute_Y:
-            printf(ANSI_COLOR_YELLOW " $%04X, Y", inst->value);
+            snprintf(operand, sizeof(operand), "$%04X, Y", inst->value);
             break;
         case kClemensCPUAddrMode_AbsoluteLong_X:
-            printf(ANSI_COLOR_YELLOW " $%02X%04X, X", inst->bank, inst->value);
+            snprintf(operand, sizeof(operand), "$%02X%04X, X", inst->bank, inst->value);
             break;
         case kClemensCPUAddrMode_DirectPage:
-            printf(ANSI_COLOR_YELLOW " $%02X", inst->value);
+            snprintf(operand, sizeof(operand), "$%02X", inst->value);
             break;
         case kClemensCPUAddrMode_DirectPage_X:
-            printf(ANSI_COLOR_YELLOW " $%02X, X", inst->value);
+            snprintf(operand, sizeof(operand), "$%02X, X", inst->value);
             break;
         case kClemensCPUAddrMode_DirectPage_Y:
-            printf(ANSI_COLOR_YELLOW " $%02X, Y", inst->value);
+            snprintf(operand, sizeof(operand), "$%02X, Y", inst->value);
             break;
         case kClemensCPUAddrMode_DirectPageIndirect:
-            printf(ANSI_COLOR_YELLOW " ($%02X)", inst->value);
+            snprintf(operand, sizeof(operand), "($%02X)", inst->value);
             break;
         case kClemensCPUAddrMode_DirectPageIndirectLong:
-            printf(ANSI_COLOR_YELLOW " [$%02X]", inst->value);
+            snprintf(operand, sizeof(operand), "[$%02X]", inst->value);
             break;
         case kClemensCPUAddrMode_DirectPage_X_Indirect:
-            printf(ANSI_COLOR_YELLOW " ($%02, X)", inst->value);
+            snprintf(operand, sizeof(operand), "($%02X, X)", inst->value);
             break;
         case kClemensCPUAddrMode_DirectPage_Indirect_Y:
-            printf(ANSI_COLOR_YELLOW " ($%02X), Y", inst->value);
+            snprintf(operand, sizeof(operand), "($%02X), Y", inst->value);
             break;
         case kClemensCPUAddrMode_DirectPage_IndirectLong_Y:
-            printf(ANSI_COLOR_YELLOW " [$%02X], Y", inst->value);
+            snprintf(operand, sizeof(operand), "[$%02X], Y", inst->value);
             break;
         case kClemensCPUAddrMode_PCRelative:
-            printf(ANSI_COLOR_YELLOW " $%02X (%d)", inst->value, (int8_t)inst->value);
+            snprintf(operand, sizeof(operand), "$%02X (%d)", inst->value, (int8_t)inst->value);
             break;
         case kClemensCPUAddrMode_PCRelativeLong:
-            printf(ANSI_COLOR_YELLOW " $%04X (%d)", inst->value, (int16_t)inst->value);
+            snprintf(operand, sizeof(operand), "$%04X (%d)", inst->value, (int16_t)inst->value);
             break;
         case kClemensCPUAddrMode_PC:
-            printf(ANSI_COLOR_YELLOW " $%04X", inst->value);
+            snprintf(operand, sizeof(operand), "$%04X", inst->value);
             break;
         case kClemensCPUAddrMode_PCIndirect:
-            printf(ANSI_COLOR_YELLOW " ($%04X)", inst->value);
+            snprintf(operand, sizeof(operand), "($%04X)", inst->value);
             break;
         case kClemensCPUAddrMode_PCIndirect_X:
-            printf(ANSI_COLOR_YELLOW " ($%04X, X)", inst->value);
+            snprintf(operand, sizeof(operand), "($%04X, X)", inst->value);
             break;
         case kClemensCPUAddrMode_PCLong:
-            printf(ANSI_COLOR_YELLOW " $%02X%04X", inst->bank, inst->value);
+            snprintf(operand, sizeof(operand), "$%02X%04X", inst->bank, inst->value);
             break;
         case kClemensCPUAddrMode_PCLongIndirect:
-            printf(ANSI_COLOR_YELLOW " [$%04X]", inst->bank, inst->value);
+            snprintf(operand, sizeof(operand), "[$%04X]", inst->bank, inst->value);
             break;
         case kClemensCPUAddrMode_Operand:
-            printf(ANSI_COLOR_YELLOW " %02X", inst->value);
+            snprintf(operand, sizeof(operand), "%02X", inst->value);
             break;
     }
-    printf(ANSI_COLOR_RESET "\n");
+
+    if (clem->debug_flags & kClemensDebugFlag_StdoutOpcode) {
+        printf(ANSI_COLOR_BLUE "%02X:%04X "
+            ANSI_COLOR_CYAN "%s" ANSI_COLOR_YELLOW " %s" ANSI_COLOR_RESET "\n",
+            inst->pbr, inst->addr, inst->desc->name, operand);
+    }
+    if ((clem->debug_flags & kClemensDebugFlag_OpcodeCallback) && clem->opcode_post) {
+        (*clem->opcode_post)(inst,  operand, clem->debug_user_ptr);
+    }
 }
 
 
@@ -321,6 +328,20 @@ bool clemens_is_initialized(ClemensMachine* machine) {
         return false;
     }
     return true;
+}
+
+void clemens_opcode_callback(
+    ClemensMachine* clem,
+    ClemensOpcodeCallback callback,
+    void* callback_ptr
+) {
+    if (callback) {
+        clem->debug_flags |= kClemensDebugFlag_OpcodeCallback;
+    } else {
+        clem->debug_flags &= ~kClemensDebugFlag_OpcodeCallback;
+    }
+    clem->opcode_post = callback;
+    clem->debug_user_ptr = callback_ptr;
 }
 
 int clemens_init(
@@ -2695,8 +2716,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             tmp_value = cpu->regs.S - 1;
             _clem_write(clem, (uint8_t)tmp_pc, cpu->regs.S - 2, 0x00);
             _cpu_sp_dec3(cpu);
-            _opcode_instruction_define_long(&opc_inst, IR, cpu->regs.PBR,
-                                            tmp_addr);
+            _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             CLEM_CPU_I_JSL_LOG(cpu, tmp_addr, tmp_bnk0);
             tmp_pc = tmp_addr;      // set next PC to the JSL routine
             cpu->regs.PBR = tmp_bnk0;
@@ -2836,9 +2856,12 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
     }
 
-    _opcode_print(&opc_inst, opc_pbr, opc_addr);
-
     cpu->regs.PC = tmp_pc;
+    if (clem->debug_flags) {
+        opc_inst.pbr = opc_pbr;
+        opc_inst.addr = opc_addr;
+        _opcode_print(clem, &opc_inst);
+    }
 }
 
 void clemens_emulate(ClemensMachine* clem) {
@@ -2879,7 +2902,7 @@ void clemens_emulate(ClemensMachine* clem) {
     //  RESB high during reset invokes our interrupt microcode
     if (!cpu->enabled) return;
 
-    CLEM_I_PRINT_STATS(clem);
+    // CLEM_I_PRINT_STATS(clem);
 
     if (cpu->state_type == kClemensCPUStateType_Reset) {
         uint16_t tmp_addr;

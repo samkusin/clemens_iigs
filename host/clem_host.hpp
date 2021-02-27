@@ -3,7 +3,10 @@
 
 #include "emulator.h"
 #include "cinek/fixedstack.hpp"
+
 #include <cstdint>
+#include <vector>
+
 
 class ClemensHost
 {
@@ -22,12 +25,29 @@ private:
   void createMachine();
   void destroyMachine();
   void resetMachine();
+  void stepMachine(int stepCount);
+
+  static void emulatorOpcodePrint(struct ClemensInstruction* inst,
+                                  const char* operand,
+                                  void* this_ptr);
 
 private:
   ClemensMachine machine_;
   cinek::FixedStack slab_;
 
   int emulationStepCount_;
+
+  struct ClemensCPURegs cpuRegsSaved_;
+  struct ClemensCPUPins cpuPinsSaved_;
+  bool cpu6502EmulationSaved_;
+
+  struct ExecutedInstruction {
+    uint32_t pc;
+    char opcode[4];
+    char operand[24];
+  };
+
+  std::vector<ExecutedInstruction> executedInstructions_;
 };
 
 

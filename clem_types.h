@@ -66,7 +66,9 @@ static struct ClemensOpcodeDesc sOpcodeDescriptions[256];
 
 struct ClemensInstruction {
     struct ClemensOpcodeDesc* desc;
+    uint16_t addr;
     uint16_t value;
+    uint8_t pbr;
     uint8_t bank;
     bool opc_8;
 };
@@ -117,14 +119,31 @@ struct Clemens65C816 {
     bool enabled;           // set to false by STP, and true by RESET
 };
 
+enum {
+    kClemensDebugFlag_None              = 0,
+    kClemensDebugFlag_StdoutOpcode      = (1 << 0),
+    kClemensDebugFlag_OpcodeCallback    = (1 << 1)
+};
+
+typedef void (*ClemensOpcodeCallback)(struct ClemensInstruction*,
+                                      const char*, void*);
 
 typedef struct {
     struct Clemens65C816 cpu;
     uint32_t clocks_step;
-    uint32_t clocks_step_mega2;     /* typically FPI speed mhz * clocks_step */
+    uint32_t clocks_step_mega2;     // typically FPI speed mhz * clocks_step
     uint32_t clocks_spent;
-    uint8_t* fpi_bank_map[256];     /* $00 - $ff */
-    uint8_t* mega2_bank_map[2];     /* $e0 - $e1 */
+    uint8_t* fpi_bank_map[256];     // $00 - $ff
+    uint8_t* mega2_bank_map[2];     // $e0 - $e1
+
+    /* Optional callback for debugging purposes.
+       When issued, it's guaranteed that all registers/CPU state has been
+       updated (and can be viewed as an accurate state of the machine after
+       running the opcode)
+    */
+    uint32_t debug_flags;           // See enum kClemensDebugFlag_
+    void* debug_user_ptr;
+    ClemensOpcodeCallback opcode_post;
 } ClemensMachine;
 
 #endif
