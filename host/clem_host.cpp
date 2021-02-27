@@ -27,10 +27,14 @@ namespace {
 
 ClemensHost::ClemensHost() :
   machine_(),
-  emulationStepCount_(0)
+  emulationStepCount_(0),
+  cpuRegsSaved_ {},
+  cpuPinsSaved_ {},
+  cpu6502EmulationSaved_(true)
 {
   void* slabMemory = malloc(kSlabMemorySize);
   slab_ = cinek::FixedStack(kSlabMemorySize, slabMemory);
+  executedInstructions_.reserve(1024);
 }
 
 ClemensHost::~ClemensHost()
@@ -44,15 +48,20 @@ ClemensHost::~ClemensHost()
 void ClemensHost::frame(int width, int height, float deltaTime)
 {
   //  execution loop for clemens 65816
+  if (emulationStepCount_ > 0) {
+    cpuRegsSaved_ = machine_.cpu.regs;
+    cpuPinsSaved_ = machine_.cpu.pins;
+    cpu6502EmulationSaved_ = machine_.cpu.emulation;
 
-  while (emulationStepCount_ > 0) {
-    if (!machine_.cpu.pins.resbIn) {
-      if (emulationStepCount_ == 1) {
-        machine_.cpu.pins.resbIn = true;
+    while (emulationStepCount_ > 0) {
+      if (!machine_.cpu.pins.resbIn) {
+        if (emulationStepCount_ == 1) {
+          machine_.cpu.pins.resbIn = true;
+        }
       }
+      clemens_emulate(&machine_);
+      --emulationStepCount_;
     }
-    clemens_emulate(&machine_);
-    --emulationStepCount_;
   }
 
   //  View
@@ -67,8 +76,16 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   ImGui::SetNextWindowSize(windowSize);
   ImGui::Begin("History", nullptr, ImGuiWindowFlags_NoResize |
                                    ImGuiWindowFlags_NoCollapse |
-                                   ImGuiWindowFlags_NoInputs |
                                    ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+  for (auto& instruction : executedInstructions_) {
+    ImGui::TextColored(ImVec4(0.75f, 0.75f, 0.75f, 1.0f), "%02X/%04X",
+                       instruction.pc >> 16, instruction.pc & 0xffff);
+    ImGui::SameLine();
+    ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "%s", instruction.opcode);
+    ImGui::SameLine();
+    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "%s", instruction.operand);
+  }
   ImGui::End();
 
   windowCursorPos.y += windowSize.y;
@@ -79,6 +96,77 @@ void ClemensHost::frame(int width, int height, float deltaTime)
                                   ImGuiWindowFlags_NoCollapse |
                                   ImGuiWindowFlags_NoInputs |
                                   ImGuiWindowFlags_NoBringToFrontOnFocus);
+  {
+    //  N, V, M, B, D, I, Z, C
+    //  N, V, M, X, D, I, Z, C
+    //  PC, PBR, IR
+    //  S, DBR, D
+    //  A, X, Y
+    //  Brk, Emu, MX
+    //  Todo: cycles, clocks spent
+    const struct ClemensCPURegs& cpuRegsNext = machine_.cpu.regs;
+    uint8_t cpuStatusChanged = cpuRegsNext.P ^ cpuRegsSaved_.P;
+    bool selectedStatusBits[8] = {
+      (cpuStatusChanged & kClemensCPUStatus_Negative) != 0,
+      (cpuStatusChanged & kClemensCPUStatus_Overflow) != 0,
+      (cpuStatusChanged & kClemensCPUStatus_MemoryAccumulator) != 0,
+      (cpuStatusChanged & kClemensCPUStatus_Index) != 0,   // same mask as 6502 brk
+      (cpuStatusChanged & kClemensCPUStatus_Decimal) != 0,
+      (cpuStatusChanged & kClemensCPUStatus_IRQDisable) != 0,
+      (cpuStatusChanged & kClemensCPUStatus_Zero) != 0,
+      (cpuStatusChanged & kClemensCPUStatus_Carry) != 0
+    };
+    ImGui::BeginGroup();
+    ImGui::BeginTable("cpu_status", 8, 0, ImVec2(windowSize.x * 0.5f, 0));
+    ImGui::TableNextColumn(); ImGui::Text("N");
+    ImGui::TableNextColumn(); ImGui::Text("V");
+    if (machine_.cpu.emulation) {
+      ImGui::TableNextColumn(); ImGui::Text("-");
+      ImGui::TableNextColumn(); ImGui::Text("B");
+    } else {
+      ImGui::TableNextColumn(); ImGui::Text("M");
+      ImGui::TableNextColumn(); ImGui::Text("X");
+    }
+    ImGui::TableNextColumn(); ImGui::Text("D");
+    ImGui::TableNextColumn(); ImGui::Text("I");
+    ImGui::TableNextColumn(); ImGui::Text("Z");
+    ImGui::TableNextColumn(); ImGui::Text("C");
+    ImGui::TableNextRow();
+    for (int i = 0; i < 8; ++i) {
+      ImGui::TableNextColumn();
+      ImGui::Selectable(cpuRegsNext.P & (1 << (7-i)) ? "1" : "0", selectedStatusBits[i]);
+    }
+    ImGui::EndTable();
+    ImGui::Separator();
+
+    char label[16];
+    ImGui::BeginTable("cpu_regs", 3, 0, ImVec2(windowSize.x * 0.5f, 0));
+    {
+      ImGui::TableNextRow();
+      snprintf(label, sizeof(label), "PC=%04X", cpuRegsNext.PC);
+      ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.PC != cpuRegsSaved_.PC);
+      snprintf(label, sizeof(label), "S=%04X", cpuRegsNext.S);
+      ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.S != cpuRegsSaved_.S);
+      snprintf(label, sizeof(label), "A=%04X", cpuRegsNext.A);
+      ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.A != cpuRegsSaved_.A);
+      ImGui::TableNextRow();
+      snprintf(label, sizeof(label), "PBR=%02X", cpuRegsNext.PBR);
+      ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.PBR != cpuRegsSaved_.PBR);
+      snprintf(label, sizeof(label), "DBR=%02X", cpuRegsNext.DBR);
+      ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.DBR != cpuRegsSaved_.DBR);
+      snprintf(label, sizeof(label), "X=%04X", cpuRegsNext.X);
+      ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.X != cpuRegsSaved_.X);
+      ImGui::TableNextRow();
+      snprintf(label, sizeof(label), "IR=%02X", cpuRegsNext.IR);
+      ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.IR != cpuRegsSaved_.IR);
+      snprintf(label, sizeof(label), "D=%04X", cpuRegsNext.D);
+      ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.D != cpuRegsSaved_.D);
+      snprintf(label, sizeof(label), "Y=%04X", cpuRegsNext.Y);
+      ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.Y != cpuRegsSaved_.Y);
+    }
+    ImGui::EndTable();
+    ImGui::EndGroup();
+  }
   ImGui::End();
 
   windowCursorPos.y += windowSize.y;
@@ -154,7 +242,8 @@ bool ClemensHost::parseCommand(const char* buffer)
         return parseCommandPower(end);
       } else if (!strncasecmp(start, ".reset", end - start)) {
         return parseCommandReset(end);
-      } else if (!strncasecmp(start, "step", end - start)) {
+      } else if (!strncasecmp(start, "step", end - start) ||
+                 !strncasecmp(start, "s", end - start)) {
         return parseCommandStep(end);
       }
       return false;
@@ -178,12 +267,29 @@ bool ClemensHost::parseCommandPower(const char* line)
 
 bool ClemensHost::parseCommandReset(const char* line)
 {
+  const char* start = trimCommand(line);
+  if (!start) {
+    resetMachine();
+    return true;
+  }
   return false;
 }
 
 bool ClemensHost::parseCommandStep(const char* line)
 {
-  return false;
+  const char* start = trimCommand(line);
+  if (!start) {
+    stepMachine(1);
+    return true;
+  }
+  return parseCommandToken(start,
+    [this](const char* start, const char* end) {
+      char number[16];
+      strncpy(number, start, std::min(sizeof(number) - 1, size_t(end - start)));
+      number[15] = '\0';
+      stepMachine(strtol(number, nullptr, 10));
+      return true;
+    });
 }
 
 void ClemensHost::createMachine()
@@ -216,6 +322,8 @@ void ClemensHost::createMachine()
                slab_.allocate(CLEM_IIGS_BANK_SIZE * fpiBankCount),
                fpiBankCount);
 
+  clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
+
   resetMachine();
 }
 
@@ -234,4 +342,27 @@ void ClemensHost::resetMachine()
   //  step 2: reset end, issue interrupt
   machine_.cpu.pins.resbIn = false;   // low signal indicates reset
   emulationStepCount_ = 2;
+}
+
+void ClemensHost::stepMachine(int stepCount)
+{
+  emulationStepCount_ = std::max(0, stepCount);
+}
+
+void ClemensHost::emulatorOpcodePrint(
+  struct ClemensInstruction* inst,
+  const char* operand,
+  void* this_ptr
+) {
+  auto* host = reinterpret_cast<ClemensHost*>(this_ptr);
+  constexpr size_t kInstructionEdgeSize = 64;
+  if (host->executedInstructions_.size() > 1024 + kInstructionEdgeSize) {
+    auto it = host->executedInstructions_.begin();
+    host->executedInstructions_.erase(it, it + kInstructionEdgeSize);
+  }
+  host->executedInstructions_.emplace_back();
+  auto& instruction = host->executedInstructions_.back();
+  strncpy(instruction.opcode, inst->desc->name, sizeof(instruction.opcode));
+  instruction.pc = (uint32_t(inst->pbr) << 16) | inst->addr;
+  strncpy(instruction.operand, operand, sizeof(instruction.operand));
 }

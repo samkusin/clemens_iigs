@@ -45,6 +45,17 @@ bool clemens_is_initialized(ClemensMachine* clem);
  */
 bool clemens_is_initialized_simple(ClemensMachine* clem);
 
+/**
+ * @brief
+ *
+ * @param clem
+ * @param callback
+ * @param callback_ptr
+ */
+void clemens_opcode_callback(ClemensMachine* clem,
+                             ClemensOpcodeCallback callback,
+                             void* callback_ptr);
+
 #ifdef __cplusplus
 }
 #endif
