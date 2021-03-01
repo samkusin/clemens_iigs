@@ -2,6 +2,9 @@
 #define CLEM_HOST_HPP
 
 #include "emulator.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_memory_editor.h"
+
 #include "cinek/fixedstack.hpp"
 
 #include <cstdint>
@@ -48,6 +51,8 @@ private:
   };
 
   std::vector<ExecutedInstruction> executedInstructions_;
+  MemoryEditor memoryViewStatic_[2];
+  uint8_t memoryViewBank_[2];
 };
 
 

@@ -88,13 +88,15 @@ struct ClemensCPURegs {
 
 struct ClemensCPUPins {
     uint16_t adr;                       // A0-A15 Address
-    uint8_t databank;                   // Bank when clockHi, else data
+    uint8_t bank;                       // bank
+    uint8_t data;                       // data
     bool abortIn;                       // ABORTB In
     bool busEnableIn;                   // Bus Enable
     bool irqIn;                         // Interrupt Request
     bool nmiIn;                         // Non-Maskable Interrupt
     bool readyOut;                      // if false, then WAIT
     bool resbIn;                        // RESET
+    bool emulation;                     // Emulation Status
     /*
     bool vpbOut;                        // Vector Pull
     bool rwbOut;                        // Read/Write byte
@@ -115,7 +117,6 @@ struct Clemens65C816 {
     struct ClemensCPURegs regs;
     enum ClemensCPUStateType state_type;
     uint32_t cycles_spent;
-    bool emulation;         // used when a BRK occurs during emulation
     bool enabled;           // set to false by STP, and true by RESET
 };
 
