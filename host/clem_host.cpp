@@ -13,9 +13,9 @@ namespace {
   constexpr float kMinDebugHistoryHeight = 256;
   constexpr float kMinDebugHistoryScalar = 0.500f;
   constexpr float kMinDebugStatusHeight = 96;
-  constexpr float kMinDebugStatusScalar = 0.200f;
-  constexpr float kMinDebugTerminalHeight = 160;
-  constexpr float kMinDebugTerminalScalar = 0.300f;
+  constexpr float kMinDebugStatusScalar = 0.150f;
+  constexpr float kMinDebugTerminalHeight = 192;
+  constexpr float kMinDebugTerminalScalar = 0.350f;
 
   constexpr float kMinConsoleWidth = 384;
   constexpr float kMinConsoleHeight = kMinDebugHistoryHeight +
@@ -48,11 +48,12 @@ ClemensHost::~ClemensHost()
 void ClemensHost::frame(int width, int height, float deltaTime)
 {
   //  execution loop for clemens 65816
+  bool emulationRan = false;
   if (emulationStepCount_ > 0) {
     cpuRegsSaved_ = machine_.cpu.regs;
     cpuPinsSaved_ = machine_.cpu.pins;
-    cpu6502EmulationSaved_ = machine_.cpu.emulation;
-
+    cpu6502EmulationSaved_ = machine_.cpu.pins.emulation;
+    machine_.cpu.cycles_spent = 0;
     while (emulationStepCount_ > 0) {
       if (!machine_.cpu.pins.resbIn) {
         if (emulationStepCount_ == 1) {
@@ -62,7 +63,12 @@ void ClemensHost::frame(int width, int height, float deltaTime)
       clemens_emulate(&machine_);
       --emulationStepCount_;
     }
+    emulationRan = true;
   }
+
+  const struct ClemensCPURegs& cpuRegsNext = machine_.cpu.regs;
+  const struct ClemensCPUPins& cpuPinsNext = machine_.cpu.pins;
+
 
   //  View
   ImVec2 windowSize;
@@ -86,6 +92,9 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     ImGui::SameLine();
     ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "%s", instruction.operand);
   }
+  if (emulationRan) {
+    ImGui::SetScrollHereY();
+  }
   ImGui::End();
 
   windowCursorPos.y += windowSize.y;
@@ -94,7 +103,6 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   ImGui::SetNextWindowSize(windowSize);
   ImGui::Begin("Status", nullptr, ImGuiWindowFlags_NoResize |
                                   ImGuiWindowFlags_NoCollapse |
-                                  ImGuiWindowFlags_NoInputs |
                                   ImGuiWindowFlags_NoBringToFrontOnFocus);
   {
     //  N, V, M, B, D, I, Z, C
@@ -104,7 +112,6 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     //  A, X, Y
     //  Brk, Emu, MX
     //  Todo: cycles, clocks spent
-    const struct ClemensCPURegs& cpuRegsNext = machine_.cpu.regs;
     uint8_t cpuStatusChanged = cpuRegsNext.P ^ cpuRegsSaved_.P;
     bool selectedStatusBits[8] = {
       (cpuStatusChanged & kClemensCPUStatus_Negative) != 0,
@@ -120,7 +127,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     ImGui::BeginTable("cpu_status", 8, 0, ImVec2(windowSize.x * 0.5f, 0));
     ImGui::TableNextColumn(); ImGui::Text("N");
     ImGui::TableNextColumn(); ImGui::Text("V");
-    if (machine_.cpu.emulation) {
+    if (machine_.cpu.pins.emulation) {
       ImGui::TableNextColumn(); ImGui::Text("-");
       ImGui::TableNextColumn(); ImGui::Text("B");
     } else {
@@ -137,34 +144,76 @@ void ClemensHost::frame(int width, int height, float deltaTime)
       ImGui::Selectable(cpuRegsNext.P & (1 << (7-i)) ? "1" : "0", selectedStatusBits[i]);
     }
     ImGui::EndTable();
-    ImGui::Separator();
+    ImGui::SameLine();
 
     char label[16];
+    ImGui::BeginTable("cpu_int", 6, 0);
+    ImGui::TableNextColumn(); ImGui::Text("EMUL");
+    ImGui::TableNextColumn(); ImGui::Text("RESB");
+    ImGui::TableNextColumn(); ImGui::Text("RDYO");
+    ImGui::TableNextColumn(); ImGui::Text("ADR");
+    ImGui::TableNextColumn(); ImGui::Text("BANK");
+    ImGui::TableNextColumn(); ImGui::Text("DATA");
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    ImGui::Selectable(cpuPinsNext.emulation ? "1" : "0",
+      cpuPinsSaved_.emulation != cpuPinsNext.emulation);
+    ImGui::TableNextColumn();
+    ImGui::Selectable(cpuPinsNext.resbIn ? "1" : "0",
+      cpuPinsSaved_.resbIn != cpuPinsNext.resbIn);
+    ImGui::TableNextColumn();
+    ImGui::Selectable(cpuPinsNext.readyOut ? "1" : "0",
+      cpuPinsSaved_.readyOut != cpuPinsNext.readyOut);
+    ImGui::TableNextColumn();
+    snprintf(label, sizeof(label), "%04X", cpuPinsNext.adr);
+    ImGui::Selectable(label, cpuPinsSaved_.adr != cpuPinsNext.adr);
+    ImGui::TableNextColumn();
+    snprintf(label, sizeof(label), "%02X", cpuPinsNext.bank);
+    ImGui::Selectable(label, cpuPinsSaved_.bank != cpuPinsNext.bank);
+    ImGui::TableNextColumn();
+    snprintf(label, sizeof(label), "%02X", cpuPinsNext.data);
+    ImGui::Selectable(label, cpuPinsSaved_.data != cpuPinsNext.data);
+    ImGui::EndTable();
+    ImGui::Separator();
+
+
     ImGui::BeginTable("cpu_regs", 3, 0, ImVec2(windowSize.x * 0.5f, 0));
     {
       ImGui::TableNextRow();
-      snprintf(label, sizeof(label), "PC=%04X", cpuRegsNext.PC);
+      snprintf(label, sizeof(label), "PC  = %04X", cpuRegsNext.PC);
       ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.PC != cpuRegsSaved_.PC);
-      snprintf(label, sizeof(label), "S=%04X", cpuRegsNext.S);
+      snprintf(label, sizeof(label), "S   = %04X", cpuRegsNext.S);
       ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.S != cpuRegsSaved_.S);
-      snprintf(label, sizeof(label), "A=%04X", cpuRegsNext.A);
+      snprintf(label, sizeof(label), "A   = %04X", cpuRegsNext.A);
       ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.A != cpuRegsSaved_.A);
       ImGui::TableNextRow();
-      snprintf(label, sizeof(label), "PBR=%02X", cpuRegsNext.PBR);
+      snprintf(label, sizeof(label), "PBR = %02X", cpuRegsNext.PBR);
       ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.PBR != cpuRegsSaved_.PBR);
-      snprintf(label, sizeof(label), "DBR=%02X", cpuRegsNext.DBR);
+      snprintf(label, sizeof(label), "DBR = %02X", cpuRegsNext.DBR);
       ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.DBR != cpuRegsSaved_.DBR);
-      snprintf(label, sizeof(label), "X=%04X", cpuRegsNext.X);
+      snprintf(label, sizeof(label), "X   = %04X", cpuRegsNext.X);
       ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.X != cpuRegsSaved_.X);
       ImGui::TableNextRow();
-      snprintf(label, sizeof(label), "IR=%02X", cpuRegsNext.IR);
+      snprintf(label, sizeof(label), "IR  = %02X", cpuRegsNext.IR);
       ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.IR != cpuRegsSaved_.IR);
-      snprintf(label, sizeof(label), "D=%04X", cpuRegsNext.D);
+      snprintf(label, sizeof(label), "D   = %04X", cpuRegsNext.D);
       ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.D != cpuRegsSaved_.D);
-      snprintf(label, sizeof(label), "Y=%04X", cpuRegsNext.Y);
+      snprintf(label, sizeof(label), "Y   = %04X", cpuRegsNext.Y);
       ImGui::TableNextColumn(); ImGui::Selectable(label, cpuRegsNext.Y != cpuRegsSaved_.Y);
     }
     ImGui::EndTable();
+    ImGui::SameLine();
+    ImGui::BeginTable("cpu_time", 2, 0, ImVec2(windowSize.x * 0.5f, 0));
+    {
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("Cycles");
+      ImGui::TableNextColumn(); ImGui::Text("%u", machine_.cpu.cycles_spent);
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("Clocks");
+      ImGui::TableNextColumn(); ImGui::Text("%u", machine_.clocks_spent);
+    }
+    ImGui::EndTable();
+
     ImGui::EndGroup();
   }
   ImGui::End();
@@ -186,18 +235,58 @@ void ClemensHost::frame(int width, int height, float deltaTime)
 
     if (ImGui::InputText("", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
       parseCommand(buffer);
+      ImGui::SetKeyboardFocusHere(-1);
     }
     ImGui::SetItemDefaultFocus();
-    ImGui::SetKeyboardFocusHere(-1);
     ImGui::PopStyleColor();
   }
   ImGui::End();
-  //  debug console
-  //    console text with input line
-  //  processor status view
-  //  memory view 0
-  //  memory view 1
 
+  windowCursorPos.x += windowSize.x;
+  ImVec2 memoryViewSize {windowSize.x, windowSize.y};
+  ImVec2 memoryViewCursor {windowCursorPos};
+  ImGui::SetNextWindowPos(memoryViewCursor);
+  ImGui::SetNextWindowSize(memoryViewSize);
+  ImGui::Begin("Context", nullptr, ImGuiWindowFlags_NoResize |
+                                   ImGuiWindowFlags_NoCollapse |
+                                   ImGuiWindowFlags_NoBringToFrontOnFocus);
+  if (clemens_is_initialized_simple(&machine_)) {
+    memoryViewStatic_[0].ReadOnly = true;
+    if (emulationRan) {
+      memoryViewStatic_[0].GotoAddrAndHighlight(cpuPinsNext.adr, cpuPinsNext.adr + 1);
+      memoryViewBank_[0] = cpuPinsNext.bank;
+    }
+    ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[0],
+                       nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
+    uint8_t viewBank = memoryViewBank_[0];
+    if (viewBank == 0xe0 || viewBank == 0xe1) {
+      memoryViewStatic_[0].DrawContents(
+        machine_.mega2_bank_map[viewBank & 0x1], CLEM_IIGS_BANK_SIZE);
+    } else {
+      memoryViewStatic_[0].DrawContents(
+        machine_.fpi_bank_map[viewBank], CLEM_IIGS_BANK_SIZE);
+    }
+  }
+  ImGui::End();
+  memoryViewCursor.x += memoryViewSize.x;
+  ImGui::SetNextWindowPos(memoryViewCursor);
+  ImGui::SetNextWindowSize(memoryViewSize);
+  ImGui::Begin("Memory 1", nullptr, ImGuiWindowFlags_NoResize |
+                                    ImGuiWindowFlags_NoCollapse |
+                                    ImGuiWindowFlags_NoBringToFrontOnFocus);
+  if (clemens_is_initialized_simple(&machine_)) {
+    ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[1],
+                       nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
+    uint8_t viewBank = memoryViewBank_[1];
+    if (viewBank == 0xe0 || viewBank == 0xe1) {
+      memoryViewStatic_[1].DrawContents(
+        machine_.mega2_bank_map[viewBank & 0x1], CLEM_IIGS_BANK_SIZE);
+    } else {
+      memoryViewStatic_[1].DrawContents(
+        machine_.fpi_bank_map[viewBank], CLEM_IIGS_BANK_SIZE);
+    }
+  }
+  ImGui::End();
 }
 
 static const char* trimCommand(const char* buffer)
@@ -245,6 +334,10 @@ bool ClemensHost::parseCommand(const char* buffer)
       } else if (!strncasecmp(start, "step", end - start) ||
                  !strncasecmp(start, "s", end - start)) {
         return parseCommandStep(end);
+      } else if (!strncasecmp(start, "clear", end - start) ||
+                 !strncasecmp(start, "c", end - start)) {
+        // clear some UI states
+        executedInstructions_.clear();
       }
       return false;
     });
@@ -323,6 +416,9 @@ void ClemensHost::createMachine()
                fpiBankCount);
 
   clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
+
+  memoryViewBank_[0] = 0x00;
+  memoryViewBank_[1] = 0x00;
 
   resetMachine();
 }

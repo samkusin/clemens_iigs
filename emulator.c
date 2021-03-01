@@ -50,7 +50,7 @@
 #define CLEM_I_PRINT_STATS(_clem_) do {\
     struct Clemens65C816* _cpu_ = &(_clem_)->cpu; \
     uint8_t _P_ = _cpu_->regs.P; \
-    if (_cpu_->emulation) { \
+    if (_cpu_->pins.emulation) { \
         printf(ANSI_COLOR_GREEN "Clocks.... Cycles...." ANSI_COLOR_RESET \
             " NV_BDIZC PC=%04X, PBR=%02X, DBR=%02X, S=%04X, D=%04X, " \
             "B=%02X A=%02X, X=%02X, Y=%02X\n", \
@@ -122,7 +122,7 @@
 } while(0)
 
 #define CLEM_CPU_I_RTI_LOG(_clem_cpu_, _adr_, _bank_) do { \
-    if ((_clem_cpu_)->emulation) { \
+    if ((_clem_cpu_)->pins.emulation) { \
         fprintf(stderr, "%02X:%04X: RTI (%04X)\n", \
             (_clem_cpu_)->regs.PBR, (_clem_cpu_)->regs.PC, _adr_); \
     } else { \
@@ -2102,7 +2102,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             // Reset Status Bits
             _clem_read_pba(clem, &tmp_data, &tmp_pc);
             cpu->regs.P &= (~tmp_data); // all 1 bits are turned OFF in P
-            if (cpu->emulation) {
+            if (cpu->pins.emulation) {
                 cpu->regs.P |= kClemensCPUStatus_MemoryAccumulator;
                 cpu->regs.P |= kClemensCPUStatus_Index;
             }
@@ -2322,7 +2322,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
         case CLEM_OPC_SEP:
             // Reset Status Bits
             _clem_read_pba(clem, &tmp_data, &tmp_pc);
-            if (cpu->emulation) {
+            if (cpu->pins.emulation) {
                 tmp_data |= kClemensCPUStatus_MemoryAccumulator;
                 tmp_data |= kClemensCPUStatus_Index;
             }
@@ -2511,7 +2511,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
              _clem_cycle(clem, 1);
             break;
         case CLEM_OPC_TCS:
-            if (cpu->emulation) {
+            if (cpu->pins.emulation) {
                 cpu->regs.S = CLEM_UTIL_set16_lo(cpu->regs.S, cpu->regs.A);
             } else {
                 cpu->regs.S = cpu->regs.A;
@@ -2524,7 +2524,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_cycle(clem, 1);
             break;
         case CLEM_OPC_TSX:
-            if (!cpu->emulation && !x_status) {
+            if (!cpu->pins.emulation && !x_status) {
                 cpu->regs.X = cpu->regs.S;
                 _cpu_p_flags_n_z_data_16(cpu, cpu->regs.X);
             } else if (x_status) {
@@ -2543,7 +2543,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_TXS:
             //  no n,z flags set
-            if (cpu->emulation) {
+            if (cpu->pins.emulation) {
                 cpu->regs.S = CLEM_UTIL_set16_lo(cpu->regs.S, cpu->regs.X);
             } else if (x_status) {
                 cpu->regs.S = cpu->regs.X & 0x00ff;
@@ -2620,9 +2620,9 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_cycle(clem, 2);
             break;
         case CLEM_OPC_XCE:
-            tmp_value = cpu->emulation;
-            cpu->emulation = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
-            if (tmp_value != cpu->emulation) {
+            tmp_value = cpu->pins.emulation;
+            cpu->pins.emulation = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
+            if (tmp_value != cpu->pins.emulation) {
                 cpu->regs.P |= kClemensCPUStatus_Index;
                 cpu->regs.P |= kClemensCPUStatus_MemoryAccumulator;
                 if (tmp_value) {
@@ -2667,7 +2667,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_write(clem, (uint8_t)(tmp_pc >> 8), cpu->regs.S,
                             0x00);
             tmp_value = cpu->regs.S - 1;
-            if (cpu->emulation) {
+            if (cpu->pins.emulation) {
                 tmp_value = CLEM_UTIL_set16_lo(cpu->regs.S, tmp_value);
             }
             _clem_write(clem, (uint8_t)tmp_pc, tmp_value, 0x00);
@@ -2680,14 +2680,14 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             //  Stack [PCH, PCL]
             _clem_cycle(clem, 2);
             tmp_value = cpu->regs.S + 1;
-            if (cpu->emulation) {
+            if (cpu->pins.emulation) {
                 tmp_value = CLEM_UTIL_set16_lo(cpu->regs.S, tmp_value);
             }
             _clem_read(clem, &tmp_data, tmp_value, 0x00,
                             CLEM_MEM_FLAG_DATA);
             tmp_addr = tmp_data;
             ++tmp_value;
-            if (cpu->emulation) {
+            if (cpu->pins.emulation) {
                 tmp_value = CLEM_UTIL_set16_lo(cpu->regs.S, tmp_value);
             }
             _clem_read(clem, &tmp_data, tmp_value, 0x00,
@@ -2753,7 +2753,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             //  PC <- use native or emulation mode vector
             //  TODO: what to do if we are already in a brk?
             //  native mode push PBR
-            if (!cpu->emulation) {
+            if (!cpu->pins.emulation) {
                 _cpu_sp_dec(cpu);
                 _clem_write(clem, (uint8_t)cpu->regs.PBR, cpu->regs.S + 1, 0x00);
             }
@@ -2766,7 +2766,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             //  status or not.
             //  TODO: address this conflict if the need arises
             cpu->regs.P &= ~kClemensCPUStatus_Decimal;
-            if (cpu->emulation) {
+            if (cpu->pins.emulation) {
                 _clem_read(clem, &tmp_data, CLEM_6502_IRQBRK_VECTOR_LO_ADDR, 0x00,
                        CLEM_MEM_FLAG_PROGRAM);
                 tmp_addr = tmp_data;
@@ -2796,7 +2796,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             //  PC <- use native or emulation mode vector
             //  TODO: what to do if we are already in a brk?
             //  native mode push PBR
-            if (!cpu->emulation) {
+            if (!cpu->pins.emulation) {
                 _cpu_sp_dec(cpu);
                 _clem_write(clem, (uint8_t)cpu->regs.PBR, cpu->regs.S + 1, 0x00);
             }
@@ -2809,7 +2809,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             //  status or not.
             //  TODO: address this conflict if the need arises
             cpu->regs.P &= ~kClemensCPUStatus_Decimal;
-            if (cpu->emulation) {
+            if (cpu->pins.emulation) {
                 _clem_read(clem, &tmp_data, CLEM_6502_COP_VECTOR_LO_ADDR, 0x00,
                        CLEM_MEM_FLAG_PROGRAM);
                 tmp_addr = tmp_data;
@@ -2832,7 +2832,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_opc_pull_status(clem);
             _clem_read_16(clem, &tmp_addr, cpu->regs.S + 1, 0x00, CLEM_MEM_FLAG_DATA);
             _cpu_sp_inc2(cpu);
-            if (!cpu->emulation) {
+            if (!cpu->pins.emulation) {
                 _clem_read(clem, &tmp_bnk0, cpu->regs.S + 1, 0x00, CLEM_MEM_FLAG_DATA);
                 _cpu_sp_inc(cpu);
                 cpu->regs.PBR = tmp_bnk0;
@@ -2891,7 +2891,7 @@ void clemens_emulate(ClemensMachine* clem) {
                 kClemensCPUStatus_MemoryAccumulator |
                 kClemensCPUStatus_Index |
                 kClemensCPUStatus_IRQDisable);
-            cpu->emulation = true;
+            cpu->pins.emulation = true;
             cpu->pins.readyOut = true;
             cpu->enabled = true;
             _clem_cycle(clem, 1);
@@ -2912,7 +2912,7 @@ void clemens_emulate(ClemensMachine* clem) {
 
         _clem_read(clem, &tmp_data, cpu->regs.S, 0x00, CLEM_MEM_FLAG_NULL);
         tmp_addr = cpu->regs.S - 1;
-        if (cpu->emulation) {
+        if (cpu->pins.emulation) {
             tmp_addr = CLEM_UTIL_set16_lo(cpu->regs.S, tmp_addr);
         }
         _clem_read(clem, &tmp_datahi, tmp_addr, 0x00, CLEM_MEM_FLAG_NULL);

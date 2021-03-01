@@ -84,7 +84,7 @@ static inline void _cpu_sp_dec3(
     struct Clemens65C816* cpu
 ) {
     uint16_t tmp = cpu->regs.S - 3;
-    if (cpu->emulation) {
+    if (cpu->pins.emulation) {
         tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
     }
     cpu->regs.S = tmp;
@@ -94,7 +94,7 @@ static inline void _cpu_sp_dec2(
     struct Clemens65C816* cpu
 ) {
     uint16_t tmp = cpu->regs.S - 2;
-    if (cpu->emulation) {
+    if (cpu->pins.emulation) {
         tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
     }
     cpu->regs.S = tmp;
@@ -104,7 +104,7 @@ static inline void _cpu_sp_dec(
     struct Clemens65C816* cpu
 ) {
     uint16_t tmp = cpu->regs.S - 1;
-    if (cpu->emulation) {
+    if (cpu->pins.emulation) {
         tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
     }
     cpu->regs.S = tmp;
@@ -114,7 +114,7 @@ static inline void _cpu_sp_inc3(
     struct Clemens65C816* cpu
 ) {
     uint16_t tmp = cpu->regs.S + 3;
-    if (cpu->emulation) {
+    if (cpu->pins.emulation) {
         tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
     }
     cpu->regs.S = tmp;
@@ -124,7 +124,7 @@ static inline void _cpu_sp_inc2(
     struct Clemens65C816* cpu
 ) {
     uint16_t tmp = cpu->regs.S + 2;
-    if (cpu->emulation) {
+    if (cpu->pins.emulation) {
         tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
     }
     cpu->regs.S = tmp;
@@ -134,7 +134,7 @@ static inline void _cpu_sp_inc(
     struct Clemens65C816* cpu
 ) {
     uint16_t tmp = cpu->regs.S + 1;
-    if (cpu->emulation) {
+    if (cpu->pins.emulation) {
         tmp = (cpu->regs.S & 0xff00) | (tmp & 0x00ff);
     }
     cpu->regs.S = tmp;
@@ -154,7 +154,7 @@ static inline void _clem_next_dbr(
     uint8_t* next_dbr,
     uint8_t dbr
 ) {
-    if (!clem->cpu.emulation) {
+    if (!clem->cpu.pins.emulation) {
         *next_dbr = dbr + 1;
     } else {
         *next_dbr = dbr;
@@ -180,7 +180,8 @@ static inline void _clem_write(
     uint8_t* bank_mem;
 
     clem->cpu.pins.adr = adr;
-    clem->cpu.pins.databank = bank;
+    clem->cpu.pins.bank = bank;
+    clem->cpu.pins.data = data;
     bank_mem = _clem_get_memory_bank(clem, bank);
     bank_mem[adr] = data;
     // TODO: account for slow/fast memory access
@@ -205,11 +206,10 @@ static inline void _clem_read(
     uint8_t bank,
     uint8_t flags
 ) {
-    clem->cpu.pins.adr = adr;
-    clem->cpu.pins.databank = bank;
     if (bank == 0x00) {
         if (adr >= 0xd000) {
             *data = clem->fpi_bank_map[0xff][adr];
+            bank = 0xff;
         } else {
             *data = clem->fpi_bank_map[0x00][adr];
         }
@@ -219,6 +219,9 @@ static inline void _clem_read(
         *data = clem->fpi_bank_map[bank][adr];
     }
     // TODO: account for slow/fast memory access
+    clem->cpu.pins.adr = adr;
+    clem->cpu.pins.bank = bank;
+    clem->cpu.pins.data = *data;
     clem->clocks_spent += clem->clocks_step;
     ++clem->cpu.cycles_spent;
 }
@@ -311,7 +314,7 @@ static inline void _clem_read_data_indexed_816(
     uint8_t dbr_actual;
     uint16_t eff_index = is_index_8 ? (index & 0xff) : index;
     uint16_t eff_addr = addr + eff_index;
-    if (eff_addr < addr && !clem->cpu.emulation) {
+    if (eff_addr < addr && !clem->cpu.pins.emulation) {
         _clem_next_dbr(clem, &dbr_actual, dbr);
     } else {
         dbr_actual = dbr;
@@ -371,7 +374,7 @@ static inline void _clem_opc_push_status(
     bool is_brk
 ) {
     uint8_t tmp_data = clem->cpu.regs.P;
-    if (clem->cpu.emulation) {
+    if (clem->cpu.pins.emulation) {
         if (is_brk) {
             tmp_data |= kClemensCPUStatus_EmulatedBrk;
         } else {
@@ -389,7 +392,7 @@ static inline void _clem_opc_pull_status(
     _cpu_sp_inc(&clem->cpu);
     _clem_read(clem, &tmp_p, clem->cpu.regs.S, 0x00, CLEM_MEM_FLAG_DATA);
 
-    if (clem->cpu.emulation) {
+    if (clem->cpu.pins.emulation) {
         // TODO: are 16-bit index registers possible in emulation mode?
         tmp_p |= kClemensCPUStatus_Index;
     }
@@ -439,7 +442,7 @@ static inline void _clem_read_pba_mode_dp(
 
     _clem_read_pba(clem, offset, pc);
     offset_index += *offset;
-    if (clem->cpu.emulation) {
+    if (clem->cpu.pins.emulation) {
         *eff_addr = (D & 0xff00) + ((D & 0xff) + offset_index) % 256;
     } else {
         *eff_addr = D + *offset + index;
@@ -882,7 +885,7 @@ static inline void _clem_write_indexed_816(
     uint16_t eff_index = is_index_8 ? (index & 0xff) : index;
     uint16_t eff_addr = addr + eff_index;
     uint8_t dbr_actual;
-    if (eff_addr < addr && !clem->cpu.emulation) {
+    if (eff_addr < addr && !clem->cpu.pins.emulation) {
         _clem_next_dbr(clem, &dbr_actual, dbr);
     } else {
         dbr_actual = dbr;
@@ -902,7 +905,7 @@ static inline void _clem_branch(
 ) {
     if (!do_branch) return;
     uint16_t tmp_addr = *pc + offset;
-    if (clem->cpu.emulation &&
+    if (clem->cpu.pins.emulation &&
         CLEM_UTIL_CROSSED_PAGE_BOUNDARY(*pc, tmp_addr)) {
         _clem_cycle(clem, 1);
     }
