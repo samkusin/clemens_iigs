@@ -39,6 +39,7 @@ private:
   cinek::FixedStack slab_;
 
   int emulationStepCount_;
+  uint64_t emulationStepCountSinceReset_;
 
   struct ClemensCPURegs cpuRegsSaved_;
   struct ClemensCPUPins cpuPinsSaved_;

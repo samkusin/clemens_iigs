@@ -22,8 +22,8 @@ enum {
     kClemensCPUStatus_IRQDisable         = (1 << 2),     // I
     kClemensCPUStatus_Decimal            = (1 << 3),     // D
     kClemensCPUStatus_Index              = (1 << 4),     // X,
+    kClemensCPUStatus_EmulatedBrk        = (1 << 4),     // B on 6502
     kClemensCPUStatus_MemoryAccumulator  = (1 << 5),     // M,
-    kClemensCPUStatus_EmulatedBrk        = (1 << 5),     // B on 6502
     kClemensCPUStatus_Overflow           = (1 << 6),     // V
     kClemensCPUStatus_Negative           = (1 << 7)      // N
 };
@@ -120,6 +120,55 @@ struct Clemens65C816 {
     bool enabled;           // set to false by STP, and true by RESET
 };
 
+
+/** NewVideo Register $C029 bits 4-1 ignored */
+enum {
+    // If 0, use all other Apple II video modes, else Super Hires
+    kClemensMMIONewVideo_SHGR_Enable        = (1 << 7),
+    // If 0, for Apple II video memory layout, else Super Hires (contiguous)
+    kClemensMMIONewVideo_SHGR_Memory_Enable = (1 << 6),
+    // If 0, color mode (140 x 192 16 colors), else 560 x 192 mono
+    kClemensMMIONewVideo_AUXHGR_Color_Inhibit = (1 << 5),
+    // If The docs here are a bit confusing... but I think this means
+    // That if inhibited, accessing video memory using the 17th address
+    //   bit to access the auxillary bank is disabled (and only softswitches
+    //   are supported.)  If ENABLED, then if ADR16 (D0 on chip) will
+    //   choose the bank - and if 1, then $01/$E1 else use softswitches.
+    // Based on ROM, looks like we rely exclusively on softswitches to
+    //   determine bank, and accesses to video in bank $01 fall back to $00
+    //   and soft-swtich behavior.  Re-evalutate
+    kClemensMMIONewVideo_BANKLATCH_Inhibit      = (1 << 0)
+};
+/** Shadow Register $C035 */
+enum {
+    // I/O and Language Card shadowing
+    kClemensMMIOShadow_IOLC_Inhibit     = (1 << 6),
+    // Text Page 2 (not in early IIgs models)
+    kClemensMMIOShadow_TXT2_Inhibit     = (1 << 5),
+    // Auxillary Bank Hi-Res (Double Hires?)
+    kClemensMMIOShadow_AUXHGR_Inhibit   = (1 << 4),
+    // Super hi-res buffer (in the aux bank)
+    kClemensMMIOShadow_SHGR_Inhibit     = (1 << 3),
+    // Hires page 2
+    kClemensMMIOShadow_HGR2_Inhibit     = (1 << 2),
+    // Hires page 1
+    kClemensMMIOShadow_HGR1_Inhibit     = (1 << 1),
+    // Text page 1
+    kClemensMMIOShadow_TXT1_Inhibit     = (1 << 0)
+};
+/** Speed Register $C036 */
+enum {
+    //  if 1, then fastest mode enabled? 2.8mhz
+    kClemensMMIOSpeed_FAST_Enable       = (1 << 7)
+};
+
+struct ClemensMMIO {
+    uint8_t newVideoC029;   // see kClemensMMIONewVideo_xxx
+    uint8_t shadowC035;     // see kClemensMMIOShadow_xxx
+    uint8_t speedC036;      // see kClemensMMIOSpeed_xxx
+
+};
+
 enum {
     kClemensDebugFlag_None              = 0,
     kClemensDebugFlag_StdoutOpcode      = (1 << 0),
@@ -134,8 +183,11 @@ typedef struct {
     uint32_t clocks_step;
     uint32_t clocks_step_mega2;     // typically FPI speed mhz * clocks_step
     uint32_t clocks_spent;
+
     uint8_t* fpi_bank_map[256];     // $00 - $ff
     uint8_t* mega2_bank_map[2];     // $e0 - $e1
+
+    struct ClemensMMIO mmio;
 
     /* Optional callback for debugging purposes.
        When issued, it's guaranteed that all registers/CPU state has been

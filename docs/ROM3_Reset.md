@@ -8,5 +8,10 @@ And a couple important opcodes, like JSR, RTS
 2. Set Interrupt Disable
 3. Set Stack Pointer to 0x01fb
 4. Some video/key code
-   1. Invoke a native mode ROM routine at ff/7600
-5. Set STATEREG c068 bits 3 and 4
+5. Set up a simple jump table at $e10198...9f (two entries)
+6. Check speed register $c035 in native mode
+   1. Set to fast (bit 7)
+7. Jump to FF7629
+   1. LDA c015
+   2. STA c007
+8. Set STATEREG c068 bits 3 and 4

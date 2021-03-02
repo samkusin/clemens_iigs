@@ -8,6 +8,8 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include <inttypes.h>
+
 namespace {
   constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
   constexpr float kMinDebugHistoryHeight = 256;
@@ -28,6 +30,7 @@ namespace {
 ClemensHost::ClemensHost() :
   machine_(),
   emulationStepCount_(0),
+  emulationStepCountSinceReset_(0),
   cpuRegsSaved_ {},
   cpuPinsSaved_ {},
   cpu6502EmulationSaved_(true)
@@ -62,7 +65,9 @@ void ClemensHost::frame(int width, int height, float deltaTime)
       }
       clemens_emulate(&machine_);
       --emulationStepCount_;
+      ++emulationStepCountSinceReset_;
     }
+
     emulationRan = true;
   }
 
@@ -129,7 +134,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     ImGui::TableNextColumn(); ImGui::Text("V");
     if (machine_.cpu.pins.emulation) {
       ImGui::TableNextColumn(); ImGui::Text("-");
-      ImGui::TableNextColumn(); ImGui::Text("B");
+      ImGui::TableNextColumn(); ImGui::Text("-");
     } else {
       ImGui::TableNextColumn(); ImGui::Text("M");
       ImGui::TableNextColumn(); ImGui::Text("X");
@@ -211,6 +216,9 @@ void ClemensHost::frame(int width, int height, float deltaTime)
       ImGui::TableNextRow();
       ImGui::TableNextColumn(); ImGui::Text("Clocks");
       ImGui::TableNextColumn(); ImGui::Text("%u", machine_.clocks_spent);
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("Steps");
+      ImGui::TableNextColumn(); ImGui::Text("%" PRIu64 "", emulationStepCountSinceReset_);
     }
     ImGui::EndTable();
 
@@ -438,6 +446,7 @@ void ClemensHost::resetMachine()
   //  step 2: reset end, issue interrupt
   machine_.cpu.pins.resbIn = false;   // low signal indicates reset
   emulationStepCount_ = 2;
+  emulationStepCountSinceReset_ = 0;
 }
 
 void ClemensHost::stepMachine(int stepCount)

@@ -1,4 +1,5 @@
 #include "clem_types.h"
+#include "clem_mem.h"
 
 static inline void _clem_cycle(
     ClemensMachine* clem,
@@ -161,34 +162,6 @@ static inline void _clem_next_dbr(
     }
 }
 
-static inline uint8_t* _clem_get_memory_bank(
-    ClemensMachine* clem,
-    uint8_t bank
-) {
-    if (bank == 0xe0 || bank == 0xe1) {
-        return clem->mega2_bank_map[bank & 0x1];
-    }
-    return clem->fpi_bank_map[bank];
-}
-
-static inline void _clem_write(
-    ClemensMachine* clem,
-    uint8_t data,
-    uint16_t adr,
-    uint8_t bank
-) {
-    uint8_t* bank_mem;
-
-    clem->cpu.pins.adr = adr;
-    clem->cpu.pins.bank = bank;
-    clem->cpu.pins.data = data;
-    bank_mem = _clem_get_memory_bank(clem, bank);
-    bank_mem[adr] = data;
-    // TODO: account for slow/fast memory access
-    clem->clocks_spent += clem->clocks_step;
-    ++clem->cpu.cycles_spent;
-}
-
 static inline void _clem_write_16(
     ClemensMachine* clem,
     uint16_t data,
@@ -197,33 +170,6 @@ static inline void _clem_write_16(
 ) {
     _clem_write(clem, (uint8_t)data, adr, bank);
     _clem_write(clem, (uint8_t)(data >> 8), adr + 1, bank);
-}
-
-static inline void _clem_read(
-    ClemensMachine* clem,
-    uint8_t* data,
-    uint16_t adr,
-    uint8_t bank,
-    uint8_t flags
-) {
-    if (bank == 0x00) {
-        if (adr >= 0xd000) {
-            *data = clem->fpi_bank_map[0xff][adr];
-            bank = 0xff;
-        } else {
-            *data = clem->fpi_bank_map[0x00][adr];
-        }
-    } else if (bank == 0xe0 || bank == 0xe1) {
-        *data = clem->mega2_bank_map[bank & 0x1][adr];
-    } else {
-        *data = clem->fpi_bank_map[bank][adr];
-    }
-    // TODO: account for slow/fast memory access
-    clem->cpu.pins.adr = adr;
-    clem->cpu.pins.bank = bank;
-    clem->cpu.pins.data = *data;
-    clem->clocks_spent += clem->clocks_step;
-    ++clem->cpu.cycles_spent;
 }
 
 static inline void _clem_read_16(
@@ -393,7 +339,7 @@ static inline void _clem_opc_pull_status(
     _clem_read(clem, &tmp_p, clem->cpu.regs.S, 0x00, CLEM_MEM_FLAG_DATA);
 
     if (clem->cpu.pins.emulation) {
-        // TODO: are 16-bit index registers possible in emulation mode?
+        tmp_p |= kClemensCPUStatus_MemoryAccumulator;
         tmp_p |= kClemensCPUStatus_Index;
     }
     clem->cpu.regs.P = tmp_p;

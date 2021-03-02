@@ -1,5 +1,4 @@
-#ifndef CLEM_MEMORY_H
-#define CLEM_MEMORY_H
+#include "clem_types.h"
 
 /**
  * Memory Mapping Controller
@@ -23,8 +22,8 @@
  *   what's described above
  * - The IIgs Firmware Reference from 1987 gives some excellent background on
  *   what's going on under the hood on startup and how the components work
- *   together
- * - The IIgs Hardware Reference is the primary source for what the $Cxxx pages
+ *   together.  It's a good reference for certain I/O registers in $C0xx space
+ * - The IIgs Hardware Reference is another source for what the $Cxxx pages
  *   are for, registers, and details about these components from a programming
  *   standpoint.  Much of this module uses this as a source
  * - Also some old IIe technical docs - of which include even more details.
@@ -32,12 +31,103 @@
  *
  */
 
-
 /**
- * Access to memory occurs via bank/offset requests from the CPU.
+ * Video Memory layout
  *
+ *  High Level:
+ *    FPI memory in banks $00 - $7F (practically up to 8MB RAM) and
+ *      ROM ($F0-$FF) - runs at clock speed
+ *    Mega 2 memory in banks $E0, $E1
+ *      - memory accesses here are always at 1mhz (reads AND writes)
+ *
+ *    Shadowing keeps select pages from $00, $01 in sync with $e0, $e1
+ *      - writes must occur at Mega 2 speed (1mhz)
+ *      - reads for I/O shadowing occur at 1mhz (reads from $E0, E1)
+ *      - reads for display shadowing occur at FPI speed (reading from $00,$01)
+ *
+ *
+ *  Bank 00/01
+ *    0400-07FF Text Page 1
+ *    0800-0BFF Text Page 2
+ *    2000-3FFF HGR Page 1
+ *    4000-5FFF HGR Page 2
+ *    * note there are quirks addressed in the "Alternate Display Mode" IIgs
+ *      feature, which turns on shadowing for text page 2 (required for Apple II
+ *      text page compatilbility)
+ *
+ *  Bank 00/01
+ *    C000-CFFF IO + slot expansions (mirrored), shadowing from bank $e0
+ *    D000-DFFF contains 2 banks of 4K RAM
+ *    E000-FFFF contains 1 bank 12K RAM
+ *
+ *  Oddities
+ *    C07X bank 0 contains code for interrupts, which relies on the shadowing
+ *      to work a certain way.  Account for this when debugging/testing
+ *      interrupts from the ROM
+ *    Generally speaking, access in the $C000 page is slow, but certain FPI
+ *      registers can be read/write fast, including interrupt rom at $C071-7F
+ *    RAM refresh delays in FPI memory 8 when instructions/data accessed
+ *      from RAM
  *
  *
  */
 
-#endif
+static inline uint8_t* _clem_get_memory_bank(
+    ClemensMachine* clem,
+    uint8_t bank
+) {
+    if (bank == 0xe0 || bank == 0xe1) {
+        return clem->mega2_bank_map[bank & 0x1];
+    }
+    return clem->fpi_bank_map[bank];
+}
+
+static inline void _clem_read(
+    ClemensMachine* clem,
+    uint8_t* data,
+    uint16_t adr,
+    uint8_t bank,
+    uint8_t flags
+) {
+    if (bank == 0x00 || bank == 0x01) {
+
+    } else {
+
+    }
+    if (bank == 0x00) {
+        if (adr >= 0xd000) {
+            *data = clem->fpi_bank_map[0xff][adr];
+            bank = 0xff;
+        } else {
+            *data = clem->fpi_bank_map[0x00][adr];
+        }
+    } else if (bank == 0xe0 || bank == 0xe1) {
+        *data = clem->mega2_bank_map[bank & 0x1][adr];
+    } else {
+        *data = clem->fpi_bank_map[bank][adr];
+    }
+    // TODO: account for slow/fast memory access
+    clem->cpu.pins.adr = adr;
+    clem->cpu.pins.bank = bank;
+    clem->cpu.pins.data = *data;
+    clem->clocks_spent += clem->clocks_step;
+    ++clem->cpu.cycles_spent;
+}
+
+static inline void _clem_write(
+    ClemensMachine* clem,
+    uint8_t data,
+    uint16_t adr,
+    uint8_t bank
+) {
+    uint8_t* bank_mem;
+
+    clem->cpu.pins.adr = adr;
+    clem->cpu.pins.bank = bank;
+    clem->cpu.pins.data = data;
+    bank_mem = _clem_get_memory_bank(clem, bank);
+    bank_mem[adr] = data;
+    // TODO: account for slow/fast memory access
+    clem->clocks_spent += clem->clocks_step;
+    ++clem->cpu.cycles_spent;
+}
