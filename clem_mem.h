@@ -1,0 +1,43 @@
+#ifndef CLEM_MEMORY_H
+#define CLEM_MEMORY_H
+
+/**
+ * Memory Mapping Controller
+ *
+ * A major part of What makes a 65816 an 'Apple IIgs' machine.   The goals of
+ * this module are to emulate accessing both FPI and the Mega2 memory.  From
+ * this, the MMC controls read/write access to I/O registers that drive the
+ * various 'machine' components (aka the main method of accessing devices
+ * from machine instructions - Memory Mapped I/O)
+ *
+ * The Mega2 is particularly tricky due to this 'slow RAM' + shadowing methods
+ * of access.  Specific state to determine what pages to access and where when
+ * emulating 8-bit Apple II devices is particular tricky.
+ *
+ * This module admittedly covers a lot.  It must support 'slow' accesses to
+ * Mega2 memory, shadowing, bank switching, I/O, etc.  Fortunately the I/O
+ * registers and techniques here are well documented by 1980s Apple literature.
+ *
+ * Things to consider (a development TODO)
+ * - The IIgs Technical Introduction is a good start for those unfamiliar with
+ *   what's described above
+ * - The IIgs Firmware Reference from 1987 gives some excellent background on
+ *   what's going on under the hood on startup and how the components work
+ *   together
+ * - The IIgs Hardware Reference is the primary source for what the $Cxxx pages
+ *   are for, registers, and details about these components from a programming
+ *   standpoint.  Much of this module uses this as a source
+ * - Also some old IIe technical docs - of which include even more details.
+ *   Seems the earlier machines even have more technical documentation.
+ *
+ */
+
+
+/**
+ * Access to memory occurs via bank/offset requests from the CPU.
+ *
+ *
+ *
+ */
+
+#endif
