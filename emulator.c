@@ -266,6 +266,12 @@ static void _opcode_print(
         case kClemensCPUAddrMode_Operand:
             snprintf(operand, sizeof(operand), "%02X", inst->value);
             break;
+        case kClemensCPUAddrMode_Stack_Relative:
+            snprintf(operand, sizeof(operand), "%02X, S", inst->value);
+            break;
+        case kClemensCPUAddrMode_Stack_Relative_Indirect_Y:
+            snprintf(operand, sizeof(operand), "(%02X, S), Y", inst->value);
+            break;
     }
 
     if (clem->debug_flags & kClemensDebugFlag_StdoutOpcode) {
@@ -805,7 +811,19 @@ int clemens_init(
     _opcode_description(CLEM_OPC_TSB_ABS, "TSB", kClemensCPUAddrMode_Absolute);
     _opcode_description(CLEM_OPC_TSB_DP,  "TSB", kClemensCPUAddrMode_DirectPage);
 
+    _opcode_description(CLEM_OPC_TAX,     "TAX", kClemensCPUAddrMode_None);
+    _opcode_description(CLEM_OPC_TAY,     "TAX", kClemensCPUAddrMode_None);
+    _opcode_description(CLEM_OPC_TCD,     "TCD", kClemensCPUAddrMode_None);
+    _opcode_description(CLEM_OPC_TDC,     "TDC", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_TCS,     "TCS", kClemensCPUAddrMode_None);
+    _opcode_description(CLEM_OPC_TSX,     "TSX", kClemensCPUAddrMode_None);
+    _opcode_description(CLEM_OPC_TXA,     "TXA", kClemensCPUAddrMode_None);
+    _opcode_description(CLEM_OPC_TXS,     "TXS", kClemensCPUAddrMode_None);
+    _opcode_description(CLEM_OPC_TXY,     "TXY", kClemensCPUAddrMode_None);
+    _opcode_description(CLEM_OPC_TYA,     "TYA", kClemensCPUAddrMode_None);
+    _opcode_description(CLEM_OPC_TYX,     "TYX", kClemensCPUAddrMode_None);
+
+
     _opcode_description(CLEM_OPC_WAI,     "WAI", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_WDM,     "WDM", kClemensCPUAddrMode_Operand);
 
@@ -2562,10 +2580,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_TYA:
             if (m_status) {
-                cpu->regs.Y = CLEM_UTIL_set16_lo(cpu->regs.A, cpu->regs.Y);
+                cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, cpu->regs.Y);
                 _cpu_p_flags_n_z_data(cpu, (uint8_t)cpu->regs.A);
             } else {
-                cpu->regs.Y = x_status ? (uint8_t)cpu->regs.X : cpu->regs.Y;
+                cpu->regs.A = x_status ? (uint8_t)cpu->regs.A : cpu->regs.Y;
                 _cpu_p_flags_n_z_data_16(cpu, cpu->regs.A);
             }
             break;
