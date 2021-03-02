@@ -72,6 +72,44 @@
  *
  */
 
+
+/**
+ *  Memory R/W access
+ *
+ *  FPI ROM -   2.864mhz
+ *  FPI RAM -   8% reduction from 2.8mhz (TPD?) - 2.6mhz approx
+ *  Mega2 RAM - 1.023 mhz
+ *
+ *  - Map Bank:Address to its actual Bank:Address inside either its FPI or Mega2
+ *    Memory
+ *  - Shadowed reads outside of I/O are handled by reading the FPI memory
+ *  - Shadowed writes outside of I/O are handled by writing to both FPI and
+ *    Mega2
+ *  - I/O is a special case
+ *  - Softswitches alter the mapping of bank 00 reads/writes
+ *  - For now, always allow address bit 17 to access auxillary memory where
+ *    c029 bit 0 is on (TODO: handle off cases when they come up)
+ *  - For now, assume Bank 00, 01 shadowing (bit 4 of c029 is off) until we
+ *    need to run the ninja force demo for testing shadowing for all banks
+ *
+ *  - Bank 01, E1 access will override softswitch main/aux setting
+ *  - Bank 00, E0 access will set the target bank bit 1 based on softswitch
+ *    main/aux
+ *    - 00, E0 special case page 00, 01, D0-DF, etc based on softswitches
+ *  - Solution seems to have a page map that maps access to main or aux memory
+ *    - Page map should include shadowing instructions for writes
+ *    - There only needs to be three page maps - 00/E0, 01/E1, and the 1:1
+ *      direct mapping version (or add a compare/branch each read/write)
+ *    - Each bank has a page map template
+ *      Each page has a 'target' (0 or 1 bank) and page (many will map 1:1)
+ *      Each page has a shadow-bit to shadow writes to the Mega2 bank
+ *      {
+ *        main/aux bit
+ *        shadow bit
+ *        page index (8 bits)
+ *      }
+ */
+
 static inline uint8_t* _clem_get_memory_bank(
     ClemensMachine* clem,
     uint8_t bank
@@ -89,6 +127,9 @@ static inline void _clem_read(
     uint8_t bank,
     uint8_t flags
 ) {
+    if (!(bank & 0xfe)) {
+      //  bank 00, require
+    }
     if (bank == 0x00 || bank == 0x01) {
 
     } else {

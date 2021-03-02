@@ -129,19 +129,17 @@ enum {
     kClemensMMIONewVideo_SHGR_Memory_Enable = (1 << 6),
     // If 0, color mode (140 x 192 16 colors), else 560 x 192 mono
     kClemensMMIONewVideo_AUXHGR_Color_Inhibit = (1 << 5),
-    // If The docs here are a bit confusing... but I think this means
-    // That if inhibited, accessing video memory using the 17th address
-    //   bit to access the auxillary bank is disabled (and only softswitches
-    //   are supported.)  If ENABLED, then if ADR16 (D0 on chip) will
-    //   choose the bank - and if 1, then $01/$E1 else use softswitches.
-    // Based on ROM, looks like we rely exclusively on softswitches to
-    //   determine bank, and accesses to video in bank $01 fall back to $00
-    //   and soft-swtich behavior.  Re-evalutate
+    // If The docs here are a bit contradictory
+    //  Hardware Reference: p16 vs p89
+    //  On = 17th bit (D0) used for auxillary bank addressing, but can also use
+    //      softswitches?
+    //  Off = use soft-switches only through 00,e0
+    //  This relies on the shadow register as well?
     kClemensMMIONewVideo_BANKLATCH_Inhibit      = (1 << 0)
 };
 /** Shadow Register $C035 */
 enum {
-    // I/O and Language Card shadowing
+    // I/O and Language Card shadowing, 0 = C000-CFFF as I/O, 1 = RAM
     kClemensMMIOShadow_IOLC_Inhibit     = (1 << 6),
     // Text Page 2 (not in early IIgs models)
     kClemensMMIOShadow_TXT2_Inhibit     = (1 << 5),
