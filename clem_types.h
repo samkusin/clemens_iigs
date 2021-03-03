@@ -160,11 +160,34 @@ enum {
     kClemensMMIOSpeed_FAST_Enable       = (1 << 7)
 };
 
+
+struct ClemensMMIOPageInfo {
+    uint8_t read;
+    uint8_t write;
+    uint8_t bank_read;
+    uint8_t bank_write;
+    uint32_t flags;
+};
+struct ClemensMMIOPageMap {
+  struct ClemensMMIOPageInfo pages[256];
+};
+
 struct ClemensMMIO {
     uint8_t newVideoC029;   // see kClemensMMIONewVideo_xxx
     uint8_t shadowC035;     // see kClemensMMIOShadow_xxx
     uint8_t speedC036;      // see kClemensMMIOSpeed_xxx
 
+    /* Provides remapping of memory read/write access per bank.  For the IIgs,
+       this map covers shadowed memory as well as language card and main/aux
+       bank access.
+    */
+    struct ClemensMMIOPageMap* bank_page_map[256];
+    struct ClemensMMIOPageMap fpi_direct_page_map;
+    struct ClemensMMIOPageMap fpi_main_page_map;
+    struct ClemensMMIOPageMap fpi_aux_page_map;
+    struct ClemensMMIOPageMap fpi_rom_page_map;
+    struct ClemensMMIOPageMap mega2_main_page_map;
+    struct ClemensMMIOPageMap mega2_aux_page_map;
 };
 
 enum {
