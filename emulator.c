@@ -299,8 +299,9 @@ void _clem_debug_memory_dump(
     if (fp) {
         uint16_t mem_addr = (uint16_t)mem_page << 8;
         while (page_count > 0) {
+            uint32_t clocks_spent;
             uint8_t mem_next_bank = mem_bank;
-            fwrite(_clem_get_memory_bank(clem, mem_bank) + mem_addr, 256, 1, fp);
+            fwrite(_clem_get_memory_bank(clem, mem_bank, &clocks_spent) + mem_addr, 256, 1, fp);
             if (mem_addr + 0x0100 < mem_addr) {
                 _clem_next_dbr(clem, &mem_next_bank, mem_bank);
             }
@@ -393,6 +394,8 @@ int clemens_init(
     memset(machine->mega2_bank_map[0x00], 0, CLEM_IIGS_BANK_SIZE);
     machine->mega2_bank_map[0x01] = (uint8_t*)e1bank;;
     memset(machine->mega2_bank_map[0x01], 0, CLEM_IIGS_BANK_SIZE);
+
+    _clem_init_page_maps(&machine->mmio);
 
     for (unsigned i = 0; i < 256; ++i) {
         _opcode_description((uint8_t)i, "...", kClemensCPUAddrMode_None);
