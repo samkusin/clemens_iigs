@@ -205,92 +205,275 @@ static inline void _clem_write(
     ++clem->cpu.cycles_spent;
 }
 
+void _clem_mmio_shadow_pages(
+    struct ClemensMMIOPageMap* page_map,
+    unsigned start_page_idx,
+    unsigned end_page_idx,
+    bool shadowed
+) {
+    unsigned page_idx;
+    for (page_idx = start_page_idx; page_idx < end_page_idx; ++page_idx) {
+        struct ClemensMMIOPageInfo* page = &page_map->pages[page_idx];
+        if (shadowed) page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+        else page->flags &= ~CLEM_MMIO_PAGE_SHADOWED;
+    }
+}
 
-void _clem_init_page_maps(struct ClemensMMIO* mmio) {
-    /* Initializes the all of our page map instances.  Each instance maps to
-        one or more banks in the MMIO page-map bank table.
+void _clem_mmio_shadow_txt1(struct ClemensMMIO* mmio) {
+    struct ClemensMMIOPageMap* page_map = &mmio->fpi_main_page_map;
+    bool inhibit_shadow = (mmio->shadowC035 & kClemensMMIOShadow_TXT1_Inhibit);
+    unsigned page_idx;
+    for (page_idx = 0x04; page_idx < 0x08; ++page_idx) {
+        struct ClemensMMIOPageInfo* page = &page_map->pages[page_idx];
+        if (inhibit_shadow) page->flags &= ~CLEM_MMIO_PAGE_SHADOWED;
+        else page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+    }
+    //  TODO: aux bank 0
+    page_map = &mmio->fpi_aux_page_map;
+    for (page_idx = 0x04; page_idx < 0x08; ++page_idx) {
+        struct ClemensMMIOPageInfo* page = &page_map->pages[page_idx];
+        if (inhibit_shadow) page->flags &= ~CLEM_MMIO_PAGE_SHADOWED;
+        else page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+    }
+}
 
-        In most cases, the majority of banks use the 'direct' page map.  Banks
-        00, 01 use the fpi_main/aux maps, and E0, E1 use the mega2_main/aux
-        maps.
+void _clem_mmio_shadow_txt2(struct ClemensMMIO* mmio) {
+    struct ClemensMMIOPageMap* page_map = &mmio->fpi_main_page_map;
+    bool inhibit_shadow = (mmio->shadowC035 & kClemensMMIOShadow_TXT2_Inhibit);
+    unsigned page_idx;
+    for (page_idx = 0x08; page_idx < 0x0C; ++page_idx) {
+        struct ClemensMMIOPageInfo* page = &page_map->pages[page_idx];
+        if (inhibit_shadow) page->flags &= ~CLEM_MMIO_PAGE_SHADOWED;
+        else page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+    }
+    //  TODO: bank 0 aux
+    page_map = &mmio->fpi_aux_page_map;
+    for (page_idx = 0x08; page_idx < 0x0C; ++page_idx) {
+        struct ClemensMMIOPageInfo* page = &page_map->pages[page_idx];
+        if (inhibit_shadow) page->flags &= ~CLEM_MMIO_PAGE_SHADOWED;
+        else page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+    }
+}
+
+void _clem_mmio_shadow_hgr_multi(struct ClemensMMIO* mmio) {
+    /* handle hgr page 0,1 in main, aux
+       handle shgr in aux, negotiating the auxillary page shadowing for hgr as
+        well
     */
-    /*
-        TODO: This assumption may change to support the extremely edge case of
-        shadowing all RAM banks.  In that case, we may need to support two
-        more page map types (even and odd banks that are not bank 0,1?)
+    struct ClemensMMIOPageMap* page_map_0 = &mmio->fpi_main_page_map;
+    struct ClemensMMIOPageMap* page_map_1 = &mmio->fpi_aux_page_map;
+    bool inhibit_hgr1 = (mmio->shadowC035 & kClemensMMIOShadow_HGR1_Inhibit);
+    bool inhibit_hgr2 = (mmio->shadowC035 & kClemensMMIOShadow_HGR2_Inhibit);
+    bool inhibit_shgr = (mmio->shadowC035 & kClemensMMIOShadow_SHGR_Inhibit);
+    bool inhibit_aux_hgr = (mmio->shadowC035 & kClemensMMIOShadow_AUXHGR_Inhibit);
+    unsigned page_idx;
 
-    */
+    //  HGR1
+    for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
+        struct ClemensMMIOPageInfo* page = &page_map_0->pages[page_idx];
+        if (inhibit_hgr1) page->flags &= ~CLEM_MMIO_PAGE_SHADOWED;
+        else page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+    }
+    //  TODO: bank 0 aux access
+    for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
+        struct ClemensMMIOPageInfo* page = &page_map_1->pages[page_idx];
+        if (inhibit_hgr1 || inhibit_shgr) {
+            page->flags &= ~CLEM_MMIO_PAGE_SHADOWED;
+        } else if (!inhibit_aux_hgr || !inhibit_shgr) {
+            page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+        }
+    }
+    //  HGR2
+    for (page_idx = 0x40; page_idx < 0x60; ++page_idx) {
+        struct ClemensMMIOPageInfo* page = &page_map_0->pages[page_idx];
+        if (inhibit_hgr1) page->flags &= ~CLEM_MMIO_PAGE_SHADOWED;
+        else page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+    }
+    //  TODO: bank 0 aux access
+    if (!(mmio->shadowC035 & kClemensMMIOShadow_AUXHGR_Inhibit)) {
+        for (page_idx = 0x40; page_idx < 0x60; ++page_idx) {
+            struct ClemensMMIOPageInfo* page = &page_map_1->pages[page_idx];
+            if (inhibit_hgr1) {
+                page->flags &= ~CLEM_MMIO_PAGE_SHADOWED;
+            } else if (!inhibit_aux_hgr || !inhibit_shgr) {
+                page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+            }
+        }
+    }
+    //  SHGR (upper pages only, since 0x20-0x60 is handled during the HGR1/2
+    //        pass)
+    //  TODO: bank 0 aux access
+    for (page_idx = 0x60; page_idx < 0xA0; ++page_idx) {
+        struct ClemensMMIOPageInfo* page = &page_map_1->pages[page_idx];
+        if (inhibit_shgr) page->flags &= ~CLEM_MMIO_PAGE_SHADOWED;
+        else page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+    }
+}
 
-    /* Use case:
-        Bank 00: Apple //e style, Mega2 shadowing
-        Page  00-BF direct map
-              C0-CF I/O map
-              E0-FF Read ROM, Write RAM
-              D0-DF Read ROM, Write RAM Bank 2
-                (D000-DFFF RAM actual vs Bank 1 which is RAM C000-CFFF)
+void _clem_mmio_shadow_iolc(struct ClemensMMIO* mmio) {
 
-        Bank 01: Auxillary address bit 17 -> bank 01, E1 shadowing
-                 Bypasses softswitches if bank latch bit 0 from NEWVIDEO is off
-        Page  00-BF direct map
-              C0-CF I/O map
-              D0-FF Read and Write RAM, Bank 2
-    */
-    struct ClemensMMIOPageMap* page_map = &mmio->fpi_direct_page_map;
+}
+
+/*
+void _clem_mmio_shadow_iolc_page_maps(struct ClemensMMIO* mmio) {
+    if (inhibit) {
+        //
+        for (page_idx = 0xC0; page_idx < 0xCF; ++page_idx) {
+            page = &page_map->pages[page_idx];
+            _clem_mmio_create_page_direct_mapping(page, page_idx);
+            page->bank_read = 0xe0;
+            page->bank_write = 0xe0;
+            page->flags |= CLEM_MMIO_PAGE_IOADDR;
+            page->flags &= ~CLEM_MMIO_PAGE_DIRECT;
+        }
+        for (page_idx = 0xD0; page_idx < 0xDF; ++page_idx) {
+            page = &page_map->pages[page_idx];
+            _clem_mmio_create_page_direct_mapping(page, page_idx);
+            page->bank_read = 0xff;
+            page->bank_write = 0x00;
+            page->flags &= ~CLEM_MMIO_PAGE_DIRECT;
+        }
+        for (page_idx = 0xE0; page_idx < 0x100; ++page_idx) {
+            page = &page_map->pages[page_idx];
+            _clem_mmio_create_page_direct_mapping(page, page_idx);
+            page->bank_read = 0xff;
+            page->bank_write = 0x00;
+            page->flags &= ~CLEM_MMIO_PAGE_DIRECT;
+        }
+    } else {
+        for (page_idx = 0xC0; page_idx < 0xCF; ++page_idx) {
+            page = &page_map->pages[page_idx];
+            _clem_mmio_create_page_direct_mapping(page, page_idx);
+            page->bank_read = 0xe0;
+            page->bank_write = 0xe0;
+            page->flags |= CLEM_MMIO_PAGE_IOADDR;
+            page->flags &= ~CLEM_MMIO_PAGE_DIRECT;
+        }
+        for (page_idx = 0xD0; page_idx < 0xDF; ++page_idx) {
+            page = &page_map->pages[page_idx];
+            _clem_mmio_create_page_direct_mapping(page, page_idx);
+            page->bank_read = 0xff;
+            page->bank_write = 0x00;
+            page->flags &= ~CLEM_MMIO_PAGE_DIRECT;
+        }
+        for (page_idx = 0xE0; page_idx < 0x100; ++page_idx) {
+            page = &page_map->pages[page_idx];
+            _clem_mmio_create_page_direct_mapping(page, page_idx);
+            page->bank_read = 0xff;
+            page->bank_write = 0x00;
+            page->flags &= ~CLEM_MMIO_PAGE_DIRECT;
+        }
+    }
+}
+*/
+
+void _clem_mmio_init_page_maps(struct ClemensMMIO* mmio) {
+    struct ClemensMMIOPageMap* page_map;
+    struct ClemensMMIOPageInfo* page;
     unsigned page_idx;
     unsigned bank_idx;
 
+    //  Bank 00, 01 as RAM
+    page_map = &mmio->fpi_main_page_map;
+    for (page_idx = 0x00; page_idx < 0xFF; ++page_idx) {
+        _clem_mmio_create_page_direct_mapping(
+            &page_map->pages[page_idx], page_idx);
+    }
+    page_map = &mmio->fpi_aux_page_map;
+    for (page_idx = 0x00; page_idx < 0xFF; ++page_idx) {
+        _clem_mmio_create_page_direct_mapping(
+            &page_map->pages[page_idx], page_idx);
+    }
     //  Banks 02-7F typically
+    page_map = &mmio->fpi_direct_page_map;
     for (page_idx = 0x00; page_idx < 0x100; ++page_idx) {
         _clem_mmio_create_page_direct_mapping(
             &page_map->pages[page_idx], page_idx);
     }
-
+    //  Banks E0
+    page_map = &mmio->mega2_main_page_map;
+    for (page_idx = 0x00; page_idx < 0x100; ++page_idx) {
+        _clem_mmio_create_page_direct_mapping(
+            &page_map->pages[page_idx], page_idx);
+    }
+    //  Banks E1
+    page_map = &mmio->mega2_aux_page_map;
+    for (page_idx = 0x00; page_idx < 0x100; ++page_idx) {
+        _clem_mmio_create_page_direct_mapping(
+            &page_map->pages[page_idx], page_idx);
+    }
     //  Banks FC-FF ROM access is read-only of course.
     page_map = &mmio->fpi_rom_page_map;
     for (page_idx = 0x00; page_idx < 0x100; ++page_idx) {
-        _clem_mmio_create_page_direct_mapping(
-            &page_map->pages[page_idx], page_idx);
-        page_map->pages[page_idx].flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
+        page = &page_map->pages[page_idx];
+        _clem_mmio_create_page_direct_mapping(page, page_idx);
+        page->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
     }
-
-    //  Bank 00
-    page_map = &mmio->fpi_main_page_map;
-    for (page_idx = 0x00; page_idx < 0xC0; ++page_idx) {
-        _clem_mmio_create_page_direct_mapping(
-            &page_map->pages[page_idx], page_idx);
-    }
-    for (page_idx = 0xC0; page_idx < 0xCF; ++page_idx) {
-        _clem_mmio_create_page_direct_mapping(
-            &page_map->pages[page_idx], page_idx);
-        page_map->pages[page_idx].bank_read = 0xe0;
-        page_map->pages[page_idx].bank_write = 0xe0;
-        page_map->pages[page_idx].flags |= CLEM_MMIO_PAGE_IOADDR;
-        page_map->pages[page_idx].flags &= ~CLEM_MMIO_PAGE_DIRECT;
-    }
-    for (page_idx = 0xD0; page_idx < 0xDF; ++page_idx) {
-        _clem_mmio_create_page_direct_mapping(
-            &page_map->pages[page_idx], page_idx);
-        page_map->pages[page_idx].bank_read = 0xff;
-        page_map->pages[page_idx].bank_write = 0x00;
-        page_map->pages[page_idx].flags &= ~CLEM_MMIO_PAGE_DIRECT;
-    }
-    for (page_idx = 0xE0; page_idx < 0x100; ++page_idx) {
-        _clem_mmio_create_page_direct_mapping(
-            &page_map->pages[page_idx], page_idx);
-        page_map->pages[page_idx].bank_read = 0xff;
-        page_map->pages[page_idx].bank_write = 0x00;
-        page_map->pages[page_idx].flags &= ~CLEM_MMIO_PAGE_DIRECT;
-    }
-
-
 
     //  set up the default page mappings
     mmio->bank_page_map[0x00] = &mmio->fpi_main_page_map;
+    mmio->bank_page_map[0x01] = &mmio->fpi_aux_page_map;
     for (bank_idx = 0x02; bank_idx < 0x80; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->fpi_direct_page_map;
     }
+    mmio->bank_page_map[0xE0] = &mmio->mega2_main_page_map;
+    mmio->bank_page_map[0xE1] = &mmio->mega2_aux_page_map;
     for (bank_idx = 0xFC; bank_idx < 0x100; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->fpi_rom_page_map;
     }
-    mmio->bank_page_map[0x00] = &mmio->fpi_main_page_map;
+
+    //  apply softswitches which affect page mappings for banks 00,01,E0,E1
+    //  shadow regions for 00, 01
+    _clem_mmio_shadow_txt1(mmio);
+    _clem_mmio_shadow_txt2(mmio);
+    _clem_mmio_shadow_hgr_multi(mmio);
+    _clem_mmio_shadow_iolc(mmio);
+
+    //  IOLC for 00, 01
+    //
+}
+/*
+
+    // TODO: apply all I/O register settings now - these should be the
+    //       defaults
+    if (!(mmio->shadowC035 & kClemensMMIOShadow_TXT1_Inhibit)) {
+        for (page_idx = 0x04; page_idx < 0x08; ++page_idx) {
+            page = &page_map->pages[page_idx];
+            page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+        }
+    }
+    if (!(mmio->shadowC035 & kClemensMMIOShadow_TXT2_Inhibit)) {
+        for (page_idx = 0x08; page_idx < 0x0C; ++page_idx) {
+            page = &page_map->pages[page_idx];
+            page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+        }
+    }
+    if (!(mmio->shadowC035 & kClemensMMIOShadow_HGR1_Inhibit)) {
+        for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
+            page = &page_map->pages[page_idx];
+            page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+        }
+    }
+    if (!(mmio->shadowC035 & kClemensMMIOShadow_HGR2_Inhibit)) {
+        for (page_idx = 0x40; page_idx < 0x60; ++page_idx) {
+            page = &page_map->pages[page_idx];
+            page->flags |= CLEM_MMIO_PAGE_SHADOWED;
+        }
+    }
+
+    _clem_mmio_shadow_iolc_page_map(
+        page_map, 0x00, mmio->shadowC035 & kClemensMMIOShadow_IOLC_Inhibit);
+}
+*/
+
+void _clem_mmio_init(struct ClemensMMIO* mmio) {
+    //  Mega2 shadowing enabled for all regions
+    //  Fast CPU mode
+    //  TODO: support enabling bank latch if we ever need to as this would be
+    //        the likely value at reset (bit set to 0 vs 1)
+    mmio->newVideoC029 = kClemensMMIONewVideo_BANKLATCH_Inhibit;
+    mmio->shadowC035 = 0x00;
+    mmio->speedC036 = kClemensMMIOSpeed_FAST_Enable;
+
+    _clem_mmio_init_page_maps(mmio);
 }
