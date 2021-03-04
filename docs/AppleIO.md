@@ -57,3 +57,12 @@ FPI Register
 
 
 
+## Memory Bank 0 and 1 Softswitch behavior
+
+The shadow register $C035 affects behavior on banks 0 and 1.  For example,
+IOLC affects both banks.  But Bank 0 effects must also take softswitches
+(i.e. ALTZP) behavior into account.  So access to Bank 01 from the CPU
+standpoint is affected, as well as Bank 00 + softswitch flags from FPI/Mega2.
+
+
+

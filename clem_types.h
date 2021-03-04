@@ -143,7 +143,7 @@ enum {
     kClemensMMIOShadow_IOLC_Inhibit     = (1 << 6),
     // Text Page 2 (not in early IIgs models)
     kClemensMMIOShadow_TXT2_Inhibit     = (1 << 5),
-    // Auxillary Bank Hi-Res (Double Hires?)
+    // Auxillary Bank Hi-Res pages 0, 1
     kClemensMMIOShadow_AUXHGR_Inhibit   = (1 << 4),
     // Super hi-res buffer (in the aux bank)
     kClemensMMIOShadow_SHGR_Inhibit     = (1 << 3),

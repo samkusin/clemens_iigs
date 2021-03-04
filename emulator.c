@@ -395,8 +395,6 @@ int clemens_init(
     machine->mega2_bank_map[0x01] = (uint8_t*)e1bank;;
     memset(machine->mega2_bank_map[0x01], 0, CLEM_IIGS_BANK_SIZE);
 
-    _clem_init_page_maps(&machine->mmio);
-
     for (unsigned i = 0; i < 256; ++i) {
         _opcode_description((uint8_t)i, "...", kClemensCPUAddrMode_None);
     }
@@ -2915,6 +2913,8 @@ void clemens_emulate(ClemensMachine* clem) {
             cpu->pins.emulation = true;
             cpu->pins.readyOut = true;
             cpu->enabled = true;
+
+            _clem_mmio_init(&clem->mmio);
             _clem_cycle(clem, 1);
         }
         _clem_cycle(clem, 1);
