@@ -268,7 +268,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
                        nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
     uint8_t viewBank = memoryViewBank_[0];
     if (viewBank == 0xe0 || viewBank == 0xe1) {
-      memoryViewStatic_[0].DrawContents(
+      memoryViewStatic_[0].DrawContents((void*)
         machine_.mega2_bank_map[viewBank & 0x1], CLEM_IIGS_BANK_SIZE);
     } else {
       memoryViewStatic_[0].DrawContents(
