@@ -3,7 +3,9 @@
 ## Essential
 
 
-### $C015 SLOTCXROM
+### $C015 RDCXROM
+
+p 192 HW Reference
 
 Read only - 1 = slot ROM enabled, 0 = internal ROM enablaed
 See STATEREG for details
@@ -17,6 +19,8 @@ Bit 0 - always assume it's going to be '1' for now - meaning the 17th
 
 
 ### $C02D - SLOT
+
+p 181 HW Reference Doc
 
 Bit N - slot N device select (#3 and #0 are labeled DO NOT MODIFY)
 
@@ -63,6 +67,3 @@ The shadow register $C035 affects behavior on banks 0 and 1.  For example,
 IOLC affects both banks.  But Bank 0 effects must also take softswitches
 (i.e. ALTZP) behavior into account.  So access to Bank 01 from the CPU
 standpoint is affected, as well as Bank 00 + softswitch flags from FPI/Mega2.
-
-
-

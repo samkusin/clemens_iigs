@@ -137,23 +137,7 @@ enum {
     //  This relies on the shadow register as well?
     kClemensMMIONewVideo_BANKLATCH_Inhibit      = (1 << 0)
 };
-/** Shadow Register $C035 */
-enum {
-    // I/O and Language Card shadowing, 0 = C000-CFFF as I/O, 1 = RAM
-    kClemensMMIOShadow_IOLC_Inhibit     = (1 << 6),
-    // Text Page 2 (not in early IIgs models)
-    kClemensMMIOShadow_TXT2_Inhibit     = (1 << 5),
-    // Auxillary Bank Hi-Res pages 0, 1
-    kClemensMMIOShadow_AUXHGR_Inhibit   = (1 << 4),
-    // Super hi-res buffer (in the aux bank)
-    kClemensMMIOShadow_SHGR_Inhibit     = (1 << 3),
-    // Hires page 2
-    kClemensMMIOShadow_HGR2_Inhibit     = (1 << 2),
-    // Hires page 1
-    kClemensMMIOShadow_HGR1_Inhibit     = (1 << 1),
-    // Text page 1
-    kClemensMMIOShadow_TXT1_Inhibit     = (1 << 0)
-};
+
 /** Speed Register $C036 */
 enum {
     //  if 1, then fastest mode enabled? 2.8mhz
@@ -168,14 +152,20 @@ struct ClemensMMIOPageInfo {
     uint8_t bank_write;
     uint32_t flags;
 };
+
+struct ClemensMMIOShadowMap {
+    uint8_t pages[256];
+};
+
 struct ClemensMMIOPageMap {
   struct ClemensMMIOPageInfo pages[256];
+  struct ClemensMMIOShadowMap* shadow_map;
 };
 
 struct ClemensMMIO {
-    uint8_t newVideoC029;   // see kClemensMMIONewVideo_xxx
-    uint8_t shadowC035;     // see kClemensMMIOShadow_xxx
-    uint8_t speedC036;      // see kClemensMMIOSpeed_xxx
+    uint32_t mmap_register; // consolidated memory map flags- CLEM_MMIO_MMAP_
+    uint8_t new_video_c029; // see kClemensMMIONewVideo_xxx
+    uint8_t speed_c036;     // see kClemensMMIOSpeed_xxx
 
     /* Provides remapping of memory read/write access per bank.  For the IIgs,
        this map covers shadowed memory as well as language card and main/aux
@@ -188,6 +178,9 @@ struct ClemensMMIO {
     struct ClemensMMIOPageMap fpi_rom_page_map;
     struct ClemensMMIOPageMap mega2_main_page_map;
     struct ClemensMMIOPageMap mega2_aux_page_map;
+
+    struct ClemensMMIOShadowMap fpi_mega2_main_shadow_map;
+    struct ClemensMMIOShadowMap fpi_mega2_aux_shadow_map;
 };
 
 enum {
