@@ -141,7 +141,9 @@ enum {
 /** Speed Register $C036 */
 enum {
     //  if 1, then fastest mode enabled? 2.8mhz
-    kClemensMMIOSpeed_FAST_Enable       = (1 << 7)
+    kClemensMMIOSpeed_FAST_Enable       = (1 << 7),
+    //  always 1 on ROM 03, unknown on ROM 01, older GS devices
+    kClemensMMIOSpeed_PoweredOn         = (1 << 6)
 };
 
 
@@ -166,6 +168,8 @@ struct ClemensMMIO {
     uint32_t mmap_register; // consolidated memory map flags- CLEM_MMIO_MMAP_
     uint8_t new_video_c029; // see kClemensMMIONewVideo_xxx
     uint8_t speed_c036;     // see kClemensMMIOSpeed_xxx
+
+    uint8_t flags_c08x;     // used to detect double reads
 
     /* Provides remapping of memory read/write access per bank.  For the IIgs,
        this map covers shadowed memory as well as language card and main/aux

@@ -46,6 +46,16 @@ bool clemens_is_initialized(ClemensMachine* clem);
 bool clemens_is_initialized_simple(ClemensMachine* clem);
 
 /**
+ * @brief Trivial validation that the emulator memory interface has been
+ *        initialized following a reset.
+ *
+ * @param machine The machine
+ * @return true  MMIO is initialized (requires a reset)
+ * @return false MMIO not initialized
+ */
+bool clemens_is_mmio_initialized(ClemensMachine* machine);
+
+/**
  * @brief
  *
  * @param clem

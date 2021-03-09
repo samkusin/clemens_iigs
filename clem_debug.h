@@ -13,4 +13,8 @@
   assert(_cond_); \
 } while (0)
 
+#define CLEM_WARN(_fmt_, ...) do { \
+  fprintf(stderr, _fmt_, __VA_ARGS__); \
+} while (0)
+
 #endif

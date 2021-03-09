@@ -34,6 +34,9 @@ private:
                                   const char* operand,
                                   void* this_ptr);
 
+  static uint8_t emulatorImGuiMemoryRead(void* ctx, const uint8_t* data, size_t off);
+  static void emulatorImguiMemoryWrite(void* ctx, uint8_t* data, size_t off, uint8_t d);
+
 private:
   ClemensMachine machine_;
   cinek::FixedStack slab_;

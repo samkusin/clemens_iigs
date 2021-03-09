@@ -37,6 +37,7 @@ endfunction()
 set(PROJECT_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}-run")
 
 set(EMULATOR_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_mem.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/emulator.c")
 
 add_library(clemens_65816 STATIC
