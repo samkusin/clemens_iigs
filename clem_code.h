@@ -1,6 +1,7 @@
 #include "clem_types.h"
 #include "clem_mem.h"
 
+
 static inline void _clem_cycle(
     ClemensMachine* clem,
     uint32_t cycle_count
@@ -168,8 +169,8 @@ static inline void _clem_write_16(
     uint16_t adr,
     uint8_t bank
 ) {
-    _clem_write(clem, (uint8_t)data, adr, bank);
-    _clem_write(clem, (uint8_t)(data >> 8), adr + 1, bank);
+    clem_write(clem, (uint8_t)data, adr, bank, CLEM_MEM_FLAG_DATA);
+    clem_write(clem, (uint8_t)(data >> 8), adr + 1, bank, CLEM_MEM_FLAG_DATA);
 }
 
 static inline void _clem_read_16(
@@ -181,9 +182,9 @@ static inline void _clem_read_16(
 ) {
     //  TODO: DATA read should wrap to next DBR
     uint8_t tmp_data;
-    _clem_read(clem, &tmp_data, adr, bank, flags);
+    clem_read(clem, &tmp_data, adr, bank, flags);
     *data16 = tmp_data;
-    _clem_read(clem, &tmp_data, adr + 1, bank, flags);
+    clem_read(clem, &tmp_data, adr + 1, bank, flags);
     *data16 = ((uint16_t)tmp_data << 8) | (*data16);
 }
 
@@ -192,7 +193,7 @@ static inline void _clem_read_pba(
     uint8_t* data,
     uint16_t* pc
 ) {
-    _clem_read(clem, data, (*pc)++, clem->cpu.regs.PBR,
+    clem_read(clem, data, (*pc)++, clem->cpu.regs.PBR,
                    CLEM_MEM_FLAG_PROGRAM);
 }
 
@@ -231,7 +232,7 @@ static inline void _clem_read_data_816(
     bool is8
 ) {
     uint8_t tmp_data;
-    _clem_read(
+    clem_read(
         clem, &tmp_data, addr, dbr, CLEM_MEM_FLAG_DATA);
     *out = tmp_data;
     if (!is8) {
@@ -242,7 +243,7 @@ static inline void _clem_read_data_816(
         } else {
             next_dbr = dbr;
         }
-        _clem_read(
+        clem_read(
             clem, &tmp_data, addr, next_dbr, CLEM_MEM_FLAG_DATA);
         *out = ((uint16_t)tmp_data << 8) | *out;
     }
@@ -280,10 +281,10 @@ static inline void _clem_opc_push_reg_816(
     struct Clemens65C816* cpu = &clem->cpu;
     _clem_cycle(clem, 1);
     if (!is8) {
-        _clem_write(clem, (uint8_t)(data >> 8), cpu->regs.S, 0x00);
+        clem_write(clem, (uint8_t)(data >> 8), cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
         _cpu_sp_dec(cpu);
     }
-    _clem_write(clem, (uint8_t)(data), cpu->regs.S, 0x00);
+    clem_write(clem, (uint8_t)(data), cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
     _cpu_sp_dec(cpu);
 }
 
@@ -296,11 +297,11 @@ static inline void _clem_opc_pull_reg_816(
     uint8_t data8;
     _clem_cycle(clem, 2);
     _cpu_sp_inc(cpu);
-    _clem_read(clem, &data8, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
+    clem_read(clem, &data8, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
     *data = CLEM_UTIL_set16_lo(*data, data8);
     if (!is8) {
         _cpu_sp_inc(cpu);
-        _clem_read(clem, &data8, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
+        clem_read(clem, &data8, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
         *data = CLEM_UTIL_set16_lo((uint16_t)(data8) << 8, *data);
     }
 }
@@ -312,7 +313,7 @@ static inline void _clem_opc_pull_reg_8(
     struct Clemens65C816* cpu = &clem->cpu;
     _clem_cycle(clem, 2);
     _cpu_sp_inc(cpu);
-    _clem_read(clem, data, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
+    clem_read(clem, data, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
 }
 
 static inline void _clem_opc_push_status(
@@ -327,7 +328,7 @@ static inline void _clem_opc_push_status(
             tmp_data &= ~kClemensCPUStatus_EmulatedBrk;
         }
     }
-    _clem_write(clem, tmp_data, clem->cpu.regs.S, 0x00);
+    clem_write(clem, tmp_data, clem->cpu.regs.S, 0x00, CLEM_MEM_FLAG_DATA);
     _cpu_sp_dec(&clem->cpu);
 }
 
@@ -336,7 +337,7 @@ static inline void _clem_opc_pull_status(
 ) {
     uint8_t tmp_p;
     _cpu_sp_inc(&clem->cpu);
-    _clem_read(clem, &tmp_p, clem->cpu.regs.S, 0x00, CLEM_MEM_FLAG_DATA);
+    clem_read(clem, &tmp_p, clem->cpu.regs.S, 0x00, CLEM_MEM_FLAG_DATA);
 
     if (clem->cpu.pins.emulation) {
         tmp_p |= kClemensCPUStatus_MemoryAccumulator;
@@ -425,7 +426,7 @@ static inline void _clem_read_pba_mode_dp_indirectl(
     _clem_read_pba_mode_dp(clem, &tmp_addr, pc, offset, index, is_index_8);
     _clem_read_16(clem, eff_addr, tmp_addr, 0x00, CLEM_MEM_FLAG_DATA);
     //  TODO: direct page wrap? (DH, DL=255 + 1 = DH, 0)?
-    _clem_read(clem, eff_bank, tmp_addr + 1, 0x00, CLEM_MEM_FLAG_DATA);
+    clem_read(clem, eff_bank, tmp_addr + 1, 0x00, CLEM_MEM_FLAG_DATA);
 }
 
 static inline void _clem_read_pba_mode_stack_rel(
@@ -813,7 +814,7 @@ static inline void _clem_write_816(
     bool is8
 ) {
     if (is8) {
-        _clem_write(clem, (uint8_t)value, addr, dbr);
+        clem_write(clem, (uint8_t)value, addr, dbr, CLEM_MEM_FLAG_DATA);
     } else {
         _clem_write_16(clem, value, addr, dbr);
     }
@@ -837,7 +838,7 @@ static inline void _clem_write_indexed_816(
         dbr_actual = dbr;
     }
     if (is_data_8) {
-        _clem_write(clem, (uint8_t)value, eff_addr, dbr_actual);
+        clem_write(clem, (uint8_t)value, eff_addr, dbr_actual, CLEM_MEM_FLAG_DATA);
     } else {
         _clem_write_16(clem, value, eff_addr, dbr_actual);
     }

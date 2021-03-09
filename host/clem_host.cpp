@@ -1,4 +1,5 @@
 #include "clem_host.hpp"
+#include "clem_mem.h"
 
 
 #include "imgui/imgui.h"
@@ -38,6 +39,13 @@ ClemensHost::ClemensHost() :
   void* slabMemory = malloc(kSlabMemorySize);
   slab_ = cinek::FixedStack(kSlabMemorySize, slabMemory);
   executedInstructions_.reserve(1024);
+
+  memoryViewStatic_[0].HandlerContext = this;
+  memoryViewStatic_[0].ReadFn = &ClemensHost::emulatorImGuiMemoryRead;
+  memoryViewStatic_[0].WriteFn = &ClemensHost::emulatorImguiMemoryWrite;
+  memoryViewStatic_[1].HandlerContext = this;
+  memoryViewStatic_[1].ReadFn = &ClemensHost::emulatorImGuiMemoryRead;
+  memoryViewStatic_[1].WriteFn = &ClemensHost::emulatorImguiMemoryWrite;
 }
 
 ClemensHost::~ClemensHost()
@@ -46,6 +54,41 @@ ClemensHost::~ClemensHost()
   if (slabMemory) {
     free(slabMemory);
   }
+}
+
+uint8_t ClemensHost::emulatorImGuiMemoryRead(
+  void* ctx,
+  const uint8_t* data,
+  size_t off
+) {
+  auto* self = reinterpret_cast<ClemensHost*>(ctx);
+  uintptr_t dataPtr = (uintptr_t)data;
+  uint8_t databank = uint8_t((dataPtr >> 16) & 0xff);
+  uint16_t offset = uint16_t(dataPtr & 0xffff);
+  uint8_t* realdata = (databank == 0xe0 || databank == 0xe1) ? (
+    self->machine_.mega2_bank_map[databank & 0x1]) : (
+      self->machine_.fpi_bank_map[databank]);
+  uint8_t v;
+  clem_read(&self->machine_, &v, uint16_t((offset + off) & 0xffff), databank,
+            CLEM_MEM_FLAG_NULL);
+  return v;
+}
+
+void ClemensHost::emulatorImguiMemoryWrite(
+  void* ctx,
+  uint8_t* data,
+  size_t off,
+  uint8_t d
+) {
+  auto* self = reinterpret_cast<ClemensHost*>(ctx);
+  uintptr_t dataPtr = (uintptr_t)data;
+  uint8_t databank = uint8_t((dataPtr >> 16) & 0xff);
+  uint16_t offset = uint16_t(dataPtr & 0xffff);
+  uint8_t* realdata = (databank == 0xe0 || databank == 0xe1) ? (
+    self->machine_.mega2_bank_map[databank & 0x1]) : (
+      self->machine_.fpi_bank_map[databank]);
+  clem_write(&self->machine_, d, uint16_t((offset + off) & 0xffff), databank,
+             CLEM_MEM_FLAG_NULL);
 }
 
 void ClemensHost::frame(int width, int height, float deltaTime)
@@ -258,7 +301,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   ImGui::Begin("Context", nullptr, ImGuiWindowFlags_NoResize |
                                    ImGuiWindowFlags_NoCollapse |
                                    ImGuiWindowFlags_NoBringToFrontOnFocus);
-  if (clemens_is_initialized_simple(&machine_)) {
+  if (clemens_is_mmio_initialized(&machine_)) {
     memoryViewStatic_[0].ReadOnly = true;
     if (emulationRan) {
       memoryViewStatic_[0].GotoAddrAndHighlight(cpuPinsNext.adr, cpuPinsNext.adr + 1);
@@ -267,13 +310,8 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[0],
                        nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
     uint8_t viewBank = memoryViewBank_[0];
-    if (viewBank == 0xe0 || viewBank == 0xe1) {
-      memoryViewStatic_[0].DrawContents((void*)
-        machine_.mega2_bank_map[viewBank & 0x1], CLEM_IIGS_BANK_SIZE);
-    } else {
-      memoryViewStatic_[0].DrawContents(
-        machine_.fpi_bank_map[viewBank], CLEM_IIGS_BANK_SIZE);
-    }
+    memoryViewStatic_[0].DrawContents((void*)
+      (void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
   }
   ImGui::End();
   memoryViewCursor.x += memoryViewSize.x;
@@ -282,17 +320,12 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   ImGui::Begin("Memory 1", nullptr, ImGuiWindowFlags_NoResize |
                                     ImGuiWindowFlags_NoCollapse |
                                     ImGuiWindowFlags_NoBringToFrontOnFocus);
-  if (clemens_is_initialized_simple(&machine_)) {
+  if (clemens_is_mmio_initialized(&machine_)) {
     ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[1],
                        nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
     uint8_t viewBank = memoryViewBank_[1];
-    if (viewBank == 0xe0 || viewBank == 0xe1) {
-      memoryViewStatic_[1].DrawContents(
-        machine_.mega2_bank_map[viewBank & 0x1], CLEM_IIGS_BANK_SIZE);
-    } else {
-      memoryViewStatic_[1].DrawContents(
-        machine_.fpi_bank_map[viewBank], CLEM_IIGS_BANK_SIZE);
-    }
+    memoryViewStatic_[1].DrawContents((void*)
+      (void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
   }
   ImGui::End();
 }

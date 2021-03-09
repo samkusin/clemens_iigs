@@ -83,9 +83,10 @@ struct MemoryEditor
     int             OptMidColsCount;                            // = 8      // set to 0 to disable extra spacing between every mid-cols.
     int             OptAddrDigitsCount;                         // = 0      // number of addr digits to display (default calculated based on maximum displayed addr).
     ImU32           HighlightColor;                             //          // background color of highlighted bytes.
-    ImU8            (*ReadFn)(const ImU8* data, size_t off);    // = 0      // optional handler to read bytes.
-    void            (*WriteFn)(ImU8* data, size_t off, ImU8 d); // = 0      // optional handler to write bytes.
-    bool            (*HighlightFn)(const ImU8* data, size_t off);//= 0      // optional handler to return Highlight property (to support non-contiguous highlighting).
+    void*           HandlerContext;                             // = 0      // optional handler context to pass to handlers
+    ImU8            (*ReadFn)(void* context, const ImU8* data, size_t off);     // = 0      // optional handler to read bytes.
+    void            (*WriteFn)(void* context, ImU8* data, size_t off, ImU8 d);  // = 0      // optional handler to write bytes.
+    bool            (*HighlightFn)(void* context, const ImU8* data, size_t off);//= 0      // optional handler to return Highlight property (to support non-contiguous highlighting).
 
     // [Internal State]
     size_t          DataPreviewAddr;
@@ -98,6 +99,22 @@ struct MemoryEditor
     ImGuiDataType   PreviewDataType;
     bool            ContentsWidthChanged;
     bool            DataEditingTakeFocus;
+
+    ImU8 UserRead(const ImU8* data, size_t off) {
+        return ReadFn ? ReadFn(HandlerContext, data, off) : data[off];
+    }
+
+    void UserWrite(ImU8* data, size_t off, ImU8 d) {
+        if (WriteFn) {
+            WriteFn(HandlerContext, data, off, d);
+        } else  {
+            data[off] = d;
+        }
+    }
+
+    bool UserHighlight(const ImU8* data, size_t off) {
+        return HighlightFn ? HighlightFn(HandlerContext, data, off) : false;
+    }
 
     MemoryEditor()
     {
@@ -114,6 +131,7 @@ struct MemoryEditor
         OptMidColsCount = 8;
         OptAddrDigitsCount = 0;
         HighlightColor = IM_COL32(255, 255, 255, 50);
+        HandlerContext = NULL;
         ReadFn = NULL;
         WriteFn = NULL;
         HighlightFn = NULL;
@@ -288,13 +306,13 @@ struct MemoryEditor
 
                 // Draw highlight
                 bool is_highlight_from_user_range = (addr >= HighlightMin && addr < HighlightMax);
-                bool is_highlight_from_user_func = (HighlightFn && HighlightFn(mem_data, addr));
+                bool is_highlight_from_user_func = UserHighlight(mem_data, addr);
                 bool is_highlight_from_preview = (addr >= DataPreviewAddr && addr < DataPreviewAddr + preview_data_type_size);
                 if (is_highlight_from_user_range || is_highlight_from_user_func || is_highlight_from_preview)
                 {
                     ImVec2 pos = ImGui::GetCursorScreenPos();
                     float highlight_width = s.GlyphWidth * 2;
-                    bool is_next_byte_highlighted =  (addr + 1 < mem_size) && ((HighlightMax != (size_t)-1 && addr + 1 < HighlightMax) || (HighlightFn && HighlightFn(mem_data, addr + 1)));
+                    bool is_next_byte_highlighted =  (addr + 1 < mem_size) && ((HighlightMax != (size_t)-1 && addr + 1 < HighlightMax) || (UserHighlight(mem_data, addr + 1)));
                     if (is_next_byte_highlighted || (n + 1 == Cols))
                     {
                         highlight_width = s.HexCellWidth;
@@ -314,7 +332,7 @@ struct MemoryEditor
                         ImGui::SetKeyboardFocusHere();
                         ImGui::CaptureKeyboardFromApp(true);
                         sprintf(AddrInputBuf, format_data, s.AddrDigitsCount, base_display_addr + addr);
-                        sprintf(DataInputBuf, format_byte, ReadFn ? ReadFn(mem_data, addr) : mem_data[addr]);
+                        sprintf(DataInputBuf, format_byte, UserRead(mem_data, addr));
                     }
                     ImGui::PushItemWidth(s.GlyphWidth * 2);
                     struct UserData
@@ -341,7 +359,7 @@ struct MemoryEditor
                     };
                     UserData user_data;
                     user_data.CursorPos = -1;
-                    sprintf(user_data.CurrentBufOverwrite, format_byte, ReadFn ? ReadFn(mem_data, addr) : mem_data[addr]);
+                    sprintf(user_data.CurrentBufOverwrite, format_byte, UserRead(mem_data, addr));
                     ImGuiInputTextFlags flags = ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_NoHorizontalScroll | ImGuiInputTextFlags_AlwaysInsertMode | ImGuiInputTextFlags_CallbackAlways;
                     if (ImGui::InputText("##data", DataInputBuf, 32, flags, UserData::Callback, &user_data))
                         data_write = data_next = true;
@@ -356,17 +374,14 @@ struct MemoryEditor
                     unsigned int data_input_value = 0;
                     if (data_write && sscanf(DataInputBuf, "%X", &data_input_value) == 1)
                     {
-                        if (WriteFn)
-                            WriteFn(mem_data, addr, (ImU8)data_input_value);
-                        else
-                            mem_data[addr] = (ImU8)data_input_value;
+                        UserWrite(mem_data, addr, (ImU8)data_input_value);
                     }
                     ImGui::PopID();
                 }
                 else
                 {
                     // NB: The trailing space is not visible but ensure there's no gap that the mouse cannot click on.
-                    ImU8 b = ReadFn ? ReadFn(mem_data, addr) : mem_data[addr];
+                    ImU8 b = UserRead(mem_data, addr);
 
                     if (OptShowHexII)
                     {
@@ -414,7 +429,7 @@ struct MemoryEditor
                         draw_list->AddRectFilled(pos, ImVec2(pos.x + s.GlyphWidth, pos.y + s.LineHeight), ImGui::GetColorU32(ImGuiCol_FrameBg));
                         draw_list->AddRectFilled(pos, ImVec2(pos.x + s.GlyphWidth, pos.y + s.LineHeight), ImGui::GetColorU32(ImGuiCol_TextSelectedBg));
                     }
-                    unsigned char c = ReadFn ? ReadFn(mem_data, addr) : mem_data[addr];
+                    unsigned char c = UserRead(mem_data, addr);
                     char display_c = (c < 32 || c >= 128) ? '.' : c;
                     draw_list->AddText(pos, (display_c == c) ? color_text : color_disabled, &display_c, &display_c + 1);
                     pos.x += s.GlyphWidth;
@@ -637,7 +652,7 @@ struct MemoryEditor
         size_t size = addr + elem_size > mem_size ? mem_size - addr : elem_size;
         if (ReadFn)
             for (int i = 0, n = (int)size; i < n; ++i)
-                buf[i] = ReadFn(mem_data, addr + i);
+                buf[i] = ReadFn(HandlerContext, mem_data, addr + i);
         else
             memcpy(buf, mem_data + addr, size);
 
