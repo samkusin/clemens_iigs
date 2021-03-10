@@ -46,10 +46,12 @@ add_library(clemens_65816 STATIC
 target_include_directories(clemens_65816
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
+add_subdirectory(tests)
+
 add_executable(clemens_65816_emulator
     "${CMAKE_CURRENT_SOURCE_DIR}/app.c")
 
-target_link_libraries(clemens_65816_emulator PRIVATE clements_65816)
+target_link_libraries(clemens_65816_emulator PRIVATE clemens_65816)
 
 project_create_assets_target(clemens_65816_emulator)
 
