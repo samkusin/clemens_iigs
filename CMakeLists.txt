@@ -33,6 +33,7 @@ function(project_create_assets_target ARG_TARGET_NAME)
     add_dependencies(app_assets_${ARG_TARGET_NAME} ${ARG_TARGET_NAME})
 endfunction()
 
+enable_testing()
 
 set(PROJECT_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}-run")
 

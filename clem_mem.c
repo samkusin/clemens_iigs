@@ -188,7 +188,7 @@ static uint8_t _clem_mmio_read_bank_select(
 ) {
     uint32_t memory_flags = mmio->mmap_register;
     switch (ioreg) {
-        case CLEM_MMIO_REG_LC2_RDRAM_WP:
+        case CLEM_MMIO_REG_LC2_RAM_WP:
             memory_flags |= (CLEM_MMIO_MMAP_RDLCRAM + CLEM_MMIO_MMAP_LCBANK2);
             memory_flags &= ~CLEM_MMIO_MMAP_WRLCRAM;
             break;
@@ -286,7 +286,7 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_STATEREG:
             result = _clem_mmio_statereg_c068(mmio);
             break;
-        case CLEM_MMIO_REG_LC2_RDRAM_WP:
+        case CLEM_MMIO_REG_LC2_RAM_WP:
         case CLEM_MMIO_REG_LC2_ROM_WE:
         case CLEM_MMIO_REG_LC2_ROM_WP:
         case CLEM_MMIO_REG_LC2_RAM_WE:
@@ -454,6 +454,12 @@ static void _clem_mmio_memory_map(
     //  ALTZPLC is a main bank-only softswitch.  As a result 01, E0, E1 bank
     //      maps for page 0, 1 remain unchanged
     if (remap_flags & CLEM_MMIO_MMAP_ALTZPLC) {
+        //  TODO: do LC mappings also change?  //e docs state that soft switches
+        //        should be explicitly set again when switching banks, but
+        //        looking at other emulators (yes... this is driving me crazy
+        //        imply otherwise.  when testing with real software, determine
+        //        which requirement is true.)
+        remap_flags |= CLEM_MMIO_MMAP_LC;
         for (page_idx = 0x00; page_idx < 0x02; ++page_idx) {
             page_B00 = &page_map_B00->pages[page_idx];
             if (memory_flags & CLEM_MMIO_MMAP_ALTZPLC) {
@@ -497,38 +503,37 @@ static void _clem_mmio_memory_map(
 
         page_B00 = &page_map_B00->pages[0xC0];
         page_B01 = &page_map_B01->pages[0xC0];
+        _clem_mmio_create_page_mainaux_mapping(page_B00, 0xC0, 0x00);
+        _clem_mmio_create_page_mainaux_mapping(page_B01, 0xC0, 0x01);
+
         if (memory_flags & CLEM_MMIO_MMAP_NIOLC) {
             page_B00->flags &= ~CLEM_MMIO_PAGE_IOADDR;
-            _clem_mmio_create_page_mainaux_mapping(page_B00, page_idx, 0x00);
             page_B01->flags &= ~CLEM_MMIO_PAGE_IOADDR;
-            _clem_mmio_create_page_mainaux_mapping(page_B01, page_idx, 0x01);
             for (page_idx = 0xC1; page_idx < 0xD0; ++page_idx) {
                 page_B00 = &page_map_B00->pages[page_idx];
-                page_B00->flags |= CLEM_MMIO_PAGE_WRITE_OK;
                 _clem_mmio_create_page_mainaux_mapping(page_B00, page_idx, 0x00);
+                page_B00->flags |= CLEM_MMIO_PAGE_WRITE_OK;
                 page_B01 = &page_map_B01->pages[page_idx];
-                page_B01->flags |= CLEM_MMIO_PAGE_WRITE_OK;
                 _clem_mmio_create_page_mainaux_mapping(page_B01, page_idx, 0x01);
+                page_B01->flags |= CLEM_MMIO_PAGE_WRITE_OK;
             }
         } else {
             page_B00->flags |= CLEM_MMIO_PAGE_IOADDR;
-            _clem_mmio_create_page_mapping(page_B00, 0xc0, 0xe0, 0xe0);
             page_B01->flags |= CLEM_MMIO_PAGE_IOADDR;
-            _clem_mmio_create_page_mapping(page_B01, 0xc0, 0xe1, 0xe1);
             for (page_idx = 0xC1; page_idx < 0xD0; ++page_idx) {
                 // TODO: peripheral ROM and slot 3 switch
                 page_B00 = &page_map_B00->pages[page_idx];
                 page_B01 = &page_map_B01->pages[page_idx];
                 if (page_idx == 0xC3) {
-                    page_B00->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
-                    page_B01->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
                     _clem_mmio_create_page_mapping(page_B00, page_idx, 0xff, 0xe0);
                     _clem_mmio_create_page_mapping(page_B01, page_idx, 0xff, 0xe1);
+                    page_B00->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
+                    page_B01->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
                 } else {
-                    page_B00->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
-                    page_B01->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
                     _clem_mmio_create_page_mapping(page_B00, page_idx, 0xff, 0xe0);
                     _clem_mmio_create_page_mapping(page_B01, page_idx, 0xff, 0xe1);
+                    page_B00->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
+                    page_B01->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
                 }
             }
         }
@@ -540,15 +545,15 @@ static void _clem_mmio_memory_map(
                 page_BE1 = &page_map_BE1->pages[page_idx];
 
                 if (page_idx == 0xC3) {
-                    page_BE0->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
-                    page_BE1->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
                     _clem_mmio_create_page_mapping(page_BE0, page_idx, 0xff, 0xe0);
                     _clem_mmio_create_page_mapping(page_BE1, page_idx, 0xff, 0xe1);
+                    page_BE0->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
+                    page_BE1->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
                 } else {
-                    page_BE0->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
-                    page_BE1->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
                     _clem_mmio_create_page_mapping(page_BE0, page_idx, 0xff, 0xe0);
                     _clem_mmio_create_page_mapping(page_BE1, page_idx, 0xff, 0xe1);
+                    page_BE0->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
+                    page_BE1->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
                 }
             }
         }
@@ -659,12 +664,14 @@ static void _clem_mmio_memory_map(
                     page_B00->flags |= CLEM_MMIO_PAGE_WRITE_OK;
                     page_B01->flags |= CLEM_MMIO_PAGE_WRITE_OK;
                 } else {
-                    page_B00->flags &= CLEM_MMIO_PAGE_WRITE_OK;
-                    page_B01->flags &= CLEM_MMIO_PAGE_WRITE_OK;
+                    page_B00->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
+                    page_B01->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
                 }
             }
         }
     }
+
+    mmio->mmap_register = memory_flags;
 }
 
 void _clem_mmio_init_page_maps(
@@ -764,8 +771,6 @@ void _clem_mmio_init(struct ClemensMMIO* mmio) {
     mmio->new_video_c029 = kClemensMMIONewVideo_BANKLATCH_Inhibit;
     mmio->speed_c036 = kClemensMMIOSpeed_FAST_Enable;
     mmio->mmap_register = CLEM_MMIO_MMAP_NSHADOW | CLEM_MMIO_MMAP_NIOLC;
-
-
     mmio->flags_c08x = 0;
 
     _clem_mmio_init_page_maps(mmio,
@@ -810,7 +815,7 @@ void clem_read(
 
         //  TODO: when reading from e0/e1 banks, is it always slow?
         //          internal ROM, peripheral?
-        if (bank == 0xe0 || bank == 0xe1) {
+        if (bank_actual == 0xe0 || bank_actual == 0xe1) {
             clocks_spent = clem->clocks_step_mega2;
         }
         *data = bank_mem[offset];
@@ -838,30 +843,38 @@ void clem_write(
     struct ClemensMMIOPageInfo* page = &bank_page_map->pages[adr >> 8];
     uint32_t clocks_spent;
     uint16_t offset = ((uint16_t)page->write << 8) | (adr & 0xff);
-    if (page->flags & CLEM_MMIO_PAGE_WRITE_OK) {
-        if (page->flags & CLEM_MMIO_PAGE_IOADDR) {
+    if (page->flags & CLEM_MMIO_PAGE_IOADDR) {
+        //  TODO: bring clocks_spent out of _clem_mmio_write (and other
+        //          utility methods - just keep inside clem_read/clem_write)
+        if (page->flags & CLEM_MMIO_PAGE_WRITE_OK) {
             _clem_mmio_write(clem, data, offset, &clocks_spent, flags);
         } else {
-            uint8_t* bank_mem;
-            uint8_t bank_actual;
-            if (page->flags & CLEM_MMIO_PAGE_DIRECT) {
-                bank_actual = bank;
-            } else if (page->flags & CLEM_MMIO_PAGE_MAINAUX) {
-                bank_actual = (bank & 0xfe) | (page->bank_write & 0x1);
-            } else {
-                bank_actual = page->bank_write;
-            }
-            bank_mem = _clem_get_memory_bank(clem, bank_actual, &clocks_spent);
+            clocks_spent = clem->clocks_step_mega2;
+        }
+    } else {
+        uint8_t* bank_mem;
+        uint8_t bank_actual;
+        if (page->flags & CLEM_MMIO_PAGE_DIRECT) {
+            bank_actual = bank;
+        } else if (page->flags & CLEM_MMIO_PAGE_MAINAUX) {
+            bank_actual = (bank & 0xfe) | (page->bank_write & 0x1);
+        } else {
+            bank_actual = page->bank_write;
+        }
+        bank_mem = _clem_get_memory_bank(clem, bank_actual, &clocks_spent);
+        if (page->flags & CLEM_MMIO_PAGE_WRITE_OK) {
             bank_mem[offset] = data;
-            if (shadow_map && shadow_map->pages[page->write]) {
-                bank_mem = _clem_get_memory_bank(
-                    clem, (0xE0) | (bank_actual & 0x1), &clocks_spent);
+        }
+        if (shadow_map && shadow_map->pages[page->write]) {
+            bank_mem = _clem_get_memory_bank(
+                clem, (0xE0) | (bank_actual & 0x1), &clocks_spent);
+            if (page->flags & CLEM_MMIO_PAGE_WRITE_OK) {
                 bank_mem[offset] = data;
             }
+        }
 
-            if (bank == 0xe0 || bank == 0xe1) {
-                clocks_spent = clem->clocks_step_mega2;
-            }
+        if (bank == 0xe0 || bank == 0xe1) {
+            clocks_spent = clem->clocks_step_mega2;
         }
     }
     if (flags != CLEM_MEM_FLAG_NULL) {

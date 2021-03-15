@@ -27,7 +27,8 @@ int clem_test_init_machine(
     fread(memory->g_test_rom + sizeof(memory->g_test_rom) - sz, 1, sz, fp);
 
     return clemens_init(machine,
-                        2800, 1023,
+                        CLEM_TEST_SLOW_CYCLE_CLOCK_COUNT,
+                        CLEM_TEST_CYCLE_CLOCK_COUNT,
                         memory->g_test_rom, sizeof(memory->g_test_rom),
                         memory->g_e0_ram, memory->g_e1_ram,
                         memory->g_fpi_ram, CLEM_TEST_NUM_FPI_BANKS);
@@ -48,9 +49,20 @@ int clem_test_init_machine_trivial_rom(
     adr = 0xfe00;
     bank[adr] = CLEM_OPC_NOP;
     bank[adr + 1] = CLEM_OPC_STP;
+    adr = 0xe000;
+    bank[adr] = CLEM_TEST_TRIVIAL_ROM_MARK_E000;
+    bank[adr + 1] = CLEM_TEST_TRIVIAL_ROM_MARK_E001;
+    bank[adr + 2] = CLEM_TEST_TRIVIAL_ROM_MARK_E002;
+    bank[adr + 3] = CLEM_TEST_TRIVIAL_ROM_MARK_E003;
+    adr = 0xd000;
+    bank[adr] = CLEM_TEST_TRIVIAL_ROM_MARK_D000;
+    bank[adr + 1] = CLEM_TEST_TRIVIAL_ROM_MARK_D001;
+    bank[adr + 2] = CLEM_TEST_TRIVIAL_ROM_MARK_D002;
+    bank[adr + 3] = CLEM_TEST_TRIVIAL_ROM_MARK_D003;
 
     return clemens_init(machine,
-                        2800, 1023,
+                        CLEM_TEST_SLOW_CYCLE_CLOCK_COUNT,
+                        CLEM_TEST_CYCLE_CLOCK_COUNT,
                         memory->g_test_rom, sizeof(memory->g_test_rom),
                         memory->g_e0_ram, memory->g_e1_ram,
                         memory->g_fpi_ram, CLEM_TEST_NUM_FPI_BANKS);
