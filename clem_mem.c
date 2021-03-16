@@ -512,10 +512,10 @@ static void _clem_mmio_memory_map(
             }
         } else {
             page_B00->flags |= CLEM_MMIO_PAGE_IOADDR;
-            _clem_mmio_create_page_mapping(page_B00, page_idx, 0xe0, 0xe0);
+            _clem_mmio_create_page_mapping(page_B00, 0xc0, 0xe0, 0xe0);
             page_B01->flags |= CLEM_MMIO_PAGE_IOADDR;
-            _clem_mmio_create_page_mapping(page_B01, page_idx, 0xe1, 0xe1);
-            for (page_idx = 0xC0; page_idx < 0xD0; ++page_idx) {
+            _clem_mmio_create_page_mapping(page_B01, 0xc0, 0xe1, 0xe1);
+            for (page_idx = 0xC1; page_idx < 0xD0; ++page_idx) {
                 // TODO: peripheral ROM and slot 3 switch
                 page_B00 = &page_map_B00->pages[page_idx];
                 page_B01 = &page_map_B01->pages[page_idx];
