@@ -90,7 +90,7 @@
 #define CLEM_MMIO_REG_STATEREG      0x68
 
 /** R1 - LC Bank 2, Read RAM, Write Protect */
-#define CLEM_MMIO_REG_LC2_RDRAM_WP  0x80
+#define CLEM_MMIO_REG_LC2_RAM_WP    0x80
 /** R2 - LC Bank 2, Read ROM, Write Enable */
 #define CLEM_MMIO_REG_LC2_ROM_WE    0x81
 /** R1 - LC Bank 2, Read ROM, Write Protect */
@@ -103,5 +103,5 @@
 #define CLEM_MMIO_REG_LC1_ROM_WE    0x89
 /** R1 - LC Bank 2, Read ROM, Write Protect */
 #define CLEM_MMIO_REG_LC1_ROM_WP    0x8A
-/** R2 - LC Bank 2, Read and Write Enable */
+/** R2 - LC Bank 1, Read and Write Enable */
 #define CLEM_MMIO_REG_LC1_RAM_WE    0x8B
