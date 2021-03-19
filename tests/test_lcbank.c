@@ -22,26 +22,6 @@ static ClemensMachine g_test_machine;
 static ClemensTestMemory g_test_memory;
 
 
-static void test_write(ClemensMachine* machine,
-                       const uint8_t* data, uint8_t cnt,
-                       uint16_t adr_a, uint8_t bank)
-{
-    unsigned i;
-    for (i = 0; i < cnt; ++i) {
-        clem_write(machine, data[i], adr_a + i, bank, CLEM_MEM_FLAG_DATA);
-    }
-}
-
-static void test_read(ClemensMachine* machine,
-                      uint8_t* data, uint8_t cnt,
-                      uint16_t adr, uint8_t bank)
-{
-    unsigned i;
-    for (i = 0; i < cnt; ++i) {
-        clem_read(machine, &data[i], adr + i, bank, CLEM_MEM_FLAG_DATA);
-    }
-}
-
 static void* test_fixture_setup(
     const MunitParameter params[],
     void* data
