@@ -80,6 +80,8 @@
 
 static void _clem_mmio_memory_map(struct ClemensMMIO* mmio,
                                   uint32_t memory_flags);
+static void _clem_mmio_shadow_map(struct ClemensMMIO* mmio,
+                                  uint32_t shadow_flags);
 
 static void _clem_mmio_create_page_direct_mapping(
     struct ClemensMMIOPageInfo* page,
@@ -149,7 +151,22 @@ static void _clem_mmio_shadow_c035_set(
     struct ClemensMMIO* mmio,
     uint8_t value
 ) {
-    CLEM_UNIMPLEMENTED("shadow c035 set");
+    unsigned mmap = mmio->mmap_register;
+    if (value & 0x01) mmap |= CLEM_MMIO_MMAP_NSHADOW_TXT1;
+    else mmap &= ~CLEM_MMIO_MMAP_NSHADOW_TXT1;
+    if (value & 0x02) mmap |= CLEM_MMIO_MMAP_NSHADOW_HGR1;
+    else mmap &= ~CLEM_MMIO_MMAP_NSHADOW_HGR1;
+    if (value & 0x04) mmap |= CLEM_MMIO_MMAP_NSHADOW_HGR2;
+    else mmap &= ~CLEM_MMIO_MMAP_NSHADOW_HGR2;
+    if (value & 0x08) mmap |= CLEM_MMIO_MMAP_NSHADOW_SHGR;
+    else mmap &= ~CLEM_MMIO_MMAP_NSHADOW_SHGR;
+    if (value & 0x10) mmap |= CLEM_MMIO_MMAP_NSHADOW_AUX;
+    else mmap &= ~CLEM_MMIO_MMAP_NSHADOW_AUX;
+    if (value & 0x20) mmap |= CLEM_MMIO_MMAP_NSHADOW_TXT2;
+    else mmap &= ~CLEM_MMIO_MMAP_NSHADOW_TXT2;
+    if (value & 0x40) mmap |= CLEM_MMIO_MMAP_NIOLC;
+    else mmap &= ~CLEM_MMIO_MMAP_NIOLC;
+    _clem_mmio_memory_map(mmio, mmap);
 }
 
 static inline uint8_t _clem_mmio_speed_c036(struct ClemensMMIO* mmio) {
@@ -366,7 +383,7 @@ static void _clem_mmio_write(
     }
 }
 
-void _clem_mmio_shadow_map(
+static void _clem_mmio_shadow_map(
     struct ClemensMMIO* mmio,
     uint32_t shadow_flags
 ) {
@@ -395,7 +412,9 @@ void _clem_mmio_shadow_map(
         }
     }
     //  HGR1
-    if (remap_flags & CLEM_MMIO_MMAP_NSHADOW_HGR1) {
+    if ((remap_flags & CLEM_MMIO_MMAP_NSHADOW_HGR1) ||
+        (remap_flags & CLEM_MMIO_MMAP_NSHADOW_AUX)
+    ) {
         for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
             uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_HGR1) ? 0 : 1;
             mmio->fpi_mega2_main_shadow_map.pages[page_idx] = v;
@@ -403,7 +422,9 @@ void _clem_mmio_shadow_map(
                 (v && !inhibit_hgr_bank_01) ? 1 : 0);
         }
     }
-    if (remap_flags & CLEM_MMIO_MMAP_NSHADOW_HGR1) {
+    if ((remap_flags & CLEM_MMIO_MMAP_NSHADOW_HGR2) ||
+        (remap_flags & CLEM_MMIO_MMAP_NSHADOW_AUX)
+    ) {
         for (page_idx = 0x40; page_idx < 0x60; ++page_idx) {
             uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_HGR2) ? 0 : 1;
             mmio->fpi_mega2_main_shadow_map.pages[page_idx] = v;

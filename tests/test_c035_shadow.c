@@ -18,7 +18,7 @@ static ClemensMachine g_test_machine;
 static ClemensTestMemory g_test_memory;
 
 
-static void test_check_mega2_bank(
+static void test_check_fpi_mega2_bank(
     ClemensMachine* machine,
     unsigned check_type,
     uint8_t* original_buffer,
@@ -105,22 +105,98 @@ static MunitResult test_shadow_txt_pages(
 
     strncpy(long_data, "deadmeat", sizeof(long_data));
     test_write(machine, long_data, sizeof(long_data), 0x400, 0x00);
-    test_check_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
-                          long_data, check_buffer, sizeof(check_buffer), 0x400, 0x00);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x400, 0x00);
 
     strncpy(long_data, "catfoods", sizeof(long_data));
     test_write(machine, long_data, sizeof(long_data), 0x800, 0x00);
-    test_check_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
-                          long_data, check_buffer, sizeof(check_buffer), 0x800, 0x00);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x800, 0x00);
 
-    //  disable TXT1 shadow
-    reg_c035 |= 0x01;
+    return MUNIT_OK;
+}
+
+static MunitResult test_shadow_txt_pages_disable(
+    const MunitParameter params[],
+    void* data
+) {
+    /* Validate flags are set correctly on startup/reset */
+    ClemensMachine* machine = (ClemensMachine*)data;
+    uint8_t reg_c035 = 0;
+    char long_data[8];
+    char check_buffer[8];
+    uint8_t* bank_mem;
+
+    /*  TXT1,2 are shadowed by default */
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    munit_assert_false(reg_c035 & 0x21);
+
+    //  disable TXT1,2 shadow
+    reg_c035 |= 0x21;
     clem_write(machine, reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+
     strncpy(long_data, "livemeat", sizeof(long_data));
     test_write(machine, long_data, sizeof(long_data), 0x400, 0x00);
-    test_check_mega2_bank(machine, CLEM_TEST_CHECK_NOT_EQUAL,
-                          long_data, check_buffer, sizeof(check_buffer), 0x400, 0x00);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_NOT_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x400, 0x00);
+    strncpy(long_data, "dogfoods", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0x800, 0x00);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_NOT_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x800, 0x00);
 
+    return MUNIT_OK;
+}
+
+
+static MunitResult test_shadow_hgr_pages(
+    const MunitParameter params[],
+    void* data
+) {
+    /* Validate flags are set correctly on startup/reset */
+    ClemensMachine* machine = (ClemensMachine*)data;
+    uint8_t reg_c035 = 0;
+    char long_data[8];
+    char check_buffer[8];
+    uint8_t* bank_mem;
+
+    /*  HGR1,2 + AUX are shadowed by default */
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    munit_assert_false(reg_c035 & 0x16);
+
+    strncpy(long_data, "deadmeat", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0x2000, 0x00);
+    test_write(machine, long_data, sizeof(long_data), 0x2100, 0x01);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x2000, 0x00);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x2100, 0x01);
+
+    strncpy(long_data, "catfoods", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0x4000, 0x00);
+    test_write(machine, long_data, sizeof(long_data), 0x4100, 0x01);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x4000, 0x00);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x4100, 0x01);
+
+    //  disable AUX page shadow
+    reg_c035 |= 0x10;
+    clem_write(machine, reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+
+    strncpy(long_data, "zombifys", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0x3000, 0x00);
+    test_write(machine, long_data, sizeof(long_data), 0x3100, 0x01);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x3000, 0x00);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_NOT_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x3100, 0x01);
+    strncpy(long_data, "ratfoods", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0x5000, 0x00);
+    test_write(machine, long_data, sizeof(long_data), 0x5100, 0x01);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x5000, 0x00);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_NOT_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x5100, 0x01);
 
     return MUNIT_OK;
 }
@@ -135,6 +211,20 @@ static MunitTest clem_tests[] = {
     },
     {
         (char*)"/shadow/txt01", test_shadow_txt_pages,
+        test_fixture_setup,
+        test_fixture_teardown,
+        MUNIT_TEST_OPTION_NONE,
+        NULL
+    },
+    {
+        (char*)"/shadow/txt01_disable", test_shadow_txt_pages_disable,
+        test_fixture_setup,
+        test_fixture_teardown,
+        MUNIT_TEST_OPTION_NONE,
+        NULL
+    },
+    {
+        (char*)"/shadow/hgr", test_shadow_hgr_pages,
         test_fixture_setup,
         test_fixture_teardown,
         MUNIT_TEST_OPTION_NONE,
