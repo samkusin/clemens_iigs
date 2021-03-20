@@ -381,7 +381,7 @@ void _clem_mmio_shadow_map(
     //  TXT 1
     if (remap_flags & CLEM_MMIO_MMAP_NSHADOW_TXT1) {
         for (page_idx = 0x04; page_idx < 0x08; ++page_idx) {
-            uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_TXT1) ? 1 : 0;
+            uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_TXT1) ? 0 : 1;
             mmio->fpi_mega2_main_shadow_map.pages[page_idx] = v;
             mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = v;
         }
@@ -389,7 +389,7 @@ void _clem_mmio_shadow_map(
     //  TXT 2
     if (remap_flags & CLEM_MMIO_MMAP_NSHADOW_TXT2) {
         for (page_idx = 0x08; page_idx < 0x0C; ++page_idx) {
-            uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_TXT2) ? 1 : 0;
+            uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_TXT2) ? 0 : 1;
             mmio->fpi_mega2_main_shadow_map.pages[page_idx] = v;
             mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = v;
         }
@@ -397,7 +397,7 @@ void _clem_mmio_shadow_map(
     //  HGR1
     if (remap_flags & CLEM_MMIO_MMAP_NSHADOW_HGR1) {
         for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
-            uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_HGR1) ? 1 : 0;
+            uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_HGR1) ? 0 : 1;
             mmio->fpi_mega2_main_shadow_map.pages[page_idx] = v;
             mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = (
                 (v && !inhibit_hgr_bank_01) ? 1 : 0);
@@ -405,7 +405,7 @@ void _clem_mmio_shadow_map(
     }
     if (remap_flags & CLEM_MMIO_MMAP_NSHADOW_HGR1) {
         for (page_idx = 0x40; page_idx < 0x60; ++page_idx) {
-            uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_HGR2) ? 1 : 0;
+            uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_HGR2) ? 0 : 1;
             mmio->fpi_mega2_main_shadow_map.pages[page_idx] = v;
             mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = (
                 (v && !inhibit_hgr_bank_01) ? 1 : 0);
@@ -413,7 +413,7 @@ void _clem_mmio_shadow_map(
     }
     if (remap_flags & CLEM_MMIO_MMAP_NSHADOW_SHGR) {
         for (page_idx = 0x60; page_idx < 0xA0; ++page_idx) {
-            uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_SHGR) ? 1 : 0;
+            uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_SHGR) ? 0 : 1;
             mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = v;
         }
     }
@@ -774,7 +774,9 @@ void _clem_mmio_init(struct ClemensMMIO* mmio) {
     mmio->flags_c08x = 0;
 
     _clem_mmio_init_page_maps(mmio,
-                              CLEM_MMIO_MMAP_WRLCRAM | CLEM_MMIO_MMAP_LCBANK2);
+                              CLEM_MMIO_MMAP_NSHADOW_SHGR |
+                              CLEM_MMIO_MMAP_WRLCRAM |
+                              CLEM_MMIO_MMAP_LCBANK2);
 
 }
 
