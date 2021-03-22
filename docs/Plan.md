@@ -10,18 +10,16 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Very emulation <-> native switch initializes everything correctly
+
+* C039 Register (Serial Communications Command register )
+* C02D Slot Register
+* Decimal math
 * Test ROM 1
 * More debugging utilities
 * Video Controller
 * Data accesses across banks are allowed (but not stack accesses?)
 * Emulation vs Native on some microinstructions (i.e. choosing a long address mode while in emulation does... what?)
 * Test ROM iteration?
-* What is going on with the ROM writing to 01 and e1 banks (shadowing)
-* Stronger memory mapping
-  * (using I/O switches)
-  * shadowing
-* Decimal math
 * Test ROM display and validate with an existing //gs emulator
 
 ## DONE
@@ -38,6 +36,10 @@ This is a running todo list.
 * Implement ROL, ROR, STX, STY, STZ
 * Implement remaining opcodes (T??, JMP, stragglers)
 * Implement interrupt opcodes (COP, BRK, CLI, RTI, etc)
+* Stronger memory mapping
+  * (using I/O switches)
+  * shadowing
+* Verify emulation <-> native switch initializes everything correctly
 
 
 ## Video Controller (VDC)
