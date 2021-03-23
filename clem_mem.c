@@ -186,7 +186,27 @@ static void _clem_mmio_speed_c036_set(
 }
 
 static inline uint8_t _clem_mmio_statereg_c068(struct ClemensMMIO* mmio) {
-    //CLEM_UNIMPLEMENTED("statereg c068");
+     uint8_t value = 0x00;
+    if (!(mmio->mmap_register & CLEM_MMIO_MMAP_ALTZPLC)) {
+        value |= 0x80;
+    }
+    /* TODO PAGE2 TEXT */
+
+    if (mmio->mmap_register & CLEM_MMIO_MMAP_RAMRD) {
+        value |= 0x20;
+    }
+    if (mmio->mmap_register & CLEM_MMIO_MMAP_RAMWRT) {
+        value |= 0x10;
+    }
+    if (!(mmio->mmap_register & CLEM_MMIO_MMAP_RDLCRAM)) {
+        value |= 0x08;
+    }
+    if (!(mmio->mmap_register & CLEM_MMIO_MMAP_LCBANK2)) {
+        value |= 0x04;
+    }
+    if (!(mmio->mmap_register & CLEM_MMIO_MMAP_CXROM)) {
+        value |= 0x01;
+    }
     return 0;
 }
 
@@ -194,7 +214,59 @@ static uint8_t _clem_mmio_statereg_c068_set(
     struct ClemensMMIO* mmio,
     uint8_t value
 ) {
-    CLEM_UNIMPLEMENTED("statereg c068 set");
+    uint32_t mmap_register = mmio->mmap_register;
+    /*  ALTZP  */
+    if (value & 0x80) {
+        mmap_register &= ~CLEM_MMIO_MMAP_ALTZPLC;
+    } else {
+        mmap_register |= CLEM_MMIO_MMAP_ALTZPLC;
+    }
+    /*  PAGE2 text - TODO when video options are fleshed out */
+    if (value & 0x40) {
+        CLEM_UNIMPLEMENTED("c068 PAGE2 Text");
+    } else {
+
+    }
+    /*  RAMRD */
+    if (value & 0x20) {
+        mmap_register |= CLEM_MMIO_MMAP_RAMRD;
+    } else {
+        mmap_register &= ~CLEM_MMIO_MMAP_RAMRD;
+    }
+    /*  RAMWRT */
+    if (value & 0x10) {
+        mmap_register |= CLEM_MMIO_MMAP_RAMWRT;
+    } else {
+        mmap_register &= ~CLEM_MMIO_MMAP_RAMWRT;
+    }
+    /*  RDROM */
+    if (value & 0x08) {
+        mmap_register &= ~CLEM_MMIO_MMAP_RDLCRAM;
+    } else {
+        mmap_register |= CLEM_MMIO_MMAP_RDLCRAM;
+    }
+    /* LCBNK2 */
+    if (value & 0x04) {
+        mmap_register &= ~CLEM_MMIO_MMAP_LCBANK2;
+    } else {
+        mmap_register |= CLEM_MMIO_MMAP_LCBANK2;
+    }
+    /* ROMBANK always 0 */
+    if (value & 0x02) {
+        /* do not set */
+        CLEM_WARN("c068 %02X not allowed", value);
+    } else {
+        /* only valid value */
+    }
+    /* INTCXROM (C3ROM?) */
+    if (value & 0x01) {
+        mmap_register &= ~CLEM_MMIO_MMAP_CXROM;
+    } else {
+        mmap_register |= CLEM_MMIO_MMAP_CXROM;
+    }
+
+    _clem_mmio_memory_map(mmio, mmap_register);
+
     return 0;
 }
 
@@ -394,6 +466,7 @@ static void _clem_mmio_shadow_map(
     unsigned remap_flags = mmio->mmap_register ^ shadow_flags;
     unsigned page_idx;
     bool inhibit_hgr_bank_01 = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_AUX) != 0;
+    bool inhibit_shgr_bank_01 = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_SHGR) != 0;
 
     //  TXT 1
     if (remap_flags & CLEM_MMIO_MMAP_NSHADOW_TXT1) {
@@ -413,29 +486,33 @@ static void _clem_mmio_shadow_map(
     }
     //  HGR1
     if ((remap_flags & CLEM_MMIO_MMAP_NSHADOW_HGR1) ||
-        (remap_flags & CLEM_MMIO_MMAP_NSHADOW_AUX)
+        (remap_flags & CLEM_MMIO_MMAP_NSHADOW_AUX) ||
+        (remap_flags & CLEM_MMIO_MMAP_NSHADOW_SHGR)
     ) {
         for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
-            uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_HGR1) ? 0 : 1;
-            mmio->fpi_mega2_main_shadow_map.pages[page_idx] = v;
-            mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = (
-                (v && !inhibit_hgr_bank_01) ? 1 : 0);
+            uint8_t v0 = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_HGR1) ? 0 : 1;
+            uint8_t v1 = (v0 && !inhibit_hgr_bank_01) ? 1 : 0;
+            if (!inhibit_shgr_bank_01 && !v1) v1 = 1;
+            mmio->fpi_mega2_main_shadow_map.pages[page_idx] = v0;
+            mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = v1;
         }
     }
     if ((remap_flags & CLEM_MMIO_MMAP_NSHADOW_HGR2) ||
-        (remap_flags & CLEM_MMIO_MMAP_NSHADOW_AUX)
+        (remap_flags & CLEM_MMIO_MMAP_NSHADOW_AUX) ||
+        (remap_flags & CLEM_MMIO_MMAP_NSHADOW_SHGR)
     ) {
         for (page_idx = 0x40; page_idx < 0x60; ++page_idx) {
-            uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_HGR2) ? 0 : 1;
-            mmio->fpi_mega2_main_shadow_map.pages[page_idx] = v;
-            mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = (
-                (v && !inhibit_hgr_bank_01) ? 1 : 0);
+            uint8_t v0 = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_HGR2) ? 0 : 1;
+            uint8_t v1 = (v0 && !inhibit_hgr_bank_01) ? 1 : 0;
+            if (!inhibit_shgr_bank_01 && !v1) v1 = 1;
+            mmio->fpi_mega2_main_shadow_map.pages[page_idx] = v0;
+            mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = v1;
         }
     }
     if (remap_flags & CLEM_MMIO_MMAP_NSHADOW_SHGR) {
         for (page_idx = 0x60; page_idx < 0xA0; ++page_idx) {
-            uint8_t v = (shadow_flags & CLEM_MMIO_MMAP_NSHADOW_SHGR) ? 0 : 1;
-            mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = v;
+            uint8_t v1 = inhibit_shgr_bank_01 ? 0 : 1;
+            mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = v1;
         }
     }
 }
@@ -514,10 +591,7 @@ static void _clem_mmio_memory_map(
     //  IOLC switch changed, which requires remapping the entire language card
     //  region + the I/O region (for FPI memory - Mega2 doesn't deal with
     //  shadowing or LC ROM mapping)
-    if (remap_flags & (CLEM_MMIO_MMAP_NIOLC +
-                       CLEM_MMIO_MMAP_CXROM +
-                       CLEM_MMIO_MMAP_C3ROM)
-    ) {
+    if (remap_flags & (CLEM_MMIO_MMAP_NIOLC + CLEM_MMIO_MMAP_CROM)) {
         if (remap_flags & CLEM_MMIO_MMAP_NIOLC) {
             remap_flags |= CLEM_MMIO_MMAP_LC;
         }
@@ -559,7 +633,7 @@ static void _clem_mmio_memory_map(
             }
         }
         //  e0, e1 isn't affected by shadowing
-        if (remap_flags & (CLEM_MMIO_MMAP_C3ROM + CLEM_MMIO_MMAP_CXROM)) {
+        if (remap_flags & CLEM_MMIO_MMAP_CROM) {
             for (page_idx = 0xC1; page_idx < 0xD0; ++page_idx) {
                 // TODO: peripheral ROM and slot 3 switch
                 page_BE0 = &page_map_BE0->pages[page_idx];

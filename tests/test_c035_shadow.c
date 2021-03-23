@@ -36,9 +36,19 @@ static void test_check_fpi_mega2_bank(
     if (check_type == CLEM_TEST_CHECK_EQUAL) {
         munit_assert_memory_equal(check_sz, check_buffer,
                                   &machine->mega2_bank_map[bank & 1][adr]);
+        for (i = 0; i < check_sz; ++i) {
+            clem_read(machine, check_buffer + i, adr + i, 0xe0 | (bank & 1),
+                      CLEM_MEM_FLAG_DATA);
+        }
+        munit_assert_memory_equal(check_sz, check_buffer, original_buffer);
     } else {
         munit_assert_memory_not_equal(check_sz, check_buffer,
                                       &machine->mega2_bank_map[bank & 1][adr]);
+        for (i = 0; i < check_sz; ++i) {
+            clem_read(machine, check_buffer + i, adr + i, 0xe0 | (bank & 1),
+                      CLEM_MEM_FLAG_DATA);
+        }
+        munit_assert_memory_not_equal(check_sz, check_buffer, original_buffer);
     }
 }
 
@@ -102,6 +112,8 @@ static MunitResult test_shadow_txt_pages(
     /*  TXT1,2 are shadowed by default */
     clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
     munit_assert_false(reg_c035 & 0x21);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe1, CLEM_MEM_FLAG_DATA);
+    munit_assert_false(reg_c035 & 0x21);
 
     strncpy(long_data, "deadmeat", sizeof(long_data));
     test_write(machine, long_data, sizeof(long_data), 0x400, 0x00);
@@ -130,10 +142,12 @@ static MunitResult test_shadow_txt_pages_disable(
     /*  TXT1,2 are shadowed by default */
     clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
     munit_assert_false(reg_c035 & 0x21);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe1, CLEM_MEM_FLAG_DATA);
+    munit_assert_false(reg_c035 & 0x21);
 
     //  disable TXT1,2 shadow
     reg_c035 |= 0x21;
-    clem_write(machine, reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    clem_write(machine, reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe1, CLEM_MEM_FLAG_DATA);
 
     strncpy(long_data, "livemeat", sizeof(long_data));
     test_write(machine, long_data, sizeof(long_data), 0x400, 0x00);
@@ -161,6 +175,8 @@ static MunitResult test_shadow_hgr_pages(
 
     /*  HGR1,2 + AUX are shadowed by default */
     clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    munit_assert_false(reg_c035 & 0x16);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe1, CLEM_MEM_FLAG_DATA);
     munit_assert_false(reg_c035 & 0x16);
 
     strncpy(long_data, "deadmeat", sizeof(long_data));
@@ -201,6 +217,159 @@ static MunitResult test_shadow_hgr_pages(
     return MUNIT_OK;
 }
 
+static MunitResult test_shadow_hgr_pages_disable(
+    const MunitParameter params[],
+    void* data
+) {
+    ClemensMachine* machine = (ClemensMachine*)data;
+    uint8_t reg_c035 = 0;
+    char long_data[8];
+    char check_buffer[8];
+    uint8_t* bank_mem;
+
+    /* disable HGR shadowing */
+    reg_c035 |= 0x16;
+    clem_write(machine, reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    munit_assert_true(reg_c035 & 0x16);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe1, CLEM_MEM_FLAG_DATA);
+    munit_assert_true(reg_c035 & 0x16);
+
+    strncpy(long_data, "deadmeat", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0x2000, 0x00);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_NOT_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x2000, 0x00);
+
+    strncpy(long_data, "catfoods", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0x4000, 0x00);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_NOT_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x4000, 0x00);
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_shadow_shgr_pages(
+    const MunitParameter params[],
+    void* data
+) {
+    ClemensMachine* machine = (ClemensMachine*)data;
+    uint8_t reg_c035 = 0;
+    char long_data[8];
+    char check_buffer[8];
+    uint8_t* bank_mem;
+
+    /* shadow SHGR only - meaning that AUX shadowing is also disabled */
+    reg_c035 = 0x7f & ~0x08;
+    clem_write(machine, reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    munit_assert_false(reg_c035 & 0x08);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe1, CLEM_MEM_FLAG_DATA);
+    munit_assert_false(reg_c035 & 0x08);
+
+    strncpy(long_data, "vegiwich", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0x3000, 0x01);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x3000, 0x01);
+    strncpy(long_data, "vegimite", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0x5000, 0x01);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x5000, 0x01);
+    strncpy(long_data, "chixobun", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0x9000, 0x01);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x9000, 0x01);
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_shadow_shgr_pages_disable(
+    const MunitParameter params[],
+    void* data
+) {
+    ClemensMachine* machine = (ClemensMachine*)data;
+    uint8_t reg_c035 = 0;
+    char long_data[8];
+    char check_buffer[8];
+    uint8_t* bank_mem;
+
+    /* shadow SHGR only - meaning that AUX shadowing is also disabled */
+    reg_c035 = 0x7f & ~0x08;
+    clem_write(machine, reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    munit_assert_false(reg_c035 & 0x08);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe1, CLEM_MEM_FLAG_DATA);
+    munit_assert_false(reg_c035 & 0x08);
+
+    strncpy(long_data, "vegiwich", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0x3000, 0x01);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x3000, 0x01);
+
+    /* effectively no shadowing */
+    reg_c035 |= 0x08;
+    clem_write(machine, reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    munit_assert_true(reg_c035 & 0x08);
+
+    strncpy(long_data, "vegimite", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0x5000, 0x01);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_NOT_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x5000, 0x01);
+
+    strncpy(long_data, "chixobun", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0x9000, 0x01);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_NOT_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0x9000, 0x01);
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_shadow_io_pages_disable(
+    const MunitParameter params[],
+    void* data
+) {
+    ClemensMachine* machine = (ClemensMachine*)data;
+    uint8_t reg_c035 = 0;
+    char long_data[8];
+    char check_buffer[8];
+    uint8_t* bank_mem;
+
+    /* no shadowing */
+    reg_c035 = 0x7f;
+    clem_write(machine, reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    munit_assert_true(reg_c035 == 0x7f);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe1, CLEM_MEM_FLAG_DATA);
+    munit_assert_true(reg_c035 == 0x7f);
+
+    /* verify that IO access to bank 0x00, page 0xc0 does nothing */
+    clem_write(machine, reg_c035 & 0x40, CLEM_TEST_IOADDR(SHADOW), 0x00, CLEM_MEM_FLAG_DATA);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0xe0, CLEM_MEM_FLAG_DATA);
+    munit_assert_uint8(reg_c035, ==, 0x7f);
+    clem_read(machine, &reg_c035, CLEM_TEST_IOADDR(SHADOW), 0x00, CLEM_MEM_FLAG_DATA);
+    munit_assert_uint8(reg_c035, ==, 0x40);
+
+    strncpy(long_data, "darkyoda", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0xC100, 0x00);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_NOT_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0xC100, 0x00);
+    strncpy(long_data, "babyyoda", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0xC100, 0x01);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_NOT_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0xC100, 0x01);
+
+    strncpy(long_data, "macwindu", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0xC200, 0x00);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_NOT_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0xC200, 0x00);
+    strncpy(long_data, "dartmaul", sizeof(long_data));
+    test_write(machine, long_data, sizeof(long_data), 0xC200, 0x01);
+    test_check_fpi_mega2_bank(machine, CLEM_TEST_CHECK_NOT_EQUAL,
+                              long_data, check_buffer, sizeof(check_buffer), 0xC200, 0x01);
+
+    return MUNIT_OK;
+}
+
 static MunitTest clem_tests[] = {
     {
         (char*)"/shadow/boot", test_shadow_on_reset,
@@ -225,6 +394,34 @@ static MunitTest clem_tests[] = {
     },
     {
         (char*)"/shadow/hgr", test_shadow_hgr_pages,
+        test_fixture_setup,
+        test_fixture_teardown,
+        MUNIT_TEST_OPTION_NONE,
+        NULL
+    },
+    {
+        (char*)"/shadow/hgr_disable", test_shadow_hgr_pages_disable,
+        test_fixture_setup,
+        test_fixture_teardown,
+        MUNIT_TEST_OPTION_NONE,
+        NULL
+    },
+    {
+        (char*)"/shadow/shgr", test_shadow_shgr_pages,
+        test_fixture_setup,
+        test_fixture_teardown,
+        MUNIT_TEST_OPTION_NONE,
+        NULL
+    },
+    {
+        (char*)"/shadow/shgr_disable", test_shadow_shgr_pages_disable,
+        test_fixture_setup,
+        test_fixture_teardown,
+        MUNIT_TEST_OPTION_NONE,
+        NULL
+    },
+    {
+        (char*)"/shadow/io_disable", test_shadow_io_pages_disable,
         test_fixture_setup,
         test_fixture_teardown,
         MUNIT_TEST_OPTION_NONE,

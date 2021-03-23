@@ -25,9 +25,15 @@
 //  0 = LC Bank 1, 1 = LC Bank 2
 #define CLEM_MMIO_MMAP_LCBANK2      0x00000040
 //  0 = Internal ROM, 1 = Peripheral ROM
-#define CLEM_MMIO_MMAP_CXROM        0x00000100
-//  0 = Internal Slot 3 ROM, 1 = Peripheral Slot 3 ROM
-#define CLEM_MMIO_MMAP_C3ROM        0x00000200
+#define CLEM_MMIO_MMAP_C1ROM        0x00000100
+#define CLEM_MMIO_MMAP_C2ROM        0x00000200
+#define CLEM_MMIO_MMAP_C3ROM        0x00000400
+#define CLEM_MMIO_MMAP_C4ROM        0x00000400
+#define CLEM_MMIO_MMAP_C5ROM        0x00000800
+#define CLEM_MMIO_MMAP_C6ROM        0x00001000
+#define CLEM_MMIO_MMAP_C7ROM        0x00002000
+#define CLEM_MMIO_MMAP_CXROM        0x00004000
+#define CLEM_MMIO_MMAP_CROM         0x0000ff00
 
 // Bits 16-23 These flags refer to shadow register controls
 #define CLEM_MMIO_MMAP_NSHADOW      0x00ff0000
