@@ -207,7 +207,7 @@ static inline uint8_t _clem_mmio_statereg_c068(struct ClemensMMIO* mmio) {
     if (!(mmio->mmap_register & CLEM_MMIO_MMAP_CXROM)) {
         value |= 0x01;
     }
-    return 0;
+    return value;
 }
 
 static uint8_t _clem_mmio_statereg_c068_set(
@@ -372,6 +372,11 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_SPEED:
             result = _clem_mmio_speed_c036(mmio);
             break;
+        case CLEM_MMIO_REG_RTC_CTL:
+            break;
+        case CLEM_MMIO_REG_RTC_DATA:
+            result = mmio->rtc_inb_c033;
+            break;
         case CLEM_MMIO_REG_STATEREG:
             result = _clem_mmio_statereg_c068(mmio);
             break;
@@ -433,18 +438,35 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_NEWVIDEO:
             _clem_mmio_newvideo_c029_set(mmio, data);
             break;
+        case CLEM_MMIO_REG_RTC_CTL:
+            break;
+        case CLEM_MMIO_REG_RTC_DATA:
+            mmio->rtc_outb_c033 = data;
+            break;
         case CLEM_MMIO_REG_SHADOW:
             _clem_mmio_shadow_c035_set(mmio, data);
             break;
         case CLEM_MMIO_REG_SPEED:
             _clem_mmio_speed_c036_set(mmio, data);
             break;
+        case CLEM_MMIO_REG_SCC_B_CMD:
+            CLEM_WARN("ioreg %02X <- %02X TODO", ioreg, data);
+            break;
+        case CLEM_MMIO_REG_SCC_A_CMD:
+            CLEM_WARN("ioreg %02X <- %02X TODO", ioreg, data);
+            break;
+        case CLEM_MMIO_REG_SCC_B_DATA:
+            CLEM_WARN("ioreg %02X <- %02X TODO", ioreg, data);
+            break;
+        case CLEM_MMIO_REG_SCC_A_DATA:
+            CLEM_WARN("ioreg %02X <- %02X TODO", ioreg, data);
+            break;
         case CLEM_MMIO_REG_STATEREG:
             _clem_mmio_statereg_c068_set(mmio, data);
             break;
         default:
             if (flags != CLEM_MEM_FLAG_NULL) {
-                CLEM_UNIMPLEMENTED("ioreg %u", ioreg);
+                CLEM_UNIMPLEMENTED("ioreg %02X", ioreg);
             }
             break;
     }

@@ -164,11 +164,24 @@ struct ClemensMMIOPageMap {
   struct ClemensMMIOShadowMap* shadow_map;
 };
 
+
+/**
+ * @brief Real time clock device interface
+ *
+ */
+struct ClemensDeviceRTC {
+    uint8_t inb_c033;
+    uint8_t outb_c033;
+    uint8_t screen_border_color;    // color indices 0 - 15
+
+};
+
 struct ClemensMMIO {
     uint32_t mmap_register; // consolidated memory map flags- CLEM_MMIO_MMAP_
     uint8_t new_video_c029; // see kClemensMMIONewVideo_xxx
     uint8_t speed_c036;     // see kClemensMMIOSpeed_xxx
-
+    uint8_t rtc_inb_c033;   // RTC inbound data register storage
+    uint8_t rtc_outb_c033;  // RTC outbound data register storage
     uint8_t flags_c08x;     // used to detect double reads
 
     /* Provides remapping of memory read/write access per bank.  For the IIgs,

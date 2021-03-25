@@ -80,6 +80,10 @@
  * the bank latch bit (0), which is always set to 1 AFAIK
  */
 #define CLEM_MMIO_REG_NEWVIDEO      0x29
+/** Real time clock data register */
+#define CLEM_MMIO_REG_RTC_DATA      0x33
+/** Real time clock + border colorl joint register */
+#define CLEM_MMIO_REG_RTC_CTL       0x34
 /**
  * Defines what areas of the FPI banks are disabled, and how I/O language
  * card space is treated on FPI bank 0 and 1.
@@ -90,6 +94,14 @@
  * items... (disk input?)
  */
 #define CLEM_MMIO_REG_SPEED         0x36
+/** SCC Command Register A */
+#define CLEM_MMIO_REG_SCC_A_CMD     0x39
+/** SCC Data Register A */
+#define CLEM_MMIO_REG_SCC_A_DATA    0x3B
+/** SCC Command Register B */
+#define CLEM_MMIO_REG_SCC_B_CMD     0x38
+/** SCC Data Register B */
+#define CLEM_MMIO_REG_SCC_B_DATA    0x3A
 /**
  * Amalgom of the C08x registers
  */
