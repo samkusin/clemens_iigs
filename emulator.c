@@ -822,6 +822,7 @@ int clemens_init(
     _opcode_description(CLEM_OPC_TCD,     "TCD", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_TDC,     "TDC", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_TCS,     "TCS", kClemensCPUAddrMode_None);
+    _opcode_description(CLEM_OPC_TSC,     "TSC", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_TSX,     "TSX", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_TXA,     "TXA", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_TXS,     "TXS", kClemensCPUAddrMode_None);
