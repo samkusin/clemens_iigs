@@ -123,6 +123,40 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"IO_DATAREG_C026":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_DATAREG_C026",
+"Value":49190,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_KMSTATUS_C027":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"Read",
+"MultiMask":null,
+"Label":"IO_KMSTATUS_C027",
+"Value":49191,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "IO_LORES_C056":{
 "DataDescriptor":{
 "Length":1,
@@ -907,6 +941,9 @@
 "226836":"JML $FF7629",
 "226850":"JML $FFA9AA",
 "244013":"Maybe this is the default BRAM table?",
+"244025":"blank param?",
+"244034":"$A0-$C0 if self diagnostics set to $FF",
+"244036":"Burn-in diagnostics skip to $C1",
 "244089":"Overflow Indicates Read BRAM",
 "244097":"Text display language?",
 "244101":"Keyboard language",
@@ -1101,6 +1138,18 @@
 "Text":"This might be the fail case - the next subroutine called seems to perform a write to all BRAM",
 "BoxMode":false,
 "MaxWidth":80,
+"BackgroundColor":0},
+
+"244005":{
+"Text":"Write default parameters to BRAM\r\n\r\n$00-$59 are a direct copy from our defaults\r\n$5A-$A0 are $FF\r\n$A1-$C0 are not changed if burn-in diagnostics\r\n$A1-$C0 are $FF if self diagnostics are used\r\n$C1-$FF are $FF\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244066":{
+"Text":"Write BRAM 00-FF loop",
+"BoxMode":false,
+"MaxWidth":80,
 "BackgroundColor":0}},
 
 "Notes":{
@@ -1213,11 +1262,11 @@
 "LabelAnno":"None"},
 
 "244080":{
-"Label":"SUB_TMP_API_7629_A3_PRAM_REFRESH",
+"Label":"SUB_API_7629_A3_BRAM_CHECK",
 "Value":16759152,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Uncertain"},
+"LabelAnno":"None"},
 
 "261676":{
 "Label":"FWR_MOVE",
@@ -1920,7 +1969,7 @@
 "LabelAnno":"None"},
 
 "260191":{
-"Label":"FRW_NXTCOL",
+"Label":"FWR_NXTCOL",
 "Value":16775263,
 "Source":"User",
 "Type":"GlobalAddr",
@@ -2351,7 +2400,56 @@
 "Value":16759077,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Uncertain"}},
+"LabelAnno":"Uncertain"},
+
+"244013":{
+"Label":"a_copy_00_to_59",
+"Value":16759085,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244038":{
+"Label":"next_b",
+"Value":16759110,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244027":{
+"Label":"b_copy_5A_to_FF",
+"Value":16759099,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244066":{
+"Label":"write_bram_byte",
+"Value":16759138,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244046":{
+"Label":"SUB_TMP_WRITE_TO_BRAM",
+"Value":16759118,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"230341":{
+"Label":"TBL_BRAM_DEFAULTS",
+"Value":16745413,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"229223":{
+"Label":"poll_kmstatus",
+"Value":16744295,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"}},
 
 "OperandFormats":{
 "226994":{
@@ -2724,4 +2822,8 @@
 
 "244511":{
 "FollowPbr":false,
-"Bank":0}}}
+"Bank":0},
+
+"244008":{
+"FollowPbr":false,
+"Bank":225}}}
