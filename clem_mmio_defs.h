@@ -69,7 +69,7 @@
 #define CLEM_MMIO_REG_LC_BANK_TEST  0x11
 /** Read and test bit 7, 0 = ROM, 1 = RAM */
 #define CLEM_MMIO_REG_ROM_RAM_TEST  0x12
-/** Get ROM source for the CXXX pages */
+/** 1 = slot ROM, 0 = internal ROM as source for the CXXX pages */
 #define CLEM_MMIO_REG_READCXROM     0x15
 /** Read bit 7 to detect bank 0 = main, 1 = aux bank */
 #define CLEM_MMIO_REG_RDALTZP       0x16

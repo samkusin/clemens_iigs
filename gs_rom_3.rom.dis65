@@ -906,6 +906,15 @@
 "226826":"Storing vectors into bank $e1 used during initialization?",
 "226836":"JML $FF7629",
 "226850":"JML $FFA9AA",
+"244338":"A \u003c- Bits 7-5 of Index",
+"244377":"Setup next read/write",
+"244388":"set data from A",
+"244391":"A = *$C034",
+"244398":"Write RTC Data (single byte xfer)",
+"244402":"Read RTC Data",
+"244404":"Execute RTC command",
+"244407":"Wait until done",
+"244412":"A = Data written or read",
 "260096":"Lores plot",
 "260110":"Lores modify plot",
 "260121":"Lores draw horizontal line",
@@ -1047,7 +1056,25 @@
 "BackgroundColor":0},
 
 "244335":{
-"Text":"Y = 00..??",
+"Text":"Read OR Write BRAM value of \u0027A\u0027 at index Y\r\nA = Register to Write?\r\nY = 00..??\r\nv = 1 then read, else write BRAM\r\n\r\nIf read, then A = value read",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244388":{
+"Text":"If Overflow was set, then we perform a read, else a write",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244387":{
+"Text":"Always write",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244345":{
+"Text":"Encode command in two bytes where I = index, w = 1 for write, 0 for read:\r\n  Byte 1: (w, 0, 1, 1, 1, I7,I6,I5)\r\n  Byte 2: (?, I4, I3, I2, I1, I0, 0, 0)\r\n",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -1134,25 +1161,25 @@
 "LabelAnno":"None"},
 
 "244387":{
-"Label":"SUB_TMP_RTC_CHECK",
+"Label":"SUB_TMP_RTC_WRITE_ONE",
 "Value":16759459,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Uncertain"},
+"LabelAnno":"None"},
 
 "244388":{
-"Label":"SUB_TMP_RTC_CHECK2",
+"Label":"SUB_TMP_RTC_RW_ON_V",
 "Value":16759460,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Uncertain"},
+"LabelAnno":"None"},
 
 "244335":{
-"Label":"SUB_TMP_RTC_CHECKFN",
+"Label":"SUB_TMP_RTC_READ_BRAM_ONE",
 "Value":16759407,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Uncertain"},
+"LabelAnno":"None"},
 
 "260226":{
 "Label":"SUB_SET_DBANK_E1",
@@ -2202,6 +2229,97 @@
 "Value":16751419,
 "Source":"User",
 "Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"244176":{
+"Label":"done_alt",
+"Value":16759248,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244089":{
+"Label":"begin",
+"Value":16759161,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244129":{
+"Label":"check_1",
+"Value":16759201,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244133":{
+"Label":"check_2",
+"Value":16759205,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244153":{
+"Label":"next",
+"Value":16759225,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244151":{
+"Label":"next_alt",
+"Value":16759223,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244123":{
+"Label":"check_0",
+"Value":16759195,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244137":{
+"Label":"check_3",
+"Value":16759209,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244149":{
+"Label":"check_4",
+"Value":16759221,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244402":{
+"Label":"read_one",
+"Value":16759474,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244404":{
+"Label":"ctl_rtc",
+"Value":16759476,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244407":{
+"Label":"ctl_rtc_poll",
+"Value":16759479,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244351":{
+"Label":"read",
+"Value":16759423,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
