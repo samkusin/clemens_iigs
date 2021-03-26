@@ -906,6 +906,12 @@
 "226826":"Storing vectors into bank $e1 used during initialization?",
 "226836":"JML $FF7629",
 "226850":"JML $FFA9AA",
+"244013":"Maybe this is the default BRAM table?",
+"244089":"Overflow Indicates Read BRAM",
+"244097":"Text display language?",
+"244101":"Keyboard language",
+"244105":"Min RAMdisk size",
+"244109":"Max RAMdisk size",
 "244338":"A \u003c- Bits 7-5 of Index",
 "244377":"Setup next read/write",
 "244388":"set data from A",
@@ -1077,6 +1083,24 @@
 "Text":"Encode command in two bytes where I = index, w = 1 for write, 0 for read:\r\n  Byte 1: (w, 0, 1, 1, 1, I7,I6,I5)\r\n  Byte 2: (?, I4, I3, I2, I1, I0, 0, 0)\r\n",
 "BoxMode":false,
 "MaxWidth":80,
+"BackgroundColor":0},
+
+"244372":{
+"Text":"Reset bit 5 to 0, marking the next r/w operation. Bit 7 should be 0 by now",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244080":{
+"Text":"This code seems to be reading in all of the BRAM values (0-255) as indicated by the X and Y counters.\r\n\r\n\u0027A\u0027 will contain the last read BRAM value.\r\nA copy of the BRAM is stored in $E1/$02C0-$03BF",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244176":{
+"Text":"This might be the fail case - the next subroutine called seems to perform a write to all BRAM",
+"BoxMode":false,
+"MaxWidth":80,
 "BackgroundColor":0}},
 
 "Notes":{
@@ -1175,7 +1199,7 @@
 "LabelAnno":"None"},
 
 "244335":{
-"Label":"SUB_TMP_RTC_READ_BRAM_ONE",
+"Label":"SUB_TMP_RTC_RW_BRAM_ONE",
 "Value":16759407,
 "Source":"User",
 "Type":"GlobalAddr",
@@ -2232,11 +2256,11 @@
 "LabelAnno":"None"},
 
 "244176":{
-"Label":"done_alt",
+"Label":"done_bad_value",
 "Value":16759248,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
-"LabelAnno":"None"},
+"LabelAnno":"Uncertain"},
 
 "244089":{
 "Label":"begin",
@@ -2246,14 +2270,14 @@
 "LabelAnno":"None"},
 
 "244129":{
-"Label":"check_1",
+"Label":"chk_lang_txt",
 "Value":16759201,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"},
 
 "244133":{
-"Label":"check_2",
+"Label":"chk_lang_keyb",
 "Value":16759205,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
@@ -2274,21 +2298,21 @@
 "LabelAnno":"None"},
 
 "244123":{
-"Label":"check_0",
+"Label":"idx_gte_3e",
 "Value":16759195,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"},
 
 "244137":{
-"Label":"check_3",
+"Label":"idx_neq_3e",
 "Value":16759209,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"},
 
 "244149":{
-"Label":"check_4",
+"Label":"idx_lt_58",
 "Value":16759221,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
@@ -2320,7 +2344,14 @@
 "Value":16759423,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
-"LabelAnno":"None"}},
+"LabelAnno":"None"},
+
+"244005":{
+"Label":"SUB_TMP_DEFAULT_BRAM_WRITE",
+"Value":16759077,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"Uncertain"}},
 
 "OperandFormats":{
 "226994":{
