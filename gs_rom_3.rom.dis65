@@ -410,6 +410,23 @@
 "Value":49233,
 "Source":"Project",
 "Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"VAR_INTCXROM":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"VAR_INTCXROM",
+"Value":14745901,
+"Source":"Project",
+"Type":"ExternalAddr",
 "LabelAnno":"None"}}},
 
 "AddressMap":[{
@@ -876,10 +893,12 @@
 "Hint":"Code"}],
 "StatusFlagOverrides":{
 "226857":11796739,
+"236343":256,
 "244080":3408328,
 "244311":256,
 "244335":3408128,
 "244431":3408136,
+"260252":19922992,
 "260706":20185088},
 
 "Comments":{
@@ -1016,7 +1035,19 @@
 "BackgroundColor":0},
 
 "244431":{
-"Text":"TBD. Called during RESET via a toolbox-like API call (undocumented)\r\n- Deals with serial and BRAM? ",
+"Text":"TOOLBOX_7629: $A3.\r\n- Called during RESET\r\n- Serial port setup\r\n- Setup some vectors in $e1 (undocumented?)\r\n- setup BRAM\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244524":{
+"Text":"Clear our Peripheral card RAM in screen space",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244335":{
+"Text":"Y = 00..??",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -1131,7 +1162,7 @@
 "LabelAnno":"None"},
 
 "244080":{
-"Label":"SUB_TMP_PRAM_REFRESH",
+"Label":"SUB_TMP_API_7629_A3_PRAM_REFRESH",
 "Value":16759152,
 "Source":"User",
 "Type":"GlobalAddr",
@@ -1803,7 +1834,7 @@
 "LabelAnno":"None"},
 
 "260252":{
-"Label":"SUB_OUTPUT_TEXT_META",
+"Label":"ENT_FWR_7629_TOOLBOX",
 "Value":16775324,
 "Source":"User",
 "Type":"GlobalAddr",
@@ -2153,11 +2184,25 @@
 "LabelAnno":"Generated"},
 
 "244431":{
-"Label":"TFFBACF",
+"Label":"API_FWR_7629_A3",
 "Value":16759503,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Generated"}},
+"LabelAnno":"None"},
+
+"226857":{
+"Label":"API_FWR_7629_TOOLBOX",
+"Value":16741929,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"236347":{
+"Label":"SUB_TMP_API_7629_A3_SETUP",
+"Value":16751419,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"}},
 
 "OperandFormats":{
 "226994":{
@@ -2445,7 +2490,7 @@
 "Format":"NumericLE",
 "SubFormat":"Symbol",
 "SymbolRef":{
-"Label":"TFFBACF",
+"Label":"API_FWR_7629_A3",
 "Part":"Low"}},
 
 "227066":{
@@ -2521,5 +2566,13 @@
 "Bank":225},
 
 "260706":{
+"FollowPbr":false,
+"Bank":0},
+
+"244452":{
+"FollowPbr":false,
+"Bank":225},
+
+"244511":{
 "FollowPbr":false,
 "Bank":0}}}
