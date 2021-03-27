@@ -3,6 +3,7 @@
 #include "clem_mmio_defs.h"
 
 #include "clem_util.h"
+#include "clem_device.h"
 
 /**
  * Video Memory layout
@@ -373,9 +374,11 @@ static uint8_t _clem_mmio_read(
             result = _clem_mmio_speed_c036(mmio);
             break;
         case CLEM_MMIO_REG_RTC_CTL:
+            clem_rtc_command(&mmio->dev_rtc);
+            result = mmio->dev_rtc.ctl_c034;
             break;
         case CLEM_MMIO_REG_RTC_DATA:
-            result = mmio->rtc_inb_c033;
+            result = mmio->dev_rtc.data_c033;
             break;
         case CLEM_MMIO_REG_STATEREG:
             result = _clem_mmio_statereg_c068(mmio);
@@ -439,9 +442,11 @@ static void _clem_mmio_write(
             _clem_mmio_newvideo_c029_set(mmio, data);
             break;
         case CLEM_MMIO_REG_RTC_CTL:
+            mmio->dev_rtc.ctl_c034 = data;
+            clem_rtc_command(&mmio->dev_rtc);
             break;
         case CLEM_MMIO_REG_RTC_DATA:
-            mmio->rtc_outb_c033 = data;
+            mmio->dev_rtc.data_c033 = data;
             break;
         case CLEM_MMIO_REG_SHADOW:
             _clem_mmio_shadow_c035_set(mmio, data);

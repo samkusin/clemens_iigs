@@ -123,6 +123,40 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"IO_DATAREG_C026":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_DATAREG_C026",
+"Value":49190,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_KMSTATUS_C027":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"Read",
+"MultiMask":null,
+"Label":"IO_KMSTATUS_C027",
+"Value":49191,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "IO_LORES_C056":{
 "DataDescriptor":{
 "Length":1,
@@ -906,6 +940,24 @@
 "226826":"Storing vectors into bank $e1 used during initialization?",
 "226836":"JML $FF7629",
 "226850":"JML $FFA9AA",
+"244013":"Maybe this is the default BRAM table?",
+"244025":"blank param?",
+"244034":"$A0-$C0 if self diagnostics set to $FF",
+"244036":"Burn-in diagnostics skip to $C1",
+"244089":"Overflow Indicates Read BRAM",
+"244097":"Text display language?",
+"244101":"Keyboard language",
+"244105":"Min RAMdisk size",
+"244109":"Max RAMdisk size",
+"244338":"A \u003c- Bits 7-5 of Index",
+"244377":"Setup next read/write",
+"244388":"set data from A",
+"244391":"A = *$C034",
+"244398":"Write RTC Data (single byte xfer)",
+"244402":"Read RTC Data",
+"244404":"Execute RTC command",
+"244407":"Wait until done",
+"244412":"A = Data written or read",
 "260096":"Lores plot",
 "260110":"Lores modify plot",
 "260121":"Lores draw horizontal line",
@@ -1047,7 +1099,55 @@
 "BackgroundColor":0},
 
 "244335":{
-"Text":"Y = 00..??",
+"Text":"Read OR Write BRAM value of \u0027A\u0027 at index Y\r\nA = Register to Write?\r\nY = 00..??\r\nv = 1 then read, else write BRAM\r\n\r\nIf read, then A = value read",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244388":{
+"Text":"If Overflow was set, then we perform a read, else a write",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244387":{
+"Text":"Always write",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244345":{
+"Text":"Encode command in two bytes where I = index, w = 1 for write, 0 for read:\r\n  Byte 1: (w, 0, 1, 1, 1, I7,I6,I5)\r\n  Byte 2: (?, I4, I3, I2, I1, I0, 0, 0)\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244372":{
+"Text":"Reset bit 5 to 0, marking the next r/w operation. Bit 7 should be 0 by now",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244080":{
+"Text":"This code seems to be reading in all of the BRAM values (0-255) as indicated by the X and Y counters.\r\n\r\n\u0027A\u0027 will contain the last read BRAM value.\r\nA copy of the BRAM is stored in $E1/$02C0-$03BF",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244176":{
+"Text":"This might be the fail case - the next subroutine called seems to perform a write to all BRAM",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244005":{
+"Text":"Write default parameters to BRAM\r\n\r\n$00-$59 are a direct copy from our defaults\r\n$5A-$A0 are $FF\r\n$A1-$C0 are not changed if burn-in diagnostics\r\n$A1-$C0 are $FF if self diagnostics are used\r\n$C1-$FF are $FF\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244066":{
+"Text":"Write BRAM 00-FF loop",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -1134,25 +1234,25 @@
 "LabelAnno":"None"},
 
 "244387":{
-"Label":"SUB_TMP_RTC_CHECK",
+"Label":"SUB_TMP_RTC_WRITE_ONE",
 "Value":16759459,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Uncertain"},
+"LabelAnno":"None"},
 
 "244388":{
-"Label":"SUB_TMP_RTC_CHECK2",
+"Label":"SUB_TMP_RTC_RW_ON_V",
 "Value":16759460,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Uncertain"},
+"LabelAnno":"None"},
 
 "244335":{
-"Label":"SUB_TMP_RTC_CHECKFN",
+"Label":"SUB_TMP_RTC_RW_BRAM_ONE",
 "Value":16759407,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Uncertain"},
+"LabelAnno":"None"},
 
 "260226":{
 "Label":"SUB_SET_DBANK_E1",
@@ -1162,11 +1262,11 @@
 "LabelAnno":"None"},
 
 "244080":{
-"Label":"SUB_TMP_API_7629_A3_PRAM_REFRESH",
+"Label":"SUB_API_7629_A3_BRAM_CHECK",
 "Value":16759152,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Uncertain"},
+"LabelAnno":"None"},
 
 "261676":{
 "Label":"FWR_MOVE",
@@ -1869,7 +1969,7 @@
 "LabelAnno":"None"},
 
 "260191":{
-"Label":"FRW_NXTCOL",
+"Label":"FWR_NXTCOL",
 "Value":16775263,
 "Source":"User",
 "Type":"GlobalAddr",
@@ -2202,6 +2302,153 @@
 "Value":16751419,
 "Source":"User",
 "Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"244176":{
+"Label":"done_bad_value",
+"Value":16759248,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"Uncertain"},
+
+"244089":{
+"Label":"begin",
+"Value":16759161,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244129":{
+"Label":"chk_lang_txt",
+"Value":16759201,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244133":{
+"Label":"chk_lang_keyb",
+"Value":16759205,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244153":{
+"Label":"next",
+"Value":16759225,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244151":{
+"Label":"next_alt",
+"Value":16759223,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244123":{
+"Label":"idx_gte_3e",
+"Value":16759195,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244137":{
+"Label":"idx_neq_3e",
+"Value":16759209,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244149":{
+"Label":"idx_lt_58",
+"Value":16759221,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244402":{
+"Label":"read_one",
+"Value":16759474,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244404":{
+"Label":"ctl_rtc",
+"Value":16759476,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244407":{
+"Label":"ctl_rtc_poll",
+"Value":16759479,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244351":{
+"Label":"read",
+"Value":16759423,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244005":{
+"Label":"SUB_TMP_DEFAULT_BRAM_WRITE",
+"Value":16759077,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"Uncertain"},
+
+"244013":{
+"Label":"a_copy_00_to_59",
+"Value":16759085,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244038":{
+"Label":"next_b",
+"Value":16759110,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244027":{
+"Label":"b_copy_5A_to_FF",
+"Value":16759099,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244066":{
+"Label":"write_bram_byte",
+"Value":16759138,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244046":{
+"Label":"SUB_TMP_WRITE_TO_BRAM",
+"Value":16759118,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"230341":{
+"Label":"TBL_BRAM_DEFAULTS",
+"Value":16745413,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"229223":{
+"Label":"poll_kmstatus",
+"Value":16744295,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -2575,4 +2822,8 @@
 
 "244511":{
 "FollowPbr":false,
-"Bank":0}}}
+"Bank":0},
+
+"244008":{
+"FollowPbr":false,
+"Bank":225}}}

@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "clem_defs.h"
+#include "clem_device.h"
 
 
 /* Note that in emulation mode, the EmulatedBrk flag should be
@@ -164,31 +165,26 @@ struct ClemensMMIOPageMap {
   struct ClemensMMIOShadowMap* shadow_map;
 };
 
-
 /**
- * @brief Real time clock device interface
+ * @brief Real time clock device and BRAM interface
  *
  */
 struct ClemensDeviceRTC {
-    uint8_t inb_c033;
-    uint8_t outb_c033;
-    uint8_t screen_border_color;    // color indices 0 - 15
-
+    uint8_t data_c033;      // command and data
+    uint8_t ctl_c034;       // bits 4-7 (bit 4 is reserved) are used by the RTC
 };
 
+/**
+ * @brief FPI + MEGA2 MMIO Interface
+ *
+ */
 struct ClemensMMIO {
-    uint32_t mmap_register; // consolidated memory map flags- CLEM_MMIO_MMAP_
-    uint8_t new_video_c029; // see kClemensMMIONewVideo_xxx
-    uint8_t speed_c036;     // see kClemensMMIOSpeed_xxx
-    uint8_t rtc_inb_c033;   // RTC inbound data register storage
-    uint8_t rtc_outb_c033;  // RTC outbound data register storage
-    uint8_t flags_c08x;     // used to detect double reads
-
     /* Provides remapping of memory read/write access per bank.  For the IIgs,
        this map covers shadowed memory as well as language card and main/aux
        bank access.
     */
     struct ClemensMMIOPageMap* bank_page_map[256];
+    /* The different page mapping types */
     struct ClemensMMIOPageMap fpi_direct_page_map;
     struct ClemensMMIOPageMap fpi_main_page_map;
     struct ClemensMMIOPageMap fpi_aux_page_map;
@@ -196,8 +192,18 @@ struct ClemensMMIO {
     struct ClemensMMIOPageMap mega2_main_page_map;
     struct ClemensMMIOPageMap mega2_aux_page_map;
 
+    /* Shadow maps for bank 00, 01 */
     struct ClemensMMIOShadowMap fpi_mega2_main_shadow_map;
     struct ClemensMMIOShadowMap fpi_mega2_aux_shadow_map;
+
+    /* All devices */
+    struct ClemensDeviceRTC dev_rtc;
+
+    /* Registers that do not fall easily within a device struct */
+    uint32_t mmap_register; // consolidated memory map flags- CLEM_MMIO_MMAP_
+    uint8_t new_video_c029; // see kClemensMMIONewVideo_xxx
+    uint8_t speed_c036;     // see kClemensMMIOSpeed_xxx
+    uint8_t flags_c08x;     // used to detect double reads
 };
 
 enum {
