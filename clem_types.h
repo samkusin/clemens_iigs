@@ -18,6 +18,106 @@ typedef uint32_t clem_clocks_duration_t;
 #define CLEM_IO_WRITE               0x01
 
 
+/** NewVideo Register $C029 bits 4-1 ignored */
+enum {
+    // If 0, use all other Apple II video modes, else Super Hires
+    kClemensMMIONewVideo_SHGR_Enable        = (1 << 7),
+    // If 0, for Apple II video memory layout, else Super Hires (contiguous)
+    kClemensMMIONewVideo_SHGR_Memory_Enable = (1 << 6),
+    // If 0, color mode (140 x 192 16 colors), else 560 x 192 mono
+    kClemensMMIONewVideo_AUXHGR_Color_Inhibit = (1 << 5),
+    // If The docs here are a bit contradictory
+    //  Hardware Reference: p16 vs p89
+    //  On = 17th bit (D0) used for auxillary bank addressing, but can also use
+    //      softswitches?
+    //  Off = use soft-switches only through 00,e0
+    //  This relies on the shadow register as well?
+    kClemensMMIONewVideo_BANKLATCH_Inhibit      = (1 << 0)
+};
+
+/** Speed Register $C036 */
+enum {
+    //  if 1, then fastest mode enabled? 2.8mhz
+    kClemensMMIOSpeed_FAST_Enable       = (1 << 7),
+    //  always 1 on ROM 03, unknown on ROM 01, older GS devices
+    kClemensMMIOSpeed_PoweredOn         = (1 << 6)
+};
+
+
+struct ClemensMMIOPageInfo {
+    uint8_t read;
+    uint8_t write;
+    uint8_t bank_read;
+    uint8_t bank_write;
+    uint32_t flags;
+};
+
+struct ClemensMMIOShadowMap {
+    uint8_t pages[256];
+};
+
+struct ClemensMMIOPageMap {
+  struct ClemensMMIOPageInfo pages[256];
+  struct ClemensMMIOShadowMap* shadow_map;
+};
+
+/**
+ * @brief Real time clock device and BRAM interface
+ *
+ */
+struct ClemensDeviceRTC {
+    clem_clocks_time_t xfer_started_time;
+    clem_clocks_duration_t xfer_latency_duration;
+
+    unsigned state;
+    unsigned index;
+
+    uint8_t bram[256];
+
+    /*  these values are set by the app */
+    uint8_t data_c033;
+    uint8_t ctl_c034;
+};
+
+struct ClemensDeviceADB {
+
+};
+
+/**
+ * @brief FPI + MEGA2 MMIO Interface
+ *
+ */
+struct ClemensMMIO {
+    /* Provides remapping of memory read/write access per bank.  For the IIgs,
+       this map covers shadowed memory as well as language card and main/aux
+       bank access.
+    */
+    struct ClemensMMIOPageMap* bank_page_map[256];
+    /* The different page mapping types */
+    struct ClemensMMIOPageMap fpi_direct_page_map;
+    struct ClemensMMIOPageMap fpi_main_page_map;
+    struct ClemensMMIOPageMap fpi_aux_page_map;
+    struct ClemensMMIOPageMap fpi_rom_page_map;
+    struct ClemensMMIOPageMap mega2_main_page_map;
+    struct ClemensMMIOPageMap mega2_aux_page_map;
+
+    /* Shadow maps for bank 00, 01 */
+    struct ClemensMMIOShadowMap fpi_mega2_main_shadow_map;
+    struct ClemensMMIOShadowMap fpi_mega2_aux_shadow_map;
+
+    /* All devices */
+    struct ClemensDeviceRTC dev_rtc;
+    struct ClemensDeviceADB dev_adb;
+
+    /* Registers that do not fall easily within a device struct */
+    uint32_t mmap_register; // consolidated memory map flags- CLEM_MMIO_MMAP_
+    uint8_t new_video_c029; // see kClemensMMIONewVideo_xxx
+    uint8_t speed_c036;     // see kClemensMMIOSpeed_xxx
+    uint8_t flags_c08x;     // used to detect double reads
+};
+
+
+
 /* Note that in emulation mode, the EmulatedBrk flag should be
    stored in the status register - for our purposes we mock this
    behvaior only when the application has access to the status
@@ -129,100 +229,6 @@ struct Clemens65C816 {
     enum ClemensCPUStateType state_type;
     uint32_t cycles_spent;
     bool enabled;           // set to false by STP, and true by RESET
-};
-
-
-/** NewVideo Register $C029 bits 4-1 ignored */
-enum {
-    // If 0, use all other Apple II video modes, else Super Hires
-    kClemensMMIONewVideo_SHGR_Enable        = (1 << 7),
-    // If 0, for Apple II video memory layout, else Super Hires (contiguous)
-    kClemensMMIONewVideo_SHGR_Memory_Enable = (1 << 6),
-    // If 0, color mode (140 x 192 16 colors), else 560 x 192 mono
-    kClemensMMIONewVideo_AUXHGR_Color_Inhibit = (1 << 5),
-    // If The docs here are a bit contradictory
-    //  Hardware Reference: p16 vs p89
-    //  On = 17th bit (D0) used for auxillary bank addressing, but can also use
-    //      softswitches?
-    //  Off = use soft-switches only through 00,e0
-    //  This relies on the shadow register as well?
-    kClemensMMIONewVideo_BANKLATCH_Inhibit      = (1 << 0)
-};
-
-/** Speed Register $C036 */
-enum {
-    //  if 1, then fastest mode enabled? 2.8mhz
-    kClemensMMIOSpeed_FAST_Enable       = (1 << 7),
-    //  always 1 on ROM 03, unknown on ROM 01, older GS devices
-    kClemensMMIOSpeed_PoweredOn         = (1 << 6)
-};
-
-
-struct ClemensMMIOPageInfo {
-    uint8_t read;
-    uint8_t write;
-    uint8_t bank_read;
-    uint8_t bank_write;
-    uint32_t flags;
-};
-
-struct ClemensMMIOShadowMap {
-    uint8_t pages[256];
-};
-
-struct ClemensMMIOPageMap {
-  struct ClemensMMIOPageInfo pages[256];
-  struct ClemensMMIOShadowMap* shadow_map;
-};
-
-/**
- * @brief Real time clock device and BRAM interface
- *
- */
-struct ClemensDeviceRTC {
-    clem_clocks_time_t xfer_started_time;
-    clem_clocks_duration_t xfer_latency_duration;
-
-    unsigned state;
-    unsigned index;
-
-    uint8_t bram[256];
-
-    /*  these values are set by the app */
-    uint8_t data_c033;
-    uint8_t ctl_c034;
-};
-
-/**
- * @brief FPI + MEGA2 MMIO Interface
- *
- */
-struct ClemensMMIO {
-    /* Provides remapping of memory read/write access per bank.  For the IIgs,
-       this map covers shadowed memory as well as language card and main/aux
-       bank access.
-    */
-    struct ClemensMMIOPageMap* bank_page_map[256];
-    /* The different page mapping types */
-    struct ClemensMMIOPageMap fpi_direct_page_map;
-    struct ClemensMMIOPageMap fpi_main_page_map;
-    struct ClemensMMIOPageMap fpi_aux_page_map;
-    struct ClemensMMIOPageMap fpi_rom_page_map;
-    struct ClemensMMIOPageMap mega2_main_page_map;
-    struct ClemensMMIOPageMap mega2_aux_page_map;
-
-    /* Shadow maps for bank 00, 01 */
-    struct ClemensMMIOShadowMap fpi_mega2_main_shadow_map;
-    struct ClemensMMIOShadowMap fpi_mega2_aux_shadow_map;
-
-    /* All devices */
-    struct ClemensDeviceRTC dev_rtc;
-
-    /* Registers that do not fall easily within a device struct */
-    uint32_t mmap_register; // consolidated memory map flags- CLEM_MMIO_MMAP_
-    uint8_t new_video_c029; // see kClemensMMIONewVideo_xxx
-    uint8_t speed_c036;     // see kClemensMMIOSpeed_xxx
-    uint8_t flags_c08x;     // used to detect double reads
 };
 
 enum {

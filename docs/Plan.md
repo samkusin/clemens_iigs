@@ -10,12 +10,13 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-
-* C039 Register (Serial Communications Command register )
+* Keyboard registers (ADB)
 * C02D Slot Register
+* C039 Register (Serial Communications Command register )
+* RAMRD and remaining //e softswitches
 * Decimal math
 * Test ROM 1
-* More debugging utilities
+*
 * Video Controller
 * Data accesses across banks are allowed (but not stack accesses?)
 * Emulation vs Native on some microinstructions (i.e. choosing a long address mode while in emulation does... what?)
@@ -24,6 +25,8 @@ This is a running todo list.
 
 ## DONE
 
+* RTC BRAM reads and writes
+* More debugging utilities
 * RESET handling and CPU initialization
 * Load ROM into an accessible region by emulated instructions
 * Handle first batch of instructions based on ROM code

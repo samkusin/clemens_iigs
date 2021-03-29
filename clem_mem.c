@@ -349,6 +349,14 @@ static uint8_t _clem_mmio_read(
     uint8_t ioreg = addr & 0xff;
 
     switch (ioreg) {
+        case CLEM_MMIO_REG_KEYB_READ:
+        case CLEM_MMIO_REG_ANYKEY_STROBE:
+        case CLEM_MMIO_REG_ADB_MOUSE_DATA:
+        case CLEM_MMIO_REG_ADB_MODKEY:
+        case CLEM_MMIO_REG_ADB_CMD_DATA:
+        case CLEM_MMIO_REG_ADB_STATUS:
+            result = clem_adb_read_switch(&mmio->dev_adb, ioreg, flags);
+            break;
         case CLEM_MMIO_REG_LC_BANK_TEST:
             result = (mmio->mmap_register & CLEM_MMIO_MMAP_LCBANK2) ? 0x80 : 0x00;
             break;
@@ -422,6 +430,14 @@ static void _clem_mmio_write(
     }
     ioreg = (addr & 0xff);
     switch (ioreg) {
+        case CLEM_MMIO_REG_KEYB_READ:
+        case CLEM_MMIO_REG_ANYKEY_STROBE:
+        case CLEM_MMIO_REG_ADB_MOUSE_DATA:
+        case CLEM_MMIO_REG_ADB_MODKEY:
+        case CLEM_MMIO_REG_ADB_CMD_DATA:
+        case CLEM_MMIO_REG_ADB_STATUS:
+            clem_adb_write_switch(&mmio->dev_adb, ioreg, data, flags);
+            break;
         case CLEM_MMIO_REG_SLOTCXROM:
             _clem_mmio_memory_map(mmio, mmio->mmap_register | CLEM_MMIO_MMAP_CXROM);
             break;
@@ -901,6 +917,7 @@ void _clem_mmio_init(
     mmio->flags_c08x = 0;
 
     clem_rtc_reset(&mmio->dev_rtc, mega2_clocks_step);
+    clem_adb_reset(&mmio->dev_adb);
 
     _clem_mmio_init_page_maps(mmio,
                               CLEM_MMIO_MMAP_NSHADOW_SHGR |
