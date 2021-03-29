@@ -5,7 +5,17 @@
 #include <stdint.h>
 
 #include "clem_defs.h"
-#include "clem_device.h"
+
+typedef uint64_t clem_clocks_time_t;
+typedef uint32_t clem_clocks_duration_t;
+
+#define CLEM_TIME_UNINITIALIZED         ((clem_clocks_time_t)(-1))
+
+/* Typically used as parameters to MMIO functions that require context on how
+   they were called (as part of a MMIO read or write operation)
+*/
+#define CLEM_IO_READ                0x00
+#define CLEM_IO_WRITE               0x01
 
 
 /* Note that in emulation mode, the EmulatedBrk flag should be
@@ -170,8 +180,17 @@ struct ClemensMMIOPageMap {
  *
  */
 struct ClemensDeviceRTC {
-    uint8_t data_c033;      // command and data
-    uint8_t ctl_c034;       // bits 4-7 (bit 4 is reserved) are used by the RTC
+    clem_clocks_time_t xfer_started_time;
+    clem_clocks_duration_t xfer_latency_duration;
+
+    unsigned state;
+    unsigned index;
+
+    uint8_t bram[256];
+
+    /*  these values are set by the app */
+    uint8_t data_c033;
+    uint8_t ctl_c034;
 };
 
 /**
@@ -217,9 +236,12 @@ typedef void (*ClemensOpcodeCallback)(struct ClemensInstruction*,
 
 typedef struct {
     struct Clemens65C816 cpu;
-    uint32_t clocks_step;
-    uint32_t clocks_step_mega2;     // typically FPI speed mhz * clocks_step
-    uint32_t clocks_spent;
+    /* clocks spent per cycle */
+    clem_clocks_duration_t clocks_step;
+    /* typically FPI speed mhz * clocks_step */
+    clem_clocks_duration_t clocks_step_mega2;
+    /* clock timer - never change once system has been started */
+    clem_clocks_time_t clocks_spent;
 
     uint8_t* fpi_bank_map[256];     // $00 - $ff
     uint8_t* mega2_bank_map[2];     // $e0 - $e1

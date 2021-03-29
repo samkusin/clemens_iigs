@@ -92,6 +92,7 @@
     } \
 } while(0)
 
+#if CLEM_COMPILE_DEFINE_JMP_LOGGING
 #define CLEM_CPU_I_JSR_LOG(_clem_cpu_, _adr_) do { \
     fprintf(stderr, "%02X:%04X: JSR $%04X\n", \
         (_clem_cpu_)->regs.PBR, (_clem_cpu_)->regs.PC, _adr_); \
@@ -132,6 +133,14 @@
     } \
     fflush(stderr); \
 } while(0)
+#else
+#define CLEM_CPU_I_JSR_LOG(_clem_cpu_, _adr_)
+#define CLEM_CPU_I_JSL_LOG(_clem_cpu_, _adr_, _bank_)
+#define CLEM_CPU_I_RTS_LOG(_clem_cpu_, _adr_)
+#define CLEM_CPU_I_RTL_LOG(_clem_cpu_, _adr_, _bank_)
+#define CLEM_CPU_I_INTR_LOG(_clem_cpu_, _name_)
+#define CLEM_CPU_I_RTI_LOG(_clem_cpu_, _adr_, _bank_)
+#endif
 
 
 static inline void _opcode_instruction_define(
@@ -300,7 +309,7 @@ void _clem_debug_memory_dump(
     if (fp) {
         uint16_t mem_addr = (uint16_t)mem_page << 8;
         while (page_count > 0) {
-            uint32_t clocks_spent;
+            clem_clocks_duration_t clocks_spent;
             uint8_t mem_next_bank = mem_bank;
             fwrite(_clem_get_memory_bank(clem, mem_bank, &clocks_spent) + mem_addr, 256, 1, fp);
             if (mem_addr + 0x0100 < mem_addr) {
@@ -2934,7 +2943,7 @@ void clemens_emulate(ClemensMachine* clem) {
             cpu->pins.readyOut = true;
             cpu->enabled = true;
 
-            _clem_mmio_init(mmio);
+            _clem_mmio_init(mmio, clem->clocks_step_mega2);
             _clem_cycle(clem, 1);
         }
         _clem_cycle(clem, 1);

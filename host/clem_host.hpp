@@ -24,6 +24,7 @@ private:
   bool parseCommandPower(const char* line);
   bool parseCommandReset(const char* line);
   bool parseCommandStep(const char* line);
+  bool parseCommandRun(const char* line);
 
   void createMachine();
   void destroyMachine();
@@ -57,6 +58,8 @@ private:
   std::vector<ExecutedInstruction> executedInstructions_;
   MemoryEditor memoryViewStatic_[2];
   uint8_t memoryViewBank_[2];
+
+  std::vector<char> terminalOutput_;
 };
 
 

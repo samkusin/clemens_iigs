@@ -1,7 +1,7 @@
 #include "clem_host.hpp"
 #include "clem_mem.h"
 
-
+#include "fmt/format.h"
 #include "imgui/imgui.h"
 
 #include <algorithm>
@@ -26,7 +26,17 @@ namespace {
                                       kMinDebugTerminalHeight;
   constexpr float kConsoleWidthScalar = 0.333f;
 
-}
+  struct FormatView {
+    std::vector<char>& buffer_;
+    FormatView(std::vector<char>& buffer): buffer_(buffer) {}
+    template<typename... Args> void format(const char* formatStr, const Args&... args) {
+      size_t sz = fmt::formatted_size(formatStr, args...);
+      size_t start = buffer_.size();
+      buffer_.resize(start + sz + 1);
+      fmt::format_to_n(buffer_.data() + start, sz + 1, formatStr, args...);
+    }
+  };
+} // namespace anon
 
 ClemensHost::ClemensHost() :
   machine_(),
@@ -258,7 +268,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
       ImGui::TableNextColumn(); ImGui::Text("%u", machine_.cpu.cycles_spent);
       ImGui::TableNextRow();
       ImGui::TableNextColumn(); ImGui::Text("Clocks");
-      ImGui::TableNextColumn(); ImGui::Text("%u", machine_.clocks_spent);
+      ImGui::TableNextColumn(); ImGui::Text("%" PRIu64 "", machine_.clocks_spent);
       ImGui::TableNextRow();
       ImGui::TableNextColumn(); ImGui::Text("Steps");
       ImGui::TableNextColumn(); ImGui::Text("%" PRIu64 "", emulationStepCountSinceReset_);
@@ -285,8 +295,20 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     ImGui::SetNextItemWidth(windowSize.x - xpos - ImGui::GetStyle().WindowPadding.x);
 
     if (ImGui::InputText("", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
-      parseCommand(buffer);
+      terminalOutput_.clear();
+
+      FormatView fv(terminalOutput_);
+      if (parseCommand(buffer)) {
+        fv.format("Ok.");
+      } else {
+        fv.format("Error.");
+      }
       ImGui::SetKeyboardFocusHere(-1);
+    }
+    for (auto it = terminalOutput_.begin(); it != terminalOutput_.end();) {
+      ImGui::Text(terminalOutput_.data() + (it - terminalOutput_.begin()));
+      it = std::find(it, terminalOutput_.end(), 0);
+      if (it != terminalOutput_.end()) ++it;
     }
     ImGui::SetItemDefaultFocus();
     ImGui::PopStyleColor();
@@ -375,6 +397,9 @@ bool ClemensHost::parseCommand(const char* buffer)
       } else if (!strncasecmp(start, "step", end - start) ||
                  !strncasecmp(start, "s", end - start)) {
         return parseCommandStep(end);
+      } else if (!strncasecmp(start, "run", end - start) ||
+                 !strncasecmp(start, "r", end - start)) {
+        return parseCommandRun(end);
       } else if (!strncasecmp(start, "clear", end - start) ||
                  !strncasecmp(start, "c", end - start)) {
         // clear some UI states
@@ -403,6 +428,11 @@ bool ClemensHost::parseCommandReset(const char* line)
 {
   const char* start = trimCommand(line);
   if (!start) {
+    if (!clemens_is_initialized(&machine_)) {
+      FormatView fv(terminalOutput_);
+      fv.format("Machine not powered on.");
+      return false;
+    }
     resetMachine();
     return true;
   }
@@ -412,6 +442,11 @@ bool ClemensHost::parseCommandReset(const char* line)
 bool ClemensHost::parseCommandStep(const char* line)
 {
   const char* start = trimCommand(line);
+  if (!clemens_is_initialized(&machine_)) {
+    FormatView fv(terminalOutput_);
+    fv.format("Machine not powered on.");
+    return false;
+  }
   if (!start) {
     stepMachine(1);
     return true;
@@ -422,6 +457,28 @@ bool ClemensHost::parseCommandStep(const char* line)
       strncpy(number, start, std::min(sizeof(number) - 1, size_t(end - start)));
       number[15] = '\0';
       stepMachine(strtol(number, nullptr, 10));
+      return true;
+    });
+}
+
+bool ClemensHost::parseCommandRun(const char* line)
+{
+  const char* start = trimCommand(line);
+  if (!clemens_is_initialized(&machine_)) {
+    FormatView fv(terminalOutput_);
+    fv.format("Machine not powered on.");
+    return false;
+  }
+  if (!start) {
+    stepMachine(1000000);
+    return true;
+  }
+  return parseCommandToken(start,
+    [this](const char* start, const char* end) {
+      char number[16];
+      strncpy(number, start, std::min(sizeof(number) - 1, size_t(end - start)));
+      number[15] = '\0';
+      //stepMachine(strtol(number, nullptr, 10));
       return true;
     });
 }
