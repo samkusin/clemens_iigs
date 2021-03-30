@@ -66,6 +66,9 @@ void clemens_opcode_callback(ClemensMachine* clem,
                              ClemensOpcodeCallback callback,
                              void* callback_ptr);
 
+void clemens_input(ClemensMachine* clem,
+                   int ascii_key);
+
 #ifdef __cplusplus
 }
 #endif

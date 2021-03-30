@@ -53,73 +53,92 @@
 /**
  * IO Registers
  */
+/** Keyboard data (bits 6-0) and strobe (bit 7) */
+#define CLEM_MMIO_REG_KEYB_READ         0x00
+/** Write to this register to set PAGE2 to flip between text pages, 40 column
+ *  text pages */
+#define CLEM_MMIO_REG_80STOREOFF_WRITE  0x00
+/** Write to this register to set PAGE2 to switch between main and aux, ala
+ *  80 column text */
+#define CLEM_MMIO_REG_80STOREIB_WRITE   0x01
 /** Write to enable peripheral ROM for C100 - CFFF */
-#define CLEM_MMIO_REG_SLOTCXROM     0x06
+#define CLEM_MMIO_REG_SLOTCXROM         0x06
 /** Write to enable internal ROM for C100 - CFFF */
-#define CLEM_MMIO_REG_INTCXROM      0x07
+#define CLEM_MMIO_REG_INTCXROM          0x07
 /** Write to enable main bank Page 0, Page 1 and LC */
-#define CLEM_MMIO_REG_STDZP         0x08
+#define CLEM_MMIO_REG_STDZP             0x08
 /** Write to enable aux bank Page 0, Page 1 and LC */
-#define CLEM_MMIO_REG_ALTZP         0x09
+#define CLEM_MMIO_REG_ALTZP             0x09
 /** Write to enable peripheral ROM for C300 */
-#define CLEM_MMIO_REG_SLOTC3ROM     0x0A
+#define CLEM_MMIO_REG_SLOTC3ROM         0x0A
 /** Write to enable internal ROM for C300 */
-#define CLEM_MMIO_REG_INTC3ROM      0x0B
+#define CLEM_MMIO_REG_INTC3ROM          0x0B
+/** Read bit 7 for 'any-key down', read or write to clear strobe bit in $C000*/
+#define CLEM_MMIO_REG_ANYKEY_STROBE     0x10
 /** Read and test bit 7, 0 = LC bank 1, 1 = bank 2 */
-#define CLEM_MMIO_REG_LC_BANK_TEST  0x11
+#define CLEM_MMIO_REG_LC_BANK_TEST      0x11
 /** Read and test bit 7, 0 = ROM, 1 = RAM */
-#define CLEM_MMIO_REG_ROM_RAM_TEST  0x12
+#define CLEM_MMIO_REG_ROM_RAM_TEST      0x12
 /** 1 = slot ROM, 0 = internal ROM as source for the CXXX pages */
-#define CLEM_MMIO_REG_READCXROM     0x15
+#define CLEM_MMIO_REG_READCXROM         0x15
 /** Read bit 7 to detect bank 0 = main, 1 = aux bank */
-#define CLEM_MMIO_REG_RDALTZP       0x16
+#define CLEM_MMIO_REG_RDALTZP           0x16
 /** Get ROM source for the C300 page */
-#define CLEM_MMIO_REG_READC3ROM     0x17
+#define CLEM_MMIO_REG_READC3ROM         0x17
+/** Mouse button (bit 7) and movement status (btis 6:0) */
+#define CLEM_MMIO_REG_ADB_MOUSE_DATA    0x24
+/** Mask indicating which modifier keys are pressed */
+#define CLEM_MMIO_REG_ADB_MODKEY        0x25
+/** ADB GLU Command Data register */
+#define CLEM_MMIO_REG_ADB_CMD_DATA      0x26
+/** ADB status (key/mouse)  register */
+#define CLEM_MMIO_REG_ADB_STATUS        0x27
+
 /**
  * Primarily defines how memory is accessed by the video controller, with
  * the bank latch bit (0), which is always set to 1 AFAIK
  */
-#define CLEM_MMIO_REG_NEWVIDEO      0x29
+#define CLEM_MMIO_REG_NEWVIDEO          0x29
 /** Real time clock data register */
-#define CLEM_MMIO_REG_RTC_DATA      0x33
+#define CLEM_MMIO_REG_RTC_DATA          0x33
 /** Real time clock + border colorl joint register */
-#define CLEM_MMIO_REG_RTC_CTL       0x34
+#define CLEM_MMIO_REG_RTC_CTL           0x34
 /**
  * Defines what areas of the FPI banks are disabled, and how I/O language
  * card space is treated on FPI bank 0 and 1.
  */
-#define CLEM_MMIO_REG_SHADOW        0x35
+#define CLEM_MMIO_REG_SHADOW            0x35
 /**
  * Defines fast/slow processor speed, system-wide shadowing behavior and other
  * items... (disk input?)
  */
-#define CLEM_MMIO_REG_SPEED         0x36
+#define CLEM_MMIO_REG_SPEED             0x36
 /** SCC Command Register A */
-#define CLEM_MMIO_REG_SCC_A_CMD     0x39
+#define CLEM_MMIO_REG_SCC_A_CMD         0x39
 /** SCC Data Register A */
-#define CLEM_MMIO_REG_SCC_A_DATA    0x3B
+#define CLEM_MMIO_REG_SCC_A_DATA        0x3B
 /** SCC Command Register B */
-#define CLEM_MMIO_REG_SCC_B_CMD     0x38
+#define CLEM_MMIO_REG_SCC_B_CMD         0x38
 /** SCC Data Register B */
-#define CLEM_MMIO_REG_SCC_B_DATA    0x3A
+#define CLEM_MMIO_REG_SCC_B_DATA        0x3A
 /**
  * Amalgom of the C08x registers
  */
-#define CLEM_MMIO_REG_STATEREG      0x68
+#define CLEM_MMIO_REG_STATEREG          0x68
 
 /** R1 - LC Bank 2, Read RAM, Write Protect */
-#define CLEM_MMIO_REG_LC2_RAM_WP    0x80
+#define CLEM_MMIO_REG_LC2_RAM_WP        0x80
 /** R2 - LC Bank 2, Read ROM, Write Enable */
-#define CLEM_MMIO_REG_LC2_ROM_WE    0x81
+#define CLEM_MMIO_REG_LC2_ROM_WE        0x81
 /** R1 - LC Bank 2, Read ROM, Write Protect */
-#define CLEM_MMIO_REG_LC2_ROM_WP    0x82
+#define CLEM_MMIO_REG_LC2_ROM_WP        0x82
 /** R2 - LC Bank 2, Read and Write Enable */
-#define CLEM_MMIO_REG_LC2_RAM_WE    0x83
+#define CLEM_MMIO_REG_LC2_RAM_WE        0x83
 /** R1 - LC Bank 1, Read RAM, Write Protect */
-#define CLEM_MMIO_REG_LC1_RAM_WP    0x88
+#define CLEM_MMIO_REG_LC1_RAM_WP        0x88
 /** R2 - LC Bank 1, Read ROM, Write Enable */
-#define CLEM_MMIO_REG_LC1_ROM_WE    0x89
+#define CLEM_MMIO_REG_LC1_ROM_WE        0x89
 /** R1 - LC Bank 2, Read ROM, Write Protect */
-#define CLEM_MMIO_REG_LC1_ROM_WP    0x8A
+#define CLEM_MMIO_REG_LC1_ROM_WP        0x8A
 /** R2 - LC Bank 1, Read and Write Enable */
-#define CLEM_MMIO_REG_LC1_RAM_WE    0x8B
+#define CLEM_MMIO_REG_LC1_RAM_WE        0x8B
