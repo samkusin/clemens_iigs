@@ -12,8 +12,11 @@
 extern "C" {
 #endif
 
-void clem_rtc_reset(struct ClemensDeviceRTC* rtc);
-void clem_rtc_command(struct ClemensDeviceRTC* rtc);
+
+void clem_rtc_reset(struct ClemensDeviceRTC* rtc,
+                    clem_clocks_duration_t latency);
+void clem_rtc_command(struct ClemensDeviceRTC* rtc, clem_clocks_time_t ts,
+                      unsigned op);
 
 #ifdef __cplusplus
 }

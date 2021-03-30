@@ -16,39 +16,29 @@
       1. Ensures Native Mode + Fast Speed + 8-bit registers
       2. Invokes API_FWR_7629_TOOLBOX which runs in native mode
 
+## BRAM Storage
+
+https://www.techtalkz.com/threads/any-raw-data-specs-for-the-apple-iigs-bram.189163/page-2#post-794483
+
+According to Michael Fischer on page 74 of "Apple IIgs Technical
+Reference" (Osborne McGraw Hill ISBN 0-07-881009-4):
+
+"The values in the BatteryRAM are also stored, on a system startup, in
+a buffer at $E1/02C0-03BF. When the Control Panel is called, it
+ensures that the current BatteryRAM values are placed in the buffer.
+Changes made by the user in the Control Panel are made to the values
+in the buffer. When you quit the Control Panel, the changes are stored
+in the BatteryRAM."
+
 ### API_FWR_7629_TOOLBOX
 
 This is used by the Monitor firmware as well.  Y = {Function}
 
 #### Function $A3
 
-* SCC initialization?
-* Extra $E1 variable initialization and setup?
-* v = 1
-* SUB_TMP_API_7629_A3_PRAM_REFRESH?
-  * v = 1; X = 0; Y = 0; A = ??
-  * SAVE A0
-  * (0) A = Y
-  * SAVE A
-  * (0) A = A & $E0
-  * (0) A >>= 5         (bits 7-5) lower (CRC?)
-  * ($38) A |= $38
-  * ($B8) A |= $80
-  * (?, $B8) A <-> B
-  * (0, $B8) RESTORE A
-  * (0, $B8) A = A & $1F
-  * (0, $B8) A <<= 2    (bits 4-0)       (CRC?)
-  * ($B8, 0) A <-> B
-  * Call SUB_TMP_RTC_CHECK
-  * (0, $B8) A <-> B
-  * Call SUB_TMP_RTC_CHECK
-  * RESTORE A0
-  * Call SUB_TMP_RTC_CHECK2?
+Likely BRAM validation check on boot
 
-##### SUB_TMP_RTC_CHECK
 
-* v = 0 (nop for SUB_TMP_RTC_CHECK2), A = data
-* Read or write to RTC chip ->
-  * Data <- A
-  * ... TBD ...
-  * A <- Data
+## Data
+
+### $2C0-$3BF : BRAM and 32-bit checksum at end

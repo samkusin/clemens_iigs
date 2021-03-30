@@ -928,6 +928,7 @@
 "StatusFlagOverrides":{
 "226857":11796739,
 "236343":256,
+"244055":304,
 "244080":3408328,
 "244311":256,
 "244335":3408128,
@@ -940,6 +941,7 @@
 "226826":"Storing vectors into bank $e1 used during initialization?",
 "226836":"JML $FF7629",
 "226850":"JML $FFA9AA",
+"226880":"Slot 3 Peripheral RAM byte",
 "244013":"Maybe this is the default BRAM table?",
 "244025":"blank param?",
 "244034":"$A0-$C0 if self diagnostics set to $FF",
@@ -1105,7 +1107,7 @@
 "BackgroundColor":0},
 
 "244388":{
-"Text":"If Overflow was set, then we perform a read, else a write",
+"Text":"If Overflow was set, then we perform a read FROM RTC\r\nElse we perform a write TO the RTC\r\n",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},
@@ -1117,7 +1119,7 @@
 "BackgroundColor":0},
 
 "244345":{
-"Text":"Encode command in two bytes where I = index, w = 1 for write, 0 for read:\r\n  Byte 1: (w, 0, 1, 1, 1, I7,I6,I5)\r\n  Byte 2: (?, I4, I3, I2, I1, I0, 0, 0)\r\n",
+"Text":"Encode command in two bytes where I = index, r = 1 for read, 0 for read:\r\n  Byte 1: (r, 0, 1, 1, 1, I7,I6,I5)\r\n  Byte 2: (?, I4, I3, I2, I1, I0, 0, 0)\r\n",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},
@@ -2449,6 +2451,41 @@
 "Value":16744295,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"226918":{
+"Label":"lookup_fn_80_FF",
+"Value":16741990,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"226913":{
+"Label":"call_hook_rts",
+"Value":16741985,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"226879":{
+"Label":"lookup_fn_05_7f",
+"Value":16741951,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"226902":{
+"Label":"lookup_fn_00_7f",
+"Value":16741974,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244311":{
+"Label":"SUB_BRAM_CHKSUM",
+"Value":16759383,
+"Source":"User",
+"Type":"GlobalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -2825,5 +2862,9 @@
 "Bank":0},
 
 "244008":{
+"FollowPbr":false,
+"Bank":225},
+
+"244049":{
 "FollowPbr":false,
 "Bank":225}}}

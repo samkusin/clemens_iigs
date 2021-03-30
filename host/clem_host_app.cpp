@@ -92,6 +92,7 @@ sapp_desc sokol_main(int argc, char* argv[])
   sapp.event_cb = &onEvent;
   sapp.fail_cb = &onFail;
   sapp.window_title = "Clemens IIgs Developer";
+  sapp.win32_console_create = true;
 
   return sapp;
 }

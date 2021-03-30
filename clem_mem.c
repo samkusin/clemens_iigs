@@ -129,7 +129,7 @@ static inline void _clem_mmio_newvideo_c029_set(
     uint8_t setflags = mmio->new_video_c029 ^ value;
     if (setflags & kClemensMMIONewVideo_BANKLATCH_Inhibit) {
         if (!(value & kClemensMMIONewVideo_BANKLATCH_Inhibit)) {
-            CLEM_UNIMPLEMENTED("ioreg %02x : %02x", CLEM_MMIO_REG_NEWVIDEO, value);
+            CLEM_UNIMPLEMENTED("ioreg %02X : %02X", CLEM_MMIO_REG_NEWVIDEO, value);
         }
         setflags ^= kClemensMMIONewVideo_BANKLATCH_Inhibit;
     }
@@ -341,7 +341,7 @@ static uint8_t _clem_mmio_read_bank_select(
 static uint8_t _clem_mmio_read(
     ClemensMachine* clem,
     uint16_t addr,
-    uint32_t* clocks_spent,
+    clem_clocks_duration_t* clocks_spent,
     uint8_t flags
 ) {
     struct ClemensMMIO* mmio = &clem->mmio;
@@ -374,7 +374,9 @@ static uint8_t _clem_mmio_read(
             result = _clem_mmio_speed_c036(mmio);
             break;
         case CLEM_MMIO_REG_RTC_CTL:
-            clem_rtc_command(&mmio->dev_rtc);
+            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+                clem_rtc_command(&mmio->dev_rtc, clem->clocks_spent, CLEM_IO_READ);
+            }
             result = mmio->dev_rtc.ctl_c034;
             break;
         case CLEM_MMIO_REG_RTC_DATA:
@@ -395,7 +397,7 @@ static uint8_t _clem_mmio_read(
             break;
         default:
             if (!(flags & CLEM_MMIO_READ_NO_OP)) {
-                CLEM_UNIMPLEMENTED("ioreg %u", ioreg);
+                CLEM_UNIMPLEMENTED("ioreg %02X", ioreg);
             }
             break;
     }
@@ -409,7 +411,7 @@ static void _clem_mmio_write(
     ClemensMachine* clem,
     uint8_t data,
     uint16_t addr,
-    uint32_t* clocks_spent,
+    clem_clocks_duration_t* clocks_spent,
     uint8_t flags
 ) {
     struct ClemensMMIO* mmio = &clem->mmio;
@@ -443,7 +445,7 @@ static void _clem_mmio_write(
             break;
         case CLEM_MMIO_REG_RTC_CTL:
             mmio->dev_rtc.ctl_c034 = data;
-            clem_rtc_command(&mmio->dev_rtc);
+            clem_rtc_command(&mmio->dev_rtc, clem->clocks_spent, CLEM_IO_WRITE);
             break;
         case CLEM_MMIO_REG_RTC_DATA:
             mmio->dev_rtc.data_c033 = data;
@@ -884,7 +886,10 @@ void _clem_mmio_init_page_maps(
     _clem_mmio_memory_map(mmio, memory_flags);
 }
 
-void _clem_mmio_init(struct ClemensMMIO* mmio) {
+void _clem_mmio_init(
+    struct ClemensMMIO* mmio,
+    clem_clocks_duration_t mega2_clocks_step
+) {
     //  Memory map starts out without shadowing, but our call to
     //  init_page_maps will initialize the memory map on IIgs reset
     //  Fast CPU mode
@@ -894,6 +899,8 @@ void _clem_mmio_init(struct ClemensMMIO* mmio) {
     mmio->speed_c036 = kClemensMMIOSpeed_FAST_Enable;
     mmio->mmap_register = CLEM_MMIO_MMAP_NSHADOW | CLEM_MMIO_MMAP_NIOLC;
     mmio->flags_c08x = 0;
+
+    clem_rtc_reset(&mmio->dev_rtc, mega2_clocks_step);
 
     _clem_mmio_init_page_maps(mmio,
                               CLEM_MMIO_MMAP_NSHADOW_SHGR |
@@ -912,7 +919,7 @@ void clem_read(
 ) {
     struct ClemensMMIOPageMap* bank_page_map = clem->mmio.bank_page_map[bank];
     struct ClemensMMIOPageInfo* page = &bank_page_map->pages[adr >> 8];
-    uint32_t clocks_spent;
+    clem_clocks_duration_t clocks_spent;
     uint16_t offset = ((uint16_t)page->read << 8) | (adr & 0xff);
     bool read_only = (flags == CLEM_MEM_FLAG_NULL);
 
@@ -965,7 +972,7 @@ void clem_write(
     struct ClemensMMIOPageMap* bank_page_map = clem->mmio.bank_page_map[bank];
     struct ClemensMMIOShadowMap* shadow_map = bank_page_map->shadow_map;
     struct ClemensMMIOPageInfo* page = &bank_page_map->pages[adr >> 8];
-    uint32_t clocks_spent;
+    clem_clocks_duration_t clocks_spent;
     uint16_t offset = ((uint16_t)page->write << 8) | (adr & 0xff);
     if (page->flags & CLEM_MMIO_PAGE_IOADDR) {
         //  TODO: bring clocks_spent out of _clem_mmio_write (and other

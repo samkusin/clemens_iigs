@@ -2,7 +2,7 @@
 static inline uint8_t* _clem_get_memory_bank(
     ClemensMachine* clem,
     uint8_t bank,
-    uint32_t* clocks_spent
+    clem_clocks_duration_t* clocks_spent
 ) {
     if (bank == 0xe0 || bank == 0xe1) {
         *clocks_spent = clem->clocks_step_mega2;
