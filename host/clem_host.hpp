@@ -10,6 +10,17 @@
 #include <cstdint>
 #include <vector>
 
+struct ClemensHostInputEvent
+{
+  enum Type {
+    KeyDown,
+    KeyUp
+  };
+  union {
+    unsigned adb_keycode;
+  };
+};
+
 
 class ClemensHost
 {
@@ -18,6 +29,8 @@ public:
   ~ClemensHost();
 
   void frame(int width, int height, float deltaTime);
+
+  void input(const ClemensInputEvent& input);
 
 private:
   bool parseCommand(const char* buffer);

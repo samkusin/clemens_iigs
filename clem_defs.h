@@ -288,4 +288,136 @@
 #define CLEM_UTIL_CROSSED_PAGE_BOUNDARY(_adr0_, _adr1_) \
     (((_adr0_) ^ (_adr1_)) & 0xff00)
 
+
+/* Key codes */
+#define CLEM_ADB_KEY_A                      0x00
+#define CLEM_ADB_KEY_S                      0x01
+#define CLEM_ADB_KEY_D                      0x02
+#define CLEM_ADB_KEY_F                      0x03
+#define CLEM_ADB_KEY_H                      0x04
+#define CLEM_ADB_KEY_G                      0x05
+#define CLEM_ADB_KEY_Z                      0x06
+#define CLEM_ADB_KEY_X                      0x07
+#define CLEM_ADB_KEY_C                      0x08
+#define CLEM_ADB_KEY_V                      0x09
+/* Skipped 0x0A */
+#define CLEM_ADB_KEY_B                      0x0B
+#define CLEM_ADB_KEY_Q                      0x0C
+#define CLEM_ADB_KEY_W                      0x0D
+#define CLEM_ADB_KEY_E                      0x0E
+#define CLEM_ADB_KEY_R                      0x0F
+#define CLEM_ADB_KEY_T                      0x10
+#define CLEM_ADB_KEY_Y                      0x11
+#define CLEM_ADB_KEY_1                      0x12
+#define CLEM_ADB_KEY_2                      0x13
+#define CLEM_ADB_KEY_3                      0x14
+#define CLEM_ADB_KEY_4                      0x15
+#define CLEM_ADB_KEY_6                      0x16
+#define CLEM_ADB_KEY_5                      0x17
+#define CLEM_ADB_KEY_EQUALS                 0x18
+#define CLEM_ADB_KEY_9                      0x19
+#define CLEM_ADB_KEY_7                      0x1A
+#define CLEM_ADB_KEY_MINUS                  0x1B
+#define CLEM_ADB_KEY_8                      0x1C
+#define CLEM_ADB_KEY_0                      0x1D
+#define CLEM_ADB_KEY_RBRACKET               0x1E
+#define CLEM_ADB_KEY_O                      0x1F
+#define CLEM_ADB_KEY_U                      0x20
+#define CLEM_ADB_KEY_LBRACKET               0x21
+#define CLEM_ADB_KEY_I                      0x22
+#define CLEM_ADB_KEY_P                      0x23
+#define CLEM_ADB_KEY_RETURN                 0x24
+#define CLEM_ADB_KEY_L                      0x25
+#define CLEM_ADB_KEY_J                      0x26
+#define CLEM_ADB_KEY_APOSTRAPHE             0x27
+#define CLEM_ADB_KEY_K                      0x28
+#define CLEM_ADB_KEY_SEMICOLON              0x29
+#define CLEM_ADB_KEY_BACKSLASH              0x2A
+#define CLEM_ADB_KEY_COMMA                  0x2B
+#define CLEM_ADB_KEY_FWDSLASH               0x2C
+#define CLEM_ADB_KEY_N                      0x2D
+#define CLEM_ADB_KEY_M                      0x2E
+#define CLEM_ADB_KEY_PERIOD                 0x2F
+#define CLEM_ADB_KEY_TAB                    0x30
+#define CLEM_ADB_KEY_SPACE                  0x31
+#define CLEM_ADB_KEY_BACKQUOTE              0x32
+#define CLEM_ADB_KEY_DELETE                 0x33
+/* Skipped 0x34 */
+#define CLEM_ADB_KEY_ESCAPE                 0x35
+#define CLEM_ADB_KEY_LCTRL                  0x36
+#define CLEM_ADB_KEY_COMMAND_APPLE          0x37
+#define CLEM_ADB_KEY_LSHIFT                 0x38
+#define CLEM_ADB_KEY_CAPSLOCK               0x39
+#define CLEM_ADB_KEY_OPTION                 0x3A
+#define CLEM_ADB_KEY_LEFT                   0x3B
+#define CLEM_ADB_KEY_RIGHT                  0x3C
+#define CLEM_ADB_KEY_DOWN                   0x3D
+#define CLEM_ADB_KEY_UP                     0x3E
+/* Skipped 0x3F */
+/* Skipped 0x40 */
+#define CLEM_ADB_KEY_PAD_DECIMAL            0x41
+/* Skipped 0x42 */
+#define CLEM_ADB_KEY_PAD_MULTIPLY           0x43
+/* Skipped 0x44 */
+#define CLEM_ADB_KEY_PAD_PLUS               0x45
+/* Skipped 0x46 */
+#define CLEM_ADB_KEY_PAD_CLEAR_NUMLOCK      0x47
+/* Skipped 0x48 */
+/* Skipped 0x49 */
+/* Skipped 0x4A */
+#define CLEM_ADB_KEY_PAD_DIVIDE             0x4B
+#define CLEM_ADB_KEY_PAD_ENTER              0x4C
+/* Skipped 0x4D */
+#define CLEM_ADB_KEY_PAD_MINUS              0x4E
+/* Skipped 0x4F */
+/* Skipped 0x50 */
+#define CLEM_ADB_KEY_PAD_EQUALS             0x51
+#define CLEM_ADB_KEY_PAD_0                  0x52
+#define CLEM_ADB_KEY_PAD_1                  0x53
+#define CLEM_ADB_KEY_PAD_2                  0x54
+#define CLEM_ADB_KEY_PAD_3                  0x55
+#define CLEM_ADB_KEY_PAD_4                  0x56
+#define CLEM_ADB_KEY_PAD_5                  0x57
+#define CLEM_ADB_KEY_PAD_6                  0x58
+#define CLEM_ADB_KEY_PAD_7                  0x59
+/* Skipped 0x5A */
+#define CLEM_ADB_KEY_PAD_8                  0x5B
+#define CLEM_ADB_KEY_PAD_9                  0x5C
+/* Skipped 0x5D */
+/* Skipped 0x5E */
+/* Skipped 0x5F */
+#define CLEM_ADB_KEY_F5                     0x60
+#define CLEM_ADB_KEY_F6                     0x61
+#define CLEM_ADB_KEY_F7                     0x62
+#define CLEM_ADB_KEY_F3                     0x63
+#define CLEM_ADB_KEY_F8                     0x64
+#define CLEM_ADB_KEY_F9                     0x65
+/* Skipped 0x66 */
+#define CLEM_ADB_KEY_F11                    0x67
+/* Skipped 0x68 */
+#define CLEM_ADB_KEY_F13                    0x69
+/* Skipped 0x6A */
+#define CLEM_ADB_KEY_F14                    0x6B
+/* Skipped 0x6C */
+#define CLEM_ADB_KEY_F10                    0x6D
+/* Skipped 0x6E */
+#define CLEM_ADB_KEY_F12                    0x6F
+/* Skipped 0x70 */
+#define CLEM_ADB_KEY_F15                    0x71
+#define CLEM_ADB_KEY_HELP_INSERT            0x72
+#define CLEM_ADB_KEY_HOME                   0x73
+#define CLEM_ADB_KEY_PAGEUP                 0x74
+#define CLEM_ADB_KEY_PAD_DELETE             0x75
+#define CLEM_ADB_KEY_F4                     0x76
+#define CLEM_ADB_KEY_END                    0x77
+#define CLEM_ADB_KEY_F2                     0x78
+#define CLEM_ADB_KEY_PAGEDOWN               0x79
+#define CLEM_ADB_KEY_F1                     0x7A
+#define CLEM_ADB_KEY_RSHIFT                 0x7B
+#define CLEM_ADB_KEY_ROPTION                0x7C
+#define CLEM_ADB_KEY_RCTRL                  0x7D
+/* Skipped 0x7E */
+#define CLEM_ADB_KEY_RESET                  0x7F
+
+
 #endif

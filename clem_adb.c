@@ -26,6 +26,13 @@ void clem_adb_reset(struct ClemensDeviceADB* adb) {
 
 }
 
+void clem_adb_input(
+  struct ClemensDeviceADB* adb,
+  struct ClemensInputEvent* input
+) {
+    // TODO: delegate keyboard input
+}
+
 void clem_adb_write_switch(
     struct ClemensDeviceADB* adb,
     uint8_t ioreg,
