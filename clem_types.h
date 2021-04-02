@@ -80,7 +80,29 @@ struct ClemensDeviceRTC {
 };
 
 struct ClemensDeviceADB {
+    int i;
+};
 
+/**
+ * @brief Identifies the input event sent to the ADB controller
+ *
+ */
+enum ClemensInputType {
+    kClemensInputType_KeyDown,
+    kClemensInputType_KeyUp
+};
+
+/**
+ * @brief Consolidated input structure passed into the emulator
+ *
+ * Input is dispatched to the ADB device, which then provides input data to
+ * the ClemensMachine
+ *
+ */
+struct ClemensInputEvent {
+    enum ClemensInputType type;
+    /* value based on the input type (ADB keycode, mouse or gamepad button) */
+    unsigned value;
 };
 
 /**

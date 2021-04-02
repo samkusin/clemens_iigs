@@ -5,6 +5,7 @@
 
 #include "clem_code.h"
 #include "clem_util.h"
+#include "clem_device.h"
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
@@ -2907,10 +2908,6 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
     }
 }
 
-void mmio_execute(struct ClemensMMIO* mmio, ClemensMachine* clem) {
-    //if (mmio->read_reg & 0xff00 >= 0x80)
-}
-
 void clemens_emulate(ClemensMachine* clem) {
     struct Clemens65C816* cpu = &clem->cpu;
     struct ClemensMMIO* mmio = &clem->mmio;
@@ -2982,5 +2979,11 @@ void clemens_emulate(ClemensMachine* clem) {
     }
 
     cpu_execute(cpu, clem);
-    mmio_execute(mmio, clem);
+}
+
+void clemens_input(
+    ClemensMachine* machine,
+    struct ClemensInputEvent* input
+) {
+    clem_adb_input(&machine->mmio.dev_adb, input);
 }

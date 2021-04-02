@@ -7,6 +7,20 @@
 extern "C" {
 #endif
 
+/**
+ * @brief
+ *
+ * @param machine
+ * @param speed_factor
+ * @param clocks_step
+ * @param rom
+ * @param romSize
+ * @param e0bank
+ * @param e1bank
+ * @param fpiRAM
+ * @param fpiRAMBankCount
+ * @return int
+ */
 int clemens_init(
     ClemensMachine* machine,
     uint32_t speed_factor,
@@ -19,6 +33,11 @@ int clemens_init(
     unsigned int fpiRAMBankCount
 );
 
+/**
+ * @brief
+ *
+ * @param clem
+ */
 void clemens_emulate(ClemensMachine* clem);
 
 /**
@@ -66,8 +85,14 @@ void clemens_opcode_callback(ClemensMachine* clem,
                              ClemensOpcodeCallback callback,
                              void* callback_ptr);
 
+/**
+ * @brief Forwards input from ths host machine to the ADB
+ *
+ * @param clem
+ * @param input
+ */
 void clemens_input(ClemensMachine* clem,
-                   int ascii_key);
+                   struct ClemensInputEvent* input);
 
 #ifdef __cplusplus
 }

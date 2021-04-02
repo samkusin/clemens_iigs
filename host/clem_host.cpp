@@ -101,6 +101,11 @@ void ClemensHost::emulatorImguiMemoryWrite(
              CLEM_MEM_FLAG_NULL);
 }
 
+void ClemensHost::input(const ClemensInputEvent& input)
+{
+
+}
+
 void ClemensHost::frame(int width, int height, float deltaTime)
 {
   //  execution loop for clemens 65816
