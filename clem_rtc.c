@@ -30,7 +30,7 @@ static void _clem_rtc_dispatch_cmd(
 ) {
     /* r, c, c, c, c, d, d, d  where r = read, c = cmd, d = data */
     unsigned cmd = (data >> 3) & 0xf;
-    CLEM_LOG("clem_rtc_dispatch: ctl=%02X, data=%02X", rtc->ctl_c034, data);
+    /* CLEM_LOG("clem_rtc_dispatch: ctl=%02X, data=%02X", rtc->ctl_c034, data); */
     switch (cmd) {
         case 0x7:
             /* bram read or write */
@@ -52,7 +52,7 @@ void _clem_rtc_bram_state(
     unsigned data
 ) {
     /* read second part of the index embedded in the data packet */
-    CLEM_LOG("clem_rtc_bram: ctl=%02X, data=%02X", rtc->ctl_c034, data);
+    /* CLEM_LOG("clem_rtc_bram: ctl=%02X, data=%02X", rtc->ctl_c034, data); */
     rtc->index = rtc->index | ((data >> 2) & 0x1f);
     if (rtc->state == CLEM_RTC_EXECUTE_RECV_CMD_BRAM_R) {
         rtc->state = CLEM_RTC_EXECUTE_READ_BRAM;
@@ -67,8 +67,10 @@ uint8_t _clem_rtc_bram_read(
     struct ClemensDeviceRTC* rtc
 ) {
     uint8_t data = rtc->bram[rtc->index & 0xff];
+    /*
     CLEM_LOG("clem_rtc_bram_read: @%02X ctl=%02X, data=%02X",
              rtc->index, rtc->ctl_c034, data);
+    */
     CLEM_ASSERT(rtc->state == CLEM_RTC_EXECUTE_READ_BRAM);
     return data;
 }
@@ -77,8 +79,10 @@ void _clem_rtc_bram_write(
     struct ClemensDeviceRTC* rtc,
     unsigned data
 ) {
+    /*
     CLEM_LOG("clem_rtc_bram_write: @%02X ctl=%02X, data=%02X",
              rtc->index, rtc->ctl_c034, data);
+    */
     CLEM_ASSERT(rtc->state == CLEM_RTC_EXECUTE_WRITE_BRAM);
     rtc->bram[rtc->index & 0xff] = data;
 }
@@ -161,6 +165,6 @@ void clem_rtc_command(
 
         rtc->xfer_started_time = CLEM_TIME_UNINITIALIZED;
         rtc->ctl_c034 &= ~CLEM_RTC_C034_FLAG_START_XFER;
-        CLEM_LOG("clem_rtc_xfer: ctl=%02X, data=%02X", rtc->ctl_c034, rtc->data_c033);
+        /* CLEM_LOG("clem_rtc_xfer: ctl=%02X, data=%02X", rtc->ctl_c034, rtc->data_c033); */
     }
 }

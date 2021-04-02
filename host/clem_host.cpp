@@ -16,9 +16,9 @@ namespace {
   constexpr float kMinDebugHistoryHeight = 256;
   constexpr float kMinDebugHistoryScalar = 0.500f;
   constexpr float kMinDebugStatusHeight = 96;
-  constexpr float kMinDebugStatusScalar = 0.150f;
+  constexpr float kMinDebugStatusScalar = 0.175f;
   constexpr float kMinDebugTerminalHeight = 192;
-  constexpr float kMinDebugTerminalScalar = 0.350f;
+  constexpr float kMinDebugTerminalScalar = 0.325f;
 
   constexpr float kMinConsoleWidth = 384;
   constexpr float kMinConsoleHeight = kMinDebugHistoryHeight +
@@ -40,8 +40,12 @@ namespace {
 
 ClemensHost::ClemensHost() :
   machine_(),
+  emulationFrameLagTime_(0.0f),
+  emulationRunTime_(0.0f),
   emulationStepCount_(0),
   emulationStepCountSinceReset_(0),
+  clocksSpentOverflowFromLastFrame_(0),
+  clocksSpentLastRun_(0),
   cpuRegsSaved_ {},
   cpuPinsSaved_ {},
   cpu6502EmulationSaved_(true)
@@ -108,30 +112,14 @@ void ClemensHost::input(const ClemensInputEvent& input)
 
 void ClemensHost::frame(int width, int height, float deltaTime)
 {
-  //  execution loop for clemens 65816
   bool emulationRan = false;
-  if (emulationStepCount_ > 0) {
-    cpuRegsSaved_ = machine_.cpu.regs;
-    cpuPinsSaved_ = machine_.cpu.pins;
-    cpu6502EmulationSaved_ = machine_.cpu.pins.emulation;
-    machine_.cpu.cycles_spent = 0;
-    while (emulationStepCount_ > 0) {
-      if (!machine_.cpu.pins.resbIn) {
-        if (emulationStepCount_ == 1) {
-          machine_.cpu.pins.resbIn = true;
-        }
-      }
-      clemens_emulate(&machine_);
-      --emulationStepCount_;
-      ++emulationStepCountSinceReset_;
-    }
-
+  if (emulationStepCount_ > 0 && clemens_is_initialized_simple(&machine_)) {
+    emulate(deltaTime);
     emulationRan = true;
   }
 
   const struct ClemensCPURegs& cpuRegsNext = machine_.cpu.regs;
   const struct ClemensCPUPins& cpuPinsNext = machine_.cpu.pins;
-
 
   //  View
   ImVec2 windowSize;
@@ -162,11 +150,18 @@ void ClemensHost::frame(int width, int height, float deltaTime)
 
   windowCursorPos.y += windowSize.y;
   windowSize.y = std::max(kMinDebugStatusHeight, height * kMinDebugStatusScalar);
+
+  char windowTitle[64];
+  if (emulationRan) {
+    snprintf(windowTitle, sizeof(windowTitle), "Status (fps: %.2f)", ImGui::GetIO().Framerate);
+  } else {
+    snprintf(windowTitle, sizeof(windowTitle), "Status", ImGui::GetIO().Framerate);
+  }
   ImGui::SetNextWindowPos(windowCursorPos);
   ImGui::SetNextWindowSize(windowSize);
-  ImGui::Begin("Status", nullptr, ImGuiWindowFlags_NoResize |
-                                  ImGuiWindowFlags_NoCollapse |
-                                  ImGuiWindowFlags_NoBringToFrontOnFocus);
+  ImGui::Begin(windowTitle, nullptr, ImGuiWindowFlags_NoResize |
+                                     ImGuiWindowFlags_NoCollapse |
+                                     ImGuiWindowFlags_NoBringToFrontOnFocus);
   {
     //  N, V, M, B, D, I, Z, C
     //  N, V, M, X, D, I, Z, C
@@ -268,15 +263,26 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     ImGui::SameLine();
     ImGui::BeginTable("cpu_time", 2, 0, ImVec2(windowSize.x * 0.5f, 0));
     {
+      double estimatedSpeed = 0.0;
+      if (emulationRunTime_ > DBL_EPSILON) {
+        estimatedSpeed = (clocksSpentLastRun_ * 1e-3) / (machine_.clocks_step_mega2 * 1e3);
+        estimatedSpeed /= emulationRunTime_;
+      }
+      ImGui::TableNextColumn(); ImGui::Text("Total Steps");
+      ImGui::TableNextColumn(); ImGui::Text("%" PRIu64 "", emulationStepCountSinceReset_);
       ImGui::TableNextRow();
-      ImGui::TableNextColumn(); ImGui::Text("Cycles");
+      ImGui::TableNextColumn(); ImGui::Text("Cycles/slice");
       ImGui::TableNextColumn(); ImGui::Text("%u", machine_.cpu.cycles_spent);
       ImGui::TableNextRow();
-      ImGui::TableNextColumn(); ImGui::Text("Clocks");
-      ImGui::TableNextColumn(); ImGui::Text("%" PRIu64 "", machine_.clocks_spent);
+      ImGui::TableNextColumn(); ImGui::Text("Actual Speed");
+      if (estimatedSpeed < DBL_EPSILON) {
+        ImGui::TableNextColumn(); ImGui::Text("N/A");
+      } else {
+        ImGui::TableNextColumn(); ImGui::Text("%.2lf mhz", estimatedSpeed);
+      }
       ImGui::TableNextRow();
-      ImGui::TableNextColumn(); ImGui::Text("Steps");
-      ImGui::TableNextColumn(); ImGui::Text("%" PRIu64 "", emulationStepCountSinceReset_);
+      ImGui::TableNextColumn(); ImGui::Text("Exec time");
+      ImGui::TableNextColumn(); ImGui::Text("%.4f secs", emulationRunTime_);
     }
     ImGui::EndTable();
 
@@ -355,6 +361,50 @@ void ClemensHost::frame(int width, int height, float deltaTime)
       (void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
   }
   ImGui::End();
+}
+
+void ClemensHost::emulate(float deltaTime)
+{
+  //  execution loop for clemens 65816
+  //    goal is to execute at least 2.8mhz / FixedFrameRate cycles per second
+  //    practially this means:
+  //      2800 clocks * 1e6 / FixedFrameRate for the 2.8mhz IIgs
+  constexpr float kFixedFrameDeltaTime = 1/30.0f;
+  bool is_machine_slow;
+  const uint64_t kClocksPerSecond = clemens_clocks_per_second(
+    &machine_, &is_machine_slow);
+  const uint64_t kClocksPerFrameDesired = kFixedFrameDeltaTime * kClocksPerSecond;
+
+  cpuRegsSaved_ = machine_.cpu.regs;
+  cpuPinsSaved_ = machine_.cpu.pins;
+  cpu6502EmulationSaved_ = machine_.cpu.pins.emulation;
+  machine_.cpu.cycles_spent = 0;
+
+  emulationFrameLagTime_ += deltaTime;
+  while (emulationFrameLagTime_ >= kFixedFrameDeltaTime) {
+    uint64_t clocksSpentDuringRun = clocksSpentOverflowFromLastFrame_;
+    uint64_t clocksSpentInitial = machine_.clocks_spent;
+    while (emulationStepCount_ > 0) {
+      if (clocksSpentDuringRun >= kClocksPerFrameDesired) {
+        clocksSpentOverflowFromLastFrame_ = clocksSpentDuringRun - kClocksPerFrameDesired;
+        break;
+      }
+      if (!machine_.cpu.pins.resbIn) {
+        if (emulationStepCount_ == 1) {
+          machine_.cpu.pins.resbIn = true;
+        }
+      }
+      clemens_emulate(&machine_);
+      --emulationStepCount_;
+      ++emulationStepCountSinceReset_;
+      clocksSpentDuringRun = machine_.clocks_spent - clocksSpentInitial;
+    }
+    clocksSpentLastRun_ += clocksSpentDuringRun;
+    emulationFrameLagTime_ -= kFixedFrameDeltaTime;
+    printf("lag = %10.4f\n", emulationFrameLagTime_);
+  }
+  emulationRunTime_ += deltaTime;
+  printf("dtm = %10.4f\n", deltaTime);
 }
 
 static const char* trimCommand(const char* buffer)
@@ -547,6 +597,10 @@ void ClemensHost::resetMachine()
 void ClemensHost::stepMachine(int stepCount)
 {
   emulationStepCount_ = std::max(0, stepCount);
+  emulationFrameLagTime_ = 0.0f;
+  emulationRunTime_ = 0.0f;
+  clocksSpentOverflowFromLastFrame_ = 0;
+  clocksSpentLastRun_ = 0;
 }
 
 void ClemensHost::emulatorOpcodePrint(
@@ -556,7 +610,7 @@ void ClemensHost::emulatorOpcodePrint(
 ) {
   auto* host = reinterpret_cast<ClemensHost*>(this_ptr);
   constexpr size_t kInstructionEdgeSize = 64;
-  if (host->executedInstructions_.size() > 1024 + kInstructionEdgeSize) {
+  if (host->executedInstructions_.size() > 256 + kInstructionEdgeSize) {
     auto it = host->executedInstructions_.begin();
     host->executedInstructions_.erase(it, it + kInstructionEdgeSize);
   }
