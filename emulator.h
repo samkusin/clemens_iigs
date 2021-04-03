@@ -94,6 +94,15 @@ void clemens_opcode_callback(ClemensMachine* clem,
 void clemens_input(ClemensMachine* clem,
                    struct ClemensInputEvent* input);
 
+/**
+ * @brief
+ *
+ * @param clem
+ * @param is_slow_speed
+ * @return uint64_t
+ */
+uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed);
+
 #ifdef __cplusplus
 }
 #endif

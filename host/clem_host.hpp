@@ -33,6 +33,10 @@ public:
   void input(const ClemensInputEvent& input);
 
 private:
+  void emulate(float deltaTime);
+
+private:
+
   bool parseCommand(const char* buffer);
   bool parseCommandPower(const char* line);
   bool parseCommandReset(const char* line);
@@ -55,8 +59,13 @@ private:
   ClemensMachine machine_;
   cinek::FixedStack slab_;
 
+  float emulationFrameLagTime_;
+  float emulationRunTime_;
+
   int emulationStepCount_;
   uint64_t emulationStepCountSinceReset_;
+  uint64_t clocksSpentOverflowFromLastFrame_;
+  uint64_t clocksSpentLastRun_;
 
   struct ClemensCPURegs cpuRegsSaved_;
   struct ClemensCPUPins cpuPinsSaved_;
