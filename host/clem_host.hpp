@@ -59,13 +59,15 @@ private:
   ClemensMachine machine_;
   cinek::FixedStack slab_;
 
-  float emulationFrameLagTime_;
   float emulationRunTime_;
+  float emulationSliceTimeLeft_;
+  float emulationSliceDuration_;
 
   int emulationStepCount_;
   uint64_t emulationStepCountSinceReset_;
-  uint64_t clocksSpentOverflowFromLastFrame_;
-  uint64_t clocksSpentLastRun_;
+  uint64_t machineCyclesSpentDuringSample_;
+  float sampleDuration_;
+  float emulationSpeedSampled_;
 
   struct ClemensCPURegs cpuRegsSaved_;
   struct ClemensCPUPins cpuPinsSaved_;

@@ -458,12 +458,13 @@ static inline void _cpu_adc(
     bool is8
 ) {
     uint32_t adc;
-    uint8_t p = cpu->regs.P;
+    uint8_t p;
     bool carry = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
     if (is8) {
         value = value & 0xff;
         adc = (cpu->regs.A & 0xff) + value  + carry;
         _cpu_p_flags_n_z_data(cpu, (uint8_t)adc);
+        p = cpu->regs.P;
         if (((cpu->regs.A & 0xff) ^ adc) & (value ^ adc) & 0x80) p |= kClemensCPUStatus_Overflow;
         else p &= ~kClemensCPUStatus_Overflow;
         if (adc & 0x100) p |= kClemensCPUStatus_Carry;
@@ -472,6 +473,7 @@ static inline void _cpu_adc(
     } else {
         adc = cpu->regs.A + value + carry;
         _cpu_p_flags_n_z_data_16(cpu, (uint16_t)adc);
+        p = cpu->regs.P;
         if ((cpu->regs.A ^ adc) & (value ^ adc) & 0x8000) p |= kClemensCPUStatus_Overflow;
         else p &= ~kClemensCPUStatus_Overflow;
         if (adc & 0x10000) p |= kClemensCPUStatus_Carry;
@@ -489,7 +491,7 @@ static inline void _cpu_sbc(
 ) {
     /* inverse adc implementation a + (-b) */
     uint32_t adc;
-    uint8_t p = cpu->regs.P;
+    uint8_t p;
     bool carry = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
     if (is8) {
         uint16_t a = cpu->regs.A & 0xff;
@@ -497,6 +499,7 @@ static inline void _cpu_sbc(
         value = value ^ 0xff;   // convert to negative
         adc = a + value + carry;
         _cpu_p_flags_n_z_data(cpu, (uint8_t)adc);
+        p = cpu->regs.P;
         if ((a ^ adc) & (value ^ adc) & 0x80) p |= kClemensCPUStatus_Overflow;
         else p &= ~kClemensCPUStatus_Overflow;
         if (adc & 0x100) p |= kClemensCPUStatus_Carry;
@@ -506,6 +509,7 @@ static inline void _cpu_sbc(
         value = value ^ 0xffff; // negative
         adc = cpu->regs.A + value + carry;
         _cpu_p_flags_n_z_data_16(cpu, (uint16_t)adc);
+        p = cpu->regs.P;
         if ((cpu->regs.A ^ adc) & (value ^ adc) & 0x8000) p |= kClemensCPUStatus_Overflow;
         else p &= ~kClemensCPUStatus_Overflow;
         if (adc & 0x10000) p |= kClemensCPUStatus_Carry;
@@ -526,15 +530,16 @@ static inline void _cpu_asl(
         if (v & 0x80) p |= kClemensCPUStatus_Carry;
         else p &= ~kClemensCPUStatus_Carry;
         v <<= 1;
+        cpu->regs.P = p;
         _cpu_p_flags_n_z_data(cpu, v);
         *value = CLEM_UTIL_set16_lo(*value, v);
     } else {
         if (*value & 0x8000) p |= kClemensCPUStatus_Carry;
         else p &= ~kClemensCPUStatus_Carry;
         *value <<= 1;
+        cpu->regs.P = p;
         _cpu_p_flags_n_z_data_16(cpu, *value);
     }
-    cpu->regs.P = p;
 }
 
 static inline void _cpu_rol(
@@ -550,6 +555,7 @@ static inline void _cpu_rol(
         v <<= 1;
         if (p & kClemensCPUStatus_Carry) v |= 0x01;
         else v &= 0xfe;
+        cpu->regs.P = p;
         _cpu_p_flags_n_z_data(cpu, v);
         *value = CLEM_UTIL_set16_lo(*value, v);
     } else {
@@ -558,9 +564,9 @@ static inline void _cpu_rol(
         *value <<= 1;
         if (p & kClemensCPUStatus_Carry) *value |= 0x0001;
         else *value &= 0xfffe;
+        cpu->regs.P = p;
         _cpu_p_flags_n_z_data_16(cpu, *value);
     }
-    cpu->regs.P = p;
 }
 
 static inline void _cpu_lsr(
@@ -574,15 +580,16 @@ static inline void _cpu_lsr(
         if (v & 0x01) p |= kClemensCPUStatus_Carry;
         else p &= ~kClemensCPUStatus_Carry;
         v >>= 1;
+        cpu->regs.P = p;
         _cpu_p_flags_n_z_data(cpu, v);
         *value = CLEM_UTIL_set16_lo(*value, v);
     } else {
         if (*value & 0x0001) p |= kClemensCPUStatus_Carry;
         else p &= ~kClemensCPUStatus_Carry;
         *value >>= 1;
+        cpu->regs.P = p;
         _cpu_p_flags_n_z_data_16(cpu, *value);
     }
-    cpu->regs.P = p;
 }
 
 static inline void _cpu_ror(
@@ -598,6 +605,7 @@ static inline void _cpu_ror(
         v >>= 1;
         if (p & kClemensCPUStatus_Carry) v |= 0x80;
         else v &= 0x7f;
+        cpu->regs.P = p;
         _cpu_p_flags_n_z_data(cpu, v);
         *value = CLEM_UTIL_set16_lo(*value, v);
     } else {
@@ -606,9 +614,9 @@ static inline void _cpu_ror(
         *value >>= 1;
         if (p & kClemensCPUStatus_Carry) *value |= 0x8000;
         else *value &= 0x7fff;
+        cpu->regs.P = p;
         _cpu_p_flags_n_z_data_16(cpu, *value);
     }
-    cpu->regs.P = p;
 }
 
 static inline void _cpu_cmp(
@@ -625,15 +633,16 @@ static inline void _cpu_cmp(
         if (cmp >= value) p |= kClemensCPUStatus_Carry;
         else p &= ~kClemensCPUStatus_Carry;
         cmp -= value;
+        cpu->regs.P = p;
         _cpu_p_flags_n_z_data(cpu, (uint8_t)cmp);
     } else {
         if (reg >= value) p |= kClemensCPUStatus_Carry;
         else p &= ~kClemensCPUStatus_Carry;
         cmp = reg;
         cmp -= value;
+        cpu->regs.P = p;
         _cpu_p_flags_n_z_data_16(cpu, (uint16_t)cmp);
     }
-    cpu->regs.P = p;
 }
 
 static inline void _cpu_and(
