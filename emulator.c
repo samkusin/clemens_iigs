@@ -858,7 +858,7 @@ uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed) {
     } else {
         *is_slow_speed = true;
     }
-    return clem->clocks_step_mega2 * 1024 * 1024;
+    return clem->clocks_step_mega2 * 1000000;
 }
 
 
