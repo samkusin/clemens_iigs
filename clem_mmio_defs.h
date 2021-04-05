@@ -50,6 +50,8 @@
 /** Flags for _clem_mmio_read */
 #define CLEM_MMIO_READ_NO_OP        0x01
 
+#define CLEM_IS_MMIO_READ_NO_OP(_flags_) (((_flags_) & CLEM_MMIO_READ_NO_OP) != 0)
+
 /**
  * IO Registers
  */
@@ -121,6 +123,8 @@
 #define CLEM_MMIO_REG_SCC_B_CMD         0x38
 /** SCC Data Register B */
 #define CLEM_MMIO_REG_SCC_B_DATA        0x3A
+/** Various Mega II specific interrupt flags likely used only by firmware */
+#define CLEM_MMIO_REG_DIAG_INTTYPE      0x46
 /**
  * Amalgom of the C08x registers
  */

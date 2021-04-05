@@ -2920,6 +2920,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
 void clemens_emulate(ClemensMachine* clem) {
     struct Clemens65C816* cpu = &clem->cpu;
     struct ClemensMMIO* mmio = &clem->mmio;
+    uint32_t delta_mega2_ticks;
 
     if (!cpu->pins.resbIn) {
         /*  the reset interrupt overrides any other state
@@ -2987,12 +2988,21 @@ void clemens_emulate(ClemensMachine* clem) {
         return;
     }
 
+    while (mmio->adb_wait_ticks >= CLEM_ADB_WAIT_TICKS) {
+        clem_adb_glu(&mmio->dev_adb);
+        mmio->adb_wait_ticks -= CLEM_ADB_WAIT_TICKS;
+    }
     cpu_execute(cpu, clem);
+
+    delta_mega2_ticks = (uint32_t)(
+        (clem->clocks_spent / clem->clocks_step_mega2) - mmio->mega2_ticks);
+    mmio->mega2_ticks += delta_mega2_ticks;
+    mmio->adb_wait_ticks += delta_mega2_ticks;
 }
 
 void clemens_input(
     ClemensMachine* machine,
     struct ClemensInputEvent* input
 ) {
-    clem_adb_input(&machine->mmio.dev_adb, input);
+    clem_adb_device_input(&machine->mmio.dev_adb, input);
 }

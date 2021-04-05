@@ -211,6 +211,12 @@ static inline uint8_t _clem_mmio_statereg_c068(struct ClemensMMIO* mmio) {
     return value;
 }
 
+static uint8_t _clem_mmio_inttype_c046(
+    struct ClemensMMIO* mmio
+) {
+    return 0;
+}
+
 static uint8_t _clem_mmio_statereg_c068_set(
     struct ClemensMMIO* mmio,
     uint8_t value
@@ -347,6 +353,7 @@ static uint8_t _clem_mmio_read(
     struct ClemensMMIO* mmio = &clem->mmio;
     uint8_t result = 0x00;
     uint8_t ioreg = addr & 0xff;
+    bool is_noop = (flags & CLEM_MMIO_READ_NO_OP) != 0;
 
     switch (ioreg) {
         case CLEM_MMIO_REG_KEYB_READ:
@@ -382,13 +389,19 @@ static uint8_t _clem_mmio_read(
             result = _clem_mmio_speed_c036(mmio);
             break;
         case CLEM_MMIO_REG_RTC_CTL:
-            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+            if (!is_noop) {
                 clem_rtc_command(&mmio->dev_rtc, clem->clocks_spent, CLEM_IO_READ);
             }
             result = mmio->dev_rtc.ctl_c034;
             break;
         case CLEM_MMIO_REG_RTC_DATA:
             result = mmio->dev_rtc.data_c033;
+            break;
+        case CLEM_MMIO_REG_DIAG_INTTYPE:
+            if (!is_noop) {
+                CLEM_WARN("IO C046 no-impl");
+            }
+            result = _clem_mmio_inttype_c046(mmio);
             break;
         case CLEM_MMIO_REG_STATEREG:
             result = _clem_mmio_statereg_c068(mmio);
@@ -404,7 +417,7 @@ static uint8_t _clem_mmio_read(
             result = _clem_mmio_read_bank_select(mmio, ioreg, flags);
             break;
         default:
-            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+            if (!is_noop) {
                 CLEM_UNIMPLEMENTED("ioreg %02X", ioreg);
             }
             break;
@@ -423,11 +436,16 @@ static void _clem_mmio_write(
     uint8_t flags
 ) {
     struct ClemensMMIO* mmio = &clem->mmio;
+    bool is_noop = (flags & CLEM_MMIO_READ_NO_OP) != 0;
     uint8_t ioreg;
     if (addr >= 0xC100) {
         //  TODO: MMIO slot ROM - it seems this needs to be treated differently
         return;
     }
+    if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+        CLEM_LOG("IO Write %04X <= %02X", addr, data);
+    }
+
     ioreg = (addr & 0xff);
     switch (ioreg) {
         case CLEM_MMIO_REG_KEYB_READ:
@@ -436,7 +454,7 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_ADB_MODKEY:
         case CLEM_MMIO_REG_ADB_CMD_DATA:
         case CLEM_MMIO_REG_ADB_STATUS:
-            clem_adb_write_switch(&mmio->dev_adb, ioreg, data, flags);
+            clem_adb_write_switch(&mmio->dev_adb, ioreg, data);
             break;
         case CLEM_MMIO_REG_SLOTCXROM:
             _clem_mmio_memory_map(mmio, mmio->mmap_register | CLEM_MMIO_MMAP_CXROM);
@@ -915,6 +933,7 @@ void _clem_mmio_init(
     mmio->speed_c036 = kClemensMMIOSpeed_FAST_Enable;
     mmio->mmap_register = CLEM_MMIO_MMAP_NSHADOW | CLEM_MMIO_MMAP_NIOLC;
     mmio->flags_c08x = 0;
+    mmio->mega2_ticks = 0;
 
     clem_rtc_reset(&mmio->dev_rtc, mega2_clocks_step);
     clem_adb_reset(&mmio->dev_adb);
