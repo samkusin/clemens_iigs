@@ -1,7 +1,14 @@
 #ifndef CLEMENS_DEFS_H
 #define CLEMENS_DEFS_H
 
+/** General Machine Settings */
+#define CLEM_IIGS_BANK_SIZE                 (64 * 1024)
+#define CLEM_IIGS_ROM3_SIZE                 (CLEM_IIGS_BANK_SIZE * 4)
 
+/** Mega2 tick interval for polling the ADB (effectively microseconds) */
+#define CLEM_ADB_WAIT_TICKS             1000
+
+/** Vector addresses */
 #define CLEM_6502_COP_VECTOR_LO_ADDR        (0xFFF4)
 #define CLEM_6502_COP_VECTOR_HI_ADDR        (0xFFF5)
 #define CLEM_6502_RESET_VECTOR_LO_ADDR      (0xFFFC)
@@ -16,9 +23,7 @@
 #define CLEM_65816_IRQB_VECTOR_LO_ADDR      (0xFFEE)
 #define CLEM_65816_IRQB_VECTOR_HI_ADDR      (0xFFEF)
 
-#define CLEM_IIGS_BANK_SIZE                 (64 * 1024)
-#define CLEM_IIGS_ROM3_SIZE                 (CLEM_IIGS_BANK_SIZE * 4)
-
+/** Opcodes! */
 #define CLEM_OPC_ADC_IMM                    (0x69)
 #define CLEM_OPC_ADC_ABS                    (0x6D)
 #define CLEM_OPC_ADC_ABSL                   (0x6F)

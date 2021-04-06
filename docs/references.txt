@@ -29,3 +29,7 @@ p53 - ghosting banks (when running with 1MB vs 8MB RAM expansion)
 Build ROM:
 
 D:\Apps\6502Tools\64tass\64tass.exe --long-address --nostart --m65816 .\testrom.65816.asm -o data\testrom.rom
+
+
+Self Test
+http://www.1000bit.it/support/manuali/apple/technotes/iigs/tn.iigs.095.html

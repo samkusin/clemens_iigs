@@ -396,7 +396,6 @@ void ClemensHost::emulate(float deltaTime)
   sampleDuration_ += deltaTime;
   emulationSpeedSampled_ = machineCyclesSpentDuringSample_ / (1e6 * sampleDuration_);
   emulationRunTime_ += deltaTime;
-  //printf("dt=%.4f\n==end\n", deltaTime);
 }
 
 static const char* trimCommand(const char* buffer)

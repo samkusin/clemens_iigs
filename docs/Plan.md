@@ -10,14 +10,16 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
+* C046 phase 1 - what's needed?  set to 0 for now?  bit 7 is mouse or diagnostic?
+  * may depend if this is being accessed from an IRQ? (INTTYPE vs DIAGTYPE)
 * Keyboard registers (ADB)
 * C02D Slot Register
 * C039 Register (Serial Communications Command register )
 * RAMRD and remaining //e softswitches
 * Decimal math
 * Test ROM 1
-*
 * Video Controller
+* Border screen color
 * Data accesses across banks are allowed (but not stack accesses?)
 * Emulation vs Native on some microinstructions (i.e. choosing a long address mode while in emulation does... what?)
 * Test ROM iteration?

@@ -80,7 +80,16 @@ struct ClemensDeviceRTC {
 };
 
 struct ClemensDeviceADB {
-    int i;
+    unsigned state;
+    unsigned version;           /* Different ROMs expect different versions */
+
+    /* Host-GLU registers */
+    uint8_t cmd_reg;            /* command type */
+    uint8_t cmd_status;         /* meant to approximately reflect C027 */
+    uint8_t cmd_data_limit;     /* expected cnt of bytes for send/recv */
+    uint8_t cmd_data_sent;      /* current index into cmd_data sent (2-way) */
+    uint8_t cmd_data_recv;      /* current index into cmd_data recv (2-way) */
+    uint8_t cmd_data[16];       /* command data */
 };
 
 /**
@@ -132,10 +141,13 @@ struct ClemensMMIO {
     struct ClemensDeviceADB dev_adb;
 
     /* Registers that do not fall easily within a device struct */
-    uint32_t mmap_register; // consolidated memory map flags- CLEM_MMIO_MMAP_
-    uint8_t new_video_c029; // see kClemensMMIONewVideo_xxx
-    uint8_t speed_c036;     // see kClemensMMIOSpeed_xxx
-    uint8_t flags_c08x;     // used to detect double reads
+    uint32_t mmap_register;     // memory map flags- CLEM_MMIO_MMAP_
+    uint8_t new_video_c029;     // see kClemensMMIONewVideo_xxx
+    uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
+    uint8_t flags_c08x;         // used to detect double reads
+
+    uint64_t mega2_ticks;       // number of mega2 pulses/ticks since startup
+    uint32_t adb_wait_ticks;    // number of mega2 ticks until ADB is polled
 };
 
 
