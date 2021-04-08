@@ -30,6 +30,8 @@ int clemens_init(
     void* e0bank,
     void* e1bank,
     void* fpiRAM,
+    void* slotROM,
+    void* slotExpansionROM,
     unsigned int fpiRAMBankCount
 );
 

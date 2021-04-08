@@ -72,7 +72,7 @@ void clem_adb_glu(struct ClemensDeviceADB* adb) {
             }
             if (adb->cmd_data_recv >= adb->cmd_data_limit) {
                 //  TODO: run command immediately
-                _clem_adb_glu_command();
+                _clem_adb_glu_command(adb);
                 adb->state = CLEM_ADB_STATE_READY;
             }
             break;
