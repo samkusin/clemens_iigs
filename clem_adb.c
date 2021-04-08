@@ -51,6 +51,14 @@ void clem_adb_device_input(
     // TODO: delegate keyboard input
 }
 
+void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
+    switch (adb->cmd_reg) {
+        case CLEM_ADB_CMD_SYNC:
+            break;
+
+    }
+}
+
 void clem_adb_glu(struct ClemensDeviceADB* adb) {
     switch (adb->state) {
         case CLEM_ADB_STATE_CMD_DATA:
@@ -64,6 +72,7 @@ void clem_adb_glu(struct ClemensDeviceADB* adb) {
             }
             if (adb->cmd_data_recv >= adb->cmd_data_limit) {
                 //  TODO: run command immediately
+                _clem_adb_glu_command();
                 adb->state = CLEM_ADB_STATE_READY;
             }
             break;
