@@ -48,6 +48,7 @@ ClemensHost::ClemensHost() :
   machineCyclesSpentDuringSample_(0),
   sampleDuration_(0.0f),
   emulationSpeedSampled_(0.0f),
+  emulationRunTarget_(0xffffffff),
   cpuRegsSaved_ {},
   cpuPinsSaved_ {},
   cpu6502EmulationSaved_(true)
@@ -115,7 +116,9 @@ void ClemensHost::input(const ClemensInputEvent& input)
 void ClemensHost::frame(int width, int height, float deltaTime)
 {
   bool emulationRan = false;
-  if (emulationStepCount_ > 0 && clemens_is_initialized_simple(&machine_)) {
+  if ((emulationStepCount_ > 0 || emulationRunTarget_ != 0xffffffff) &&
+      clemens_is_initialized_simple(&machine_)
+  ) {
     emulate(deltaTime);
     emulationRan = true;
   }
@@ -377,10 +380,18 @@ void ClemensHost::emulate(float deltaTime)
   uint64_t clocksSpentInitial = machine_.clocks_spent;
 
   machine_.cpu.cycles_spent = 0;
-  while (emulationStepCount_ > 0) {
+  while (emulationStepCount_ > 0 || emulationRunTarget_ != 0xffffffff) {
     if (machine_.clocks_spent - clocksSpentInitial >= kClocksPerFrameDesired) {
       // TODO: if we overflow, deduct from the budget for the next frame
       break;
+    }
+    if (emulationRunTarget_ <= 0x01000000) {
+      if (machine_.cpu.regs.PC == (emulationRunTarget_ & 0xffff)) {
+        if (machine_.cpu.regs.PBR == uint8_t(emulationRunTarget_ >> 16)) {
+          emulationBreak();
+          break;
+        }
+      }
     }
     if (!machine_.cpu.pins.resbIn) {
       if (emulationStepCount_ == 1) {
@@ -388,6 +399,7 @@ void ClemensHost::emulate(float deltaTime)
       }
     }
     clemens_emulate(&machine_);
+
     --emulationStepCount_;
     ++emulationStepCountSinceReset_;
   }
@@ -416,7 +428,7 @@ template<typename Cb> static bool parseCommandToken(
   while (cur - line < 256) {
     char ch = *cur;
     if (!ch || std::isspace(ch)) {
-      if (!cb(start, cur)) return false;
+      return cb(start, cur);
     }
     if (!ch) break;
     ++cur;
@@ -446,6 +458,9 @@ bool ClemensHost::parseCommand(const char* buffer)
       } else if (!strncasecmp(start, "run", end - start) ||
                  !strncasecmp(start, "r", end - start)) {
         return parseCommandRun(end);
+      }  else if (!strncasecmp(start, "break", end - start) ||
+                 !strncasecmp(start, "b", end - start)) {
+        return parseCommandBreak(end);
       } else if (!strncasecmp(start, "clear", end - start) ||
                  !strncasecmp(start, "c", end - start)) {
         // clear some UI states
@@ -493,6 +508,7 @@ bool ClemensHost::parseCommandStep(const char* line)
     fv.format("Machine not powered on.");
     return false;
   }
+  emulationBreak();
   if (!start) {
     stepMachine(1);
     return true;
@@ -507,6 +523,27 @@ bool ClemensHost::parseCommandStep(const char* line)
     });
 }
 
+bool ClemensHost::parseCommandBreak(const char* line) {
+  const char* start = trimCommand(line);
+  if (!clemens_is_initialized(&machine_)) {
+    FormatView fv(terminalOutput_);
+    fv.format("Machine not powered on.");
+    return false;
+  }
+  if (!start) {
+    emulationBreak();
+    return true;
+  }
+  return parseCommandToken(start,
+    [this](const char* start, const char* end) {
+      char number[16];
+      strncpy(number, start, std::min(sizeof(number) - 1, size_t(end - start)));
+      number[15] = '\0';
+      //stepMachine(strtol(number, nullptr, 10));
+      return false;
+    });
+}
+
 bool ClemensHost::parseCommandRun(const char* line)
 {
   const char* start = trimCommand(line);
@@ -516,7 +553,8 @@ bool ClemensHost::parseCommandRun(const char* line)
     return false;
   }
   if (!start) {
-    stepMachine(1000000);
+    emulationStepCount_ = 0;
+    emulationRunTarget_ = 0x80000000;
     return true;
   }
   return parseCommandToken(start,
@@ -524,7 +562,11 @@ bool ClemensHost::parseCommandRun(const char* line)
       char number[16];
       strncpy(number, start, std::min(sizeof(number) - 1, size_t(end - start)));
       number[15] = '\0';
-      //stepMachine(strtol(number, nullptr, 10));
+      emulationRunTarget_ = strtol(number, nullptr, 16);
+      emulationStepCount_ = 0;
+      if (emulationRunTarget_ > 0x00ffffff) {
+        emulationRunTarget_ = 0xffffffff;
+      }
       return true;
     });
 }
@@ -598,6 +640,12 @@ void ClemensHost::stepMachine(int stepCount)
   emulationSpeedSampled_ = 0.0f;
   machineCyclesSpentDuringSample_ = 0;
   sampleDuration_ = 0.0f;
+}
+
+void ClemensHost::emulationBreak()
+{
+  emulationRunTarget_ = 0xffffffff;
+  emulationStepCount_ = 0;
 }
 
 void ClemensHost::emulatorOpcodePrint(

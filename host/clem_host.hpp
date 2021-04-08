@@ -41,12 +41,14 @@ private:
   bool parseCommandPower(const char* line);
   bool parseCommandReset(const char* line);
   bool parseCommandStep(const char* line);
+  bool parseCommandBreak(const char* line);
   bool parseCommandRun(const char* line);
 
   void createMachine();
   void destroyMachine();
   void resetMachine();
   void stepMachine(int stepCount);
+  void emulationBreak();
 
   static void emulatorOpcodePrint(struct ClemensInstruction* inst,
                                   const char* operand,
@@ -68,6 +70,12 @@ private:
   uint64_t machineCyclesSpentDuringSample_;
   float sampleDuration_;
   float emulationSpeedSampled_;
+  //  0x80000000, run indefinitely, emulationStepCount ignored
+  //  0xffffffff, run target inactive (uses emulationStepCount)
+  //  0x00xxxxxx, run PC target (if never hit, runs indefinitely)
+  uint32_t emulationRunTarget_;
+
+  std::vector<uint32_t> breakpoints_;
 
   struct ClemensCPURegs cpuRegsSaved_;
   struct ClemensCPUPins cpuPinsSaved_;

@@ -179,11 +179,13 @@ static void _clem_mmio_speed_c036_set(
     uint8_t value
 ) {
     uint8_t setflags = mmio->speed_c036 ^ value;
-    mmio->speed_c036 = value;
+    /* bit 5 should always be 0 */
+    /* for ROM 3, bit 6 can be on or off - for ROM 1, must be off */
+    mmio->speed_c036 = (value & 0xdf);
+
     if (!(mmio->speed_c036 & kClemensMMIOSpeed_PoweredOn)) {
-        CLEM_WARN("SPEED C036 PowerOn set to zero");
+        CLEM_LOG("SPEED C036 PowerOn set to zero");
     }
-    mmio->speed_c036 |= kClemensMMIOSpeed_PoweredOn;
 }
 
 static inline uint8_t _clem_mmio_statereg_c068(struct ClemensMMIO* mmio) {
@@ -930,7 +932,8 @@ void _clem_mmio_init(
     //  TODO: support enabling bank latch if we ever need to as this would be
     //        the likely value at reset (bit set to 0 vs 1)
     mmio->new_video_c029 = kClemensMMIONewVideo_BANKLATCH_Inhibit;
-    mmio->speed_c036 = kClemensMMIOSpeed_FAST_Enable;
+    mmio->speed_c036 = kClemensMMIOSpeed_FAST_Enable |
+                       kClemensMMIOSpeed_PoweredOn;
     mmio->mmap_register = CLEM_MMIO_MMAP_NSHADOW | CLEM_MMIO_MMAP_NIOLC;
     mmio->flags_c08x = 0;
     mmio->mega2_ticks = 0;
