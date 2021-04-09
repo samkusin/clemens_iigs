@@ -148,6 +148,8 @@ struct ClemensMMIO {
 
     uint64_t mega2_ticks;       // number of mega2 pulses/ticks since startup
     uint32_t adb_wait_ticks;    // number of mega2 ticks until ADB is polled
+
+    int32_t card_expansion_rom_index;   // card slot has the mutex on C800-CFFF
 };
 
 
@@ -285,6 +287,13 @@ typedef struct {
 
     uint8_t* fpi_bank_map[256];     // $00 - $ff
     uint8_t* mega2_bank_map[2];     // $e0 - $e1
+    /** ROM memory for individual card slots.  Only slots 1,2,4,5,6,7 are used
+     *  and each slot should have 256 bytes allocated for it */
+    uint8_t* card_slot_memory[7];
+    /** Expansion ROM area for each card.  This area is paged into addressable
+     *  memory with the correct IO instructions.  Each area should be 2K in
+     *  size.  As with card slot memory, slot 3 is ignored */
+    uint8_t* card_slot_expansion_memory[7];
 
     struct ClemensMMIO mmio;
 

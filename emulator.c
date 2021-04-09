@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "emulator.h"
+
 #include "clem_code.h"
 #include "clem_util.h"
 #include "clem_device.h"
@@ -808,6 +810,8 @@ int clemens_init(
     void* e0bank,
     void* e1bank,
     void* fpiRAM,
+    void* slotROM,
+    void* slotExpansionROM,
     unsigned int fpiRAMBankCount
 ) {
     machine->cpu.pins.resbIn = true;
@@ -840,8 +844,13 @@ int clemens_init(
     */
     machine->mega2_bank_map[0x00] = (uint8_t*)e0bank;
     memset(machine->mega2_bank_map[0x00], 0, CLEM_IIGS_BANK_SIZE);
-    machine->mega2_bank_map[0x01] = (uint8_t*)e1bank;;
+    machine->mega2_bank_map[0x01] = (uint8_t*)e1bank;
     memset(machine->mega2_bank_map[0x01], 0, CLEM_IIGS_BANK_SIZE);
+
+    for (uint8_t i = 0; i < 7; ++i) {
+        machine->card_slot_memory[i] = ((uint8_t*)slotROM) + (i * 256);
+        machine->card_slot_expansion_memory[i] = ((uint8_t*)slotExpansionROM) + (i * 256);
+    }
 
     for (unsigned i = 0; i < 256; ++i) {
         _opcode_description((uint8_t)i, "...", kClemensCPUAddrMode_None);
@@ -2671,8 +2680,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             tmp_value = cpu->pins.emulation;
             cpu->pins.emulation = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
             if (tmp_value != cpu->pins.emulation) {
-                cpu->regs.P |= kClemensCPUStatus_Index;
-                cpu->regs.P |= kClemensCPUStatus_MemoryAccumulator;
+                _cpu_p_flags_m_x(
+                    cpu, kClemensCPUStatus_Index | kClemensCPUStatus_MemoryAccumulator);
                 if (tmp_value) {
                     // switch to native, sets M and X to 8-bits (1)
                     // TODO: log internally

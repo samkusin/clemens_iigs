@@ -82,6 +82,20 @@ static inline void _cpu_p_flags_n_z_data_816(
     }
 }
 
+static inline void _cpu_p_flags_m_x(
+    struct Clemens65C816* cpu,
+    uint8_t data
+) {
+    uint8_t cur_mx = cpu->regs.P & (
+        kClemensCPUStatus_Index + kClemensCPUStatus_MemoryAccumulator);
+    uint8_t changed = cur_mx ^ (
+        data & (kClemensCPUStatus_Index + kClemensCPUStatus_MemoryAccumulator));
+    cpu->regs.P |= kClemensCPUStatus_Index;
+    cpu->regs.P |= kClemensCPUStatus_MemoryAccumulator;
+
+    // TODO:
+}
+
 static inline void _cpu_sp_dec3(
     struct Clemens65C816* cpu
 ) {

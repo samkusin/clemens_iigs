@@ -4,9 +4,16 @@
 //  bank
 #define CLEM_MMIO_PAGE_MAINAUX      0x10000000
 //  use the original bank register
-#define CLEM_MMIO_PAGE_DIRECT       0x40000000
+#define CLEM_MMIO_PAGE_DIRECT       0x20000000
+//  use card memory vs internal
+#define CLEM_MMIO_PAGE_CARDMEM      0x40000000
 //  redirects to Mega2 I/O registers
 #define CLEM_MMIO_PAGE_IOADDR       0x80000000
+
+//  convenience flags to identify source of memory
+#define CLEM_MMIO_BANK_MEMORY       0x30000000
+#define CLEM_MMIO_IO_MEMORY         0xC0000000
+#define CLEM_MMIO_PAGE_TYPE_MASK    0xF0000000
 
 //  These flags refer to bank 0 memory switches for address bit 17
 //  0 = Main Bank, 1 = Aux Bank ZP, Stack and Language Card
@@ -28,11 +35,11 @@
 #define CLEM_MMIO_MMAP_C1ROM        0x00000100
 #define CLEM_MMIO_MMAP_C2ROM        0x00000200
 #define CLEM_MMIO_MMAP_C3ROM        0x00000400
-#define CLEM_MMIO_MMAP_C4ROM        0x00000400
-#define CLEM_MMIO_MMAP_C5ROM        0x00000800
-#define CLEM_MMIO_MMAP_C6ROM        0x00001000
-#define CLEM_MMIO_MMAP_C7ROM        0x00002000
-#define CLEM_MMIO_MMAP_CXROM        0x00004000
+#define CLEM_MMIO_MMAP_C4ROM        0x00000800
+#define CLEM_MMIO_MMAP_C5ROM        0x00001000
+#define CLEM_MMIO_MMAP_C6ROM        0x00002000
+#define CLEM_MMIO_MMAP_C7ROM        0x00004000
+#define CLEM_MMIO_MMAP_CXROM        0x00008000
 #define CLEM_MMIO_MMAP_CROM         0x0000ff00
 
 // Bits 16-23 These flags refer to shadow register controls
@@ -63,9 +70,9 @@
 /** Write to this register to set PAGE2 to switch between main and aux, ala
  *  80 column text */
 #define CLEM_MMIO_REG_80STOREIB_WRITE   0x01
-/** Write to enable peripheral ROM for C100 - CFFF */
+/** Write to enable peripheral ROM for C100 - C7FF */
 #define CLEM_MMIO_REG_SLOTCXROM         0x06
-/** Write to enable internal ROM for C100 - CFFF */
+/** Write to enable internal ROM for C100 - C7FF */
 #define CLEM_MMIO_REG_INTCXROM          0x07
 /** Write to enable main bank Page 0, Page 1 and LC */
 #define CLEM_MMIO_REG_STDZP             0x08
@@ -101,6 +108,8 @@
  * the bank latch bit (0), which is always set to 1 AFAIK
  */
 #define CLEM_MMIO_REG_NEWVIDEO          0x29
+/** Selects Internal vs Peripheral ROM for slots 1 - 7, bit 0, 3 must be 0 */
+#define CLEM_MMIO_REG_SLOTROMSEL        0x2D
 /** Real time clock data register */
 #define CLEM_MMIO_REG_RTC_DATA          0x33
 /** Real time clock + border colorl joint register */

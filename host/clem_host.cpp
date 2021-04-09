@@ -603,6 +603,8 @@ void ClemensHost::createMachine()
                slab_.allocate(CLEM_IIGS_BANK_SIZE),
                slab_.allocate(CLEM_IIGS_BANK_SIZE),
                slab_.allocate(CLEM_IIGS_BANK_SIZE * fpiBankCount),
+               slab_.allocate(256 * 7), // TODO make this a little less magic-numberish
+               slab_.allocate(2048 * 7),
                fpiBankCount);
 
   clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
