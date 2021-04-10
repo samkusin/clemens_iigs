@@ -34,7 +34,7 @@
 #define CLEM_ADB_CMD_SYNC           0x07
 
 /* c027 status flags */
-#define CLEM_ADB_C027_CMD_FULL     0x01
+#define CLEM_ADB_C027_CMD_FULL      0x01
 
 #define CLEM_ADB_ROM_3              0x06
 
@@ -67,7 +67,8 @@ void clem_adb_glu(struct ClemensDeviceADB* adb) {
             */
             if (adb->cmd_data_sent > adb->cmd_data_recv) {
                 ++adb->cmd_data_recv;
-            } else {
+            }
+            if (adb->cmd_data_sent == adb->cmd_data_recv) {
                 adb->cmd_status &= ~CLEM_ADB_C027_CMD_FULL;
             }
             if (adb->cmd_data_recv >= adb->cmd_data_limit) {

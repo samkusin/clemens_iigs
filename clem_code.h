@@ -82,18 +82,16 @@ static inline void _cpu_p_flags_n_z_data_816(
     }
 }
 
-static inline void _cpu_p_flags_m_x(
-    struct Clemens65C816* cpu,
-    uint8_t data
+static inline void _cpu_p_flags_apply_m_x(
+    struct Clemens65C816* cpu
 ) {
-    uint8_t cur_mx = cpu->regs.P & (
-        kClemensCPUStatus_Index + kClemensCPUStatus_MemoryAccumulator);
-    uint8_t changed = cur_mx ^ (
-        data & (kClemensCPUStatus_Index + kClemensCPUStatus_MemoryAccumulator));
-    cpu->regs.P |= kClemensCPUStatus_Index;
-    cpu->regs.P |= kClemensCPUStatus_MemoryAccumulator;
-
-    // TODO:
+    bool idx8 = (cpu->regs.P & kClemensCPUStatus_Index) != 0;
+    if (idx8) {
+        cpu->regs.X &= 0xff;
+        cpu->regs.Y &= 0xff;
+    } else {
+        cpu->regs.P &= ~kClemensCPUStatus_Index;
+    }
 }
 
 static inline void _cpu_sp_dec3(
@@ -358,6 +356,7 @@ static inline void _clem_opc_pull_status(
         tmp_p |= kClemensCPUStatus_Index;
     }
     clem->cpu.regs.P = tmp_p;
+    _cpu_p_flags_apply_m_x(&clem->cpu);
 }
 
 /*  Handle opcode addressing modes

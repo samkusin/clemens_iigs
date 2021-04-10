@@ -2163,6 +2163,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 cpu->regs.P |= kClemensCPUStatus_MemoryAccumulator;
                 cpu->regs.P |= kClemensCPUStatus_Index;
             }
+            _cpu_p_flags_apply_m_x(cpu);
             _clem_cycle(clem, 1);
             _opcode_instruction_define(&opc_inst, IR, tmp_data, false);
             break;
@@ -2384,6 +2385,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 tmp_data |= kClemensCPUStatus_Index;
             }
             cpu->regs.P |= tmp_data;    // all 1 bits are turned ON in P
+            _cpu_p_flags_apply_m_x(cpu);
             _clem_cycle(clem, 1);
             _opcode_instruction_define(&opc_inst, IR, tmp_data, false);
             break;
@@ -2680,17 +2682,15 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             tmp_value = cpu->pins.emulation;
             cpu->pins.emulation = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
             if (tmp_value != cpu->pins.emulation) {
-                _cpu_p_flags_m_x(
-                    cpu, kClemensCPUStatus_Index | kClemensCPUStatus_MemoryAccumulator);
+                cpu->regs.P |= kClemensCPUStatus_Index;
+                cpu->regs.P |= kClemensCPUStatus_MemoryAccumulator;
                 if (tmp_value) {
-                    // switch to native, sets M and X to 8-bits (1)
                     // TODO: log internally
                 } else {
                     // switch to emulation, and emulation stack
                     cpu->regs.S = CLEM_UTIL_set16_lo(0x0100, cpu->regs.S);
-                    cpu->regs.X &= 0xff;
-                    cpu->regs.Y &= 0xff;
                 }
+                _cpu_p_flags_apply_m_x(cpu);
             }
             if (tmp_value) {
                 cpu->regs.P |= kClemensCPUStatus_Carry;
