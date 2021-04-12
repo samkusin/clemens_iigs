@@ -10,11 +10,16 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Implement CLEM_MMIO_MMAP_CXROM etc, and ability to be slot specific
-  * When internal rom enabled, then c800-cfff is mapped to internal memory
-  * When slot rom enabled, then we use the expansion rom, which may be set to
-    a specific slot?
-* C02D Slot Register
+* Add interrupt system IRQ
+* C000 CLR80COL - disable 80 column store
+* C001 SET80COL - enable 80 column store
+* C002 RDMAINRAM - read main 48K
+* C003 RDALTRAM - read alt 48K
+* C004 WRMAINRAM - write main 48K
+* C005 WRALTRAM - write alt 48K
+*
+* Expansion Slot ROM switching
+*
 * C046 phase 1 - what's needed?  set to 0 for now?  bit 7 is mouse or diagnostic?
   * may depend if this is being accessed from an IRQ? (INTTYPE vs DIAGTYPE)
 * Keyboard registers (ADB)
@@ -31,6 +36,8 @@ This is a running todo list.
 
 ## DONE
 
+* ADB command/glu framework
+* C02D Slot Register
 * RTC BRAM reads and writes
 * More debugging utilities
 * RESET handling and CPU initialization

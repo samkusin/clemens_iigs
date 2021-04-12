@@ -36,13 +36,6 @@ int clemens_init(
 );
 
 /**
- * @brief
- *
- * @param clem
- */
-void clemens_emulate(ClemensMachine* clem);
-
-/**
  * @brief Verify the machine is initialized/ready for emulation
  *
  * The emulator does not ever allocate memory.  This method checks if the
@@ -88,6 +81,15 @@ void clemens_opcode_callback(ClemensMachine* clem,
                              void* callback_ptr);
 
 /**
+ * @brief
+ *
+ * @param clem
+ * @param is_slow_speed
+ * @return uint64_t
+ */
+uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed);
+
+/**
  * @brief Forwards input from ths host machine to the ADB
  *
  * @param clem
@@ -100,10 +102,11 @@ void clemens_input(ClemensMachine* clem,
  * @brief
  *
  * @param clem
- * @param is_slow_speed
- * @return uint64_t
  */
-uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed);
+void clemens_emulate(ClemensMachine* clem);
+
+
+
 
 #ifdef __cplusplus
 }

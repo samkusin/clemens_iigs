@@ -359,6 +359,22 @@ static inline void _clem_opc_pull_status(
     _cpu_p_flags_apply_m_x(&clem->cpu);
 }
 
+static inline void _clem_opc_push_pc16(
+    ClemensMachine* clem,
+    uint16_t pc
+) {
+    uint16_t tmp_s = clem->cpu.regs.S;
+    //  stack receives last address of operand
+    clem_write(clem, (uint8_t)(pc >> 8), tmp_s, 0x00, CLEM_MEM_FLAG_DATA);
+    --tmp_s;
+    if (clem->cpu.pins.emulation) {
+        tmp_s = CLEM_UTIL_set16_lo(clem->cpu.regs.S, tmp_s);
+    }
+    clem_write(clem, (uint8_t)pc, tmp_s, 0x00, CLEM_MEM_FLAG_DATA);
+    _cpu_sp_dec2(&clem->cpu);
+}
+
+
 /*  Handle opcode addressing modes
 */
 static inline void _clem_read_pba_mode_imm_816(

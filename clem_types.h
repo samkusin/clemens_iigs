@@ -18,32 +18,6 @@ typedef uint32_t clem_clocks_duration_t;
 #define CLEM_IO_WRITE               0x01
 
 
-/** NewVideo Register $C029 bits 4-1 ignored */
-enum {
-    // If 0, use all other Apple II video modes, else Super Hires
-    kClemensMMIONewVideo_SHGR_Enable        = (1 << 7),
-    // If 0, for Apple II video memory layout, else Super Hires (contiguous)
-    kClemensMMIONewVideo_SHGR_Memory_Enable = (1 << 6),
-    // If 0, color mode (140 x 192 16 colors), else 560 x 192 mono
-    kClemensMMIONewVideo_AUXHGR_Color_Inhibit = (1 << 5),
-    // If The docs here are a bit contradictory
-    //  Hardware Reference: p16 vs p89
-    //  On = 17th bit (D0) used for auxillary bank addressing, but can also use
-    //      softswitches?
-    //  Off = use soft-switches only through 00,e0
-    //  This relies on the shadow register as well?
-    kClemensMMIONewVideo_BANKLATCH_Inhibit      = (1 << 0)
-};
-
-/** Speed Register $C036 */
-enum {
-    //  if 1, then fastest mode enabled? 2.8mhz
-    kClemensMMIOSpeed_FAST_Enable       = (1 << 7),
-    //  always 1 on ROM 03, unknown on ROM 01, older GS devices
-    kClemensMMIOSpeed_PoweredOn         = (1 << 6)
-};
-
-
 struct ClemensMMIOPageInfo {
     uint8_t read;
     uint8_t write;
@@ -79,17 +53,39 @@ struct ClemensDeviceRTC {
     uint8_t ctl_c034;
 };
 
+struct ClemensDeviceKeyboard {
+    unsigned keys[CLEM_ADB_KEYB_BUFFER_LIMIT];
+    int size;
+};
+
+struct ClemensDeviceMouse {
+    int x;
+    int y;
+};
+
 struct ClemensDeviceADB {
     unsigned state;
     unsigned version;           /* Different ROMs expect different versions */
 
     /* Host-GLU registers */
-    uint8_t cmd_reg;            /* command type */
-    uint8_t cmd_status;         /* meant to approximately reflect C027 */
-    uint8_t cmd_data_limit;     /* expected cnt of bytes for send/recv */
-    uint8_t cmd_data_sent;      /* current index into cmd_data sent (2-way) */
-    uint8_t cmd_data_recv;      /* current index into cmd_data recv (2-way) */
-    uint8_t cmd_data[16];       /* command data */
+    uint8_t cmd_reg;            /**< command type */
+    uint8_t cmd_status;         /**< meant to approximately reflect C027 */
+    uint8_t cmd_data_limit;     /**< expected cnt of bytes for send/recv */
+    uint8_t cmd_data_sent;      /**< current index into cmd_data sent 2-way */
+    uint8_t cmd_data_recv;      /**< current index into cmd_data recv 2-way */
+    uint8_t cmd_data[16];       /**< command data */
+
+    struct ClemensDeviceKeyboard keyb;
+    struct ClemensDeviceMouse mouse;
+};
+
+/** Really, this is part of the RTC/VGC, but for separation of concerns,
+ *  pulling out into its own component
+ */
+struct ClemensDeviceTimer {
+    unsigned irq_1sec_ms;       /**< used to trigger IRQ one sec */
+    unsigned irq_qtrsec_ms;     /**< used to trigger IRQ quarter sec */
+    unsigned flags;             /**< interrupt  */
 };
 
 /**
@@ -139,6 +135,7 @@ struct ClemensMMIO {
     /* All devices */
     struct ClemensDeviceRTC dev_rtc;
     struct ClemensDeviceADB dev_adb;
+    struct ClemensDeviceTimer dev_timer;
 
     /* Registers that do not fall easily within a device struct */
     uint32_t mmap_register;     // memory map flags- CLEM_MMIO_MMAP_
@@ -146,10 +143,14 @@ struct ClemensMMIO {
     uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
     uint8_t flags_c08x;         // used to detect double reads
 
-    uint64_t mega2_ticks;       // number of mega2 pulses/ticks since startup
-    uint32_t adb_wait_ticks;    // number of mega2 ticks until ADB is polled
+    /* terminology all mmio related cycles are mega2 cycles */
+    uint64_t mega2_cycles;        // number of mega2 pulses/ticks since startup
+    uint32_t mega2_cycles_to_ms;  // number of mega2 c until ADB is polled
 
     int32_t card_expansion_rom_index;   // card slot has the mutex on C800-CFFF
+
+    /* All ticks are mega2 cycles */
+    uint32_t irq_line;          // see CLEM_IRQ_XXX flags, if !=0 triggers irqb
 };
 
 
@@ -239,7 +240,7 @@ struct ClemensCPUPins {
     uint8_t data;                       // data
     bool abortIn;                       // ABORTB In
     bool busEnableIn;                   // Bus Enable
-    bool irqIn;                         // Interrupt Request
+    bool irqbIn;                        // Interrupt Request
     bool nmiIn;                         // Non-Maskable Interrupt
     bool readyOut;                      // if false, then WAIT
     bool resbIn;                        // RESET
@@ -256,7 +257,8 @@ struct ClemensCPUPins {
 enum ClemensCPUStateType {
     kClemensCPUStateType_None,
     kClemensCPUStateType_Reset,
-    kClemensCPUStateType_Execute
+    kClemensCPUStateType_Execute,
+    kClemensCPUStateType_IRQ
 };
 
 struct Clemens65C816 {

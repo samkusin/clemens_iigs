@@ -592,10 +592,7 @@ void ClemensHost::createMachine()
   unsigned fpiBankCount = 16;         // 1MB RAM
   // Apple II line (including Mega2) was 1.023mhz
   // A Mega2 cycle is equivalent to 1 full cycle of the 2.8mhz clock
-  // TODO: reevaluate this clocks logic, seems extremely hard to grok
-  //       my initial 1023, 2800 clocks setting yielded a 'slower than 2.8mhz'
-  //       speed when 2.8mhz was expected. (~2.74, which mathematically makes
-  //       sense given that 1.023mhz * 2.74 = 2.8)
+  // TODO: allows 1.023, 2.8, 8mhz without any loss due to integer div
   const uint32_t kClocksPerFastCycle = 1023;
   const uint32_t kClocksPerSlowCycle = 2864;
   clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle,
