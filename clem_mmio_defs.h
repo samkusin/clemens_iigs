@@ -69,7 +69,7 @@
 #define CLEM_MMIO_REG_80STOREOFF_WRITE  0x00
 /** Write to this register to set PAGE2 to switch between main and aux, ala
  *  80 column text */
-#define CLEM_MMIO_REG_80STOREIB_WRITE   0x01
+#define CLEM_MMIO_REG_80STOREON_WRITE   0x01
 /** Write to enable peripheral ROM for C100 - C7FF */
 #define CLEM_MMIO_REG_SLOTCXROM         0x06
 /** Write to enable internal ROM for C100 - C7FF */
@@ -155,3 +155,14 @@
 #define CLEM_MMIO_REG_LC1_ROM_WP        0x8A
 /** R2 - LC Bank 1, Read and Write Enable */
 #define CLEM_MMIO_REG_LC1_RAM_WE        0x8B
+
+/** New video (C029) bitflag defines */
+#define CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT  0x01
+
+/** Speed register (C036) bitflag defines */
+#define CLEM_MMIO_SPEED_POWERED_ON      0x40
+#define CLEM_MMIO_SPEED_FAST_ENABLED    0x80
+
+/** Timer (internal, C023 partial) device flags */
+#define CLEM_MMIO_TIMER_1SEC_ENABLED    0x00000040
+#define CLEM_MMIO_TIMER_QSEC_ENABLED    0x00000100

@@ -3,11 +3,14 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "clem_mmio_defs.h"
+
 #include "emulator.h"
 
 #include "clem_code.h"
 #include "clem_util.h"
 #include "clem_device.h"
+
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
@@ -862,7 +865,7 @@ int clemens_init(
 }
 
 uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed) {
-    if (clem->mmio.speed_c036 & kClemensMMIOSpeed_FAST_Enable) {
+    if (clem->mmio.speed_c036 & CLEM_MMIO_SPEED_FAST_ENABLED) {
         *is_slow_speed = false;
     } else {
         *is_slow_speed = true;
@@ -2720,17 +2723,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_read_pba_16(clem, &tmp_addr, &tmp_pc);
             --tmp_pc;       // point to last byte in operand
             _clem_cycle(clem, 1);
-            //  stack receives last address of operand
-            clem_write(clem, (uint8_t)(tmp_pc >> 8), cpu->regs.S, 0x00,
-                       CLEM_MEM_FLAG_DATA);
-            tmp_value = cpu->regs.S - 1;
-            if (cpu->pins.emulation) {
-                tmp_value = CLEM_UTIL_set16_lo(cpu->regs.S, tmp_value);
-            }
-            clem_write(clem, (uint8_t)tmp_pc, tmp_value, 0x00,
-                       CLEM_MEM_FLAG_DATA);
+            _clem_opc_push_pc16(clem, tmp_pc);
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, false);
-            _cpu_sp_dec2(cpu);
             CLEM_CPU_I_JSR_LOG(cpu, tmp_addr);
             tmp_pc = tmp_addr;      // set next PC to the JSR routine
             break;
@@ -2929,7 +2923,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
 void clemens_emulate(ClemensMachine* clem) {
     struct Clemens65C816* cpu = &clem->cpu;
     struct ClemensMMIO* mmio = &clem->mmio;
-    uint32_t delta_mega2_ticks;
+    uint32_t delta_mega2_cycles;
 
     if (!cpu->pins.resbIn) {
         /*  the reset interrupt overrides any other state
@@ -2995,18 +2989,52 @@ void clemens_emulate(ClemensMachine* clem) {
 
         cpu->state_type = kClemensCPUStateType_Execute;
         return;
+    } else if (cpu->state_type == kClemensCPUStateType_IRQ) {
+        uint8_t tmp_data;
+        uint8_t tmp_datahi;
+        // 2 cycles of 'internal ops'
+        // 2 cycles of pushing PC (next instruction to run)
+        // 1 cycle push status reg
+        // 2 cycles vector pull to PC
+        // disable interrupts, clear decimal mode
+        _clem_cycle(clem, 2);
+        _clem_opc_push_pc16(clem, cpu->regs.PC);
+        _clem_opc_push_status(clem, false);
+        // vector pull low signal while the PC is being loaded
+        clem_read(clem, &tmp_data, CLEM_6502_IRQBRK_VECTOR_LO_ADDR, 0x00,
+                       CLEM_MEM_FLAG_PROGRAM);
+        clem_read(clem, &tmp_datahi, CLEM_6502_IRQBRK_VECTOR_HI_ADDR,
+                       0x00, CLEM_MEM_FLAG_PROGRAM);
+        cpu->regs.PC = (uint16_t)(tmp_datahi << 8) | tmp_data;
+        cpu->regs.P |= kClemensCPUStatus_IRQDisable;
+        cpu->regs.P &= ~kClemensCPUStatus_Decimal;
+        cpu->state_type = kClemensCPUStateType_Execute;
+        return;
     }
 
-    while (mmio->adb_wait_ticks >= CLEM_ADB_WAIT_TICKS) {
-        clem_adb_glu(&mmio->dev_adb);
-        mmio->adb_wait_ticks -= CLEM_ADB_WAIT_TICKS;
-    }
     cpu_execute(cpu, clem);
 
-    delta_mega2_ticks = (uint32_t)(
-        (clem->clocks_spent / clem->clocks_step_mega2) - mmio->mega2_ticks);
-    mmio->mega2_ticks += delta_mega2_ticks;
-    mmio->adb_wait_ticks += delta_mega2_ticks;
+    delta_mega2_cycles = (uint32_t)(
+        (clem->clocks_spent / clem->clocks_step_mega2) - mmio->mega2_cycles);
+    mmio->mega2_cycles += delta_mega2_cycles;
+    mmio->mega2_cycles_to_ms += delta_mega2_cycles;
+
+    /* background execution of some async devices on the millisecond timer */
+    while (mmio->mega2_cycles_to_ms >= CLEM_MEGA2_CYCLES_PER_MS) {
+        mmio->irq_line = clem_timer_sync(&mmio->dev_timer, 1, mmio->irq_line);
+        mmio->irq_line = clem_adb_glu_sync(&mmio->dev_adb, 1, mmio->irq_line);
+        mmio->mega2_cycles_to_ms -= CLEM_MEGA2_CYCLES_PER_MS;
+    }
+
+    /* IRQB low triggers an interrupt next frame */
+    cpu->pins.irqbIn = mmio->irq_line == 0;
+    if (!cpu->pins.irqbIn && cpu->state_type == kClemensCPUStateType_Execute) {
+        if (!(cpu->regs.P & kClemensCPUStatus_IRQDisable)) {
+            cpu->state_type = kClemensCPUStateType_IRQ;
+        }
+    }
+
+
 }
 
 void clemens_input(

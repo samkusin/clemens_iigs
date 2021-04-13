@@ -127,11 +127,11 @@ static inline void _clem_mmio_newvideo_c029_set(
     uint8_t value
 ) {
     uint8_t setflags = mmio->new_video_c029 ^ value;
-    if (setflags & kClemensMMIONewVideo_BANKLATCH_Inhibit) {
-        if (!(value & kClemensMMIONewVideo_BANKLATCH_Inhibit)) {
+    if (setflags & CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT) {
+        if (!(value & CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT)) {
             CLEM_UNIMPLEMENTED("ioreg %02X : %02X", CLEM_MMIO_REG_NEWVIDEO, value);
         }
-        setflags ^= kClemensMMIONewVideo_BANKLATCH_Inhibit;
+        setflags ^= CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT;
     }
     CLEM_ASSERT(setflags == 0);
 }
@@ -217,7 +217,7 @@ static void _clem_mmio_speed_c036_set(
     /* for ROM 3, bit 6 can be on or off - for ROM 1, must be off */
     mmio->speed_c036 = (value & 0xdf);
 
-    if (!(mmio->speed_c036 & kClemensMMIOSpeed_PoweredOn)) {
+    if (!(mmio->speed_c036 & CLEM_MMIO_SPEED_POWERED_ON)) {
         CLEM_LOG("SPEED C036 PowerOn set to zero");
     }
 }
@@ -1006,14 +1006,15 @@ void _clem_mmio_init(
     //  Fast CPU mode
     //  TODO: support enabling bank latch if we ever need to as this would be
     //        the likely value at reset (bit set to 0 vs 1)
-    mmio->new_video_c029 = kClemensMMIONewVideo_BANKLATCH_Inhibit;
-    mmio->speed_c036 = kClemensMMIOSpeed_FAST_Enable |
-                       kClemensMMIOSpeed_PoweredOn;
+    mmio->new_video_c029 = CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT;
+    mmio->speed_c036 = CLEM_MMIO_SPEED_FAST_ENABLED |
+                       CLEM_MMIO_SPEED_POWERED_ON;
     mmio->mmap_register = CLEM_MMIO_MMAP_NSHADOW | CLEM_MMIO_MMAP_NIOLC;
     mmio->flags_c08x = 0;
-    mmio->mega2_ticks = 0;
+    mmio->mega2_cycles = 0;
     mmio->card_expansion_rom_index = -1;
 
+    clem_timer_reset(&mmio->dev_timer);
     clem_rtc_reset(&mmio->dev_rtc, mega2_clocks_step);
     clem_adb_reset(&mmio->dev_adb);
 

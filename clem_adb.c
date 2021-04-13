@@ -10,18 +10,19 @@
  * General Pattern:
  *  Clemens <-> ADB Translation Layer <-> ADB GLU/Micro <- Client Input Devices
  *
- * Keyboard Support
- *  Clemens <-> ADB R/W switch Keyboard ADB Device at Address 2 <- Client Keyboard
- *              If Autopoll off, Interrupt Forwarding
- *      - Assume Autopoll on, so $c000, etc are updated
- *      - c026 returns 0
- *          assert if c026 is written to
- *      - c027 should reflect keyboard register $C000, no mouse and no interrupts
- *      - c024 returns 0
- *      - c025 contains key modifier flags
- *      - c000 contains keyboard data
- *      - build up from here if we need to during ROM bootup
- *          - ADB commands and interrupts will be the big thing
+ * The 'GLU' here isn't an accurate emulation of the on-board GLU.  This GLU
+ * just implements the ADB commands used by the machine, and forwards input
+ * from the emulator host OS into our keyboard and mouse data structures.
+ *
+ * The GLU layer also provides keyboard/mouse data in its 'raw' form.
+ * The GLU layer has an 'autopoll' mode, which updates the mega2 IO registers
+ * with keyboard and mouse data automatically.
+ *  - if autopoll is not enabled for these devices, the ADB host (machine)
+ *    must have an ISR that handles SRQ events and will issue 'TALK' commands
+ *    to the GLU
+ *  - the TALK commands return data from the GLU logical registers
+ *  - note that we don't literally lay out these registers in the ADB data
+ *    structure, but instead construct the values on demand.
  */
 
 /* ADB emulated GLU/Controller is ready for a command with a write to C026 */
@@ -36,19 +37,25 @@
 /* c027 status flags */
 #define CLEM_ADB_C027_CMD_FULL      0x01
 
+/* This version is returned by the ADB microcontroller based on ROM type */
 #define CLEM_ADB_ROM_3              0x06
 
 
 void clem_adb_reset(struct ClemensDeviceADB* adb) {
     memset(adb, 0, sizeof(*adb));
     adb->version = CLEM_ADB_ROM_3;      /* TODO - input to reset? */
+    adb->keyb.size = 0;
 }
 
 void clem_adb_device_input(
   struct ClemensDeviceADB* adb,
   struct ClemensInputEvent* input
 ) {
-    // TODO: delegate keyboard input
+    //  events are sent to our ADB 'microcontroller'
+    //      keyboard events are queued up for buffering by the microcontroller
+    //      and picking by the host.
+    //      mouse events are polled
+    //
 }
 
 void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
@@ -59,7 +66,11 @@ void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
     }
 }
 
-void clem_adb_glu(struct ClemensDeviceADB* adb) {
+uint32_t clem_adb_glu_sync(
+    struct ClemensDeviceADB* adb,
+    uint32_t delta_ms,
+    uint32_t irq_line
+) {
     switch (adb->state) {
         case CLEM_ADB_STATE_CMD_DATA:
             /* Consume incoming command data and execute the command once
@@ -80,6 +91,7 @@ void clem_adb_glu(struct ClemensDeviceADB* adb) {
         default:
             break;
     }
+    return irq_line;
 }
 
 /*  Some of this logic comes from the IIgs  HW and FW references and its

@@ -1,12 +1,19 @@
 #ifndef CLEMENS_DEFS_H
 #define CLEMENS_DEFS_H
 
+/** Setting: Mega2 tick interval for polling the ADB (effectively microseconds)
+ */
+#define CLEM_MEGA2_CYCLES_PER_MS            1000
+#define CLEM_MEGA2_TIMER_1SEC_MS            1000
+#define CLEM_MEGA2_TIMER_QSEC_MS            266
+
+/** Setting: ADB keyboard buffer size
+ */
+#define CLEM_ADB_KEYB_BUFFER_LIMIT          8
+
 /** General Machine Settings */
 #define CLEM_IIGS_BANK_SIZE                 (64 * 1024)
 #define CLEM_IIGS_ROM3_SIZE                 (CLEM_IIGS_BANK_SIZE * 4)
-
-/** Mega2 tick interval for polling the ADB (effectively microseconds) */
-#define CLEM_ADB_WAIT_TICKS             1000
 
 /** Vector addresses */
 #define CLEM_6502_COP_VECTOR_LO_ADDR        (0xFFF4)
@@ -22,6 +29,12 @@
 #define CLEM_65816_BRK_VECTOR_HI_ADDR       (0xFFE7)
 #define CLEM_65816_IRQB_VECTOR_LO_ADDR      (0xFFEE)
 #define CLEM_65816_IRQB_VECTOR_HI_ADDR      (0xFFEF)
+
+/** IRQ line masks */
+#define CLEM_IRQ_VGC_SCAN_LINE              (0x00000010)
+#define CLEM_IRQ_TIMER_QSEC                 (0x00001000)
+#define CLEM_IRQ_ADB_SRQ                    (0x00010000)
+#define CLEM_IRQ_TIMER_RTC_1SEC             (0x00100000)
 
 /** Opcodes! */
 #define CLEM_OPC_ADC_IMM                    (0x69)
