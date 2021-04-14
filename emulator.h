@@ -45,7 +45,7 @@ int clemens_init(
  * @return true The machine has ROM/RAM and clock settings
  * @return false
  */
-bool clemens_is_initialized(ClemensMachine* clem);
+bool clemens_is_initialized(const ClemensMachine* clem);
 
 /**
  * @brief Trivial validation function (one conditional)
@@ -57,7 +57,7 @@ bool clemens_is_initialized(ClemensMachine* clem);
  * @return true Passes a trivial check
  * @return false Fails a trivial check
  */
-bool clemens_is_initialized_simple(ClemensMachine* clem);
+bool clemens_is_initialized_simple(const ClemensMachine* clem);
 
 /**
  * @brief Trivial validation that the emulator memory interface has been
@@ -67,7 +67,7 @@ bool clemens_is_initialized_simple(ClemensMachine* clem);
  * @return true  MMIO is initialized (requires a reset)
  * @return false MMIO not initialized
  */
-bool clemens_is_mmio_initialized(ClemensMachine* machine);
+bool clemens_is_mmio_initialized(const ClemensMachine* machine);
 
 /**
  * @brief
@@ -96,7 +96,7 @@ uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed);
  * @param input
  */
 void clemens_input(ClemensMachine* clem,
-                   struct ClemensInputEvent* input);
+                   const struct ClemensInputEvent* input);
 
 /**
  * @brief

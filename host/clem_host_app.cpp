@@ -181,6 +181,21 @@ static void onEvent(const sapp_event* evt)
       clemInput.value = g_sokolToADBKey[evt->key_code];
       clemInput.type = kClemensInputType_KeyUp;
       break;
+    case SAPP_EVENTTYPE_MOUSE_DOWN:
+      clemInput.type = kClemensInputType_MouseButtonDown;
+      if (evt->mouse_button == SAPP_MOUSEBUTTON_LEFT) {
+        clemInput.value |= 0x01;
+      }
+      break;
+    case SAPP_EVENTTYPE_MOUSE_UP:
+      clemInput.type = kClemensInputType_MouseButtonUp;
+      if (evt->mouse_button == SAPP_MOUSEBUTTON_LEFT) {
+        clemInput.value |= 0x01;
+      }
+      break;
+    default:
+      clemInput.type = kClemensInputType_None;
+      break;
   }
   g_Host->input(clemInput);
 

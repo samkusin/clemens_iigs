@@ -110,15 +110,15 @@ void ClemensHost::emulatorImguiMemoryWrite(
 
 void ClemensHost::input(const ClemensInputEvent& input)
 {
-
+  if (isRunningEmulation()) {
+    clemens_input(&machine_, &input);
+  }
 }
 
 void ClemensHost::frame(int width, int height, float deltaTime)
 {
   bool emulationRan = false;
-  if ((emulationStepCount_ > 0 || emulationRunTarget_ != 0xffffffff) &&
-      clemens_is_initialized_simple(&machine_)
-  ) {
+  if (isRunningEmulation()) {
     emulate(deltaTime);
     emulationRan = true;
   }
@@ -617,6 +617,7 @@ void ClemensHost::destroyMachine()
   if (!clemens_is_initialized(&machine_)) {
     return;
   }
+  emulationBreak();
   memset(&machine_, 0, sizeof(ClemensMachine));
 }
 
@@ -645,6 +646,11 @@ void ClemensHost::emulationBreak()
 {
   emulationRunTarget_ = 0xffffffff;
   emulationStepCount_ = 0;
+}
+
+bool ClemensHost::isRunningEmulation() const
+{
+  return (emulationStepCount_ > 0 || emulationRunTarget_ != 0xffffffff);
 }
 
 void ClemensHost::emulatorOpcodePrint(

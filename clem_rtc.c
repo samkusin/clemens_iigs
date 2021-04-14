@@ -42,7 +42,7 @@ static void _clem_rtc_dispatch_cmd(
             rtc->index = (data & 0x7) << 5;
             break;
         default:
-            CLEM_UNIMPLEMENTED(false);
+            CLEM_UNIMPLEMENTED("RTC %02X", cmd);
             break;
     }
 }

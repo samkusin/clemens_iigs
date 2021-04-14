@@ -765,15 +765,15 @@ void _clem_init_instruction_map() {
     _opcode_description(CLEM_OPC_XCE,     "XCE", kClemensCPUAddrMode_None);
 }
 
-bool clemens_is_initialized_simple(ClemensMachine* machine) {
+bool clemens_is_initialized_simple(const ClemensMachine* machine) {
     return (machine->fpi_bank_map[0xff] != NULL);
 }
 
-bool clemens_is_mmio_initialized(ClemensMachine* machine) {
+bool clemens_is_mmio_initialized(const ClemensMachine* machine) {
     return machine->mmio.bank_page_map[0] && machine->mmio.bank_page_map[1];
 }
 
-bool clemens_is_initialized(ClemensMachine* machine) {
+bool clemens_is_initialized(const ClemensMachine* machine) {
     if (!clemens_is_initialized_simple(machine)) {
         return false;
     }
@@ -3017,13 +3017,15 @@ void clemens_emulate(ClemensMachine* clem) {
     delta_mega2_cycles = (uint32_t)(
         (clem->clocks_spent / clem->clocks_step_mega2) - mmio->mega2_cycles);
     mmio->mega2_cycles += delta_mega2_cycles;
-    mmio->mega2_cycles_to_ms += delta_mega2_cycles;
+    mmio->timer_60hz_us += delta_mega2_cycles;
 
-    /* background execution of some async devices on the millisecond timer */
-    while (mmio->mega2_cycles_to_ms >= CLEM_MEGA2_CYCLES_PER_MS) {
-        mmio->irq_line = clem_timer_sync(&mmio->dev_timer, 1, mmio->irq_line);
-        mmio->irq_line = clem_adb_glu_sync(&mmio->dev_adb, 1, mmio->irq_line);
-        mmio->mega2_cycles_to_ms -= CLEM_MEGA2_CYCLES_PER_MS;
+    /* background execution of some async devices on the 60 hz timer */
+    while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {
+        mmio->irq_line = clem_timer_sync(
+            &mmio->dev_timer, CLEM_MEGA2_CYCLES_PER_60TH, mmio->irq_line);
+        mmio->irq_line = clem_adb_glu_sync(
+            &mmio->dev_adb, CLEM_MEGA2_CYCLES_PER_60TH, mmio->irq_line);
+        mmio->timer_60hz_us -= CLEM_MEGA2_CYCLES_PER_60TH;
     }
 
     /* IRQB low triggers an interrupt next frame */
@@ -3033,13 +3035,11 @@ void clemens_emulate(ClemensMachine* clem) {
             cpu->state_type = kClemensCPUStateType_IRQ;
         }
     }
-
-
 }
 
 void clemens_input(
     ClemensMachine* machine,
-    struct ClemensInputEvent* input
+    const struct ClemensInputEvent* input
 ) {
     clem_adb_device_input(&machine->mmio.dev_adb, input);
 }

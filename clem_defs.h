@@ -3,11 +3,14 @@
 
 /** Setting: Mega2 tick interval for polling the ADB (effectively microseconds)
  */
-#define CLEM_MEGA2_CYCLES_PER_MS            1000
-#define CLEM_MEGA2_TIMER_1SEC_MS            1000
-#define CLEM_MEGA2_TIMER_QSEC_MS            266
+#define CLEM_MEGA2_CYCLES_PER_60TH          16667
+#define CLEM_MEGA2_TIMER_1SEC_US            1000000
+#define CLEM_MEGA2_TIMER_QSEC_US            266667
 
-/** Setting: ADB keyboard buffer size
+/** Setting: ADB keyboard buffer size - this doesn't need to be large since
+ *  Apple II apps typically expect to consume events via ISR or prompt polling
+ *  of IO registers.  Our host should have the opportunity to send input to the
+ *  emulator at a decent frequency (30-60hz) for us not to lose events
  */
 #define CLEM_ADB_KEYB_BUFFER_LIMIT          8
 
@@ -437,5 +440,9 @@
 /* Skipped 0x7E */
 #define CLEM_ADB_KEY_RESET                  0x7F
 
+#define CLEM_ADB_KEY_CODE_LIMIT             0x80
+
+#define CLEM_DEBUG_UNIMPL_IOREAD            1U
+#define CLEM_DEBUG_UNIMPL_IOWRITE           2U
 
 #endif
