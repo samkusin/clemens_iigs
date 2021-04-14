@@ -6,7 +6,7 @@
 #include <assert.h>
 
 #define CLEM_UNIMPLEMENTED(_fmt_, ...) do { \
-  fprintf(stderr, _fmt_, __VA_ARGS__); \
+  fprintf(stderr, "UNIMPLEMENTED: " _fmt_, __VA_ARGS__); \
   fputc('\n', stderr);  assert(0); \
 } while (0)
 

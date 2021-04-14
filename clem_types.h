@@ -54,7 +54,8 @@ struct ClemensDeviceRTC {
 };
 
 struct ClemensDeviceKeyboard {
-    unsigned keys[CLEM_ADB_KEYB_BUFFER_LIMIT];
+    uint8_t keys[CLEM_ADB_KEYB_BUFFER_LIMIT];
+    uint8_t states[CLEM_ADB_KEY_CODE_LIMIT];    // should be ascii, so 128
     int size;
 };
 
@@ -66,9 +67,20 @@ struct ClemensDeviceMouse {
 struct ClemensDeviceADB {
     unsigned state;
     unsigned version;           /* Different ROMs expect different versions */
+    unsigned poll_timer_us;     /* 60 hz timer (machine time) */
+    unsigned mode_flags;        /* ADB modes */
+    bool is_keypad_down;        /* Used to determine keypad modifier status */
+    bool is_asciikey_down;      /* Used to determine c010 anykey down status */
+
+    uint8_t io_key_last_ascii;  /* The last ascii key pressed */
+    uint8_t io_key_last_a2key;  /* The last a2 key pressed */
 
     /* Host-GLU registers */
+    uint16_t keyb_reg[4];       /**< mocked GLU keyboard registers */
+    uint16_t mouse_reg[4];      /**< mocked GLU mouse registers */
+
     uint8_t cmd_reg;            /**< command type */
+    uint8_t cmd_flags;          /**< meant to reflect C026 when not data */
     uint8_t cmd_status;         /**< meant to approximately reflect C027 */
     uint8_t cmd_data_limit;     /**< expected cnt of bytes for send/recv */
     uint8_t cmd_data_sent;      /**< current index into cmd_data sent 2-way */
@@ -83,8 +95,8 @@ struct ClemensDeviceADB {
  *  pulling out into its own component
  */
 struct ClemensDeviceTimer {
-    unsigned irq_1sec_ms;       /**< used to trigger IRQ one sec */
-    unsigned irq_qtrsec_ms;     /**< used to trigger IRQ quarter sec */
+    unsigned irq_1sec_us;       /**< used to trigger IRQ one sec */
+    unsigned irq_qtrsec_us;     /**< used to trigger IRQ quarter sec */
     unsigned flags;             /**< interrupt  */
 };
 
@@ -93,8 +105,11 @@ struct ClemensDeviceTimer {
  *
  */
 enum ClemensInputType {
+    kClemensInputType_None,
     kClemensInputType_KeyDown,
-    kClemensInputType_KeyUp
+    kClemensInputType_KeyUp,
+    kClemensInputType_MouseButtonDown,
+    kClemensInputType_MouseButtonUp
 };
 
 /**
@@ -108,6 +123,11 @@ struct ClemensInputEvent {
     enum ClemensInputType type;
     /* value based on the input type (ADB keycode, mouse or gamepad button) */
     unsigned value;
+};
+
+struct ClemensDeviceDebugger {
+    unsigned ioreg_read_ctr[256];
+    unsigned ioreg_write_ctr[256];
 };
 
 /**
@@ -136,6 +156,7 @@ struct ClemensMMIO {
     struct ClemensDeviceRTC dev_rtc;
     struct ClemensDeviceADB dev_adb;
     struct ClemensDeviceTimer dev_timer;
+    struct ClemensDeviceDebugger dev_debug;
 
     /* Registers that do not fall easily within a device struct */
     uint32_t mmap_register;     // memory map flags- CLEM_MMIO_MMAP_
@@ -144,9 +165,8 @@ struct ClemensMMIO {
     uint8_t flags_c08x;         // used to detect double reads
 
     /* terminology all mmio related cycles are mega2 cycles */
-    uint64_t mega2_cycles;        // number of mega2 pulses/ticks since startup
-    uint32_t mega2_cycles_to_ms;  // number of mega2 c until ADB is polled
-
+    uint64_t mega2_cycles;      // number of mega2 pulses/ticks since startup
+    uint32_t timer_60hz_us;     // used for executing logic per 1/60th second
     int32_t card_expansion_rom_index;   // card slot has the mutex on C800-CFFF
 
     /* All ticks are mega2 cycles */

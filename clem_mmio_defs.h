@@ -134,6 +134,15 @@
 #define CLEM_MMIO_REG_SCC_B_DATA        0x3A
 /** Various Mega II specific interrupt flags likely used only by firmware */
 #define CLEM_MMIO_REG_DIAG_INTTYPE      0x46
+
+/** Joystick Button 3 */
+#define CLEM_MMIO_REG_BTN3              0x62
+/** Open Apple Key or Joystick Button 0 */
+#define CLEM_MMIO_REG_BTN0              0x61
+/** Solid Apple Key or Joystick Button 1 */
+#define CLEM_MMIO_REG_BTN1              0x62
+/** Joystick Button 2 */
+#define CLEM_MMIO_REG_BTN2              0x63
 /**
  * Amalgom of the C08x registers
  */

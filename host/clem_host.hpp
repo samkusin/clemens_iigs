@@ -50,6 +50,8 @@ private:
   void stepMachine(int stepCount);
   void emulationBreak();
 
+  bool isRunningEmulation() const;
+
   static void emulatorOpcodePrint(struct ClemensInstruction* inst,
                                   const char* operand,
                                   void* this_ptr);

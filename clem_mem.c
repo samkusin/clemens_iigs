@@ -392,6 +392,10 @@ static uint8_t _clem_mmio_read(
     uint8_t ioreg = addr & 0xff;
     bool is_noop = (flags & CLEM_MMIO_READ_NO_OP) != 0;
 
+    if (!is_noop) {
+        ++mmio->dev_debug.ioreg_read_ctr[ioreg];
+    }
+
     switch (ioreg) {
         case CLEM_MMIO_REG_KEYB_READ:
         case CLEM_MMIO_REG_ANYKEY_STROBE:
@@ -443,6 +447,10 @@ static uint8_t _clem_mmio_read(
             }
             result = _clem_mmio_inttype_c046(mmio);
             break;
+        case CLEM_MMIO_REG_BTN0:
+        case CLEM_MMIO_REG_BTN1:
+            result = clem_adb_read_switch(&mmio->dev_adb, ioreg, flags);
+            break;
         case CLEM_MMIO_REG_STATEREG:
             result = _clem_mmio_statereg_c068(mmio);
             break;
@@ -458,7 +466,8 @@ static uint8_t _clem_mmio_read(
             break;
         default:
             if (!is_noop) {
-                CLEM_UNIMPLEMENTED("ioreg %02X", ioreg);
+                clem_debug_break(&mmio->dev_debug, &clem->cpu,
+                                 CLEM_DEBUG_UNIMPL_IOREAD, addr, 0x0000);
             }
             break;
     }
@@ -482,11 +491,11 @@ static void _clem_mmio_write(
         //  TODO: MMIO slot ROM - it seems this needs to be treated differently
         return;
     }
-    if (!(flags & CLEM_MMIO_READ_NO_OP)) {
-        CLEM_LOG("IO Write %04X <= %02X", addr, data);
-    }
 
     ioreg = (addr & 0xff);
+    if (!is_noop) {
+        ++mmio->dev_debug.ioreg_write_ctr[ioreg];
+    }
     switch (ioreg) {
         case CLEM_MMIO_REG_KEYB_READ:
         case CLEM_MMIO_REG_ANYKEY_STROBE:
@@ -549,8 +558,9 @@ static void _clem_mmio_write(
             _clem_mmio_statereg_c068_set(mmio, data);
             break;
         default:
-            if (flags != CLEM_MEM_FLAG_NULL) {
-                CLEM_UNIMPLEMENTED("ioreg %02X", ioreg);
+            if (!is_noop) {
+                clem_debug_break(&mmio->dev_debug, &clem->cpu,
+                                 CLEM_DEBUG_UNIMPL_IOWRITE, addr, data);
             }
             break;
     }
