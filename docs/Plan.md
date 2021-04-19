@@ -10,32 +10,36 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Add interrupt system IRQ
+* C046 phase 1 - what's needed?  set to 0 for now?  bit 7 is mouse or diagnostic?
+  * may depend if this is being accessed from an IRQ? (INTTYPE vs DIAGTYPE)
+  * System IRQ line status
+* Keyboard registers (ADB), c000, c010, c025
+* ADB command 73
 * C000 CLR80COL - disable 80 column store
 * C001 SET80COL - enable 80 column store
 * C002 RDMAINRAM - read main 48K
 * C003 RDALTRAM - read alt 48K
 * C004 WRMAINRAM - write main 48K
 * C005 WRALTRAM - write alt 48K
-*
-* Expansion Slot ROM switching
-*
-* C046 phase 1 - what's needed?  set to 0 for now?  bit 7 is mouse or diagnostic?
-  * may depend if this is being accessed from an IRQ? (INTTYPE vs DIAGTYPE)
-* Keyboard registers (ADB)
-* C039 Register (Serial Communications Command register )
-* RAMRD and remaining //e softswitches
+* C041 INTEN - enable Mega II, VBL, quartersec interrupts
+* C047 clearing timer interrupt flags for VBL and quartersec
+* VGC pass 1 : text modes and switches
+* ADB Mouse
+* remaining //e softswitches
 * Decimal math
 * Test ROM 1
-* Video Controller
+* VGC Pass 2 : Graphics modes (not SHGR)
+* C039 Register (Serial Communications Command register )
 * Border screen color
 * Data accesses across banks are allowed (but not stack accesses?)
 * Emulation vs Native on some microinstructions (i.e. choosing a long address mode while in emulation does... what?)
 * Test ROM iteration?
-* Test ROM display and validate with an existing //gs emulator
+* Ghosting banks?
 
 ## DONE
 
+* Expansion Slot ROM switching
+* Add interrupt system IRQ
 * ADB command/glu framework
 * C02D Slot Register
 * RTC BRAM reads and writes

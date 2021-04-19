@@ -12,11 +12,23 @@
 extern "C" {
 #endif
 
+void clem_debug_reset(struct ClemensDeviceDebugger* dbg);
+void clem_debug_call_stack(struct ClemensDeviceDebugger* dbg);
+void clem_debug_counters(struct ClemensDeviceDebugger* dbg);
+
 void clem_debug_break(struct ClemensDeviceDebugger* dbg,
                       struct Clemens65C816* cpu,
                       unsigned debug_reason,
                       unsigned param0,
                       unsigned param1);
+void clem_debug_jsr(struct ClemensDeviceDebugger* dbg,
+                    struct Clemens65C816* cpu,
+                    uint16_t next_pc,
+                    uint8_t pbr);
+void clem_debug_rts(struct ClemensDeviceDebugger* dbg,
+                    struct Clemens65C816* cpu,
+                    uint16_t next_pc,
+                    uint8_t pbr);
 
 
 void clem_rtc_reset(struct ClemensDeviceRTC* rtc,

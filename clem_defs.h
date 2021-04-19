@@ -442,7 +442,8 @@
 
 #define CLEM_ADB_KEY_CODE_LIMIT             0x80
 
-#define CLEM_DEBUG_UNIMPL_IOREAD            1U
-#define CLEM_DEBUG_UNIMPL_IOWRITE           2U
+#define CLEM_DEBUG_JSR_CONTEXT_LIMIT        256
+#define CLEM_DEBUG_BREAK_UNIMPL_IOREAD      1U
+#define CLEM_DEBUG_BREAK_UNIMPL_IOWRITE     2U
 
 #endif

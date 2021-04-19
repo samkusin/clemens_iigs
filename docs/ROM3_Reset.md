@@ -36,9 +36,16 @@ This is used by the Monitor firmware as well.  Y = {Function}
 
 #### Function $A3
 
-Likely BRAM validation check on boot
+1. Likely BRAM validation check on boot
+2. RAM storage in $E1 $2C0-$3BF : BRAM and 32-bit checksum at end
 
+## ADB Sync
 
-## Data
+1. Sets modes to all $00 (assuming default BRAM parameters.)
+2. First ADB call to the system
 
-### $2C0-$3BF : BRAM and 32-bit checksum at end
+## Self vs Burn-in Diagnostixs Check
+
+1. $C046 polled here with $C061/$C062 on boot uses the 'DIAGTYPE' definition
+2. If $C061/BTN0 or $C062/BTN1 do self or burn-in diagnostics
+3.

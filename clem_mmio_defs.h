@@ -172,6 +172,9 @@
 #define CLEM_MMIO_SPEED_POWERED_ON      0x40
 #define CLEM_MMIO_SPEED_FAST_ENABLED    0x80
 
+/** Interrupt type register (consolidated with Mega II) */
+#define CLEM_MMIO_INTTYPE_IRQ           0x01
+
 /** Timer (internal, C023 partial) device flags */
 #define CLEM_MMIO_TIMER_1SEC_ENABLED    0x00000040
 #define CLEM_MMIO_TIMER_QSEC_ENABLED    0x00000100

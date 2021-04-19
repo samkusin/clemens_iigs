@@ -225,8 +225,14 @@ static void _clem_mmio_speed_c036_set(
 static uint8_t _clem_mmio_inttype_c046(
     struct ClemensMMIO* mmio
 ) {
+    uint8_t result = mmio->irq_line ? CLEM_MMIO_INTTYPE_IRQ : 0;
 
-    return 0;
+    if (mmio->irq_line & CLEM_IRQ_TIMER_QSEC) {
+
+    }
+
+    /* TODO: other flags */
+    return result;
 }
 
 static inline uint8_t _clem_mmio_statereg_c068(struct ClemensMMIO* mmio) {
@@ -443,7 +449,7 @@ static uint8_t _clem_mmio_read(
             break;
         case CLEM_MMIO_REG_DIAG_INTTYPE:
             if (!is_noop) {
-                CLEM_WARN("IO C046 no-impl");
+                CLEM_WARN("IO C046 partial impl");
             }
             result = _clem_mmio_inttype_c046(mmio);
             break;
@@ -467,7 +473,7 @@ static uint8_t _clem_mmio_read(
         default:
             if (!is_noop) {
                 clem_debug_break(&mmio->dev_debug, &clem->cpu,
-                                 CLEM_DEBUG_UNIMPL_IOREAD, addr, 0x0000);
+                                 CLEM_DEBUG_BREAK_UNIMPL_IOREAD, addr, 0x0000);
             }
             break;
     }
@@ -560,7 +566,7 @@ static void _clem_mmio_write(
         default:
             if (!is_noop) {
                 clem_debug_break(&mmio->dev_debug, &clem->cpu,
-                                 CLEM_DEBUG_UNIMPL_IOWRITE, addr, data);
+                                 CLEM_DEBUG_BREAK_UNIMPL_IOWRITE, addr, data);
             }
             break;
     }
@@ -1024,6 +1030,7 @@ void _clem_mmio_init(
     mmio->mega2_cycles = 0;
     mmio->card_expansion_rom_index = -1;
 
+    clem_debug_reset(&mmio->dev_debug);
     clem_timer_reset(&mmio->dev_timer);
     clem_rtc_reset(&mmio->dev_rtc, mega2_clocks_step);
     clem_adb_reset(&mmio->dev_adb);
@@ -1051,8 +1058,25 @@ void clem_read(
 
     // TODO: store off if read_reg has a read_count of 1 here
     //       reset it automatically if true at the end of this function
-    if (!(page->flags & CLEM_MMIO_PAGE_TYPE_MASK) ||
-        (page->flags & CLEM_MMIO_BANK_MEMORY)
+    if (page->flags & CLEM_MMIO_IO_MEMORY) {
+        if (page->flags & CLEM_MMIO_PAGE_IOADDR) {
+            *data = _clem_mmio_read(clem, offset, &clocks_spent,
+                    read_only ? CLEM_MMIO_READ_NO_OP : 0);
+        } else if (page->flags & CLEM_MMIO_PAGE_CARDMEM) {
+            if (page->bank_read == 0x00) {
+                *data = clem->card_slot_memory[page->read][offset & 0xff];
+            } else if (clem->mmio.card_expansion_rom_index >= 0) {
+                *data = clem->card_slot_expansion_memory[(
+                    clem->mmio.card_expansion_rom_index)][offset];
+            } else {
+                /* TODO: read from 'phantom' memory? */
+                CLEM_ASSERT(false);
+            }
+        } else {
+            CLEM_ASSERT(false);
+        }
+    } else if (!(page->flags & CLEM_MMIO_PAGE_TYPE_MASK) ||
+               (page->flags & CLEM_MMIO_BANK_MEMORY)
     ) {
         uint8_t* bank_mem;
         uint8_t bank_actual;
@@ -1071,23 +1095,6 @@ void clem_read(
             clocks_spent = clem->clocks_step_mega2;
         }
         *data = bank_mem[offset];
-    } else if (page->flags & CLEM_MMIO_IO_MEMORY) {
-        if (page->flags & CLEM_MMIO_PAGE_IOADDR) {
-            *data = _clem_mmio_read(clem, offset, &clocks_spent,
-                    read_only ? CLEM_MMIO_READ_NO_OP : 0);
-        } else if (page->flags & CLEM_MMIO_PAGE_CARDMEM) {
-            if (page->bank_read == 0x00) {
-                *data = clem->card_slot_memory[page->read][offset & 0xff];
-            } else if (clem->mmio.card_expansion_rom_index >= 0) {
-                *data = clem->card_slot_expansion_memory[(
-                    clem->mmio.card_expansion_rom_index)][offset];
-            } else {
-                /* TODO: read from 'phantom' memory? */
-                CLEM_ASSERT(false);
-            }
-        } else {
-            CLEM_ASSERT(false);
-        }
     } else {
         CLEM_ASSERT(false);
     }
@@ -1114,8 +1121,23 @@ void clem_write(
     struct ClemensMMIOPageInfo* page = &bank_page_map->pages[adr >> 8];
     clem_clocks_duration_t clocks_spent;
     uint16_t offset = ((uint16_t)page->write << 8) | (adr & 0xff);
-    if (!(page->flags & CLEM_MMIO_PAGE_TYPE_MASK) ||
-        (page->flags & CLEM_MMIO_BANK_MEMORY)
+    if (page->flags & CLEM_MMIO_IO_MEMORY) {
+        if (page->flags & CLEM_MMIO_PAGE_IOADDR) {
+            //  TODO: bring clocks_spent out of _clem_mmio_write (and other
+            //          utility methods - just keep inside clem_read/clem_write)
+            if (page->flags & CLEM_MMIO_PAGE_WRITE_OK) {
+                _clem_mmio_write(clem, data, offset, &clocks_spent, flags);
+            } else {
+                clocks_spent = clem->clocks_step_mega2;
+            }
+        } else if (page->flags & CLEM_MMIO_PAGE_CARDMEM) {
+            //  Always ROM?
+            CLEM_ASSERT(false);
+        } else {
+            CLEM_ASSERT(false);
+        }
+    } else if (!(page->flags & CLEM_MMIO_PAGE_TYPE_MASK) ||
+                (page->flags & CLEM_MMIO_BANK_MEMORY)
     ) {
         uint8_t* bank_mem;
         uint8_t bank_actual;
@@ -1140,21 +1162,6 @@ void clem_write(
 
         if (bank == 0xe0 || bank == 0xe1) {
             clocks_spent = clem->clocks_step_mega2;
-        }
-    } else if (page->flags & CLEM_MMIO_IO_MEMORY) {
-        if (page->flags & CLEM_MMIO_PAGE_IOADDR) {
-            //  TODO: bring clocks_spent out of _clem_mmio_write (and other
-            //          utility methods - just keep inside clem_read/clem_write)
-            if (page->flags & CLEM_MMIO_PAGE_WRITE_OK) {
-                _clem_mmio_write(clem, data, offset, &clocks_spent, flags);
-            } else {
-                clocks_spent = clem->clocks_step_mega2;
-            }
-        } else if (page->flags & CLEM_MMIO_PAGE_CARDMEM) {
-            //  Always ROM?
-            CLEM_ASSERT(false);
-        } else {
-            CLEM_ASSERT(false);
         }
     } else {
         CLEM_ASSERT(false);
