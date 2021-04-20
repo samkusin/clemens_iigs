@@ -64,6 +64,7 @@
  */
 /** Keyboard data (bits 6-0) and strobe (bit 7) */
 #define CLEM_MMIO_REG_KEYB_READ         0x00
+
 /** Write to this register to set PAGE2 to flip between text pages, 40 column
  *  text pages */
 #define CLEM_MMIO_REG_80STOREOFF_WRITE  0x00
@@ -82,7 +83,10 @@
 #define CLEM_MMIO_REG_SLOTC3ROM         0x0A
 /** Write to enable internal ROM for C300 */
 #define CLEM_MMIO_REG_INTC3ROM          0x0B
-/** Read bit 7 for 'any-key down', read or write to clear strobe bit in $C000*/
+/** Read bit 7 for 'any-key down', read or write to clear strobe bit in $C000,
+ *  and also provides the last key down - not clear in the //e or IIgs docs.
+ * (per https://apple2.org.za/gswv/a2zine/faqs/csa2pfaq.html)
+*/
 #define CLEM_MMIO_REG_ANYKEY_STROBE     0x10
 /** Read and test bit 7, 0 = LC bank 1, 1 = bank 2 */
 #define CLEM_MMIO_REG_LC_BANK_TEST      0x11
