@@ -72,7 +72,7 @@ struct ClemensDeviceADB {
     bool is_keypad_down;        /* Used to determine keypad modifier status */
     bool is_asciikey_down;      /* Used to determine c010 anykey down status */
 
-    uint8_t io_key_last_ascii;  /* The last ascii key pressed */
+    uint8_t io_key_last_ascii;  /* The last ascii key pressed, bit 7 strobe */
     uint8_t io_key_last_a2key;  /* The last a2 key pressed */
 
     /* Host-GLU registers */

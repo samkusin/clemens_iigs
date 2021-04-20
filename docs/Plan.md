@@ -13,7 +13,7 @@ This is a running todo list.
 * C046 phase 1 - what's needed?  set to 0 for now?  bit 7 is mouse or diagnostic?
   * may depend if this is being accessed from an IRQ? (INTTYPE vs DIAGTYPE)
   * System IRQ line status
-* Keyboard registers (ADB), c000, c010, c025
+* Keyboard registers (ADB),c025
 * ADB command 73
 * C000 CLR80COL - disable 80 column store
 * C001 SET80COL - enable 80 column store
@@ -38,6 +38,7 @@ This is a running todo list.
 
 ## DONE
 
+* Keyboard registers (ADB), c000, c010
 * Expansion Slot ROM switching
 * Add interrupt system IRQ
 * ADB command/glu framework

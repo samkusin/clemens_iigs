@@ -343,7 +343,7 @@ uint8_t _clem_adb_glu_keyb_parse(
     }
     if (ascii_key != 0xff) {
         if (is_key_down) {
-            adb->io_key_last_ascii = ascii_key;
+            adb->io_key_last_ascii =  0x80 | ascii_key;
             adb->is_asciikey_down = true;
         } else {
             adb->is_asciikey_down = false;
@@ -608,6 +608,10 @@ void clem_adb_write_switch(
     uint8_t value
 ) {
     switch (ioreg) {
+        case CLEM_MMIO_REG_ANYKEY_STROBE:
+            /* always clear strobe bit */
+            adb->io_key_last_ascii &= ~0x80;
+            break;
         case CLEM_MMIO_REG_ADB_CMD_DATA:
             _clem_adb_write_cmd(adb, value);
             break;
@@ -639,6 +643,15 @@ uint8_t clem_adb_read_switch(
 ) {
     bool is_noop = (flags & CLEM_MMIO_READ_NO_OP) != 0;
     switch (ioreg) {
+        case CLEM_MMIO_REG_KEYB_READ:
+            return adb->io_key_last_ascii;
+            break;
+        case CLEM_MMIO_REG_ANYKEY_STROBE:
+            /* clear strobe bit and return any-key status */
+            adb->io_key_last_ascii &= ~0x80;
+            return (adb->is_asciikey_down ? 0x80 : 0x00) |
+                   (adb->io_key_last_ascii & 0x7f);
+            break;
         case CLEM_MMIO_REG_ADB_CMD_DATA:
             return _clem_adb_read_cmd(adb, flags);
         case CLEM_MMIO_REG_ADB_STATUS:
