@@ -26,6 +26,10 @@ Registers:
 $c029 - new video register: Page 89-90 - Apple IIgs Hardware Reference
 $c035 - shadow Register
 
+VBL and counters:
+http://www.1000bit.it/support/manuali/apple/technotes/iigs/tn.iigs.039.html
+60hz vertical?
+
 
 HW Reference:
 
