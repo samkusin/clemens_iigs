@@ -6,13 +6,19 @@ http://archive.6502.org/datasheets/wdc_65816_programming_manual.pdf
 Interrupts:
 http://6502.org/tutorials/interrupts.html
 https://www.pagetable.com/?p=410
-
+https://apple2.org.za/gswv/a2zine/faqs/csa2pfaq.html#012
+    (mouse interrupts, can be correlate behavior with C041, C046 as its likely
+     these IO addressed are used by mouse firmware for IIe emulation)
 
 The "B" Flag
 http://visual6502.org/wiki/index.php?title=6502_BRK_and_B_bit
 
 ROM Chip Select Apple //c and FPI for //gs
 https://retrocomputing.stackexchange.com/questions/11044/why-does-the-apple-iigs-fpi-chip-buffer-the-a14-address-signal-to-the-rom
+
+
+A good ADB addendum documenation for information not in the HW or FW refs:
+https://developer.apple.com/library/archive/technotes/hw/hw_01.html
 
 
 Registers:

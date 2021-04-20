@@ -452,6 +452,8 @@ bool ClemensHost::parseCommand(const char* buffer)
         return parseCommandPower(end);
       } else if (!strncasecmp(start, ".reset", end - start)) {
         return parseCommandReset(end);
+      } else if (!strncasecmp(start, ".status", end - start)) {
+        return parseCommandDebugStatus(end);
       } else if (!strncasecmp(start, "step", end - start) ||
                  !strncasecmp(start, "s", end - start)) {
         return parseCommandStep(end);
@@ -499,6 +501,22 @@ bool ClemensHost::parseCommandReset(const char* line)
   }
   return false;
 }
+
+bool ClemensHost::parseCommandDebugStatus(const char* line)
+{
+  const char* start = trimCommand(line);
+  if (!start) {
+    if (!clemens_is_initialized(&machine_)) {
+      FormatView fv(terminalOutput_);
+      fv.format("Machine not powered on.");
+      return false;
+    }
+    clemens_debug_status(&machine_);
+    return true;
+  }
+  return false;
+}
+
 
 bool ClemensHost::parseCommandStep(const char* line)
 {

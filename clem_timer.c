@@ -5,7 +5,7 @@
 void clem_timer_reset(struct ClemensDeviceTimer* timer) {
     timer->irq_1sec_us = 0;
     timer->irq_qtrsec_us = 0;
-    timer->flags = 0;
+    timer->flags = 0;       // timer interrupts disabled on startup
 }
 
 uint32_t clem_timer_sync(

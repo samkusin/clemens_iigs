@@ -40,6 +40,7 @@ private:
   bool parseCommand(const char* buffer);
   bool parseCommandPower(const char* line);
   bool parseCommandReset(const char* line);
+  bool parseCommandDebugStatus(const char* line);
   bool parseCommandStep(const char* line);
   bool parseCommandBreak(const char* line);
   bool parseCommandRun(const char* line);

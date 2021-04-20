@@ -105,7 +105,12 @@ void clemens_input(ClemensMachine* clem,
  */
 void clemens_emulate(ClemensMachine* clem);
 
-
+/**
+ * @brief
+ *
+ * @param clem
+ */
+void clemens_debug_status(ClemensMachine* clem);
 
 
 #ifdef __cplusplus

@@ -873,7 +873,6 @@ uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed) {
     return clem->clocks_step_mega2 * 1000000;
 }
 
-
 void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
     uint16_t tmp_addr;
     uint16_t tmp_eaddr;
@@ -2726,6 +2725,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_opc_push_pc16(clem, tmp_pc);
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, false);
             CLEM_CPU_I_JSR_LOG(cpu, tmp_addr);
+            clem_debug_jsr(&clem->mmio.dev_debug, cpu, tmp_addr, cpu->regs.PBR);
             tmp_pc = tmp_addr;      // set next PC to the JSR routine
             break;
         case CLEM_OPC_RTS:
@@ -2745,6 +2745,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             clem_read(clem, &tmp_data, tmp_value, 0x00,
                             CLEM_MEM_FLAG_DATA);
             tmp_addr = ((uint16_t)tmp_data << 8) | tmp_addr;
+            clem_debug_rts(&clem->mmio.dev_debug, cpu, tmp_addr, cpu->regs.PBR);
             _clem_cycle(clem, 1);
             _cpu_sp_inc2(cpu);
             tmp_pc = tmp_addr + 1;  //  point to next instruction
@@ -2772,6 +2773,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _cpu_sp_dec3(cpu);
             _opcode_instruction_define_long(&opc_inst, IR, tmp_bnk0, tmp_addr);
             CLEM_CPU_I_JSL_LOG(cpu, tmp_addr, tmp_bnk0);
+            clem_debug_jsr(&clem->mmio.dev_debug, cpu, tmp_addr, tmp_bnk0);
             tmp_pc = tmp_addr;      // set next PC to the JSL routine
             cpu->regs.PBR = tmp_bnk0;
             break;
@@ -2787,6 +2789,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             tmp_addr = ((uint16_t)tmp_data << 8) | tmp_addr;
             clem_read(clem, &tmp_data, cpu->regs.S + 3, 0x00,
                             CLEM_MEM_FLAG_DATA);
+            clem_debug_rts(&clem->mmio.dev_debug, cpu, tmp_addr, tmp_data);
             _cpu_sp_inc3(cpu);
             tmp_pc = tmp_addr + 1;
             CLEM_CPU_I_RTL_LOG(cpu, tmp_pc, tmp_data);
@@ -3042,4 +3045,9 @@ void clemens_input(
     const struct ClemensInputEvent* input
 ) {
     clem_adb_device_input(&machine->mmio.dev_adb, input);
+}
+
+void clemens_debug_status(ClemensMachine* clem) {
+    clem_debug_call_stack(&clem->mmio.dev_debug);
+    clem_debug_counters(&clem->mmio.dev_debug);
 }
