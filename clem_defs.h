@@ -36,7 +36,9 @@
 /** IRQ line masks */
 #define CLEM_IRQ_VGC_SCAN_LINE              (0x00000010)
 #define CLEM_IRQ_TIMER_QSEC                 (0x00001000)
-#define CLEM_IRQ_ADB_SRQ                    (0x00010000)
+#define CLEM_IRQ_ADB_KEYB_SRQ               (0x00010000)
+#define CLEM_IRQ_ADB_MOUSE_SRQ              (0x00010000) /* IIgs Unsupported */
+#define CLEM_IRQ_ADB_SRQ                    (0x000f0000)
 #define CLEM_IRQ_TIMER_RTC_1SEC             (0x00100000)
 
 /** Opcodes! */
