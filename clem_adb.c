@@ -59,6 +59,7 @@
 
 /* c027 status flags */
 #define CLEM_ADB_C027_CMD_FULL          0x01
+#define CLEM_ADB_C027_KEY_FULL          0x08
 
 /* This version is returned by the ADB microcontroller based on ROM type */
 #define CLEM_ADB_ROM_3                  0x06
@@ -71,6 +72,8 @@
 #define CLEM_ADB_GLU_REG2_KEY_CTRL          0x0800
 #define CLEM_ADB_GLU_REG2_KEY_RESET         0x1000
 #define CLEM_ADB_GLU_REG2_KEY_CAPS          0x2000
+/* no scroll lock and LEDs counted - see 'ADB - The Untold Story' refe */
+#define CLEM_ADB_GLU_REG2_MODKEY_MASK       0x7f80
 
 #define CLEM_ADB_GLU_REG3_MASK_SRQ          0x2000
 #define CLEM_ADB_GLU_REG3_DEVICE_MASK       0x0F00
@@ -305,7 +308,8 @@ uint8_t _clem_adb_glu_keyb_parse(
     uint8_t ascii_key;
 
     uint8_t* ascii_table = &g_a2_to_ascii[key_index][0];
-    uint16_t modifiers = adb->keyb_reg[2];
+    uint16_t modifiers = adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_MODKEY_MASK;
+    uint16_t old_modifiers = modifiers & CLEM_ADB_GLU_REG2_MODKEY_MASK;
 
     if (is_key_down) {
         adb->io_key_last_a2key = key_index;
@@ -344,10 +348,18 @@ uint8_t _clem_adb_glu_keyb_parse(
     if (ascii_key != 0xff) {
         if (is_key_down) {
             adb->io_key_last_ascii =  0x80 | ascii_key;
+            /* via HWRef, but FWRef contradicts? */
+            adb->cmd_status |= CLEM_ADB_C027_KEY_FULL;
             adb->is_asciikey_down = true;
         } else {
             adb->is_asciikey_down = false;
         }
+    }
+
+    /* FIXME: sketchy - is this doing what a  modifier key latch does? */
+    if ((modifiers ^ old_modifiers) && !adb->is_asciikey_down) {
+        modifiers &= CLEM_ADB_GLU_REG2_MODKEY_MASK;
+        adb->has_modkey_changed = true;
     }
 
     return key_event;
@@ -612,6 +624,17 @@ void clem_adb_write_switch(
             /* always clear strobe bit */
             adb->io_key_last_ascii &= ~0x80;
             break;
+        case CLEM_MMIO_REG_ADB_MODKEY:
+            CLEM_LOG("IO Write %02X", ioreg);
+            break;
+        case CLEM_MMIO_REG_ADB_STATUS:
+            /* TODO: support enabling mouse interrupts when mouse data reg is
+                     filled
+               TODO: Throw a warning if keyboard data interrupt enabled - not
+                     supported according to docs
+               TODO: support command data interrupts
+            */
+            break;
         case CLEM_MMIO_REG_ADB_CMD_DATA:
             _clem_adb_write_cmd(adb, value);
             break;
@@ -636,14 +659,50 @@ static uint8_t _clem_adb_read_cmd(struct ClemensDeviceADB* adb, uint8_t flags) {
     return result;
 }
 
+static uint8_t _clem_adb_read_modkeys(struct ClemensDeviceADB* adb) {
+    uint8_t modkeys = 0;
+    if (adb->keyb_reg[2] & CLEM_ADB_KEY_MOD_APPLE) {
+        modkeys |= 0x80;
+    }
+    if (adb->keyb_reg[2] & CLEM_ADB_KEY_MOD_OPTION) {
+        modkeys |= 0x40;
+    }
+    if (adb->is_keypad_down) {
+        modkeys |= 0x10;
+    }
+    if (adb->keyb_reg[2] & CLEM_ADB_KEY_CAPSLOCK) {
+        modkeys |= 0x04;
+    }
+    if (adb->keyb_reg[2] & CLEM_ADB_KEY_MOD_CTRL) {
+        modkeys |= 0x02;
+    }
+    if (adb->keyb_reg[2] & CLEM_ADB_KEY_MOD_SHIFT) {
+        modkeys |= 0x01;
+    }
+    if (adb->is_asciikey_down) {
+        /* FIXME: should this be any key like c010, or anykey at all? HW Ref
+           implies a 'key is being held down' - and we're assuming ascii vs
+           scan code here... */
+        modkeys |= 0x08;
+    }
+    if (adb->has_modkey_changed) {
+        modkeys |= 0x20;
+    }
+    return modkeys;
+}
+
 uint8_t clem_adb_read_switch(
     struct ClemensDeviceADB* adb,
     uint8_t ioreg,
     uint8_t flags
 ) {
     bool is_noop = (flags & CLEM_MMIO_READ_NO_OP) != 0;
+    uint8_t tmp;
+
     switch (ioreg) {
         case CLEM_MMIO_REG_KEYB_READ:
+            /* FIXME: HWRef says this is cleared when reading here */
+            adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
             return adb->io_key_last_ascii;
             break;
         case CLEM_MMIO_REG_ANYKEY_STROBE:
@@ -652,17 +711,30 @@ uint8_t clem_adb_read_switch(
             return (adb->is_asciikey_down ? 0x80 : 0x00) |
                    (adb->io_key_last_ascii & 0x7f);
             break;
+        case CLEM_MMIO_REG_ADB_MODKEY:
+            if (adb->keyb_reg[2] & CLEM_ADB_KEY_MOD_APPLE) {
+                return _clem_adb_read_modkeys(adb);
+            }
+            break;
         case CLEM_MMIO_REG_ADB_CMD_DATA:
             return _clem_adb_read_cmd(adb, flags);
         case CLEM_MMIO_REG_ADB_STATUS:
-            return adb->cmd_status;
+            /* FIXME: HWRef docs are vague here - which bits are actually
+               cleared? eyboard data bit only according to the HWRef.  But FW
+               Ref says 'never use, won't work' for the keyboard bits here...
+            */
+            tmp = adb->cmd_status;
+            adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
+            return tmp;
         case CLEM_MMIO_REG_BTN0:
             if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_APPLE) {
                 return 0x80;
             }
             break;
         case CLEM_MMIO_REG_BTN1:
-            // TODO: No solid apple key?
+              if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_OPTION) {
+                return 0x80;
+            }
             break;
         default:
             if (!CLEM_IS_MMIO_READ_NO_OP(flags)) {

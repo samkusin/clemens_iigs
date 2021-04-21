@@ -178,6 +178,8 @@
 
 /** Interrupt type register (consolidated with Mega II) */
 #define CLEM_MMIO_INTTYPE_IRQ           0x01
+#define CLEM_MMIO_INTTYPE_VBL           0x08
+#define CLEM_MMIO_INTTYPE_QSEC          0x10
 
 /** Timer (internal, C023 partial) device flags */
 #define CLEM_MMIO_TIMER_1SEC_ENABLED    0x00000040

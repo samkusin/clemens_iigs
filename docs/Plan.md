@@ -10,10 +10,6 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* C046 phase 1 - what's needed?  set to 0 for now?  bit 7 is mouse or diagnostic?
-  * may depend if this is being accessed from an IRQ? (INTTYPE vs DIAGTYPE)
-  * System IRQ line status
-* Keyboard registers (ADB),c025
 * ADB command 73
 * C000 CLR80COL - disable 80 column store
 * C001 SET80COL - enable 80 column store
@@ -24,7 +20,8 @@ This is a running todo list.
 * C041 INTEN - enable Mega II, VBL, quartersec interrupts
 * C047 clearing timer interrupt flags for VBL and quartersec
 * VGC pass 1 : text modes and switches
-* ADB Mouse
+* ADB Mouse Support and Data Interrupts
+* C046 phase 2 - Mouse
 * remaining //e softswitches
 * Decimal math
 * Test ROM 1
@@ -35,10 +32,13 @@ This is a running todo list.
 * Emulation vs Native on some microinstructions (i.e. choosing a long address mode while in emulation does... what?)
 * Test ROM iteration?
 * Ghosting banks?
+* VGC Pass 3: SHGR
+* Ensoniq!
 
 ## DONE
 
-* Keyboard registers (ADB), c000, c010
+* c046 System IRQ line status
+* Keyboard registers (ADB), c000, c010, c025
 * Expansion Slot ROM switching
 * Add interrupt system IRQ
 * ADB command/glu framework

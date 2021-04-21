@@ -228,10 +228,10 @@ static uint8_t _clem_mmio_inttype_c046(
     uint8_t result = mmio->irq_line ? CLEM_MMIO_INTTYPE_IRQ : 0;
 
     if (mmio->irq_line & CLEM_IRQ_TIMER_QSEC) {
-
+        result |= CLEM_MMIO_INTTYPE_QSEC;
     }
 
-    /* TODO: other flags */
+    /* TODO: other flags, mouse, VBL, */
     return result;
 }
 
