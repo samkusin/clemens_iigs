@@ -53,6 +53,14 @@
 
 /* ADB Sync, a combination of SetMode, ClearMode, SetConfig */
 #define CLEM_ADB_CMD_SYNC               0x07
+#define CLEM_ADB_CMD_DEVICE_ENABLE_SRQ  0x50
+#define CLEM_ADB_CMD_DEVICE_FLUSH       0x60
+#define CLEM_ADB_CMD_DEVICE_DISABLE_SRQ 0x70
+#define CLEM_ADB_CMD_DEVICE_TRANSMIT_2  0x80
+#define CLEM_ADB_CMD_DEVICE_POLL_0      0xc0
+#define CLEM_ADB_CMD_DEVICE_POLL_1      0xd0
+#define CLEM_ADB_CMD_DEVICE_POLL_2      0xe0
+#define CLEM_ADB_CMD_DEVICE_POLL_3      0xf0
 
 /* c026 status flags */
 #define CLEM_ADB_C026_SRQ               0x08
@@ -63,6 +71,10 @@
 
 /* This version is returned by the ADB microcontroller based on ROM type */
 #define CLEM_ADB_ROM_3                  0x06
+
+/* GLU Device addresses */
+#define CLEM_ADB_DEVICE_KEYBOARD        0x02
+#define CLEM_ADB_DEVICE_MOUSE           0x03
 
 /* GLU register flags */
 #define CLEM_ADB_GLU_REG2_KEY_CLEAR_NUMLOCK 0x0080
@@ -439,8 +451,37 @@ void _clem_adb_glu_set_mode_flags(
     }
 }
 
+void _clem_adb_glu_enable_srq(
+    struct ClemensDeviceADB* adb,
+    unsigned device_address,
+    bool enable
+) {
+    switch (device_address) {
+        case CLEM_ADB_DEVICE_KEYBOARD:
+            if (enable) {
+                adb->keyb_reg[3] |= CLEM_ADB_GLU_REG3_MASK_SRQ;
+            } else {
+                adb->keyb_reg[3] &= ~CLEM_ADB_GLU_REG3_MASK_SRQ;
+            }
+            break;
+
+        case CLEM_ADB_DEVICE_MOUSE:
+            if (enable) {
+                adb->mouse_reg[3] |= CLEM_ADB_GLU_REG3_MASK_SRQ;
+            } else {
+                adb->mouse_reg[3] &= ~CLEM_ADB_GLU_REG3_MASK_SRQ;
+            }
+            break;
+        default:
+            CLEM_WARN("ADB Device Address %u unsupported", device_address);
+            break;
+    }
+}
+
 
 void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
+    unsigned device_command = 0;
+    unsigned device_address = 0;
     unsigned param;
     switch (adb->cmd_reg) {
         case CLEM_ADB_CMD_SYNC:
@@ -456,7 +497,51 @@ void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
                      adb->cmd_data[7]);
             _clem_adb_glu_set_mode_flags(adb, adb->cmd_data[0]);
             break;
+        default:
+            device_command = adb->cmd_reg & 0xf0;
+            device_address = adb->cmd_reg & 0x0f;
+            break;
     }
+
+    switch (device_command) {
+        case 0:
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_ENABLE_SRQ:
+            CLEM_LOG("ADB ENABLE SRQ: %0X", device_address);
+            _clem_adb_glu_enable_srq(adb, device_address, true);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_FLUSH:
+            CLEM_UNIMPLEMENTED("ADB Flush: %0X", device_address);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_DISABLE_SRQ:
+            CLEM_LOG("ADB DISABLE SRQ: %0X", device_address);
+            _clem_adb_glu_enable_srq(adb, device_address, false);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_TRANSMIT_2:
+            CLEM_UNIMPLEMENTED("ADB Transmit: %0X", device_address);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_POLL_0:
+            CLEM_UNIMPLEMENTED("ADB Poll 0: %0X", device_address);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_POLL_1:
+            CLEM_UNIMPLEMENTED("ADB Poll 1: %0X", device_address);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_POLL_2:
+            CLEM_UNIMPLEMENTED("ADB Poll 2: %0X", device_address);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_POLL_3:
+            CLEM_UNIMPLEMENTED("ADB Poll 3: %0X", device_address);
+            break;
+    }
+
 }
 
 uint32_t clem_adb_glu_sync(
@@ -502,8 +587,10 @@ uint32_t clem_adb_glu_sync(
 
     if (adb->keyb_reg[3] & CLEM_ADB_GLU_REG3_MASK_SRQ) {
         if (adb->keyb.size > 0) {
-            irq_line |= CLEM_IRQ_ADB_SRQ;
+            irq_line |= CLEM_IRQ_ADB_KEYB_SRQ;
         }
+    } else {
+        irq_line &= ~CLEM_IRQ_ADB_KEYB_SRQ;
     }
     if (irq_line & CLEM_IRQ_ADB_SRQ) {
         adb->cmd_flags |= CLEM_ADB_C026_SRQ;
@@ -571,6 +658,8 @@ static void _clem_adb_expect_data(
 }
 
 static void _clem_adb_start_cmd(struct ClemensDeviceADB* adb, uint8_t value) {
+    unsigned device_command = 0;
+    unsigned device_address = 0;
     adb->cmd_reg = value;
     adb->cmd_status |= CLEM_ADB_C027_CMD_FULL;
 
@@ -584,8 +673,48 @@ static void _clem_adb_start_cmd(struct ClemensDeviceADB* adb, uint8_t value) {
                 _clem_adb_expect_data(adb, CLEM_ADB_STATE_CMD_DATA, 4);
             }
             break;
+
         default:
-            /* unimplemented? */
+            device_command = value & 0xf0;
+            device_address = value & 0x0f;
+            break;
+    }
+    switch (device_command) {
+        case 0:
+            break;
+        case CLEM_ADB_CMD_DEVICE_ENABLE_SRQ:
+            CLEM_UNIMPLEMENTED("ADB Enable SRQ: %0X", device_address);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_FLUSH:
+            CLEM_UNIMPLEMENTED("ADB Flush: %0X", device_address);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_DISABLE_SRQ:
+            _clem_adb_expect_data(adb, CLEM_ADB_STATE_CMD_DATA, 0);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_TRANSMIT_2:
+            CLEM_UNIMPLEMENTED("ADB Transmit: %0X", device_address);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_POLL_0:
+            CLEM_UNIMPLEMENTED("ADB Poll 0: %0X", device_address);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_POLL_1:
+            CLEM_UNIMPLEMENTED("ADB Poll 1: %0X", device_address);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_POLL_2:
+            CLEM_UNIMPLEMENTED("ADB Poll 2: %0X", device_address);
+            break;
+
+        case CLEM_ADB_CMD_DEVICE_POLL_3:
+            CLEM_UNIMPLEMENTED("ADB Poll 3: %0X", device_address);
+            break;
+
+        default:                /* unimplemented? */
             CLEM_WARN("ADB command %02X unimplemented", value);
             break;
     }

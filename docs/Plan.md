@@ -10,7 +10,7 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* ADB command 73
+* VGC Pass 0 - research and defining data structures for host
 * C000 CLR80COL - disable 80 column store
 * C001 SET80COL - enable 80 column store
 * C002 RDMAINRAM - read main 48K
@@ -34,9 +34,11 @@ This is a running todo list.
 * Ghosting banks?
 * VGC Pass 3: SHGR
 * Ensoniq!
+* ADB Mouse on Keypad Feature
 
 ## DONE
 
+* ADB command 73
 * c046 System IRQ line status
 * Keyboard registers (ADB), c000, c010, c025
 * Expansion Slot ROM switching
