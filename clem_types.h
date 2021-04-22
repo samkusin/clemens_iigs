@@ -140,6 +140,25 @@ struct ClemensDeviceDebugger {
 };
 
 /**
+ * @brief Each scanline contains offsets into different bank memory regions
+ *
+ */
+struct ClemensScanline {
+    unsigned offset;
+    unsigned meta;
+};
+
+struct ClemensVGC {
+    struct ClemensScanline text_1_scanlines[CLEM_VGC_TEXT_SCANLINE_COUNT];
+    struct ClemensScanline text_2_scanlines[CLEM_VGC_TEXT_SCANLINE_COUNT];
+    struct ClemensScanline hgr_1_scanlines[CLEM_VGC_HGR_SCANLINE_COUNT];
+    struct ClemensScanline hgr_2_scanlines[CLEM_VGC_HGR_SCANLINE_COUNT];
+    struct ClemensScanline shgr_scanlines[CLEM_VGC_SHGR_SCANLINE_COUNT];
+
+    unsigned vbl_counter;
+};
+
+/**
  * @brief FPI + MEGA2 MMIO Interface
  *
  */
@@ -162,6 +181,7 @@ struct ClemensMMIO {
     struct ClemensMMIOShadowMap fpi_mega2_aux_shadow_map;
 
     /* All devices */
+    struct ClemensVGC vgc;
     struct ClemensDeviceRTC dev_rtc;
     struct ClemensDeviceADB dev_adb;
     struct ClemensDeviceTimer dev_timer;
@@ -173,7 +193,6 @@ struct ClemensMMIO {
     uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
     uint8_t flags_c08x;         // used to detect double reads
 
-    /* terminology all mmio related cycles are mega2 cycles */
     uint64_t mega2_cycles;      // number of mega2 pulses/ticks since startup
     uint32_t timer_60hz_us;     // used for executing logic per 1/60th second
     int32_t card_expansion_rom_index;   // card slot has the mutex on C800-CFFF
@@ -315,6 +334,7 @@ typedef struct {
     clem_clocks_duration_t clocks_step_mega2;
     /* clock timer - never change once system has been started */
     clem_clocks_time_t clocks_spent;
+
 
     uint8_t* fpi_bank_map[256];     // $00 - $ff
     uint8_t* mega2_bank_map[2];     // $e0 - $e1

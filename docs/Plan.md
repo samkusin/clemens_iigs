@@ -11,6 +11,8 @@ with ROM1 if possible compatibility.)
 This is a running todo list.
 
 * VGC Pass 0 - research and defining data structures for host
+* VGC Pass 0.1 - Find apple ii fonts to use
+* VGC Pass 0.2 - define API to access the text page
 * C000 CLR80COL - disable 80 column store
 * C001 SET80COL - enable 80 column store
 * C002 RDMAINRAM - read main 48K
@@ -24,6 +26,7 @@ This is a running todo list.
 * C046 phase 2 - Mouse
 * remaining //e softswitches
 * Decimal math
+* IWM? Disk support?
 * Test ROM 1
 * VGC Pass 2 : Graphics modes (not SHGR)
 * C039 Register (Serial Communications Command register )

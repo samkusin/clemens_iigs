@@ -42,6 +42,7 @@ set(EMULATOR_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_debug.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_rtc.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_timer.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_vgc.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_mem.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/emulator.c")
 
