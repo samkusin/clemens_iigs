@@ -4,6 +4,7 @@
 
 #include "clem_util.h"
 #include "clem_device.h"
+#include "clem_vgc.h"
 
 /**
  * Video Memory layout
@@ -1034,6 +1035,7 @@ void _clem_mmio_init(
     clem_timer_reset(&mmio->dev_timer);
     clem_rtc_reset(&mmio->dev_rtc, mega2_clocks_step);
     clem_adb_reset(&mmio->dev_adb);
+    clem_vgc_init(&mmio->vgc);
 
     _clem_mmio_init_page_maps(mmio,
                               CLEM_MMIO_MMAP_NSHADOW_SHGR |

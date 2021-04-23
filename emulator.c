@@ -10,7 +10,7 @@
 #include "clem_code.h"
 #include "clem_util.h"
 #include "clem_device.h"
-
+#include "clem_vgc.h"
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
@@ -2991,7 +2991,6 @@ void clemens_emulate(ClemensMachine* clem) {
         cpu->regs.PC = (uint16_t)(tmp_datahi << 8) | tmp_data;
 
         cpu->state_type = kClemensCPUStateType_Execute;
-        return;
     } else if (cpu->state_type == kClemensCPUStateType_IRQ) {
         uint8_t tmp_data;
         uint8_t tmp_datahi;
@@ -3012,15 +3011,26 @@ void clemens_emulate(ClemensMachine* clem) {
         cpu->regs.P |= kClemensCPUStatus_IRQDisable;
         cpu->regs.P &= ~kClemensCPUStatus_Decimal;
         cpu->state_type = kClemensCPUStateType_Execute;
-        return;
+    } else {
+        cpu_execute(cpu, clem);
     }
 
-    cpu_execute(cpu, clem);
+    //  1 mega2 cycle = 1023 nanoseconds
+    //  1 fast cycle = 1023 / (2864/1023) nanoseconds
+
+    //  1 fast cycle = 1 mega2 cycle (ns) / (clocks_step_mega2 / clocks_step) =
+    //      (1 mega2 cycle (ns) * clocks_step) / clocks_step_mega2
+
+    // TODO: calculate delta_ns per emulate call to call 'real-time' systems
+    //      like VGC
 
     delta_mega2_cycles = (uint32_t)(
         (clem->clocks_spent / clem->clocks_step_mega2) - mmio->mega2_cycles);
     mmio->mega2_cycles += delta_mega2_cycles;
     mmio->timer_60hz_us += delta_mega2_cycles;
+
+    mmio->irq_line = clem_vgc_sync(
+            &mmio->vgc, CLEM_MEGA2_CYCLES_PER_60TH, mmio->irq_line);
 
     /* background execution of some async devices on the 60 hz timer */
     while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {
