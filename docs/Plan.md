@@ -10,18 +10,15 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* VGC Pass 0 - research and defining data structures for host
+* C00C 40 column mode (W)
+* C00D 80 column mode (W)
+* C01F 80COL yes/no state
 * VGC Pass 0.1 - Find apple ii fonts to use
 * VGC Pass 0.2 - define API to access the text page
-* C000 CLR80COL - disable 80 column store
-* C001 SET80COL - enable 80 column store
-* C002 RDMAINRAM - read main 48K
-* C003 RDALTRAM - read alt 48K
-* C004 WRMAINRAM - write main 48K
-* C005 WRALTRAM - write alt 48K
+* VGC pass 1 : text modes and switches
+* C07F? - AN3?
 * C041 INTEN - enable Mega II, VBL, quartersec interrupts
 * C047 clearing timer interrupt flags for VBL and quartersec
-* VGC pass 1 : text modes and switches
 * ADB Mouse Support and Data Interrupts
 * C046 phase 2 - Mouse
 * remaining //e softswitches
@@ -41,6 +38,17 @@ This is a running todo list.
 
 ## DONE
 
+* C050, C051 TXTSET
+* C000 CLR80COL - disable 80 column store
+  * TXTPAGE2 (R/W) refers to text page 2 ($800) in main memory
+* C001 SET80COL - enable 80 column store
+  * TXTPAGE2 (R/W) refers to aux text page for 80 column
+* C054, C055 TXTPAGE1, TXTPAGE2
+* C002 RDMAINRAM - read main 48K
+* C003 RDALTRAM - read alt 48K
+* C004 WRMAINRAM - write main 48K
+* C005 WRALTRAM - write alt 48K
+* VGC Pass 0 - research and defining data structures for host
 * ADB command 73
 * c046 System IRQ line status
 * Keyboard registers (ADB), c000, c010, c025

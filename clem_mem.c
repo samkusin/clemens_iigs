@@ -418,14 +418,29 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_ROM_RAM_TEST:
             result = (mmio->mmap_register & CLEM_MMIO_MMAP_RDLCRAM) ? 0x80 : 0x00;
             break;
-        case CLEM_MMIO_REG_READCXROM:
-            result = (mmio->mmap_register & CLEM_MMIO_MMAP_CXROM) ? 0x01 : 00;
+        case CLEM_MMIO_REG_RAMRD_TEST:
+            result = (mmio->mmap_register & CLEM_MMIO_MMAP_RAMRD) ? 0x80 : 0x00;
             break;
-        case CLEM_MMIO_REG_RDALTZP:
+        case CLEM_MMIO_REG_RAMWRT_TEST:
+            result = (mmio->mmap_register & CLEM_MMIO_MMAP_RAMWRT) ? 0x80 : 0x00;
+            break;
+        case CLEM_MMIO_REG_READCXROM:
+            result = (mmio->mmap_register & CLEM_MMIO_MMAP_CXROM) ? 0x80 : 00;
+            break;
+        case CLEM_MMIO_REG_RDALTZP_TEST:
             result = (mmio->mmap_register & CLEM_MMIO_MMAP_ALTZPLC) ? 0x80 : 0x00;
             break;
         case CLEM_MMIO_REG_READC3ROM:
-            result = (mmio->mmap_register & CLEM_MMIO_MMAP_C3ROM) ? 0x01 : 00;
+            result = (mmio->mmap_register & CLEM_MMIO_MMAP_C3ROM) ? 0x80 : 00;
+            break;
+        case CLEM_MMIO_REG_80COLSTORE_TEST:
+            result = (mmio->mmap_register & CLEM_MMIO_MMAP_80COLSTORE) ? 0x80 : 00;
+            break;
+        case CLEM_MMIO_REG_TXT_TEST:
+            result = (mmio->vgc.mode_flags & CLEM_MMIO_VGC_GRAPHICS_MODE) ? 0x00 : 0x80;
+            break;
+        case CLEM_MMIO_REG_TXTPAGE2_TEST:
+            result = (mmio->mmap_register & CLEM_MMIO_MMAP_TXTPAGE2) ? 0x80 : 00;
             break;
         case CLEM_MMIO_REG_NEWVIDEO:
             result = _clem_mmio_newvideo_c029(mmio);
@@ -453,6 +468,18 @@ static uint8_t _clem_mmio_read(
                 CLEM_WARN("IO C046 partial impl");
             }
             result = _clem_mmio_inttype_c046(mmio);
+            break;
+        case CLEM_MMIO_REG_TXTCLR:
+            clem_vgc_set_mode(&mmio->vgc, CLEM_MMIO_VGC_GRAPHICS_MODE);
+            break;
+        case CLEM_MMIO_REG_TXTSET:
+            clem_vgc_clear_mode(&mmio->vgc, CLEM_MMIO_VGC_GRAPHICS_MODE);
+            break;
+        case CLEM_MMIO_REG_TXTPAGE1:
+            _clem_mmio_memory_map(mmio, mmio->mmap_register & ~CLEM_MMIO_MMAP_TXTPAGE2);
+            break;
+        case CLEM_MMIO_REG_TXTPAGE2:
+            _clem_mmio_memory_map(mmio, mmio->mmap_register | CLEM_MMIO_MMAP_TXTPAGE2);
             break;
         case CLEM_MMIO_REG_BTN0:
         case CLEM_MMIO_REG_BTN1:
@@ -504,13 +531,30 @@ static void _clem_mmio_write(
         ++mmio->dev_debug.ioreg_write_ctr[ioreg];
     }
     switch (ioreg) {
-        case CLEM_MMIO_REG_KEYB_READ:
         case CLEM_MMIO_REG_ANYKEY_STROBE:
         case CLEM_MMIO_REG_ADB_MOUSE_DATA:
         case CLEM_MMIO_REG_ADB_MODKEY:
         case CLEM_MMIO_REG_ADB_CMD_DATA:
         case CLEM_MMIO_REG_ADB_STATUS:
             clem_adb_write_switch(&mmio->dev_adb, ioreg, data);
+            break;
+        case CLEM_MMIO_REG_80STOREOFF_WRITE:
+            _clem_mmio_memory_map(mmio, mmio->mmap_register & ~CLEM_MMIO_MMAP_80COLSTORE);
+            break;
+        case CLEM_MMIO_REG_80STOREON_WRITE:
+            _clem_mmio_memory_map(mmio, mmio->mmap_register | CLEM_MMIO_MMAP_80COLSTORE);
+            break;
+        case CLEM_MMIO_REG_RDMAINRAM:
+            _clem_mmio_memory_map(mmio, mmio->mmap_register & ~CLEM_MMIO_MMAP_RAMRD);
+            break;
+        case CLEM_MMIO_REG_RDCARDRAM:
+            _clem_mmio_memory_map(mmio, mmio->mmap_register | CLEM_MMIO_MMAP_RAMRD);
+            break;
+        case CLEM_MMIO_REG_WRMAINRAM:
+            _clem_mmio_memory_map(mmio, mmio->mmap_register & ~CLEM_MMIO_MMAP_RAMWRT);
+            break;
+        case CLEM_MMIO_REG_WRCARDRAM:
+            _clem_mmio_memory_map(mmio, mmio->mmap_register | CLEM_MMIO_MMAP_RAMWRT);
             break;
         case CLEM_MMIO_REG_SLOTCXROM:
             _clem_mmio_memory_map(mmio, mmio->mmap_register | CLEM_MMIO_MMAP_CXROM);
@@ -560,6 +604,18 @@ static void _clem_mmio_write(
             break;
         case CLEM_MMIO_REG_SCC_A_DATA:
             CLEM_WARN("ioreg %02X <- %02X TODO", ioreg, data);
+            break;
+        case CLEM_MMIO_REG_TXTCLR:
+            clem_vgc_set_mode(&mmio->vgc, CLEM_MMIO_VGC_GRAPHICS_MODE);
+            break;
+        case CLEM_MMIO_REG_TXTSET:
+            clem_vgc_clear_mode(&mmio->vgc, CLEM_MMIO_VGC_GRAPHICS_MODE);
+            break;
+        case CLEM_MMIO_REG_TXTPAGE1:
+            _clem_mmio_memory_map(mmio, mmio->mmap_register & ~CLEM_MMIO_MMAP_TXTPAGE2);
+            break;
+        case CLEM_MMIO_REG_TXTPAGE2:
+            _clem_mmio_memory_map(mmio, mmio->mmap_register | CLEM_MMIO_MMAP_TXTPAGE2);
             break;
         case CLEM_MMIO_REG_STATEREG:
             _clem_mmio_statereg_c068_set(mmio, data);
@@ -693,10 +749,60 @@ static void _clem_mmio_memory_map(
         }
     }
 
-    //  RAMRD/RAMWRT
+    //  TODO: 80COLSTORE and TXTPAGE2 will override RAMRD, RAMWRT and so
+    //        we check the 80COLSTORE flags before RAMRD/WRT
+    //  Shadowing is always applied after the write to 00/01, so the remapping
+    //      here should automatically be shdaowed to the appropriate e0/e1
+    //      area for display.
+    if (remap_flags & CLEM_MMIO_MMAP_OLDVIDEO) {
+        for (page_idx = 0x04; page_idx < 0x08; ++page_idx) {
+            page_B00 = &page_map_B00->pages[page_idx];
+            if (memory_flags & CLEM_MMIO_MMAP_80COLSTORE) {
+                page_B00->bank_read = (
+                    (memory_flags & CLEM_MMIO_MMAP_TXTPAGE2) ? 0x01 : 00);
+                page_B00->bank_write =(
+                    (memory_flags & CLEM_MMIO_MMAP_TXTPAGE2) ? 0x01 : 00);
+            } else {
+                page_B00->bank_read =(
+                    (memory_flags & CLEM_MMIO_MMAP_RAMRD) ? 0x01 : 00);
+                page_B00->bank_write =(
+                    (memory_flags & CLEM_MMIO_MMAP_RAMWRT) ? 0x01 : 00);
+            }
+        }
+        for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
+            page_B00 = &page_map_B00->pages[page_idx];
+            if (memory_flags & (CLEM_MMIO_MMAP_80COLSTORE + CLEM_MMIO_MMAP_HIRES)) {
+                page_B00->bank_read =(
+                    (memory_flags & CLEM_MMIO_MMAP_TXTPAGE2) ? 0x01 : 00);
+                page_B00->bank_write =(
+                    (memory_flags & CLEM_MMIO_MMAP_TXTPAGE2) ? 0x01 : 00);
+            } else {
+                page_B00->bank_read =(
+                    (memory_flags & CLEM_MMIO_MMAP_RAMRD) ? 0x01 : 00);
+                page_B00->bank_write =(
+                    (memory_flags & CLEM_MMIO_MMAP_RAMWRT) ? 0x01 : 00);
+            }
+        }
+    }
+
+    //  RAMRD/RAMWRT minus the page 1 Apple //e video regions
     if (remap_flags & (CLEM_MMIO_MMAP_RAMRD + CLEM_MMIO_MMAP_RAMWRT)) {
         remap_flags |= CLEM_MMIO_MMAP_NSHADOW;
-        for (page_idx = 0x02; page_idx < 0xC0; ++page_idx) {
+        for (page_idx = 0x02; page_idx < 0x03; ++page_idx) {
+            page_B00 = &page_map_B00->pages[page_idx];
+            page_B00->bank_read =(
+                (memory_flags & CLEM_MMIO_MMAP_RAMRD) ? 0x01 : 00);
+            page_B00->bank_write =(
+                (memory_flags & CLEM_MMIO_MMAP_RAMWRT) ? 0x01 : 00);
+        }
+        for (page_idx = 0x08; page_idx < 0x20; ++page_idx) {
+            page_B00 = &page_map_B00->pages[page_idx];
+            page_B00->bank_read =(
+                (memory_flags & CLEM_MMIO_MMAP_RAMRD) ? 0x01 : 00);
+            page_B00->bank_write =(
+                (memory_flags & CLEM_MMIO_MMAP_RAMWRT) ? 0x01 : 00);
+        }
+        for (page_idx = 0x40; page_idx < 0xC0; ++page_idx) {
             page_B00 = &page_map_B00->pages[page_idx];
             page_B00->bank_read =(
                 (memory_flags & CLEM_MMIO_MMAP_RAMRD) ? 0x01 : 00);
