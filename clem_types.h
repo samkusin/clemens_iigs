@@ -155,7 +155,11 @@ struct ClemensVGC {
     struct ClemensScanline hgr_2_scanlines[CLEM_VGC_HGR_SCANLINE_COUNT];
     struct ClemensScanline shgr_scanlines[CLEM_VGC_SHGR_SCANLINE_COUNT];
 
-    unsigned vbl_counter;
+    uint32_t timer_ns;
+    uint32_t vbl_counter;
+
+    /* amalgom of possible display modes */
+    unsigned mode_flags;
 };
 
 /**
@@ -326,6 +330,36 @@ enum {
 typedef void (*ClemensOpcodeCallback)(struct ClemensInstruction*,
                                       const char*, void*);
 
+
+/**
+ * @brief
+ *
+ */
+enum ClemensVideoFormat {
+    kClemensVideoFormat_Text,
+    kClemensVideoFormat_Text_Alternate,
+    kClemensVideoFormat_Lores,
+    kClemensVideoFormat_Hires,
+    kClemensVideoFormat_Double_Hires,
+    kClemensVideoFormat_Count
+};
+
+/**
+ * @brief
+ *
+ */
+typedef struct {
+    struct ClemensScanline* scanlines;
+    int scanline_byte_cnt;
+    int scanline_start;
+    int scanline_count;
+    enum ClemensVideoFormat format;
+} ClemensVideo;
+
+/**
+ * @brief
+ *
+ */
 typedef struct {
     struct Clemens65C816 cpu;
     /* clocks spent per cycle */
@@ -334,7 +368,6 @@ typedef struct {
     clem_clocks_duration_t clocks_step_mega2;
     /* clock timer - never change once system has been started */
     clem_clocks_time_t clocks_spent;
-
 
     uint8_t* fpi_bank_map[256];     // $00 - $ff
     uint8_t* mega2_bank_map[2];     // $e0 - $e1

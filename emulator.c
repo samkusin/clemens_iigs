@@ -2926,7 +2926,9 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
 void clemens_emulate(ClemensMachine* clem) {
     struct Clemens65C816* cpu = &clem->cpu;
     struct ClemensMMIO* mmio = &clem->mmio;
+    clem_clocks_time_t last_clocks_spent = clem->clocks_spent;
     uint32_t delta_mega2_cycles;
+    uint32_t delta_ns;
 
     if (!cpu->pins.resbIn) {
         /*  the reset interrupt overrides any other state
@@ -3002,11 +3004,18 @@ void clemens_emulate(ClemensMachine* clem) {
         _clem_cycle(clem, 2);
         _clem_opc_push_pc16(clem, cpu->regs.PC);
         _clem_opc_push_status(clem, false);
-        // vector pull low signal while the PC is being loaded
-        clem_read(clem, &tmp_data, CLEM_6502_IRQBRK_VECTOR_LO_ADDR, 0x00,
-                       CLEM_MEM_FLAG_PROGRAM);
-        clem_read(clem, &tmp_datahi, CLEM_6502_IRQBRK_VECTOR_HI_ADDR,
-                       0x00, CLEM_MEM_FLAG_PROGRAM);
+        if (cpu->pins.emulation) {
+            // vector pull low signal while the PC is being loaded
+            clem_read(clem, &tmp_data, CLEM_6502_IRQBRK_VECTOR_LO_ADDR, 0x00,
+                        CLEM_MEM_FLAG_PROGRAM);
+            clem_read(clem, &tmp_datahi, CLEM_6502_IRQBRK_VECTOR_HI_ADDR,
+                        0x00, CLEM_MEM_FLAG_PROGRAM);
+        } else {
+            clem_read(clem, &tmp_data, CLEM_65816_IRQB_VECTOR_LO_ADDR, 0x00,
+                        CLEM_MEM_FLAG_PROGRAM);
+            clem_read(clem, &tmp_datahi, CLEM_65816_IRQB_VECTOR_HI_ADDR,
+                        0x00, CLEM_MEM_FLAG_PROGRAM);
+        }
         cpu->regs.PC = (uint16_t)(tmp_datahi << 8) | tmp_data;
         cpu->regs.P |= kClemensCPUStatus_IRQDisable;
         cpu->regs.P &= ~kClemensCPUStatus_Decimal;
@@ -3024,13 +3033,16 @@ void clemens_emulate(ClemensMachine* clem) {
     // TODO: calculate delta_ns per emulate call to call 'real-time' systems
     //      like VGC
 
+    delta_ns = (1023 * (clem->clocks_spent - last_clocks_spent)) / (
+        clem->clocks_step_mega2);
+    mmio->irq_line = clem_vgc_sync(
+            &mmio->vgc, CLEM_MEGA2_CYCLES_PER_60TH, mmio->irq_line);
+
     delta_mega2_cycles = (uint32_t)(
         (clem->clocks_spent / clem->clocks_step_mega2) - mmio->mega2_cycles);
     mmio->mega2_cycles += delta_mega2_cycles;
     mmio->timer_60hz_us += delta_mega2_cycles;
 
-    mmio->irq_line = clem_vgc_sync(
-            &mmio->vgc, CLEM_MEGA2_CYCLES_PER_60TH, mmio->irq_line);
 
     /* background execution of some async devices on the 60 hz timer */
     while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {
@@ -3050,6 +3062,17 @@ void clemens_emulate(ClemensMachine* clem) {
     }
 }
 
+ClemensVideo* clemens_get_text_video(ClemensVideo* video, ClemensMachine* clem) {
+    struct ClemensVGC* vgc = &clem->mmio.vgc;
+    bool use_page_2 = (clem->mmio.mmap_register & CLEM_MMIO_MMAP_TXTPAGE2) != 0;
+    if (vgc->mode_flags & CLEM_MMIO_VGC_GRAPHICS_MODE) {
+
+    } else {
+        if (vgc
+    }
+}
+
+
 void clemens_input(
     ClemensMachine* machine,
     const struct ClemensInputEvent* input
@@ -3061,3 +3084,4 @@ void clemens_debug_status(ClemensMachine* clem) {
     clem_debug_call_stack(&clem->mmio.dev_debug);
     clem_debug_counters(&clem->mmio.dev_debug);
 }
+

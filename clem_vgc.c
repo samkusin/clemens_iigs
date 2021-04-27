@@ -1,12 +1,17 @@
 #include "clem_vgc.h"
 
+#define CLEM_VGC_VSYNC_TIME_NS  (1e9/60)
+
+static ClemensVideo g_clemens_video_formats[kClemensVideoFormat_Count];
 
 void clem_vgc_init(struct ClemensVGC* vgc) {
     /* setup scanline maps for all of the different modes */
+    ClemensVideo* video;
     struct ClemensScanline* line;
     unsigned offset;
     unsigned row, inner;
 
+    vgc->timer_ns = 0;
     vgc->vbl_counter = 0;
 
     /*  text page 1 $0400-$07FF, page 2 = $0800-$0BFF
@@ -77,12 +82,31 @@ void clem_vgc_init(struct ClemensVGC* vgc) {
         offset += 160;
     }
 
+    video = &g_clemens_video_formats[kClemensVideoFormat_Text];
+    video->scanlines = vgc->text_1_scanlines
+
 }
+
+void clem_vgc_set_mode(struct ClemensVGC* vgc, unsigned mode_flags) {
+    vgc->mode_flags &= ~mode_flags;
+}
+
+void clem_vgc_clear_mode(struct ClemensVGC* vgc, unsigned mode_flags) {
+    vgc->mode_flags |= mode_flags;
+}
+
 
 uint32_t clem_vgc_sync(
     struct ClemensVGC* vgc,
-    uint32_t delta_us,
+    uint32_t delta_ns,
     uint32_t irq_line
 ) {
+    vgc->timer_ns += delta_ns;
 
+    while (vgc->timer_ns >= CLEM_VGC_VSYNC_TIME_NS) {
+
+        ++vgc->vbl_counter;
+        vgc->timer_ns -= CLEM_VGC_VSYNC_TIME_NS;
+    }
+    return irq_line;
 }

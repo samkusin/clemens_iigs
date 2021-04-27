@@ -113,6 +113,42 @@ void clemens_emulate(ClemensMachine* clem);
 void clemens_debug_status(ClemensMachine* clem);
 
 
+/**
+ * @brief Returns the current video data to be displayed by the host
+ *
+ * The data here is in the form of scanlines and a description of how to
+ * interpret the data.  The host must convert this information to visuals.
+ *
+ * @param clem
+ * @return ClemensVideo*
+ */
+
+/**
+ * @brief Returns the current text video data to be displayed by the host
+ *
+ * The data here is in the form of scanlines and a description of how to
+ * interpret the data.  The host must convert this information to visuals.
+ *
+ * @param video
+ * @param clem
+ * @return ClemensVideo*
+ */
+ClemensVideo* clemens_get_text_video(ClemensVideo* video,
+                                     ClemensMachine* clem);
+
+/**
+ * @brief Returns the current graphics video data to be displayed by the host
+ *
+ * The data here is in the form of scanlines and a description of how to
+ * interpret the data.  The host must convert this information to visuals.
+ *
+ * @param video
+ * @param clem
+ * @return ClemensVideo*
+ */
+ClemensVideo* clemens_get_graphics_video(ClemensVideo* video,
+                                         ClemensMachine* clem);
+
 #ifdef __cplusplus
 }
 #endif
