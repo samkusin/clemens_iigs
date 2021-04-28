@@ -133,6 +133,8 @@
 #define CLEM_MMIO_REG_80COLSTORE_TEST   0x18
 /** Bit 7: on = Full text mode, off = none or mixed */
 #define CLEM_MMIO_REG_TXT_TEST          0x1A
+/** Bit 7: on = Mixed text mode, off = full screen mode */
+#define CLEM_MMIO_REG_MIXED_TEST        0x1B
 /** Bit 7: on = page 2, off = page 1 */
 #define CLEM_MMIO_REG_TXTPAGE2_TEST     0x1C
 /** Mouse button (bit 7) and movement status (btis 6:0) */
@@ -179,6 +181,10 @@
 #define CLEM_MMIO_REG_TXTCLR            0x50
 /** R/W Display text mode only */
 #define CLEM_MMIO_REG_TXTSET            0x51
+/** R/W Clears mixed mode graphics */
+#define CLEM_MMIO_REG_MIXCLR            0x52
+/** R/W Sets mixed mode graphics */
+#define CLEM_MMIO_REG_MIXSET            0x53
 /** R/W enable page 1 or page 2 text modified by 80COLSTORE */
 #define CLEM_MMIO_REG_TXTPAGE1          0x54
 #define CLEM_MMIO_REG_TXTPAGE2          0x55

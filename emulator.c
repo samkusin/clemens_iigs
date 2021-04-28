@@ -3062,16 +3062,75 @@ void clemens_emulate(ClemensMachine* clem) {
     }
 }
 
-ClemensVideo* clemens_get_text_video(ClemensVideo* video, ClemensMachine* clem) {
+ClemensVideo* clemens_get_text_video(
+    ClemensVideo* video,
+    ClemensMachine* clem
+) {
     struct ClemensVGC* vgc = &clem->mmio.vgc;
-    bool use_page_2 = (clem->mmio.mmap_register & CLEM_MMIO_MMAP_TXTPAGE2) != 0;
-    if (vgc->mode_flags & CLEM_MMIO_VGC_GRAPHICS_MODE) {
-
+    if (vgc->mode_flags & CLEM_MMIO_VGC_MIXED_TEXT) {
+        video->scanline_count = 4;
+        video->scanline_start = 20;
+    } else if (!(vgc->mode_flags & CLEM_MMIO_VGC_GRAPHICS_MODE)) {
+        video->scanline_count = 24;
+        video->scanline_start = 0;
     } else {
-        if (vgc
+        return NULL;
     }
+    // TODO: support the alternate text character set
+    video->format = kClemensVideoFormat_Text;
+    video->scanline_byte_cnt = 40;
+    if ((clem->mmio.mmap_register & CLEM_MMIO_MMAP_TXTPAGE2) &&
+        !(clem->mmio.mmap_register & CLEM_MMIO_MMAP_80COLSTORE)
+    ) {
+        video->scanlines = vgc->text_2_scanlines;
+    } else {
+        video->scanlines = vgc->text_1_scanlines;
+    }
+    return video;
 }
 
+ClemensVideo* clemens_get_graphics_video(
+    ClemensVideo* video,
+    ClemensMachine* clem
+) {
+    struct ClemensVGC* vgc = &clem->mmio.vgc;
+    bool use_page_2 = (clem->mmio.mmap_register & CLEM_MMIO_MMAP_TXTPAGE2) &&
+                      !(clem->mmio.mmap_register & CLEM_MMIO_MMAP_80COLSTORE);
+    if (vgc->mode_flags & CLEM_MMIO_VGC_GRAPHICS_MODE) {
+        video->scanline_start = 0;
+        if (vgc->mode_flags & CLEM_MMIO_VGC_HIRES) {
+            video->format = kClemensVideoFormat_Hires;
+            if (vgc->mode_flags & CLEM_MMIO_VGC_MIXED_TEXT) {
+                video->scanline_count = 160;
+            } else {
+                video->scanline_count = 192;
+            }
+        } else {
+            video->format = kClemensVideoFormat_Lores;
+            if (vgc->mode_flags & CLEM_MMIO_VGC_MIXED_TEXT) {
+                video->scanline_count = 20;
+            } else {
+                video->scanline_count = 24;
+            }
+        }
+    } else {
+        return NULL;
+    }
+    if (video->format == kClemensVideoFormat_Hires) {
+        if (use_page_2) {
+            video->scanlines = vgc->hgr_2_scanlines;
+        } else {
+            video->scanlines = vgc->hgr_1_scanlines;
+        }
+    } else {
+        if (use_page_2) {
+            video->scanlines = vgc->text_2_scanlines;
+        } else {
+            video->scanlines = vgc->text_1_scanlines;
+        }
+    }
+    return video;
+}
 
 void clemens_input(
     ClemensMachine* machine,
@@ -3084,4 +3143,3 @@ void clemens_debug_status(ClemensMachine* clem) {
     clem_debug_call_stack(&clem->mmio.dev_debug);
     clem_debug_counters(&clem->mmio.dev_debug);
 }
-

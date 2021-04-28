@@ -2,8 +2,6 @@
 
 #define CLEM_VGC_VSYNC_TIME_NS  (1e9/60)
 
-static ClemensVideo g_clemens_video_formats[kClemensVideoFormat_Count];
-
 void clem_vgc_init(struct ClemensVGC* vgc) {
     /* setup scanline maps for all of the different modes */
     ClemensVideo* video;
@@ -81,10 +79,6 @@ void clem_vgc_init(struct ClemensVGC* vgc) {
         line->meta = 0;         /* this is the scanline control register */
         offset += 160;
     }
-
-    video = &g_clemens_video_formats[kClemensVideoFormat_Text];
-    video->scanlines = vgc->text_1_scanlines
-
 }
 
 void clem_vgc_set_mode(struct ClemensVGC* vgc, unsigned mode_flags) {

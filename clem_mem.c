@@ -439,6 +439,9 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_TXT_TEST:
             result = (mmio->vgc.mode_flags & CLEM_MMIO_VGC_GRAPHICS_MODE) ? 0x00 : 0x80;
             break;
+        case CLEM_MMIO_REG_MIXED_TEST:
+            result = (mmio->vgc.mode_flags & CLEM_MMIO_VGC_MIXED_TEXT) ? 0x80 : 0x80;
+            break;
         case CLEM_MMIO_REG_TXTPAGE2_TEST:
             result = (mmio->mmap_register & CLEM_MMIO_MMAP_TXTPAGE2) ? 0x80 : 00;
             break;
@@ -474,6 +477,12 @@ static uint8_t _clem_mmio_read(
             break;
         case CLEM_MMIO_REG_TXTSET:
             clem_vgc_clear_mode(&mmio->vgc, CLEM_MMIO_VGC_GRAPHICS_MODE);
+            break;
+        case CLEM_MMIO_REG_MIXCLR:
+            clem_vgc_clear_mode(&mmio->vgc, CLEM_MMIO_VGC_MIXED_TEXT);
+            break;
+        case CLEM_MMIO_REG_MIXSET:
+            clem_vgc_set_mode(&mmio->vgc, CLEM_MMIO_VGC_MIXED_TEXT);
             break;
         case CLEM_MMIO_REG_TXTPAGE1:
             _clem_mmio_memory_map(mmio, mmio->mmap_register & ~CLEM_MMIO_MMAP_TXTPAGE2);
@@ -610,6 +619,12 @@ static void _clem_mmio_write(
             break;
         case CLEM_MMIO_REG_TXTSET:
             clem_vgc_clear_mode(&mmio->vgc, CLEM_MMIO_VGC_GRAPHICS_MODE);
+            break;
+        case CLEM_MMIO_REG_MIXCLR:
+            clem_vgc_clear_mode(&mmio->vgc, CLEM_MMIO_VGC_MIXED_TEXT);
+            break;
+        case CLEM_MMIO_REG_MIXSET:
+            clem_vgc_set_mode(&mmio->vgc, CLEM_MMIO_VGC_MIXED_TEXT);
             break;
         case CLEM_MMIO_REG_TXTPAGE1:
             _clem_mmio_memory_map(mmio, mmio->mmap_register & ~CLEM_MMIO_MMAP_TXTPAGE2);
