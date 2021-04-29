@@ -10,7 +10,9 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Looks like there's an ADB timeout due to some leftover state after disabling the SRQ
+* Add ADB Read Memory, Write Memory
+  * RAM starts empty
+  * ROM -- WIP?
 * C00C 40 column mode (W)
 * C00D 80 column mode (W)
 * C01F 80COL yes/no state
@@ -39,6 +41,7 @@ This is a running todo list.
 
 ## DONE
 
+* Added ADB GetVersion
 * C050, C051 TXTSET
 * C000 CLR80COL - disable 80 column store
   * TXTPAGE2 (R/W) refers to text page 2 ($800) in main memory

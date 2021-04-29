@@ -51,8 +51,7 @@ void clem_timer_reset(struct ClemensDeviceTimer* timer);
  * @param irq_line
  * @return uint32_t modified irq_line
  */
-uint32_t clem_timer_sync(struct ClemensDeviceTimer* timer, uint32_t delta_us,
-                         uint32_t irq_line);
+void clem_timer_sync(struct ClemensDeviceTimer* timer, uint32_t delta_us);
 
 /**
  * @brief Resets the ADB state
@@ -77,11 +76,8 @@ void clem_adb_device_input(struct ClemensDeviceADB* adb,
  *
  * @param adb ADB device data (1 ms worth of cycles?)
  * @param delta_us Microsecond increment since last sync
- * @param irq_line
- * @return uint32_t modified irq_line*
  */
-uint32_t clem_adb_glu_sync(struct ClemensDeviceADB* adb, uint32_t delta_us,
-                           uint32_t irq_line);
+void clem_adb_glu_sync(struct ClemensDeviceADB* adb, uint32_t delta_us);
 
 /**
  * @brief Executed from the memory subsystem for MMIO

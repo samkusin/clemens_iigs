@@ -79,7 +79,6 @@ void clem_debug_rts(
     struct ClemensDebugJSRContext* ctx;
 
     if (dbg->jsr_context_count >= CLEM_DEBUG_JSR_CONTEXT_LIMIT) return;
-    CLEM_ASSERT(dbg->jsr_context_count > 0);
     if (dbg->jsr_context_count == 0) return;
 
     ctx = &dbg->jsr_contexts[--dbg->jsr_context_count];

@@ -90,6 +90,10 @@ struct ClemensDeviceADB {
 
     struct ClemensDeviceKeyboard keyb;
     struct ClemensDeviceMouse mouse;
+
+    uint8_t ram[256];           /**< Microcontroller RAM */
+
+    uint32_t irq_line;          /**< IRQ flags passed to machine */
 };
 
 /** Really, this is part of the RTC/VGC, but for separation of concerns,
@@ -99,6 +103,7 @@ struct ClemensDeviceTimer {
     unsigned irq_1sec_us;       /**< used to trigger IRQ one sec */
     unsigned irq_qtrsec_us;     /**< used to trigger IRQ quarter sec */
     unsigned flags;             /**< interrupt  */
+    uint32_t irq_line;          /**< IRQ flags passed to machine */
 };
 
 /**

@@ -737,6 +737,11 @@
 "Hint":"Code"},
 
 {
+"Low":229527,
+"High":229527,
+"Hint":"Code"},
+
+{
 "Low":236343,
 "High":236343,
 "Hint":"Code"},
@@ -1181,6 +1186,7 @@
 "High":262087,
 "Hint":"Code"}],
 "StatusFlagOverrides":{
+"56207":304,
 "226857":11796739,
 "236343":256,
 "236590":3145984,
@@ -1408,6 +1414,18 @@
 
 "244066":{
 "Text":"Write BRAM 00-FF loop",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"229526":{
+"Text":"This will return to the addressed pushed via PER above.",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"229515":{
+"Text":"This PEA 0001 seems to push an \u0027abort\u0027 command for the ADB which is executed in the ROM routine called below (assuming that the emulation code I\u0027m running is doing the right thing.)",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -2840,6 +2858,48 @@
 "239633":{
 "Label":"SUB_SET_GR_MODES",
 "Value":16754705,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"229782":{
+"Label":"SUB_ADB_WAIT_FOR_DATA",
+"Value":16744854,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"229407":{
+"Label":"adb_version_lt_6",
+"Value":16744479,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"229469":{
+"Label":"skip_rom3_adb",
+"Value":16744541,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"229788":{
+"Label":"wait_adb_data",
+"Value":16744860,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"229376":{
+"Label":"get_adb_ram_e8",
+"Value":16744448,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"56281":{
+"Label":"SUB_FC_E1_DBR_BANK",
+"Value":16571353,
 "Source":"User",
 "Type":"GlobalAddr",
 "LabelAnno":"None"}},
