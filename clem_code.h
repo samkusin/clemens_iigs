@@ -421,7 +421,7 @@ static inline void _clem_read_pba_mode_dp(
     if (clem->cpu.pins.emulation) {
         *eff_addr = (D & 0xff00) + ((D & 0xff) + offset_index) % 256;
     } else {
-        *eff_addr = D + *offset + index;
+        *eff_addr = D + offset_index;
     }
     if (D & 0x00ff) {
         _clem_cycle(clem, 1);
@@ -820,7 +820,7 @@ static inline void _cpu_trb(
         uint8_t a = (uint8_t)(cpu->regs.A);
         v &= ~a;
         _cpu_p_flags_z_data(cpu, v & a);
-        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, v);
+        *value = CLEM_UTIL_set16_lo(cpu->regs.A, v);
     } else {
          *value &= ~cpu->regs.A;
         _cpu_p_flags_z_data_16(cpu, *value & cpu->regs.A);
@@ -837,9 +837,9 @@ static inline void _cpu_tsb(
         uint8_t a = (uint8_t)(cpu->regs.A);
         v |= a;
         _cpu_p_flags_z_data(cpu, v & a);
-        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, v);
+        *value = CLEM_UTIL_set16_lo(cpu->regs.A, v);
     } else {
-         *value |= cpu->regs.A;
+        *value |= cpu->regs.A;
         _cpu_p_flags_z_data_16(cpu, *value & cpu->regs.A);
     }
 }

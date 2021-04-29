@@ -2089,6 +2089,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_cycle(clem, 1);
             _cpu_sp_dec2(cpu);
             _clem_write_16(clem, tmp_addr, cpu->regs.S + 1, 0x00);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_PHA:
             _clem_opc_push_reg_816(clem, cpu->regs.A, m_status);
@@ -3043,15 +3044,15 @@ void clemens_emulate(ClemensMachine* clem) {
     mmio->mega2_cycles += delta_mega2_cycles;
     mmio->timer_60hz_us += delta_mega2_cycles;
 
-
     /* background execution of some async devices on the 60 hz timer */
     while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {
-        mmio->irq_line = clem_timer_sync(
-            &mmio->dev_timer, CLEM_MEGA2_CYCLES_PER_60TH, mmio->irq_line);
-        mmio->irq_line = clem_adb_glu_sync(
-            &mmio->dev_adb, CLEM_MEGA2_CYCLES_PER_60TH, mmio->irq_line);
+        clem_timer_sync(&mmio->dev_timer, CLEM_MEGA2_CYCLES_PER_60TH);
+        clem_adb_glu_sync(&mmio->dev_adb, CLEM_MEGA2_CYCLES_PER_60TH);
         mmio->timer_60hz_us -= CLEM_MEGA2_CYCLES_PER_60TH;
     }
+
+    mmio->irq_line &= ~(CLEM_IRQ_ADB_MASK | CLEM_IRQ_TIMER_MASK);
+    mmio->irq_line |= (mmio->dev_adb.irq_line | mmio->dev_timer.irq_line);
 
     /* IRQB low triggers an interrupt next frame */
     cpu->pins.irqbIn = mmio->irq_line == 0;
