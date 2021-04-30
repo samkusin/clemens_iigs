@@ -54,15 +54,22 @@
 #define CLEM_ADB_STATE_RESULT_DATA      2
 
 #define CLEM_ADB_CMD_ABORT              0x01
+#define CLEM_ADB_CMD_SET_MODES          0x04
+#define CLEM_ADB_CMD_CLEAR_MODES        0x05
 #define CLEM_ADB_CMD_SET_CONFIG         0x06
 #define CLEM_ADB_CMD_SYNC               0x07
 #define CLEM_ADB_CMD_WRITE_RAM          0x08
 #define CLEM_ADB_CMD_READ_MEM           0x09
+#define CLEM_ADB_CMD_UNDOCUMENTED_12    0x12
+#define CLEM_ADB_CMD_UNDOCUMENTED_13    0x13
 #define CLEM_ADB_CMD_VERSION            0x0d
 #define CLEM_ADB_CMD_DEVICE_ENABLE_SRQ  0x50
 #define CLEM_ADB_CMD_DEVICE_FLUSH       0x60
 #define CLEM_ADB_CMD_DEVICE_DISABLE_SRQ 0x70
-#define CLEM_ADB_CMD_DEVICE_TRANSMIT_2  0x80
+#define CLEM_ADB_CMD_DEVICE_XMIT_2_R0   0x80
+#define CLEM_ADB_CMD_DEVICE_XMIT_2_R1   0x90
+#define CLEM_ADB_CMD_DEVICE_XMIT_2_R2   0xA0
+#define CLEM_ADB_CMD_DEVICE_XMIT_2_R3   0xB0
 #define CLEM_ADB_CMD_DEVICE_POLL_0      0xc0
 #define CLEM_ADB_CMD_DEVICE_POLL_1      0xd0
 #define CLEM_ADB_CMD_DEVICE_POLL_2      0xe0
@@ -493,20 +500,33 @@ static void _clem_adb_glu_set_mode_flags(
     struct ClemensDeviceADB* adb,
     unsigned mode_flags
 ) {
-    if (!(mode_flags ^ (adb->mode_flags & 0xff))) return;
-
     if (mode_flags & 0x01) {
         adb->mode_flags &= ~CLEM_ADB_MODE_AUTOPOLL_KEYB;
-    } else {
-        adb->mode_flags |= CLEM_ADB_MODE_AUTOPOLL_KEYB;
+        CLEM_LOG("ADB Disable Keyboard Autopoll");
     }
     if (mode_flags & 0x02) {
         adb->mode_flags &= ~CLEM_ADB_MODE_AUTOPOLL_MOUSE;
-    } else {
-        adb->mode_flags |= CLEM_ADB_MODE_AUTOPOLL_MOUSE;
+        CLEM_LOG("ADB Disable Mouse Autopoll");
     }
     if (mode_flags & 0x000000fc) {
         CLEM_WARN("ADB SetMode %02X Unimplemented", mode_flags & 0x000000fc);
+    }
+}
+
+static void _clem_adb_glu_clear_mode_flags(
+    struct ClemensDeviceADB* adb,
+    unsigned mode_flags
+) {
+    if (mode_flags & 0x01) {
+        adb->mode_flags |= CLEM_ADB_MODE_AUTOPOLL_KEYB;
+        CLEM_LOG("ADB Enable Keyboard Autopoll");
+    }
+    if (mode_flags & 0x02) {
+        adb->mode_flags |= CLEM_ADB_MODE_AUTOPOLL_MOUSE;
+        CLEM_LOG("ADB Enable Mouse Autopoll");
+    }
+    if (mode_flags & 0x000000fc) {
+        CLEM_WARN("ADB ClearMode %02X Unimplemented", mode_flags & 0x000000fc);
     }
 }
 
@@ -589,18 +609,61 @@ static uint8_t _clem_adb_glu_read_memory(
     return result;
 }
 
+void _clem_adb_glu_set_register(
+    struct ClemensDeviceADB* adb,
+    unsigned device_register,
+    unsigned address,
+    uint8_t hi,
+    uint8_t lo
+) {
+    switch (address) {
+        case CLEM_ADB_DEVICE_KEYBOARD:
+            if (device_register == 0x3) {
+                if ((hi & 0x0f) != CLEM_ADB_DEVICE_KEYBOARD) {
+                    /* changing to a device address other than what's standard? */
+                    CLEM_WARN("ADB change keyboard device address to not 0x03: %0X", hi);
+                }
+                CLEM_LOG("ADB keyb device handler to %0X", lo);
+            }
+            adb->keyb_reg[device_register % 4] = ((unsigned)hi << 8) | lo;
+            break;
+        case CLEM_ADB_DEVICE_MOUSE:
+            if (device_register == 0x3) {
+                if ((hi & 0x0f) != CLEM_ADB_DEVICE_MOUSE) {
+                    /* changing to a device address other than what's standard? */
+                    CLEM_WARN("Attempting to change mouse device to address: %0X", hi);
+                }
+                CLEM_LOG("ADB mouse device handler to %0X", lo);
+            }
+            adb->mouse_reg[device_register % 4] = ((unsigned)hi << 8) | lo;
+            break;
+        default:
+            CLEM_WARN("GLU read device register unsupported: %0X", address);
+            break;
+    }
+}
+
 
 void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
     unsigned device_command = 0;
     unsigned device_address = 0;
-    unsigned param;
-    uint8_t result[16];
+    uint8_t data[8];
 
     switch (adb->cmd_reg) {
         case CLEM_ADB_CMD_ABORT:
             CLEM_LOG("ADB ABORT");
             _clem_adb_send_none(adb);
             return;
+        case CLEM_ADB_CMD_SET_MODES:
+            CLEM_LOG("ADB SET_MODES %02X", adb->cmd_data[0]);
+            _clem_adb_glu_set_mode_flags(adb, adb->cmd_data[0]);
+            _clem_adb_send_none(adb);
+            break;
+        case CLEM_ADB_CMD_CLEAR_MODES:
+            CLEM_LOG("ADB CLEAR_MODES %02X", adb->cmd_data[0]);
+            _clem_adb_glu_clear_mode_flags(adb, adb->cmd_data[0]);
+            _clem_adb_send_none(adb);
+            break;
         case CLEM_ADB_CMD_SET_CONFIG:
             CLEM_LOG("ADB CONFIG: %02X %02X %02X",
                     adb->cmd_data[0],
@@ -646,6 +709,14 @@ void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
             _clem_adb_send_result(adb, 1);
             _clem_adb_add_result(adb, (uint8_t)adb->version);
             return;
+        case CLEM_ADB_CMD_UNDOCUMENTED_12:
+            CLEM_LOG("ADB UNDOC 12: %02X, %02X", adb->cmd_data[0], adb->cmd_data[1]);
+            _clem_adb_send_none(adb);
+            break;
+        case CLEM_ADB_CMD_UNDOCUMENTED_13:
+            CLEM_LOG("ADB UNDOC 13: %02X, %02X", adb->cmd_data[0], adb->cmd_data[1]);
+            _clem_adb_send_none(adb);
+            break;
         default:
             device_command = adb->cmd_reg & 0xf0;
             device_address = adb->cmd_reg & 0x0f;
@@ -674,8 +745,16 @@ void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
             _clem_adb_send_none(adb);
             break;
 
-        case CLEM_ADB_CMD_DEVICE_TRANSMIT_2:
-            CLEM_UNIMPLEMENTED("ADB Transmit: %0X", device_address);
+        case CLEM_ADB_CMD_DEVICE_XMIT_2_R0:
+        case CLEM_ADB_CMD_DEVICE_XMIT_2_R1:
+        case CLEM_ADB_CMD_DEVICE_XMIT_2_R2:
+        case CLEM_ADB_CMD_DEVICE_XMIT_2_R3:
+            CLEM_LOG("ADB XMIT2 ADR: %0X", device_address);
+            _clem_adb_glu_set_register(adb,
+                                       (device_command & 0x80) >> 4,
+                                       device_address,
+                                       adb->cmd_data[0],
+                                       adb->cmd_data[1]);
             _clem_adb_send_none(adb);
             break;
 
@@ -816,6 +895,12 @@ static void _clem_adb_start_cmd(struct ClemensDeviceADB* adb, uint8_t value) {
         case CLEM_ADB_CMD_ABORT:
             _clem_adb_expect_data(adb, 0);
             break;
+        case CLEM_ADB_CMD_SET_MODES:
+            _clem_adb_expect_data(adb, 1);
+            break;
+        case CLEM_ADB_CMD_CLEAR_MODES:
+            _clem_adb_expect_data(adb, 1);
+            break;
         case CLEM_ADB_CMD_SET_CONFIG:
             _clem_adb_expect_data(adb, 3);      /* 3 config bytes */
             break;
@@ -836,6 +921,12 @@ static void _clem_adb_start_cmd(struct ClemensDeviceADB* adb, uint8_t value) {
             break;
         case CLEM_ADB_CMD_VERSION:
             _clem_adb_expect_data(adb, 0);
+            break;
+        case CLEM_ADB_CMD_UNDOCUMENTED_12:
+            _clem_adb_expect_data(adb, 2);
+            break;
+        case CLEM_ADB_CMD_UNDOCUMENTED_13:
+            _clem_adb_expect_data(adb, 2);
             break;
         default:
             parsed_command = false;
@@ -861,8 +952,12 @@ static void _clem_adb_start_cmd(struct ClemensDeviceADB* adb, uint8_t value) {
             _clem_adb_expect_data(adb, 0);
             break;
 
-        case CLEM_ADB_CMD_DEVICE_TRANSMIT_2:
-            CLEM_UNIMPLEMENTED("ADB Transmit: %0X", device_address);
+        case CLEM_ADB_CMD_DEVICE_XMIT_2_R0:
+        case CLEM_ADB_CMD_DEVICE_XMIT_2_R1:
+        case CLEM_ADB_CMD_DEVICE_XMIT_2_R2:
+        case CLEM_ADB_CMD_DEVICE_XMIT_2_R3:
+            /* device will listen for 2 bytes and inject into register RX */
+            _clem_adb_expect_data(adb, 2);
             break;
 
         case CLEM_ADB_CMD_DEVICE_POLL_0:

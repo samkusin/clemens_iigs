@@ -1186,7 +1186,6 @@
 "High":262087,
 "Hint":"Code"}],
 "StatusFlagOverrides":{
-"56207":304,
 "226857":11796739,
 "236343":256,
 "236590":3145984,
@@ -1414,18 +1413,6 @@
 
 "244066":{
 "Text":"Write BRAM 00-FF loop",
-"BoxMode":false,
-"MaxWidth":80,
-"BackgroundColor":0},
-
-"229526":{
-"Text":"This will return to the addressed pushed via PER above.",
-"BoxMode":false,
-"MaxWidth":80,
-"BackgroundColor":0},
-
-"229515":{
-"Text":"This PEA 0001 seems to push an \u0027abort\u0027 command for the ADB which is executed in the ROM routine called below (assuming that the emulation code I\u0027m running is doing the right thing.)",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -2897,11 +2884,18 @@
 "Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"},
 
-"56281":{
-"Label":"SUB_FC_E1_DBR_BANK",
-"Value":16571353,
+"229218":{
+"Label":"SUB_ADB_STARTUP_DIAGS",
+"Value":16744290,
 "Source":"User",
 "Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"244528":{
+"Label":"next",
+"Value":16759600,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{

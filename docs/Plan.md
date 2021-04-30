@@ -10,9 +10,8 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Add ADB Read Memory, Write Memory
-  * RAM starts empty
-  * ROM -- WIP?
+* First pass remaining IO registers
+* C022 Text Color Mode
 * C00C 40 column mode (W)
 * C00D 80 column mode (W)
 * C01F 80COL yes/no state
@@ -41,6 +40,10 @@ This is a running todo list.
 
 ## DONE
 
+* Add ADB SetMode, ClearMode, XMIT 2, UNDOCS 12, 13
+* Add ADB Read Memory, Write Memory
+  * RAM starts empty
+  * ROM -- WIP?
 * Added ADB GetVersion
 * C050, C051 TXTSET
 * C000 CLR80COL - disable 80 column store
