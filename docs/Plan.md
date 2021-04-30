@@ -11,6 +11,7 @@ with ROM1 if possible compatibility.)
 This is a running todo list.
 
 * First pass remaining IO registers
+* Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
 * C022 Text Color Mode
 * C00C 40 column mode (W)
 * C00D 80 column mode (W)

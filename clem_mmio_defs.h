@@ -110,6 +110,12 @@
 #define CLEM_MMIO_REG_SLOTC3ROM         0x0A
 /** Write to enable internal ROM for C300 */
 #define CLEM_MMIO_REG_INTC3ROM          0x0B
+/** Write Switches for toggling 80 column mode display */
+#define CLEM_MMIO_REG_80COLUMN_OFF      0x0C
+#define CLEM_MMIO_REG_80COLUMN_ON       0x0D
+/** Write Alternate Character Set Off/On */
+#define CLEM_MMIO_REG_ALTCHARSET_OFF    0x0E
+#define CLEM_MMIO_REG_ALTCHARSET_ON     0x0F
 /** Read bit 7 for 'any-key down', read or write to clear strobe bit in $C000,
  *  and also provides the last key down - not clear in the //e or IIgs docs.
  * (per https://apple2.org.za/gswv/a2zine/faqs/csa2pfaq.html)
@@ -131,12 +137,26 @@
 #define CLEM_MMIO_REG_READC3ROM         0x17
 /** Bit 7: on = 80COLSTORE on */
 #define CLEM_MMIO_REG_80COLSTORE_TEST   0x18
+/** Bit 7: on = not Vertical Blank  */
+#define CLEM_MMIO_REG_VBLBAR            0x19
 /** Bit 7: on = Full text mode, off = none or mixed */
 #define CLEM_MMIO_REG_TXT_TEST          0x1A
 /** Bit 7: on = Mixed text mode, off = full screen mode */
 #define CLEM_MMIO_REG_MIXED_TEST        0x1B
 /** Bit 7: on = page 2, off = page 1 */
 #define CLEM_MMIO_REG_TXTPAGE2_TEST     0x1C
+/** Bit 7: on = hires mode on */
+#define CLEM_MMIO_REG_HIRES_TEST        0x1D
+/** Bit 7: alternate character set on */
+#define CLEM_MMIO_REG_HIRES_TEST        0x1E
+/** Bit 7: 80 column mode on */
+#define CLEM_MMIO_REG_80COLUMN_TEST     0x1F
+/** Write Bit 7: 1 = monochrome, 0 = color */
+#define CLEM_MMIO_REG_VGC_MONO          0x21
+/** Text: Bits 7-4, background: bits 3-0 color */
+#define CLEM_MMIO_REG_VGC_TEXT_COLOR    0x22
+/** R/W VGC Interrupt Byte */
+#define CLEM_MMIO_REG_VGC_IRQ_BYTE      0x23
 /** Mouse button (bit 7) and movement status (btis 6:0) */
 #define CLEM_MMIO_REG_ADB_MOUSE_DATA    0x24
 /** Mask indicating which modifier keys are pressed */
