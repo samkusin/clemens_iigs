@@ -160,11 +160,16 @@ struct ClemensVGC {
     struct ClemensScanline hgr_2_scanlines[CLEM_VGC_HGR_SCANLINE_COUNT];
     struct ClemensScanline shgr_scanlines[CLEM_VGC_SHGR_SCANLINE_COUNT];
 
-    uint32_t timer_ns;
-    uint32_t vbl_counter;
+    unsigned timer_ns;
+    unsigned vbl_counter;
+    unsigned v_counter;
+    unsigned h_counter;
 
     /* amalgom of possible display modes */
     unsigned mode_flags;
+    unsigned text_fg_color;
+    unsigned text_bg_color;
+    unsigned text_language;
 };
 
 /**

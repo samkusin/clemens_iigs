@@ -454,4 +454,23 @@
 #define CLEM_VGC_HGR_SCANLINE_COUNT         192
 #define CLEM_VGC_SHGR_SCANLINE_COUNT        200
 
+/* Text colors */
+#define CLEM_VGC_COLOR_BLACK                0x00
+#define CLEM_VGC_COLOR_DEEP_RED             0x01
+#define CLEM_VGC_COLOR_DARK_BLUE            0x02
+#define CLEM_VGC_COLOR_PURPLE               0x03
+#define CLEM_VGC_COLOR_DARK_GREEN           0x04
+#define CLEM_VGC_COLOR_DARK_GRAY            0x05
+#define CLEM_VGC_COLOR_MEDIUM_BLUE          0x06
+#define CLEM_VGC_COLOR_LIGHT_BLUE           0x07
+#define CLEM_VGC_COLOR_BROWN                0x08
+#define CLEM_VGC_COLOR_ORANGE               0x09
+#define CLEM_VGC_COLOR_LIGHT_GRAY           0x0A
+#define CLEM_VGC_COLOR_PINK                 0x0B
+#define CLEM_VGC_COLOR_GREEN                0x0C
+#define CLEM_VGC_COLOR_YELLOW               0x0D
+#define CLEM_VGC_COLOR_AQUAMARINE           0x0E
+#define CLEM_VGC_COLOR_WHITE                0x0F
+
+
 #endif

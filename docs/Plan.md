@@ -10,11 +10,11 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* First pass remaining IO registers
+* CLEM_MMIO_REG_VGC_IRQ_BYTE
+* First pass Ensoniq research (ROM is getting to this point)
+* Quality of life host app improvements
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
 * C022 Text Color Mode
-* C00C 40 column mode (W)
-* C00D 80 column mode (W)
 * C01F 80COL yes/no state
 * VGC Pass 0.1 - Find apple ii fonts to use
 * VGC Pass 0.2 - define API to access the text page
@@ -41,6 +41,9 @@ This is a running todo list.
 
 ## DONE
 
+* C00C 40 column mode (W)
+* C00D 80 column mode (W)
+* CLEM_MMIO_REG_LANGSEL
 * Add ADB SetMode, ClearMode, XMIT 2, UNDOCS 12, 13
 * Add ADB Read Memory, Write Memory
   * RAM starts empty
