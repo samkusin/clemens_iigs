@@ -148,7 +148,7 @@
 /** Bit 7: on = hires mode on */
 #define CLEM_MMIO_REG_HIRES_TEST        0x1D
 /** Bit 7: alternate character set on */
-#define CLEM_MMIO_REG_HIRES_TEST        0x1E
+#define CLEM_MMIO_REG_ALTCHARSET_TEST   0x1E
 /** Bit 7: 80 column mode on */
 #define CLEM_MMIO_REG_80COLUMN_TEST     0x1F
 /** Write Bit 7: 1 = monochrome, 0 = color */
@@ -171,8 +171,22 @@
  * the bank latch bit (0), which is always set to 1 AFAIK
  */
 #define CLEM_MMIO_REG_NEWVIDEO          0x29
+/** R/W? Character set language selection and NTSC/PAL region */
+#define CLEM_MMIO_REG_LANGSEL           0x2B
+/** ??? */
+#define CLEM_MMIO_REG_CHARROM_TEST      0x2C
 /** Selects Internal vs Peripheral ROM for slots 1 - 7, bit 0, 3 must be 0 */
 #define CLEM_MMIO_REG_SLOTROMSEL        0x2D
+/** Read Vertical counter bits?? */
+#define CLEM_MMIO_REG_VGC_VERTCNT       0x2E
+/** Read Vertical counter bits?? */
+#define CLEM_MMIO_REG_VGC_HORIZCNT      0x2F
+/** Speaker click */
+#define CLEM_MMIO_REG_SPKR              0x30
+/** Write Disk access 3.5" */
+#define CLEM_MMIO_REG_DISK35            0x31
+/** Write Scan interrupts (VGC, RTC) clear  */
+#define CLEM_MMIO_REG_RTC_SCANINT       0x32
 /** Real time clock data register */
 #define CLEM_MMIO_REG_RTC_DATA          0x33
 /** Real time clock + border colorl joint register */
@@ -253,11 +267,3 @@
 /** Timer (internal, C023 partial) device flags */
 #define CLEM_MMIO_TIMER_1SEC_ENABLED    0x00000040
 #define CLEM_MMIO_TIMER_QSEC_ENABLED    0x00000100
-
-#define CLEM_MMIO_VGC_GRAPHICS_MODE     0x00000001
-#define CLEM_MMIO_VGC_MIXED_TEXT        0x00000002
-#define CLEM_MMIO_VGC_80COLUMN_TEXT     0x00000004
-#define CLEM_MMIO_VGC_LORES             0x00000008
-#define CLEM_MMIO_VGC_HIRES             0x00000010
-#define CLEM_MMIO_VGC_DBLHIRES          0x00000020
-#define CLEM_MMIO_VGC_SUPER_HIRES       0x00000040

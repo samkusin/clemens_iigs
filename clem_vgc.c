@@ -1,5 +1,14 @@
 #include "clem_vgc.h"
 
+/* References:
+
+   Vertical/Horizontal Counters and general VBL timings
+   http://www.1000bit.it/support/manuali/apple/technotes/iigs/tn.iigs.039.html
+
+   VBL particulars:
+   http://www.1000bit.it/support/manuali/apple/technotes/iigs/tn.iigs.040.html
+*/
+
 #define CLEM_VGC_VSYNC_TIME_NS  (1e9/60)
 
 void clem_vgc_init(struct ClemensVGC* vgc) {
@@ -11,6 +20,9 @@ void clem_vgc_init(struct ClemensVGC* vgc) {
 
     vgc->timer_ns = 0;
     vgc->vbl_counter = 0;
+
+    vgc->text_fg_color = CLEM_VGC_COLOR_WHITE;
+    vgc->text_bg_color = CLEM_VGC_COLOR_MEDIUM_BLUE;
 
     /*  text page 1 $0400-$07FF, page 2 = $0800-$0BFF
 
@@ -88,6 +100,37 @@ void clem_vgc_set_mode(struct ClemensVGC* vgc, unsigned mode_flags) {
 void clem_vgc_clear_mode(struct ClemensVGC* vgc, unsigned mode_flags) {
     vgc->mode_flags |= mode_flags;
 }
+
+void clem_vgc_set_text_colors(
+    struct ClemensVGC* vgc,
+    unsigned fg_color,
+    unsigned bg_color
+) {
+    vgc->text_fg_color = fg_color;
+    vgc->text_bg_color = bg_color;
+}
+
+void clem_vgc_set_region(struct ClemensVGC* vgc, uint8_t c02b_value) {
+    if (c02b_value & 0x08) {
+        clem_vgc_set_mode(vgc, CLEM_VGC_LANGUAGE);
+    } else {
+        clem_vgc_clear_mode(vgc, CLEM_VGC_LANGUAGE);
+    }
+    if (c02b_value & 0x10) {
+        clem_vgc_set_mode(vgc, CLEM_VGC_PAL);
+    } else {
+        clem_vgc_clear_mode(vgc, CLEM_VGC_PAL);
+    }
+    vgc->text_language = (c02b_value & 0xe0) >> 5;
+}
+
+uint8_t clem_vgc_get_region(struct ClemensVGC* vgc) {
+    uint8_t result = (vgc->mode_flags & CLEM_VGC_LANGUAGE) ? 0x08 : 0x00;
+    if (vgc->mode_flags & CLEM_VGC_PAL) result |= 0x10;
+    result |= (uint8_t)((vgc->text_language << 5) & 0xe0);
+    return result;
+}
+
 
 
 uint32_t clem_vgc_sync(
