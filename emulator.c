@@ -3044,10 +3044,13 @@ void clemens_emulate(ClemensMachine* clem) {
     mmio->mega2_cycles += delta_mega2_cycles;
     mmio->timer_60hz_us += delta_mega2_cycles;
 
+
     /* background execution of some async devices on the 60 hz timer */
     while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {
         clem_timer_sync(&mmio->dev_timer, CLEM_MEGA2_CYCLES_PER_60TH);
         clem_adb_glu_sync(&mmio->dev_adb, CLEM_MEGA2_CYCLES_PER_60TH);
+        /* TODO: move sound into the frequent update loop 16khz? */
+        clem_sound_glu_sync(&mmio->dev_audio, CLEM_MEGA2_CYCLES_PER_60TH);
         mmio->timer_60hz_us -= CLEM_MEGA2_CYCLES_PER_60TH;
     }
 

@@ -201,14 +201,24 @@
  * items... (disk input?)
  */
 #define CLEM_MMIO_REG_SPEED             0x36
-/** SCC Command Register A */
-#define CLEM_MMIO_REG_SCC_A_CMD         0x39
-/** SCC Data Register A */
-#define CLEM_MMIO_REG_SCC_A_DATA        0x3B
 /** SCC Command Register B */
 #define CLEM_MMIO_REG_SCC_B_CMD         0x38
+/** SCC Command Register A */
+#define CLEM_MMIO_REG_SCC_A_CMD         0x39
 /** SCC Data Register B */
 #define CLEM_MMIO_REG_SCC_B_DATA        0x3A
+/** SCC Data Register A */
+#define CLEM_MMIO_REG_SCC_A_DATA        0x3B
+
+/** Sound GLU Control Register */
+#define CLEM_MMIO_REG_AUDIO_CTL         0x3C
+/** Sound GLU Read/Write Data Register */
+#define CLEM_MMIO_REG_AUDIO_DATA        0x3D
+/** Sound GLU Data Address Lo byte Register */
+#define CLEM_MMIO_REG_AUDIO_ADRLO       0x3E
+/** Sound GLU Data Address Hi byte Register */
+#define CLEM_MMIO_REG_AUDIO_ADRHI       0x3F
+
 /** Various Mega II specific interrupt flags likely used only by firmware */
 #define CLEM_MMIO_REG_DIAG_INTTYPE      0x46
 /** R/W Display graphics mode - will be mixed if correct flags are set */
