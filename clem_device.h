@@ -133,7 +133,7 @@ void clem_sound_write_switch(struct ClemensDeviceAudio* glu, uint8_t ioreg,
  * @param flags Access flags used to determine if the read is a no-op
  * @return uint8_t The value read from the MMIO register
  */
-uint8_t clem_adb_read_switch(struct ClemensDeviceAudio* glu, uint8_t ioreg,
+uint8_t clem_sound_read_switch(struct ClemensDeviceAudio* glu, uint8_t ioreg,
                              uint8_t flags);
 
 

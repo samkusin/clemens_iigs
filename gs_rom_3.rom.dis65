@@ -1002,6 +1002,11 @@
 "Hint":"Code"},
 
 {
+"Low":260865,
+"High":260869,
+"Hint":"InlineData"},
+
+{
 "Low":260888,
 "High":260888,
 "Hint":"InlineData"},
@@ -1186,6 +1191,7 @@
 "High":262087,
 "Hint":"Code"}],
 "StatusFlagOverrides":{
+"56207":304,
 "226857":11796739,
 "236343":256,
 "236590":3145984,
@@ -1413,6 +1419,30 @@
 
 "244066":{
 "Text":"Write BRAM 00-FF loop",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"229526":{
+"Text":"This will return to the addressed pushed via PER above.",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"229515":{
+"Text":"This PEA 0001 seems to push an \u0027abort\u0027 command for the ADB which is executed in the ROM routine called below (assuming that the emulation code I\u0027m running is doing the right thing.)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244557":{
+"Text":"I *THINK* we are finally checking peripherals for disk access",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"260578":{
+"Text":"Scan from slot 7 to slot 5 for card ROM\r\n",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -2884,18 +2914,46 @@
 "Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"},
 
-"229218":{
-"Label":"SUB_ADB_STARTUP_DIAGS",
-"Value":16744290,
+"56281":{
+"Label":"SUB_FC_E1_DBR_BANK",
+"Value":16571353,
 "Source":"User",
 "Type":"GlobalAddr",
 "LabelAnno":"None"},
 
 "244528":{
-"Label":"next",
+"Label":"next_x",
 "Value":16759600,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"260578":{
+"Label":"SUB_TMP_SELROMSLOT",
+"Value":16775650,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"260614":{
+"Label":"next_y",
+"Value":16775686,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"260600":{
+"Label":"next_slot",
+"Value":16775672,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"260790":{
+"Label":"FWR_SLOOP_00",
+"Value":16775862,
+"Source":"User",
+"Type":"GlobalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -3188,6 +3246,36 @@
 "Part":"Low"}},
 
 "227066":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"260865":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"260866":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"260867":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"260868":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"260869":{
 "Length":1,
 "Format":"NumericLE",
 "SubFormat":"None",
