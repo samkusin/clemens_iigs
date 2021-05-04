@@ -96,6 +96,17 @@ struct ClemensDeviceADB {
     uint32_t irq_line;          /**< IRQ flags passed to machine */
 };
 
+struct ClemensDeviceAudio {
+    uint8_t sound_ram[65536];
+
+    unsigned address;           /**< 16-bit address into RAM or registers */
+    unsigned status;            /**< I/O status */
+
+    /* settings */
+    uint8_t volume;             /**< 0 - 15 */
+
+};
+
 /** Really, this is part of the RTC/VGC, but for separation of concerns,
  *  pulling out into its own component
  */
@@ -200,6 +211,7 @@ struct ClemensMMIO {
     struct ClemensDeviceADB dev_adb;
     struct ClemensDeviceTimer dev_timer;
     struct ClemensDeviceDebugger dev_debug;
+    struct ClemensDeviceAudio dev_audio;
 
     /* Registers that do not fall easily within a device struct */
     uint32_t mmap_register;     // memory map flags- CLEM_MMIO_MMAP_

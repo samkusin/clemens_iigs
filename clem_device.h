@@ -100,6 +100,42 @@ void clem_adb_write_switch(struct ClemensDeviceADB* adb, uint8_t ioreg,
 uint8_t clem_adb_read_switch(struct ClemensDeviceADB* adb, uint8_t ioreg,
                              uint8_t flags);
 
+/**
+ * @brief Resets the Sound state
+ *
+ * @param glu sound data
+ */
+void clem_sound_reset(struct ClemensDeviceAudio* glu);
+
+/**
+ * @brief Executed frequently enough to emulate the GLU Microcontroller
+ *
+ * @param glu device data (1 ms worth of cycles?)
+ * @param delta_us Microsecond increment since last sync
+ */
+void clem_sound_glu_sync(struct ClemensDeviceAudio* glu, uint32_t delta_us);
+
+/**
+ * @brief Executed from the memory subsystem for MMIO
+ *
+ * @param glu GLU data
+ * @param ioreg The MMIO register accessed
+ * @param value The value written to the MMIO register
+ */
+void clem_sound_write_switch(struct ClemensDeviceAudio* glu, uint8_t ioreg,
+                             uint8_t value);
+
+/**
+ * @brief Executed from the memory subsystem for MMIO
+ *
+ * @param glu GLU data
+ * @param ioreg The MMIO register accessed
+ * @param flags Access flags used to determine if the read is a no-op
+ * @return uint8_t The value read from the MMIO register
+ */
+uint8_t clem_adb_read_switch(struct ClemensDeviceAudio* glu, uint8_t ioreg,
+                             uint8_t flags);
+
 
 #ifdef __cplusplus
 }
