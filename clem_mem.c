@@ -479,6 +479,18 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_RTC_DATA:
             result = mmio->dev_rtc.data_c033;
             break;
+        case CLEM_MMIO_REG_AUDIO_CTL:
+            result = clem_sound_read_switch(&mmio->dev_audio, ioreg, flags);
+            break;
+        case CLEM_MMIO_REG_AUDIO_DATA:
+            result = clem_sound_read_switch(&mmio->dev_audio, ioreg, flags);
+            break;
+        case CLEM_MMIO_REG_AUDIO_ADRLO:
+            result = clem_sound_read_switch(&mmio->dev_audio, ioreg, flags);
+            break;
+        case CLEM_MMIO_REG_AUDIO_ADRHI:
+            result = clem_sound_read_switch(&mmio->dev_audio, ioreg, flags);
+            break;
         case CLEM_MMIO_REG_DIAG_INTTYPE:
             if (!is_noop) {
                 CLEM_WARN("IO C046 partial impl");
@@ -661,6 +673,18 @@ static void _clem_mmio_write(
             break;
         case CLEM_MMIO_REG_SCC_A_DATA:
             CLEM_WARN("ioreg %02X <- %02X TODO", ioreg, data);
+            break;
+        case CLEM_MMIO_REG_AUDIO_CTL:
+            clem_sound_write_switch(&mmio->dev_audio, ioreg, data);
+            break;
+        case CLEM_MMIO_REG_AUDIO_DATA:
+            clem_sound_write_switch(&mmio->dev_audio, ioreg, data);
+            break;
+        case CLEM_MMIO_REG_AUDIO_ADRLO:
+            clem_sound_write_switch(&mmio->dev_audio, ioreg, data);
+            break;
+        case CLEM_MMIO_REG_AUDIO_ADRHI:
+            clem_sound_write_switch(&mmio->dev_audio, ioreg, data);
             break;
         case CLEM_MMIO_REG_TXTCLR:
             clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_GRAPHICS_MODE);
@@ -909,20 +933,21 @@ static void _clem_mmio_memory_map(
             page_B01->flags |= CLEM_MMIO_PAGE_IOADDR;
             for (page_idx = 0xC1; page_idx < 0xC8; ++page_idx) {
                 unsigned slot_idx = ((page_idx - 1) & 0xf) >> 4;
-                bool slotcx_page = (memory_flags & CLEM_MMIO_MMAP_CXROM) || (
+                /* INTCXROM from IIgs specific status reg takes precedence */
+                bool intcx_page = !(memory_flags & CLEM_MMIO_MMAP_CXROM) || !(
                     memory_flags & (CLEM_MMIO_MMAP_C1ROM << slot_idx));
 
                 // TODO: peripheral ROM and slot 3 switch
                 page_B00 = &page_map_B00->pages[page_idx];
                 page_B01 = &page_map_B01->pages[page_idx];
-                if (slotcx_page) {
+                if (intcx_page) {
+                    _clem_mmio_create_page_mapping(page_B00, page_idx, 0xff, 0x00);
+                    _clem_mmio_create_page_mapping(page_B01, page_idx, 0xff, 0x01);
+                } else {
                     _clem_mmio_create_page_mapping(page_B00, slot_idx, 0x00, 0x00);
                     _clem_mmio_create_page_mapping(page_B01, slot_idx, 0x00, 0x00);
                     page_B00->flags |= CLEM_MMIO_PAGE_CARDMEM;
                     page_B01->flags |= CLEM_MMIO_PAGE_CARDMEM;
-                } else {
-                    _clem_mmio_create_page_mapping(page_B00, page_idx, 0xff, 0x00);
-                    _clem_mmio_create_page_mapping(page_B01, page_idx, 0xff, 0x01);
                 }
                 page_B00->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
                 page_B01->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
@@ -946,18 +971,18 @@ static void _clem_mmio_memory_map(
         if (remap_flags & CLEM_MMIO_MMAP_CROM) {
             for (page_idx = 0xC1; page_idx < 0xC8; ++page_idx) {
                 unsigned slot_idx = ((page_idx - 1) & 0xf) >> 4;
-                bool slotcx_page = (memory_flags & CLEM_MMIO_MMAP_CXROM) || (
+                bool intcx_page = !(memory_flags & CLEM_MMIO_MMAP_CXROM) || !(
                     memory_flags & (CLEM_MMIO_MMAP_C1ROM << slot_idx));
                 page_BE0 = &page_map_BE0->pages[page_idx];
                 page_BE1 = &page_map_BE1->pages[page_idx];
-                if (slotcx_page) {
+                if (intcx_page) {
+                    _clem_mmio_create_page_mapping(page_BE0, page_idx, 0xff, 0xe0);
+                    _clem_mmio_create_page_mapping(page_BE1, page_idx, 0xff, 0xe1);
+                } else {
                     _clem_mmio_create_page_mapping(page_BE0, slot_idx, 0x00, 0x00);
                     _clem_mmio_create_page_mapping(page_BE1, slot_idx, 0x00, 0x00);
                     page_B00->flags |= CLEM_MMIO_PAGE_CARDMEM;
                     page_B01->flags |= CLEM_MMIO_PAGE_CARDMEM;
-                } else {
-                    _clem_mmio_create_page_mapping(page_BE0, page_idx, 0xff, 0xe0);
-                    _clem_mmio_create_page_mapping(page_BE1, page_idx, 0xff, 0xe1);
                 }
                 page_BE0->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
                 page_BE1->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
@@ -1242,8 +1267,11 @@ void clem_read(
                     clem->mmio.card_expansion_rom_index)][offset];
             } else {
                 /* TODO: read from 'phantom' memory? */
-                CLEM_ASSERT(false);
+                *data = 0x00;
+                //CLEM_ASSERT(false);
             }
+            /* assuming reads from card memory via MEGA2 are slow */
+            clocks_spent = clem->clocks_step_mega2;
         } else {
             CLEM_ASSERT(false);
         }

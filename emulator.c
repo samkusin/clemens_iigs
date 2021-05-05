@@ -1161,8 +1161,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 m_status, x_status);
             _cpu_asl(cpu, &tmp_value, m_status);
             _clem_cycle(clem, 1);
-            _clem_write_indexed_816(clem, tmp_value, cpu->regs.DBR, tmp_addr,
-                cpu->regs.X, m_status, x_status);
+            _clem_write_indexed_816(clem, tmp_value, tmp_addr, cpu->regs.X,
+                cpu->regs.DBR, m_status, x_status);
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
             break;
         case CLEM_OPC_ASL_ABS_DP_IDX:

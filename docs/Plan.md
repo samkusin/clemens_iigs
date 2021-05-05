@@ -10,8 +10,9 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
+* Debug ff/bb91 jsr call that eventually segfaults
+  * Do we need to implement ghost banks sooner?
 * CLEM_MMIO_REG_VGC_IRQ_BYTE
-* First pass Ensoniq research (ROM is getting to this point)
 * Quality of life host app improvements
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
 * C022 Text Color Mode
@@ -41,6 +42,7 @@ This is a running todo list.
 
 ## DONE
 
+* First pass Ensoniq research (ROM is getting to this point)
 * C00C 40 column mode (W)
 * C00D 80 column mode (W)
 * CLEM_MMIO_REG_LANGSEL
