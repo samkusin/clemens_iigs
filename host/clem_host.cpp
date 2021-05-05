@@ -51,12 +51,12 @@ ClemensHost::ClemensHost() :
   emulationRunTarget_(0xffffffff),
   cpuRegsSaved_ {},
   cpuPinsSaved_ {},
-  cpu6502EmulationSaved_(true)
+  cpu6502EmulationSaved_(true),
+  widgetInputContext_(InputContext::None)
 {
   void* slabMemory = malloc(kSlabMemorySize);
   slab_ = cinek::FixedStack(kSlabMemorySize, slabMemory);
   executedInstructions_.reserve(1024);
-
   memoryViewStatic_[0].HandlerContext = this;
   memoryViewStatic_[0].ReadFn = &ClemensHost::emulatorImGuiMemoryRead;
   memoryViewStatic_[0].WriteFn = &ClemensHost::emulatorImguiMemoryWrite;
@@ -290,16 +290,24 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   windowSize.y = std::max(kMinDebugTerminalHeight, height * kMinDebugTerminalScalar);
   ImGui::SetNextWindowPos(windowCursorPos);
   ImGui::SetNextWindowSize(windowSize);
+  if (widgetInputContext_ == InputContext::TerminalKeyboardFocus) {
+    // hacky - but unsure how else to keep my terminal in focus
+    ImGui::SetNextWindowFocus();
+  }
   ImGui::Begin("Terminal", nullptr, ImGuiWindowFlags_NoResize |
                                     ImGuiWindowFlags_NoCollapse );
   {
-    bool terminalInFocus =  ImGui::IsWindowFocused();
     char buffer[128] = "";
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetStyleColorVec4(ImGuiCol_WindowBg));
     ImGui::Text(">");
     ImGui::SameLine();
     float xpos = ImGui::GetCursorPosX();
     ImGui::SetNextItemWidth(windowSize.x - xpos - ImGui::GetStyle().WindowPadding.x);
+
+    if (widgetInputContext_ == InputContext::TerminalKeyboardFocus) {
+      ImGui::SetKeyboardFocusHere(0);
+      widgetInputContext_ = InputContext::None;
+    }
 
     if (ImGui::InputText("", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
       terminalOutput_.clear();
@@ -310,7 +318,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
       } else {
         fv.format("Error.");
       }
-      ImGui::SetKeyboardFocusHere(-1);
+      widgetInputContext_ = InputContext::TerminalKeyboardFocus;
     }
     for (auto it = terminalOutput_.begin(); it != terminalOutput_.end();) {
       ImGui::Text(terminalOutput_.data() + (it - terminalOutput_.begin()));
@@ -323,10 +331,12 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   ImGui::End();
 
   windowCursorPos.x += windowSize.x;
+
   ImVec2 memoryViewSize {windowSize.x, windowSize.y};
   ImVec2 memoryViewCursor {windowCursorPos};
   ImGui::SetNextWindowPos(memoryViewCursor);
   ImGui::SetNextWindowSize(memoryViewSize);
+
   ImGui::Begin("Context", nullptr, ImGuiWindowFlags_NoResize |
                                    ImGuiWindowFlags_NoCollapse |
                                    ImGuiWindowFlags_NoBringToFrontOnFocus);
@@ -339,8 +349,10 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[0],
                        nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
     uint8_t viewBank = memoryViewBank_[0];
-    memoryViewStatic_[0].DrawContents((void*)
-      (void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
+    if (!isRunningEmulation() || isRunningEmulationStep()) {
+      memoryViewStatic_[0].DrawContents((void*)
+        (void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
+    }
   }
   ImGui::End();
   memoryViewCursor.x += memoryViewSize.x;
@@ -353,8 +365,10 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[1],
                        nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
     uint8_t viewBank = memoryViewBank_[1];
-    memoryViewStatic_[1].DrawContents((void*)
-      (void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
+    if (!isRunningEmulation() || isRunningEmulationStep()) {
+      memoryViewStatic_[1].DrawContents((void*)
+        (void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
+    }
   }
   ImGui::End();
 }
@@ -572,7 +586,7 @@ bool ClemensHost::parseCommandRun(const char* line)
   }
   if (!start) {
     emulationStepCount_ = 0;
-    emulationRunTarget_ = 0x80000000;
+    emulationRun(0x00ffffff);
     return true;
   }
   return parseCommandToken(start,
@@ -580,12 +594,7 @@ bool ClemensHost::parseCommandRun(const char* line)
       char number[16];
       strncpy(number, start, std::min(sizeof(number) - 1, size_t(end - start)));
       number[15] = '\0';
-      emulationRunTarget_ = strtol(number, nullptr, 16);
-      emulationStepCount_ = 0;
-      if (emulationRunTarget_ > 0x00ffffff) {
-        emulationRunTarget_ = 0xffffffff;
-      }
-      return true;
+      return emulationRun(strtol(number, nullptr, 16));
     });
 }
 
@@ -660,15 +669,30 @@ void ClemensHost::stepMachine(int stepCount)
   sampleDuration_ = 0.0f;
 }
 
+bool ClemensHost::emulationRun(unsigned target) {
+  emulationRunTarget_ = target;
+  emulationStepCount_ = 0;
+  if (emulationRunTarget_ > 0x00ffffff) {
+    return false;
+  }
+  clemens_opcode_callback(&machine_, NULL, NULL);
+  return true;
+}
+
 void ClemensHost::emulationBreak()
 {
   emulationRunTarget_ = 0xffffffff;
   emulationStepCount_ = 0;
+  clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
 }
 
 bool ClemensHost::isRunningEmulation() const
 {
   return (emulationStepCount_ > 0 || emulationRunTarget_ != 0xffffffff);
+}
+
+bool ClemensHost::isRunningEmulationStep() const {
+  return isRunningEmulation() && emulationStepCount_ > 0;
 }
 
 void ClemensHost::emulatorOpcodePrint(

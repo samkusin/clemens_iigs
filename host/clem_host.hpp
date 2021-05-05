@@ -49,9 +49,11 @@ private:
   void destroyMachine();
   void resetMachine();
   void stepMachine(int stepCount);
+  bool emulationRun(unsigned target);
   void emulationBreak();
 
   bool isRunningEmulation() const;
+  bool isRunningEmulationStep() const;
 
   static void emulatorOpcodePrint(struct ClemensInstruction* inst,
                                   const char* operand,
@@ -89,6 +91,13 @@ private:
     char opcode[4];
     char operand[24];
   };
+
+  enum class InputContext {
+    None,
+    TerminalKeyboardFocus
+  };
+
+  InputContext widgetInputContext_;
 
   std::vector<ExecutedInstruction> executedInstructions_;
   MemoryEditor memoryViewStatic_[2];
