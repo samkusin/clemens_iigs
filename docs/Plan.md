@@ -33,6 +33,8 @@ This is a running todo list.
 * C039 Register (Serial Communications Command register )
 * Border screen color
 * Data accesses across banks are allowed (but not stack accesses?)
+* Audit Direct Page in emulation mode (wrap zero page, only if D=0000 for 6502
+  instructions, but for 65816 instructions there is no wrapping?)
 * Emulation vs Native on some microinstructions (i.e. choosing a long address mode while in emulation does... what?)
 * Test ROM iteration?
 * Ghosting banks?
