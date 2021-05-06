@@ -515,6 +515,14 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_TXTPAGE2:
             _clem_mmio_memory_map(mmio, mmio->mmap_register | CLEM_MMIO_MMAP_TXTPAGE2);
             break;
+        case CLEM_MMIO_REG_LORES:
+            /* implicitly clears hires */
+            clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_LORES);
+            break;
+        case CLEM_MMIO_REG_HIRES:
+            /* implicitly clears lores */
+            clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_HIRES);
+            break;
         case CLEM_MMIO_REG_BTN0:
         case CLEM_MMIO_REG_BTN1:
             result = clem_adb_read_switch(&mmio->dev_adb, ioreg, flags);
@@ -705,6 +713,14 @@ static void _clem_mmio_write(
             break;
         case CLEM_MMIO_REG_TXTPAGE2:
             _clem_mmio_memory_map(mmio, mmio->mmap_register | CLEM_MMIO_MMAP_TXTPAGE2);
+            break;
+        case CLEM_MMIO_REG_LORES:
+            /* implicitly clears hires */
+            clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_LORES);
+            break;
+        case CLEM_MMIO_REG_HIRES:
+            /* implicitly clears lores */
+            clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_HIRES);
             break;
         case CLEM_MMIO_REG_STATEREG:
             _clem_mmio_statereg_c068_set(mmio, data);
