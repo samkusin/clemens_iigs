@@ -2137,11 +2137,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_PLD:
             _clem_cycle(clem, 2);
-            //  65816 quirk - PHD can overrun the valid stack range
-            _clem_read_16(clem, &cpu->regs.D, cpu->regs.S, 0x00,
+            _clem_read_16(clem, &cpu->regs.D, cpu->regs.S + 1, 0x00,
                               CLEM_MEM_FLAG_DATA);
-            _cpu_p_flags_n_z_data_16(cpu, cpu->regs.D);
             _cpu_sp_inc2(cpu);
+            _cpu_p_flags_n_z_data_16(cpu, cpu->regs.D);
             break;
         case CLEM_OPC_PLP:
             // In emulation, the B flag is not restored - it should
@@ -2151,11 +2150,11 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_opc_pull_status(clem);
             break;
         case CLEM_OPC_PLX:
-            _clem_opc_push_reg_816(clem, cpu->regs.X, x_status);
+            _clem_opc_pull_reg_816(clem, &cpu->regs.X, x_status);
             _cpu_p_flags_n_z_data_816(cpu, cpu->regs.X, x_status);
             break;
         case CLEM_OPC_PLY:
-            _clem_opc_push_reg_816(clem, cpu->regs.Y, x_status);
+            _clem_opc_pull_reg_816(clem, &cpu->regs.Y, x_status);
             _cpu_p_flags_n_z_data_816(cpu, cpu->regs.Y, x_status);
             break;
         case CLEM_OPC_REP:

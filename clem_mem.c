@@ -533,7 +533,9 @@ static uint8_t _clem_mmio_read(
             result = _clem_mmio_read_bank_select(mmio, ioreg, flags);
             break;
         default:
-            if (!is_noop) {
+            if (ioreg >= 0x71 && ioreg < 0x80) {
+                result = clem->fpi_bank_map[0xff][0xc000 | ioreg];
+            } else if (!is_noop) {
                 clem_debug_break(&mmio->dev_debug, &clem->cpu,
                                  CLEM_DEBUG_BREAK_UNIMPL_IOREAD, addr, 0x0000);
             }
