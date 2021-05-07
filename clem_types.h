@@ -64,6 +64,12 @@ struct ClemensDeviceMouse {
     int y;
 };
 
+struct ClemensDeviceGameport {
+    uint8_t paddle[4];
+    uint8_t btn_mask;
+    uint8_t ann_mask;
+};
+
 struct ClemensDeviceADB {
     unsigned state;
     unsigned version;           /* Different ROMs expect different versions */
@@ -90,6 +96,7 @@ struct ClemensDeviceADB {
 
     struct ClemensDeviceKeyboard keyb;
     struct ClemensDeviceMouse mouse;
+    struct ClemensDeviceGameport gameport;
 
     uint8_t ram[256];           /**< Microcontroller RAM */
 

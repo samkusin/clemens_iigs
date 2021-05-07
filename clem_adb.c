@@ -1144,6 +1144,30 @@ uint8_t clem_adb_read_switch(
                 return 0x80;
             }
             break;
+        case CLEM_MMIO_REG_AN0_OFF:
+            adb->gameport.ann_mask &= ~0x1;
+            break;
+        case CLEM_MMIO_REG_AN0_ON:
+            adb->gameport.ann_mask |= 0x1;
+            break;
+        case CLEM_MMIO_REG_AN1_OFF:
+            adb->gameport.ann_mask &= ~0x2;
+            break;
+        case CLEM_MMIO_REG_AN1_ON:
+            adb->gameport.ann_mask |= 0x2;
+            break;
+        case CLEM_MMIO_REG_AN2_OFF:
+            adb->gameport.ann_mask &= ~0x4;
+            break;
+        case CLEM_MMIO_REG_AN2_ON:
+            adb->gameport.ann_mask |= 0x4;
+            break;
+        case CLEM_MMIO_REG_AN3_OFF:
+            adb->gameport.ann_mask &= ~0x8;
+            break;
+        case CLEM_MMIO_REG_AN3_ON:
+            adb->gameport.ann_mask |= 0x8;
+            break;
         default:
             if (!CLEM_IS_MMIO_READ_NO_OP(flags)) {
                 CLEM_WARN("Unimplemented ADB read %02X", ioreg);
