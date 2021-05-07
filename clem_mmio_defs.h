@@ -232,6 +232,10 @@
 /** R/W enable page 1 or page 2 text modified by 80COLSTORE */
 #define CLEM_MMIO_REG_TXTPAGE1          0x54
 #define CLEM_MMIO_REG_TXTPAGE2          0x55
+/** R/W enable lo-res graphics */
+#define CLEM_MMIO_REG_LORES             0x56
+/** R/W enable lo-res graphics */
+#define CLEM_MMIO_REG_HIRES             0x57
 /** Joystick Button 3 */
 #define CLEM_MMIO_REG_BTN3              0x62
 /** Open Apple Key or Joystick Button 0 */

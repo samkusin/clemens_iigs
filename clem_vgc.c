@@ -94,11 +94,14 @@ void clem_vgc_init(struct ClemensVGC* vgc) {
 }
 
 void clem_vgc_set_mode(struct ClemensVGC* vgc, unsigned mode_flags) {
-    vgc->mode_flags &= ~mode_flags;
+    if (mode_flags & CLEM_VGC_RESOLUTION_MASK) {
+        mode_flags &= ~CLEM_VGC_RESOLUTION_MASK;
+    }
+    vgc->mode_flags |= mode_flags;
 }
 
 void clem_vgc_clear_mode(struct ClemensVGC* vgc, unsigned mode_flags) {
-    vgc->mode_flags |= mode_flags;
+    vgc->mode_flags &= ~mode_flags;
 }
 
 void clem_vgc_set_text_colors(
