@@ -118,6 +118,11 @@ uint8_t clem_sound_read_switch(
         case CLEM_MMIO_REG_AUDIO_ADRHI:
             result = (uint8_t)((glu->address >> 8) & 0x00ff);
             break;
+        case CLEM_MMIO_REG_SPKR:
+            if (!CLEM_IS_MMIO_READ_NO_OP(flags)) {
+            }
+            result = 0x00;
+            break;
         default:
             result = 0x00;
             break;

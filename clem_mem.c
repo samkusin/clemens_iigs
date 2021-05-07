@@ -464,6 +464,13 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_SLOTROMSEL:
             result = _clem_mmio_slotromsel_c02d(mmio);
             break;
+        case CLEM_MMIO_REG_SPKR:
+            result = clem_sound_read_switch(&mmio->dev_audio, ioreg, flags);
+            break;
+        case CLEM_MMIO_REG_DISK35:
+            result = 0x00;
+            //result = clem_iwm_read_switch(&mmio->dev_iwm, ioreg, flags);
+            break;
         case CLEM_MMIO_REG_SHADOW:
             result = _clem_mmio_shadow_c035(mmio);
             break;
@@ -523,6 +530,14 @@ static uint8_t _clem_mmio_read(
             /* implicitly clears lores */
             clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_HIRES);
             break;
+        case CLEM_MMIO_REG_AN0_OFF:
+        case CLEM_MMIO_REG_AN0_ON:
+        case CLEM_MMIO_REG_AN1_OFF:
+        case CLEM_MMIO_REG_AN1_ON:
+        case CLEM_MMIO_REG_AN2_OFF:
+        case CLEM_MMIO_REG_AN2_ON:
+        case CLEM_MMIO_REG_AN3_OFF:
+        case CLEM_MMIO_REG_AN3_ON:
         case CLEM_MMIO_REG_BTN0:
         case CLEM_MMIO_REG_BTN1:
             result = clem_adb_read_switch(&mmio->dev_adb, ioreg, flags);
@@ -659,6 +674,9 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_SLOTROMSEL:
             _clem_mmio_slotrom_select_c02d(mmio, data);
             break;
+        case CLEM_MMIO_REG_SPKR:
+            clem_sound_write_switch(&mmio->dev_audio, ioreg, data);
+            break;
         case CLEM_MMIO_REG_RTC_CTL:
             mmio->dev_rtc.ctl_c034 = data;
             clem_rtc_command(&mmio->dev_rtc, clem->clocks_spent, CLEM_IO_WRITE);
@@ -721,6 +739,16 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_HIRES:
             /* implicitly clears lores */
             clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_HIRES);
+            break;
+        case CLEM_MMIO_REG_AN0_OFF:
+        case CLEM_MMIO_REG_AN0_ON:
+        case CLEM_MMIO_REG_AN1_OFF:
+        case CLEM_MMIO_REG_AN1_ON:
+        case CLEM_MMIO_REG_AN2_OFF:
+        case CLEM_MMIO_REG_AN2_ON:
+        case CLEM_MMIO_REG_AN3_OFF:
+        case CLEM_MMIO_REG_AN3_ON:
+            clem_adb_write_switch(&mmio->dev_adb, ioreg, data);
             break;
         case CLEM_MMIO_REG_STATEREG:
             _clem_mmio_statereg_c068_set(mmio, data);

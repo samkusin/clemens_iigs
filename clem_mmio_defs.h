@@ -236,6 +236,16 @@
 #define CLEM_MMIO_REG_LORES             0x56
 /** R/W enable lo-res graphics */
 #define CLEM_MMIO_REG_HIRES             0x57
+/** R/W enable/disable annunciator pins */
+#define CLEM_MMIO_REG_AN0_OFF           0x58
+#define CLEM_MMIO_REG_AN0_ON            0x59
+#define CLEM_MMIO_REG_AN1_OFF           0x5A
+#define CLEM_MMIO_REG_AN1_ON            0x5B
+#define CLEM_MMIO_REG_AN2_OFF           0x5C
+#define CLEM_MMIO_REG_AN2_ON            0x5D
+#define CLEM_MMIO_REG_AN3_OFF           0x5E
+#define CLEM_MMIO_REG_AN3_ON            0x5F
+
 /** Joystick Button 3 */
 #define CLEM_MMIO_REG_BTN3              0x62
 /** Open Apple Key or Joystick Button 0 */
@@ -244,6 +254,14 @@
 #define CLEM_MMIO_REG_BTN1              0x62
 /** Joystick Button 2 */
 #define CLEM_MMIO_REG_BTN2              0x63
+/** Paddle 0 */
+#define CLEM_MMIO_REG_PADDL0            0x64
+/** Paddle 1 */
+#define CLEM_MMIO_REG_PADDL1            0x65
+/** Paddle 2 */
+#define CLEM_MMIO_REG_PADDL2            0x66
+/** Paddle 3 */
+#define CLEM_MMIO_REG_PADDL3            0x67
 /**
  * Amalgom of the C08x registers
  */
