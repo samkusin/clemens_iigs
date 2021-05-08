@@ -10,7 +10,7 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Debug ff/bb91 jsr call that eventually segfaults
+* fc/0305 is the block failing due to legit writes to ghosted memory
   * Do we need to implement ghost banks sooner?
 * CLEM_MMIO_REG_VGC_IRQ_BYTE
 * Quality of life host app improvements
