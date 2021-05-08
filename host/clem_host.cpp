@@ -616,7 +616,7 @@ void ClemensHost::createMachine()
     fread(romMemory, 1, romMemorySize, fp);
     fclose(fp);
   }
-  unsigned fpiBankCount = 16;         // 1MB RAM
+  unsigned fpiBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT;
   // Apple II line (including Mega2) was 1.023mhz
   // A Mega2 cycle is equivalent to 1 full cycle of the 2.8mhz clock
   // TODO: allows 1.023, 2.8, 8mhz without any loss due to integer div

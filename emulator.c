@@ -20,6 +20,8 @@
 #define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
+static uint8_t s_empty_ram[CLEM_IIGS_BANK_SIZE];
+
 
 /*
  * The Clemens Emulator
@@ -830,6 +832,11 @@ int clemens_init(
         return -2;
     }
     /* memory organization for the FPI */
+    /* TODO: Support ROM 01 */
+    memset(s_empty_ram, 0, CLEM_IIGS_BANK_SIZE);
+    for (unsigned i = 0xf0; i < 0xfc; ++i) {
+        machine->fpi_bank_map[i] = s_empty_ram;
+    }
     machine->fpi_bank_map[0xfc] = (uint8_t*)rom;
     machine->fpi_bank_map[0xfd] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE;
     machine->fpi_bank_map[0xfe] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE * 2;
@@ -838,13 +845,14 @@ int clemens_init(
     /* TODO: clear memory according to spec 0x00, 0xff, etc (look it up) */
     if (fpiRAMBankCount > 128) fpiRAMBankCount = 128;
 
-    for (uint8_t i  = 0; i < (uint8_t)fpiRAMBankCount; ++i) {
+    for (unsigned i  = 0; i < fpiRAMBankCount; ++i) {
         machine->fpi_bank_map[i] = ((uint8_t*)fpiRAM) + (i * CLEM_IIGS_BANK_SIZE);
         memset(machine->fpi_bank_map[i], 0, CLEM_IIGS_BANK_SIZE);
     }
     /* TODO: remap non used banks to used banks per the wrapping mechanism on
        the IIgs
     */
+    machine->fpi_bank_map[CLEM_IIGS_EMPTY_RAM_BANK] = s_empty_ram;
     machine->mega2_bank_map[0x00] = (uint8_t*)e0bank;
     memset(machine->mega2_bank_map[0x00], 0, CLEM_IIGS_BANK_SIZE);
     machine->mega2_bank_map[0x01] = (uint8_t*)e1bank;

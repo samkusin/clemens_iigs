@@ -846,6 +846,11 @@
 "Hint":"Code"},
 
 {
+"Low":456,
+"High":456,
+"Hint":"Code"},
+
+{
 "Low":494,
 "High":494,
 "Hint":"Code"},
@@ -853,6 +858,11 @@
 {
 "Low":55990,
 "High":55990,
+"Hint":"Code"},
+
+{
+"Low":131708,
+"High":131708,
 "Hint":"Code"},
 
 {
@@ -928,6 +938,11 @@
 {
 "Low":239225,
 "High":239225,
+"Hint":"Code"},
+
+{
+"Low":239345,
+"High":239345,
 "Hint":"Code"},
 
 {
@@ -1038,6 +1053,11 @@
 {
 "Low":243835,
 "High":243835,
+"Hint":"Code"},
+
+{
+"Low":244248,
+"High":244248,
 "Hint":"Code"},
 
 {
@@ -1340,10 +1360,12 @@
 "High":262087,
 "Hint":"Code"}],
 "StatusFlagOverrides":{
+"456":304,
 "494":304,
 "55630":304,
 "55990":2097424,
 "56207":304,
+"131708":304,
 "226857":11796739,
 "226964":3145984,
 "228339":3145984,
@@ -1352,8 +1374,10 @@
 "236590":3145984,
 "236737":2097424,
 "238899":304,
+"239345":304,
 "244055":304,
 "244080":3408328,
+"244248":304,
 "244311":256,
 "244335":3408128,
 "244431":3408136,
@@ -1648,7 +1672,7 @@
 "BackgroundColor":0},
 
 "773":{
-"Text":"I *think* this code is checking ghosted memory to determine memory of device?",
+"Text":"I *think* this code is checking how much memory is on this machine",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -3312,6 +3336,34 @@
 "260277":{
 "Label":"SUB_EMULATION_MODE",
 "Value":16775349,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"773":{
+"Label":"SUB_ENUM_RAM_BANKS",
+"Value":16515845,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"239345":{
+"Label":"SUB_CHK_ROMTOOLS",
+"Value":16754417,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"239371":{
+"Label":"no_extended_rom",
+"Value":16754443,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"239373":{
+"Label":"STR_ROMTOOLS",
+"Value":16754445,
 "Source":"User",
 "Type":"GlobalAddr",
 "LabelAnno":"None"}},

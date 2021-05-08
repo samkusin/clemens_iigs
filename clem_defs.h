@@ -17,6 +17,8 @@
 /** General Machine Settings */
 #define CLEM_IIGS_BANK_SIZE                 (64 * 1024)
 #define CLEM_IIGS_ROM3_SIZE                 (CLEM_IIGS_BANK_SIZE * 4)
+#define CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT   16
+#define CLEM_IIGS_EMPTY_RAM_BANK            0x81
 
 /** Vector addresses */
 #define CLEM_6502_COP_VECTOR_LO_ADDR        (0xFFF4)
