@@ -451,11 +451,14 @@ static inline void _clem_read_pba_mode_dp_indirectl(
     uint16_t index,
     bool is_index_8
 ) {
+    /* read address located in direct page offset: lo, hi, bank ->
+       eff_addr, eff_bank)
+    */
     uint16_t tmp_addr;
     _clem_read_pba_mode_dp(clem, &tmp_addr, pc, offset, index, is_index_8);
     _clem_read_16(clem, eff_addr, tmp_addr, 0x00, CLEM_MEM_FLAG_DATA);
     //  TODO: direct page wrap? (DH, DL=255 + 1 = DH, 0)?
-    clem_read(clem, eff_bank, tmp_addr + 1, 0x00, CLEM_MEM_FLAG_DATA);
+    clem_read(clem, eff_bank, tmp_addr + 2, 0x00, CLEM_MEM_FLAG_DATA);
 }
 
 static inline void _clem_read_pba_mode_stack_rel(

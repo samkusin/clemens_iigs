@@ -1251,6 +1251,10 @@ void _clem_mmio_init_page_maps(
     memset(&mmio->fpi_mega2_aux_shadow_map, 0,
            sizeof(mmio->fpi_mega2_aux_shadow_map));
 
+    /* brute force initialization of all page maps to ensure every option
+       is executed on startup */
+    mmio->mmap_register = 0xffffffff;
+    _clem_mmio_memory_map(mmio, 0x0000000000);
     _clem_mmio_memory_map(mmio, memory_flags);
 }
 
@@ -1266,10 +1270,14 @@ void _clem_mmio_init(
     mmio->new_video_c029 = CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT;
     mmio->speed_c036 = CLEM_MMIO_SPEED_FAST_ENABLED |
                        CLEM_MMIO_SPEED_POWERED_ON;
-    mmio->mmap_register = CLEM_MMIO_MMAP_NSHADOW | CLEM_MMIO_MMAP_NIOLC;
     mmio->flags_c08x = 0;
     mmio->mega2_cycles = 0;
     mmio->card_expansion_rom_index = -1;
+
+    _clem_mmio_init_page_maps(mmio,
+                              CLEM_MMIO_MMAP_NSHADOW_SHGR |
+                              CLEM_MMIO_MMAP_WRLCRAM |
+                              CLEM_MMIO_MMAP_LCBANK2);
 
     clem_debug_reset(&mmio->dev_debug);
     clem_timer_reset(&mmio->dev_timer);
@@ -1277,12 +1285,6 @@ void _clem_mmio_init(
     clem_adb_reset(&mmio->dev_adb);
     clem_sound_reset(&mmio->dev_audio);
     clem_vgc_init(&mmio->vgc);
-
-    _clem_mmio_init_page_maps(mmio,
-                              CLEM_MMIO_MMAP_NSHADOW_SHGR |
-                              CLEM_MMIO_MMAP_WRLCRAM |
-                              CLEM_MMIO_MMAP_LCBANK2);
-
 }
 
 

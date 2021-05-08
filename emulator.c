@@ -2104,10 +2104,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_cycle(clem, 1);
             //  65816 quirk - PHD can overrun the valid stack range
             clem_write(
-                clem, (uint8_t)(cpu->regs.A >> 8), cpu->regs.S, 0x00,
+                clem, (uint8_t)(cpu->regs.D >> 8), cpu->regs.S, 0x00,
                 CLEM_MEM_FLAG_DATA);
             clem_write(
-                clem, (uint8_t)(cpu->regs.A), cpu->regs.S - 1, 0x00,
+                clem, (uint8_t)(cpu->regs.D), cpu->regs.S - 1, 0x00,
                 CLEM_MEM_FLAG_DATA);
             _cpu_sp_dec2(cpu);
             break;
