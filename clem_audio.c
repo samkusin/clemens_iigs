@@ -98,6 +98,7 @@ uint8_t clem_sound_read_switch(
             if (!CLEM_IS_MMIO_READ_NO_OP(flags)) {
                 if (!(glu->status & CLEM_AUDIO_CTL_READ_MODE)) {
                     glu->status |= CLEM_AUDIO_CTL_READ_MODE;
+                    result = 0x00;
                 } else {
                     if (glu->status & CLEM_AUDIO_CTL_ACCESS_RAM) {
                         result = glu->sound_ram[glu->address & 0xffff];

@@ -207,6 +207,7 @@ struct ClemensMMIO {
     struct ClemensMMIOPageMap fpi_rom_page_map;
     struct ClemensMMIOPageMap mega2_main_page_map;
     struct ClemensMMIOPageMap mega2_aux_page_map;
+    struct ClemensMMIOPageMap empty_page_map;
 
     /* Shadow maps for bank 00, 01 */
     struct ClemensMMIOShadowMap fpi_mega2_main_shadow_map;

@@ -236,9 +236,13 @@ static uint8_t _clem_mmio_inttype_c046(
     return result;
 }
 
+/* For why we don't follow the HW Ref, see important changes documented for
+   STATEREG here:
+   http://www.1000bit.it/support/manuali/apple/technotes/iigs/tn.iigs.030.html
+*/
 static inline uint8_t _clem_mmio_statereg_c068(struct ClemensMMIO* mmio) {
      uint8_t value = 0x00;
-    if (!(mmio->mmap_register & CLEM_MMIO_MMAP_ALTZPLC)) {
+    if (mmio->mmap_register & CLEM_MMIO_MMAP_ALTZPLC) {
         value |= 0x80;
     }
     /* TODO PAGE2 TEXT */
@@ -252,7 +256,7 @@ static inline uint8_t _clem_mmio_statereg_c068(struct ClemensMMIO* mmio) {
     if (!(mmio->mmap_register & CLEM_MMIO_MMAP_RDLCRAM)) {
         value |= 0x08;
     }
-    if (!(mmio->mmap_register & CLEM_MMIO_MMAP_LCBANK2)) {
+    if (mmio->mmap_register & CLEM_MMIO_MMAP_LCBANK2) {
         value |= 0x04;
     }
     if (!(mmio->mmap_register & CLEM_MMIO_MMAP_CXROM)) {
@@ -268,9 +272,9 @@ static uint8_t _clem_mmio_statereg_c068_set(
     uint32_t mmap_register = mmio->mmap_register;
     /*  ALTZP  */
     if (value & 0x80) {
-        mmap_register &= ~CLEM_MMIO_MMAP_ALTZPLC;
-    } else {
         mmap_register |= CLEM_MMIO_MMAP_ALTZPLC;
+    } else {
+        mmap_register &= ~CLEM_MMIO_MMAP_ALTZPLC;
     }
     /*  PAGE2 text - TODO when video options are fleshed out */
     if (value & 0x40) {
@@ -298,9 +302,9 @@ static uint8_t _clem_mmio_statereg_c068_set(
     }
     /* LCBNK2 */
     if (value & 0x04) {
-        mmap_register &= ~CLEM_MMIO_MMAP_LCBANK2;
-    } else {
         mmap_register |= CLEM_MMIO_MMAP_LCBANK2;
+    } else {
+        mmap_register &= ~CLEM_MMIO_MMAP_LCBANK2;
     }
     /* ROMBANK always 0 */
     if (value & 0x02) {
@@ -999,15 +1003,19 @@ static void _clem_mmio_memory_map(
                 page_B01->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
             }
             for (page_idx = 0xC8; page_idx < 0xD0; ++page_idx) {
-                if (memory_flags & CLEM_MMIO_MMAP_CXROM) {
+                bool intcx_page = !(memory_flags & CLEM_MMIO_MMAP_CXROM) ||
+                    mmio->card_expansion_rom_index < 0;
+                page_B00 = &page_map_B00->pages[page_idx];
+                page_B01 = &page_map_B01->pages[page_idx];
+                if (intcx_page) {
+                    /* internal ROM */
+                    _clem_mmio_create_page_mapping(page_B00, page_idx, 0xff, 0x00);
+                    _clem_mmio_create_page_mapping(page_B01, page_idx, 0xff, 0x01);
+                } else {
                     _clem_mmio_create_page_mapping(page_B00, page_idx - 0xc8, 0xcc, 0xcc);
                     _clem_mmio_create_page_mapping(page_B01, page_idx - 0xc8, 0xcc, 0xcc);
                     page_B00->flags |= CLEM_MMIO_PAGE_CARDMEM;
                     page_B01->flags |= CLEM_MMIO_PAGE_CARDMEM;
-                } else {
-                    /* internal ROM */
-                    _clem_mmio_create_page_mapping(page_B00, page_idx, 0xff, 0x00);
-                    _clem_mmio_create_page_mapping(page_B01, page_idx, 0xff, 0x01);
                 }
                 page_B00->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
                 page_B01->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
@@ -1035,15 +1043,19 @@ static void _clem_mmio_memory_map(
 
             }
             for (page_idx = 0xC8; page_idx < 0xD0; ++page_idx) {
-                if (memory_flags & CLEM_MMIO_MMAP_CXROM) {
+                bool intcx_page = !(memory_flags & CLEM_MMIO_MMAP_CXROM) ||
+                    mmio->card_expansion_rom_index < 0;
+                page_BE0 = &page_map_BE0->pages[page_idx];
+                page_BE1 = &page_map_BE1->pages[page_idx];
+                if (intcx_page) {
+                    /* internal ROM */
+                    _clem_mmio_create_page_mapping(page_BE0, page_idx, 0xff, 0xe0);
+                    _clem_mmio_create_page_mapping(page_BE1, page_idx, 0xff, 0xe1);
+                } else {
                     _clem_mmio_create_page_mapping(page_BE0, page_idx-0xc8, 0xcc, 0xcc);
                     _clem_mmio_create_page_mapping(page_BE1, page_idx-0xc8, 0xcc, 0xcc);
                     page_BE0->flags |= CLEM_MMIO_PAGE_CARDMEM;
                     page_BE1->flags |= CLEM_MMIO_PAGE_CARDMEM;
-                } else {
-                    /* internal ROM */
-                    _clem_mmio_create_page_mapping(page_BE0, page_idx, 0xff, 0xe0);
-                    _clem_mmio_create_page_mapping(page_BE1, page_idx, 0xff, 0xe1);
                 }
                 page_BE0->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
                 page_BE1->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
@@ -1177,6 +1189,20 @@ void _clem_mmio_init_page_maps(
 
     //  Bank 00, 01 as RAM
     //  TODO need to mask bank for main and aux page maps
+
+    page_map = &mmio->empty_page_map;
+    page_map->shadow_map = NULL;
+    for (page_idx = 0x00; page_idx < 0x100; ++page_idx) {
+        /* using a non-valid IIgs bank here that's not writable. */
+        page = &page_map->pages[page_idx];
+        _clem_mmio_create_page_mapping(
+            page,
+            page_idx,
+            CLEM_IIGS_EMPTY_RAM_BANK,
+            CLEM_IIGS_EMPTY_RAM_BANK);
+        page->flags &= ~CLEM_MMIO_PAGE_WRITE_OK;
+    }
+
     page_map = &mmio->fpi_main_page_map;
     page_map->shadow_map = &mmio->fpi_mega2_main_shadow_map;
     for (page_idx = 0x00; page_idx < 0x100; ++page_idx) {
@@ -1189,7 +1215,7 @@ void _clem_mmio_init_page_maps(
         _clem_mmio_create_page_mainaux_mapping(
             &page_map->pages[page_idx], page_idx, 0x01);
     }
-    //  Banks 02-7F typically
+    //  Banks 02-7f typically (if expanded memory is available)
     page_map = &mmio->fpi_direct_page_map;
     page_map->shadow_map = NULL;
     for (page_idx = 0x00; page_idx < 0x100; ++page_idx) {
@@ -1237,11 +1263,20 @@ void _clem_mmio_init_page_maps(
     memset(&mmio->bank_page_map, 0, sizeof(mmio->bank_page_map));
     mmio->bank_page_map[0x00] = &mmio->fpi_main_page_map;
     mmio->bank_page_map[0x01] = &mmio->fpi_aux_page_map;
-    for (bank_idx = 0x02; bank_idx < 0x80; ++bank_idx) {
+
+    for (bank_idx = 0x02; bank_idx < CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->fpi_direct_page_map;
+    }
+    /* TODO: handle expansion RAM */
+    for (bank_idx = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT; bank_idx < 0x80; ++bank_idx) {
+        mmio->bank_page_map[bank_idx] = &mmio->empty_page_map;
     }
     mmio->bank_page_map[0xE0] = &mmio->mega2_main_page_map;
     mmio->bank_page_map[0xE1] = &mmio->mega2_aux_page_map;
+    /* TODO: handle expansion ROM and 128K firmware ROM 01*/
+    for (bank_idx = 0xF0; bank_idx < 0xFC; ++bank_idx) {
+        mmio->bank_page_map[bank_idx] = &mmio->empty_page_map;
+    }
     for (bank_idx = 0xFC; bank_idx < 0x100; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->fpi_rom_page_map;
     }
