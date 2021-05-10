@@ -1,6 +1,11 @@
 #include "clem_device.h"
 #include "clem_debug.h"
 
+/* References:
+    https://llx.com/Neil/a2/bram
+    https://vintageapple.org/macbooks/pdf/Inside_Macintosh_Volumes_I-II-III_1985.pdf
+*/
+
 #define CLEM_RTC_C034_FLAG_START_XFER   0x80
 #define CLEM_RTC_C034_FLAG_READ_OP      0x40
 #define CLEM_RTC_C034_FLAG_LAST_BYTE    0x20
@@ -11,7 +16,20 @@
 #define CLEM_RTC_EXECUTE_READ_BRAM          0x02
 #define CLEM_RTC_EXECUTE_RECV_CMD_BRAM_W    0x04
 #define CLEM_RTC_EXECUTE_WRITE_BRAM         0x05
+#define CLEM_RTC_EXECUTE_REG_TEST           0x06
+#define CLEM_RTC_EXECUTE_REG_WRITE_PROTECT  0x07
+#define CLEM_RTC_EXECUTE_REG_UNKNOWN        0x08
 #define CLEM_RTC_EXECUTE_ERROR              0xff
+
+#define CLEM_RTC_CMD_SECONDS_LO             0x00
+#define CLEM_RTC_CMD_SECONDS_HI             0x01
+#define CLEM_RTC_CMD_REGISTER               0x06
+#define CLEM_RTC_CMD_BRAM                   0x07
+
+#define CLEM_RTC_FLAG_WRITE_PROTECT         1
+
+
+
 
 void clem_rtc_reset(
     struct ClemensDeviceRTC* rtc,
@@ -19,6 +37,7 @@ void clem_rtc_reset(
 ) {
     rtc->data_c033 = 0x00;
     rtc->ctl_c034 = 0x00;
+    rtc->flags = 0;
     rtc->xfer_latency_duration = latency;
     rtc->xfer_started_time = CLEM_TIME_UNINITIALIZED;
     rtc->state = CLEM_RTC_EXECUTE_RECV_CMD;
@@ -28,13 +47,30 @@ static void _clem_rtc_dispatch_cmd(
     struct ClemensDeviceRTC* rtc,
     unsigned data
 ) {
-    /* r, c, c, c, c, d, d, d  where r = read, c = cmd, d = data */
     unsigned cmd = (data >> 3) & 0xf;
+    unsigned read = (data & 0x80);
     /* CLEM_LOG("clem_rtc_dispatch: ctl=%02X, data=%02X", rtc->ctl_c034, data); */
     switch (cmd) {
-        case 0x7:
+        case CLEM_RTC_CMD_REGISTER:
+            /* special case registers - write only supported */
+            if (!read) {
+                rtc->index = data & 0x7;
+                if (rtc->index == 0x1) {
+                    rtc->state = CLEM_RTC_EXECUTE_REG_TEST;
+                } else if (rtc->index == 0x5) {
+                    rtc->state = CLEM_RTC_EXECUTE_REG_WRITE_PROTECT;
+                } else if (rtc->index == 0x7) {
+                    rtc->state = CLEM_RTC_EXECUTE_REG_UNKNOWN;
+                } else {
+                    CLEM_UNIMPLEMENTED("clem_rtc: register op is unsupported", rtc->index);
+                }
+            } else {
+                CLEM_WARN("clem_rtc: reg read is unsupported", cmd);
+            }
+            break;
+        case CLEM_RTC_CMD_BRAM:
             /* bram read or write */
-            if (data & 0x80) {
+            if (read) {
                 rtc->state = CLEM_RTC_EXECUTE_RECV_CMD_BRAM_R;
             } else {
                 rtc->state = CLEM_RTC_EXECUTE_RECV_CMD_BRAM_W;
@@ -101,7 +137,6 @@ void clem_rtc_command(
     bool is_write_cmd = !(rtc->ctl_c034 & CLEM_RTC_C034_FLAG_READ_OP);
     bool has_recv_started = (rtc->ctl_c034 & CLEM_RTC_C034_FLAG_START_XFER);
     bool is_new_txn = !(rtc->ctl_c034 & CLEM_RTC_C034_FLAG_LAST_BYTE);
-    unsigned data = rtc->data_c033;
 
     if (op == CLEM_IO_WRITE) {
         if (is_new_txn) {
@@ -113,7 +148,7 @@ void clem_rtc_command(
         switch (rtc->state) {
         case CLEM_RTC_EXECUTE_RECV_CMD:
             if (has_recv_started && is_write_cmd) {
-                _clem_rtc_dispatch_cmd(rtc, data);
+                _clem_rtc_dispatch_cmd(rtc, rtc->data_c033);
             }
             else {
                 CLEM_WARN("clem_rtc: unexpected ctrl %02X, state: %02X",
@@ -123,7 +158,7 @@ void clem_rtc_command(
         case CLEM_RTC_EXECUTE_RECV_CMD_BRAM_R:
         case CLEM_RTC_EXECUTE_RECV_CMD_BRAM_W:
             if (has_recv_started && is_write_cmd) {
-                _clem_rtc_bram_state(rtc, data);
+                _clem_rtc_bram_state(rtc, rtc->data_c033);
             }
             else {
                 CLEM_WARN("clem_rtc: unexpected ctrl %02X, state: %02X",
@@ -144,13 +179,32 @@ void clem_rtc_command(
         case CLEM_RTC_EXECUTE_WRITE_BRAM:
             if (has_recv_started) {
                 if (is_write_cmd) {
-                    _clem_rtc_bram_write(rtc, data);
+                    _clem_rtc_bram_write(rtc, rtc->data_c033);
                 }
                 else {
                     CLEM_WARN("clem_rtc: unexpected ctrl $02X, state: %02X",
                         rtc->ctl_c034, rtc->state);
                 }
             }
+            break;
+        case CLEM_RTC_EXECUTE_REG_TEST:
+            if (rtc->data_c033 & 0xc0) {
+                /* bits 6-7 must be zero */
+                CLEM_WARN("clem_rtc: non zero bits 6,7 set: %02X", rtc->data_c033);
+            } else {
+                CLEM_LOG("clem_rtc: test register set to %02X", rtc->data_c033);
+            }
+            break;
+        case CLEM_RTC_EXECUTE_REG_WRITE_PROTECT:
+            if (rtc->data_c033 & 0x80) {
+                rtc->flags |= CLEM_RTC_FLAG_WRITE_PROTECT;
+            } else {
+                rtc->flags |= CLEM_RTC_FLAG_WRITE_PROTECT;
+            }
+            CLEM_LOG("clem_rtc: write-protect register set to %02X", rtc->data_c033);
+            break;
+        case CLEM_RTC_EXECUTE_REG_UNKNOWN:
+            CLEM_LOG("clem_rtc: register_unknown data %02X", rtc->data_c033);
             break;
         default:
             break;

@@ -861,6 +861,31 @@
 "Hint":"Code"},
 
 {
+"Low":131201,
+"High":131201,
+"Hint":"Code"},
+
+{
+"Low":131205,
+"High":131205,
+"Hint":"Code"},
+
+{
+"Low":131209,
+"High":131209,
+"Hint":"Code"},
+
+{
+"Low":131213,
+"High":131213,
+"Hint":"Code"},
+
+{
+"Low":131217,
+"High":131217,
+"Hint":"Code"},
+
+{
 "Low":131708,
 "High":131708,
 "Hint":"Code"},
@@ -1362,6 +1387,7 @@
 "StatusFlagOverrides":{
 "456":304,
 "494":304,
+"1315":304,
 "55630":304,
 "55990":2097424,
 "56207":304,
@@ -1385,6 +1411,7 @@
 "260706":20185088},
 
 "Comments":{
+"131184":"Tool Locator Init",
 "226816":"TBD - A=$fb at this time, so storing $fbfb?",
 "226826":"Storing vectors into bank $e1 used during initialization?",
 "226836":"JML $FF7629",
@@ -1393,6 +1420,7 @@
 "227902":"inhibit text page 2 shadowing",
 "227909":"bit 5 has no effect on the 256k board",
 "229324":"Disable SRQ Keyboard?",
+"236808":"Maybe this tests ROM 01?",
 "244013":"Maybe this is the default BRAM table?",
 "244025":"blank param?",
 "244034":"$A0-$C0 if self diagnostics set to $FF",
@@ -1666,13 +1694,31 @@
 "BackgroundColor":0},
 
 "260340":{
-"Text":"Display the home bootup screen and... something else?\r\n",
+"Text":"Display the home bootup screen and toolbox init",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},
 
 "773":{
 "Text":"I *think* this code is checking how much memory is on this machine",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"236842":{
+"Text":"tmp - Failure somewhere here?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"131201":{
+"Text":"This block is copied into $e10000",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"131217":{
+"Text":"This block is copied into $e10180\r\n",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -2648,11 +2694,11 @@
 "LabelAnno":"Generated"},
 
 "236735":{
-"Label":"TFF9CBF",
+"Label":"SUB_TMP_API_7629_9D",
 "Value":16751807,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Generated"},
+"LabelAnno":"None"},
 
 "248228":{
 "Label":"TFFC9A4",
@@ -3366,6 +3412,34 @@
 "Value":16754445,
 "Source":"User",
 "Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"131201":{
+"Label":"SYM_TOOLBOX_ENTRY_CODE",
+"Value":16646273,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"131217":{
+"Label":"SYM_TOOLBOX_UNKNOWN_CODE",
+"Value":16646289,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"236816":{
+"Label":"tool_init_success",
+"Value":16751888,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"236802":{
+"Label":"tool_init",
+"Value":16751874,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -3726,7 +3800,7 @@
 "Format":"NumericLE",
 "SubFormat":"Symbol",
 "SymbolRef":{
-"Label":"TFF9CBF",
+"Label":"SUB_TMP_API_7629_9D",
 "Part":"Low"}},
 
 "227054":{

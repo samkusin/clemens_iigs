@@ -45,6 +45,7 @@ struct ClemensDeviceRTC {
 
     unsigned state;
     unsigned index;
+    unsigned flags;
 
     uint8_t bram[256];
 
