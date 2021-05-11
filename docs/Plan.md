@@ -10,10 +10,7 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* fc/0305 is the block failing due to legit writes to ghosted memory
-  * Do we need to implement ghost banks sooner?
 * CLEM_MMIO_REG_VGC_IRQ_BYTE
-* Quality of life host app improvements
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
 * C022 Text Color Mode
 * C01F 80COL yes/no state
@@ -44,6 +41,9 @@ This is a running todo list.
 
 ## DONE
 
+* Quality of life host app improvements
+* RTC register instructions
+* Read write from empty ROM (for invalid banks)
 * First pass Ensoniq research (ROM is getting to this point)
 * C00C 40 column mode (W)
 * C00D 80 column mode (W)
