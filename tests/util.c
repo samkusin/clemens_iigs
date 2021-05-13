@@ -32,7 +32,10 @@ int clem_test_init_machine(
                         CLEM_TEST_CYCLE_CLOCK_COUNT,
                         memory->g_test_rom, sizeof(memory->g_test_rom),
                         memory->g_e0_ram, memory->g_e1_ram,
-                        memory->g_fpi_ram, CLEM_TEST_NUM_FPI_BANKS);
+                        memory->g_fpi_ram,
+                        memory->g_card_rom,
+                        memory->g_card_expansion_rom,
+                        CLEM_TEST_NUM_FPI_BANKS);
 }
 
 int clem_test_init_machine_trivial_rom(
@@ -66,7 +69,10 @@ int clem_test_init_machine_trivial_rom(
                         CLEM_TEST_CYCLE_CLOCK_COUNT,
                         memory->g_test_rom, sizeof(memory->g_test_rom),
                         memory->g_e0_ram, memory->g_e1_ram,
-                        memory->g_fpi_ram, CLEM_TEST_NUM_FPI_BANKS);
+                        memory->g_fpi_ram,
+                        memory->g_card_rom,
+                        memory->g_card_expansion_rom,
+                        CLEM_TEST_NUM_FPI_BANKS);
 }
 
 void test_write(

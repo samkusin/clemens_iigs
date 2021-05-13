@@ -30,6 +30,8 @@ typedef struct {
     uint8_t g_e0_ram[CLEM_IIGS_BANK_SIZE];
     uint8_t g_e1_ram[CLEM_IIGS_BANK_SIZE];
     uint8_t g_fpi_ram[CLEM_IIGS_BANK_SIZE * CLEM_TEST_NUM_FPI_BANKS];
+    uint8_t g_card_rom[CLEM_IIGS_PAGE_SIZE * 7];
+    uint8_t g_card_expansion_rom[CLEM_IIGS_EXPANSION_ROM_SIZE * 7];
 } ClemensTestMemory;
 
 extern int clem_test_init_machine(

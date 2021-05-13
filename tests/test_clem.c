@@ -73,7 +73,10 @@ static MunitResult test_clem_initialize_failure(
         g_test_memory.g_test_rom,
         CLEM_IIGS_ROM3_SIZE - 1,
         g_test_memory.g_e0_ram, g_test_memory.g_e1_ram,
-        g_test_memory.g_fpi_ram, CLEM_TEST_NUM_FPI_BANKS);
+        g_test_memory.g_fpi_ram,
+        g_test_memory.g_card_rom,
+        g_test_memory.g_card_expansion_rom,
+        CLEM_TEST_NUM_FPI_BANKS);
 
     munit_assert_int(init_result, ==, -1);
 
@@ -86,6 +89,8 @@ static MunitResult test_clem_initialize_failure(
         1024,
         g_test_memory.g_test_rom,
         CLEM_IIGS_ROM3_SIZE,
+        NULL,
+        NULL,
         NULL,
         NULL,
         NULL,
