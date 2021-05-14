@@ -15,8 +15,10 @@
 #define CLEM_ADB_KEYB_BUFFER_LIMIT          8
 
 /** General Machine Settings */
+#define CLEM_IIGS_PAGE_SIZE                 256
 #define CLEM_IIGS_BANK_SIZE                 (64 * 1024)
 #define CLEM_IIGS_ROM3_SIZE                 (CLEM_IIGS_BANK_SIZE * 4)
+#define CLEM_IIGS_EXPANSION_ROM_SIZE        2048
 #define CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT   16
 #define CLEM_IIGS_EMPTY_RAM_BANK            0x81
 

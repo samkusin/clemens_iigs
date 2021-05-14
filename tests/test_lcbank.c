@@ -65,7 +65,7 @@ static MunitResult test_lcbank_on_reset_default(
     clem_read(machine, &value, CLEM_TEST_IOADDR(ROM_RAM_TEST), 0x00,
               CLEM_MEM_FLAG_DATA);
     munit_assert_false(value & 0x80);   // ROM
-    clem_read(machine, &value, CLEM_TEST_IOADDR(RDALTZP), 0x00,
+    clem_read(machine, &value, CLEM_TEST_IOADDR(RDALTZP_TEST), 0x00,
               CLEM_MEM_FLAG_DATA);
     munit_assert_false(value & 0x80);   // Bank 0 RAM
 
@@ -331,7 +331,7 @@ static MunitResult test_lcbank_altzp_stdzp(
 
     /* Altzp first - then switch to stdzp */
     clem_write(machine, 0x01, CLEM_TEST_IOADDR(ALTZP), 0x00, CLEM_MEM_FLAG_DATA);
-    clem_read(machine, &value, CLEM_TEST_IOADDR(RDALTZP), 0x00,
+    clem_read(machine, &value, CLEM_TEST_IOADDR(RDALTZP_TEST), 0x00,
               CLEM_MEM_FLAG_DATA);
     munit_assert_true(value & 0x80);   // Aux bank
 
@@ -389,7 +389,7 @@ static MunitResult test_lcbank_altzp_stdzp(
 
     /* Switch to StdZP */
     clem_write(machine, 0x01, CLEM_TEST_IOADDR(STDZP), 0x00, CLEM_MEM_FLAG_DATA);
-    clem_read(machine, &value, CLEM_TEST_IOADDR(RDALTZP), 0x00,
+    clem_read(machine, &value, CLEM_TEST_IOADDR(RDALTZP_TEST), 0x00,
               CLEM_MEM_FLAG_DATA);
     munit_assert_false(value & 0x80);   // Std/Main bank
 
