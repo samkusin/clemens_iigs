@@ -1421,6 +1421,7 @@
 "227909":"bit 5 has no effect on the 256k board",
 "229324":"Disable SRQ Keyboard?",
 "236808":"Maybe this tests ROM 01?",
+"236842":"Setup RTC registers",
 "244013":"Maybe this is the default BRAM table?",
 "244025":"blank param?",
 "244034":"$A0-$C0 if self diagnostics set to $FF",
@@ -1701,12 +1702,6 @@
 
 "773":{
 "Text":"I *think* this code is checking how much memory is on this machine",
-"BoxMode":false,
-"MaxWidth":80,
-"BackgroundColor":0},
-
-"236842":{
-"Text":"tmp - Failure somewhere here?",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},
