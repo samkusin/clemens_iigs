@@ -48,6 +48,29 @@ int clemens_init(
 bool clemens_is_initialized(const ClemensMachine* clem);
 
 /**
+ * @brief
+ *
+ * @param clem
+ * @param drive_type
+ * @param disk
+ * @return true
+ * @return false
+ */
+bool clemens_assign_disk(ClemensMachine* clem,
+                         enum ClemensDriveType drive_type,
+                         struct ClemensWOZDisk* disk);
+
+/**
+ * @brief
+ *
+ * @param clem
+ * @param drive_type
+ * @return true
+ * @return false
+ */
+bool clemens_has_disk(ClemensMachine* clem, enum ClemensDriveType drive_type);
+
+/**
  * @brief Trivial validation function (one conditional)
  *
  * Better used for polling every frame vs a more comprehensive check via

@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "clem_defs.h"
+#include "clem_woz.h"
 
 typedef uint64_t clem_clocks_time_t;
 typedef uint32_t clem_clocks_duration_t;
@@ -191,6 +192,15 @@ struct ClemensVGC {
     unsigned text_language;
 };
 
+
+/**
+ * IWM emulation of c0x0-c0xf for IWM devices
+ *
+ */
+struct ClemensDeviceIWM {
+    unsigned i;
+};
+
 /**
  * @brief FPI + MEGA2 MMIO Interface
  *
@@ -221,6 +231,7 @@ struct ClemensMMIO {
     struct ClemensDeviceTimer dev_timer;
     struct ClemensDeviceDebugger dev_debug;
     struct ClemensDeviceAudio dev_audio;
+    struct ClemensDeviceIWM dev_iwm;
 
     /* Registers that do not fall easily within a device struct */
     uint32_t mmap_register;     // memory map flags- CLEM_MMIO_MMAP_
@@ -236,6 +247,38 @@ struct ClemensMMIO {
     uint32_t irq_line;          // see CLEM_IRQ_XXX flags, if !=0 triggers irqb
 };
 
+/*  ClemensDrive Data
+ */
+
+struct ClemensWOZDisk;
+
+enum ClemensDriveType {
+    kClemensDrive_3_5,
+    kClemensDrive_3_5_D1 = kClemensDrive_3_5,
+    kClemensDrive_3_5_D2,
+    kClemensDrive_5_25,
+    kClemensDrive_5_25_D1 = kClemensDrive_5_25,
+    kClemensDrive_5_25_D2
+};
+
+/**
+ * @brief
+ *
+ */
+struct ClemensDrive {
+    struct ClemensWOZDisk* data;    /**< The parsed WOZ data */
+};
+
+struct ClemensDriveSeries {
+    enum ClemensDriveType drive_type;
+    struct ClemensDrive drive1;
+    struct ClemensDrive drive2;
+};
+
+struct ClemensDriveBay {
+    struct ClemensDriveSeries slot5;
+    struct ClemensDriveSeries slot6;
+};
 
 
 /* Note that in emulation mode, the EmulatedBrk flag should be
@@ -411,6 +454,7 @@ typedef struct {
     uint8_t* card_slot_expansion_memory[7];
 
     struct ClemensMMIO mmio;
+    struct ClemensDriveBay active_drives;
 
     /* Optional callback for debugging purposes.
        When issued, it's guaranteed that all registers/CPU state has been

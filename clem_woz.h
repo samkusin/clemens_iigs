@@ -61,7 +61,8 @@ struct ClemensWOZDisk {
     unsigned flags;                     /* CLEM_WOZ_SUPPORT, CLEM_WOZ_IMAGE */
     unsigned required_ram_kb;
     unsigned max_track_size_bytes;
-    unsigned bit_timing_ns;             /* time to read (and write?)
+    unsigned bit_timing_ns;             /* time to read (and write?) */
+    unsigned track_count;
 
     /* maps quarter tracks (for 5.25) and 80 tracks per side (for 3.25).  the
        drive head mechanism should track current head position by the meta

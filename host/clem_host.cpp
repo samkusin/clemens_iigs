@@ -40,6 +40,8 @@ namespace {
 
 ClemensHost::ClemensHost() :
   machine_(),
+  disks35_{},
+  disks525_{},
   emulationRunTime_(0.0f),
   emulationSliceTimeLeft_(0.0f),
   emulationSliceDuration_(0.0f),
@@ -63,6 +65,20 @@ ClemensHost::ClemensHost() :
   memoryViewStatic_[1].HandlerContext = this;
   memoryViewStatic_[1].ReadFn = &ClemensHost::emulatorImGuiMemoryRead;
   memoryViewStatic_[1].WriteFn = &ClemensHost::emulatorImguiMemoryWrite;
+
+  //  TODO: move into UI
+  FILE* fp = fopen("dos_3_3_master.woz", "rb");
+  if (fp) {
+    fseek(fp, 0, SEEK_END);
+    long sz = ftell(fp);
+    uint8_t* tmp = (uint8_t*)malloc(sz);
+    fseek(fp, 0, SEEK_SET);
+    fread(tmp, 1, sz, fp);
+    fclose(fp);
+    parseWOZDisk(&disks525_[0], tmp, sz);
+    free(tmp);
+  }
+
 }
 
 ClemensHost::~ClemensHost()
@@ -711,4 +727,59 @@ void ClemensHost::emulatorOpcodePrint(
   strncpy(instruction.opcode, inst->desc->name, sizeof(instruction.opcode));
   instruction.pc = (uint32_t(inst->pbr) << 16) | inst->addr;
   strncpy(instruction.operand, operand, sizeof(instruction.operand));
+}
+
+bool ClemensHost::parseWOZDisk(
+  struct ClemensWOZDisk* woz,
+  uint8_t* data,
+  size_t dataSize
+) {
+  const uint8_t* current = clem_woz_check_header(data, dataSize);
+  if (!current) {
+    return false;
+  }
+
+  struct ClemensWOZChunkHeader chunkHeader;
+
+  while ((
+    current = clem_woz_parse_chunk_header(
+                  &chunkHeader,
+                  current,
+                  current - data)
+    ) != nullptr
+  ) {
+    switch (chunkHeader.type) {
+      case CLEM_WOZ_CHUNK_INFO:
+        current = clem_woz_parse_info_chunk(
+          woz, &chunkHeader, current, chunkHeader.data_size);
+        break;
+      case CLEM_WOZ_CHUNK_TMAP:
+        current = clem_woz_parse_tmap_chunk(
+          woz, &chunkHeader, current, chunkHeader.data_size);
+        break;
+      case CLEM_WOZ_CHUNK_TRKS:
+        if (woz->track_count > 0) {
+          unsigned trackDataSize = woz->track_count * woz->max_track_size_bytes;
+          if (woz->flags & CLEM_WOZ_IMAGE_DOUBLE_SIDED) {
+            trackDataSize <<= 1;
+          }
+          woz->bits_data = (uint8_t*)malloc(trackDataSize);
+          woz->bits_data_end = woz->bits_data + trackDataSize;
+        }
+        current = clem_woz_parse_trks_chunk(
+          woz, &chunkHeader, current, chunkHeader.data_size);
+        break;
+      case CLEM_WOZ_CHUNK_WRIT:
+        break;
+      case CLEM_WOZ_CHUNK_META:
+        current = clem_woz_parse_meta_chunk(
+          woz, &chunkHeader, current, chunkHeader.data_size);
+        // skip for now
+        break;
+      default:
+        break;
+    }
+  }
+
+  return true;
 }

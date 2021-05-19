@@ -2,6 +2,7 @@
 #define CLEM_HOST_HPP
 
 #include "emulator.h"
+#include "clem_woz.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_memory_editor.h"
 
@@ -9,6 +10,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <array>
 
 struct ClemensHostInputEvent
 {
@@ -34,6 +36,8 @@ public:
 
 private:
   void emulate(float deltaTime);
+
+  bool parseWOZDisk(struct ClemensWOZDisk* woz, uint8_t* data, size_t dataSize);
 
 private:
 
@@ -65,6 +69,9 @@ private:
 private:
   ClemensMachine machine_;
   cinek::FixedStack slab_;
+
+  std::array<struct ClemensWOZDisk, 2> disks35_;
+  std::array<struct ClemensWOZDisk, 2> disks525_;
 
   float emulationRunTime_;
   float emulationSliceTimeLeft_;

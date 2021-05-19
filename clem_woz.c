@@ -248,11 +248,10 @@ const uint8_t* clem_woz_parse_info_chunk(
             disk->max_track_size_bytes = 6646;  /* v1 max track size */
         } else if (disk->disk_type == CLEM_WOZ_DISK_3_5) {
             disk->bit_timing_ns = 2;
-            /* max 12 sectors per track, remembering that track size is
-               variable on 3.5" IIgs disks -- I don't know if this is
-               right though??? */
-            CLEM_ASSERT(false);
-            disk->max_track_size_bytes = 12 * 512;
+            /* this appears to be the upper limit of all tracks on 3.5" disks
+               according to experiments with WOZ files - may be overkill
+            */
+            disk->max_track_size_bytes = 19 * 512;
         }
         disk->boot_type = CLEM_WOZ_BOOT_UNDEFINED;
     }
@@ -267,6 +266,7 @@ const uint8_t* clem_woz_parse_tmap_chunk(
 ) {
     struct _ClemBufferIterator woz_iter;
     unsigned idx;
+    unsigned track_idx = (unsigned)(-1);
 
     if (data_sz < header->data_size) return NULL;
 
@@ -275,6 +275,16 @@ const uint8_t* clem_woz_parse_tmap_chunk(
 
     for (idx = 0; idx < CLEM_WOZ_LIMIT_QTR_TRACKS; ++idx) {
         disk->meta_track_map[idx] = _clem_woz_read_u8(&woz_iter);
+        if (disk->meta_track_map[idx] != 0xff) {
+            if (track_idx == (unsigned)(-1) ||
+                track_idx < disk->meta_track_map[idx]
+            ) {
+                track_idx = disk->meta_track_map[idx];
+            }
+        }
+    }
+    if (track_idx < (unsigned)(-1)) {
+        disk->track_count = track_idx + 1;
     }
 
     return woz_iter.end;
@@ -301,8 +311,9 @@ const uint8_t* clem_woz_parse_trks_chunk(
 
     last_byte_offset = 0;
     for (idx = 0; idx < CLEM_WOZ_LIMIT_QTR_TRACKS; ++idx) {
-        param = _clem_woz_read_u16(&woz_iter);
-        disk->track_byte_count[idx] = _clem_woz_read_u16(&woz_iter) * 512;
+        param = (uint32_t)_clem_woz_read_u16(&woz_iter) * 512;
+        disk->track_byte_count[idx] = (
+            (uint32_t)_clem_woz_read_u16(&woz_iter) * 512);
         disk->track_bits_count[idx] = _clem_woz_read_u32(&woz_iter);
         if (param != 0) {
             disk->track_byte_offset[idx] = param - CLEM_WOZ_OFFSET_TRACK_DATA;
