@@ -137,6 +137,66 @@ uint8_t clem_sound_read_switch(struct ClemensDeviceAudio* glu, uint8_t ioreg,
                              uint8_t flags);
 
 
+/**
+ * @brief Resets the IWM controller state
+ *
+ * @param glu Device data
+ */
+void clem_iwm_reset(struct ClemensDeviceIWM* glu);
+
+/**
+ * @brief
+ *
+ * @param glu
+ * @param drive_type
+ */
+void clem_iwm_insert_disk(struct ClemensDeviceIWM* glu,
+                          enum ClemensDriveType drive_type,
+                          struct ClemensWOZDisk* disk);
+/**
+ * @brief
+ *
+ * @param glu
+ * @param drive_type
+ */
+void clem_iwm_eject_disk(struct ClemensDeviceIWM* glu,
+                         enum ClemensDriveType drive_type);
+
+/**
+ * @brief Executed frequently enough to emulate a IWM controller
+ *
+ * Note, due to the emulation rate (down to the microsecond of machine time),
+ * most emulation will occur on demand via swtiches.   This function is here
+ * to be consistent with our device/controller pattern.
+ *
+ * @param glu device data
+ * @param delta_us Microsecond increment since last sync
+ */
+void clem_iwm_glu_sync(struct ClemensDeviceIWM* glu, uint32_t delta_us);
+
+/**
+ * @brief Executed from the memory subsystem for MMIO
+ *
+ * @param glu GLU data
+ * @param ioreg The MMIO register accessed
+ * @param value The value written to the MMIO register
+ */
+void clem_iwm_write_switch(struct ClemensDeviceIWM* glu, uint8_t ioreg,
+                           uint8_t value);
+
+/**
+ * @brief Executed from the memory subsystem for MMIO
+ *
+ * @param glu GLU data
+ * @param ioreg The MMIO register accessed
+ * @param flags Access flags used to determine if the read is a no-op
+ * @return uint8_t The value read from the MMIO register
+ */
+uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM* glu, uint8_t ioreg,
+                             uint8_t flags);
+
+
+
 #ifdef __cplusplus
 }
 #endif

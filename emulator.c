@@ -872,6 +872,67 @@ int clemens_init(
     return 0;
 }
 
+static inline struct ClemensDrive* _clem_drive_get(
+    ClemensMachine* clem,
+    enum ClemensDriveType drive_type
+) {
+    struct ClemensDrive* drive;
+    switch (drive_type) {
+        case kClemensDrive_3_5_D1: drive = &clem->active_drives.slot5.drive1; break;
+        case kClemensDrive_3_5_D2: drive = &clem->active_drives.slot5.drive2; break;
+        case kClemensDrive_5_25_D1: drive = &clem->active_drives.slot6.drive1; break;
+        case kClemensDrive_5_25_D2: drive = &clem->active_drives.slot6.drive2; break;
+        default: drive = NULL; break;
+    }
+    return drive;
+}
+
+bool clemens_assign_disk(
+    ClemensMachine* clem,
+    enum ClemensDriveType drive_type,
+    struct ClemensWOZDisk* disk
+) {
+    struct ClemensDrive* drive = _clem_drive_get(clem, drive_type);
+    if (!drive) {
+        return false;
+    }
+    if (disk && drive->data) {
+        /* active disk found.; must unassign first */
+        return false;
+    }
+    if (!disk) {
+        clem_iwm_eject_disk(&clem->mmio.dev_iwm, drive_type);
+        return true;
+    }
+
+    /* filter out 'bad' disk/drive pairings before the IWM has a chance to flag
+       them
+    */
+    if (drive_type == kClemensDrive_5_25_D1 || drive_type == kClemensDrive_5_25_D2) {
+        if (disk->disk_type != CLEM_WOZ_DISK_5_25) {
+            return false;
+        }
+    } else if (drive_type == kClemensDrive_3_5_D1 || drive_type == kClemensDrive_3_5_D2) {
+        if (disk->disk_type != CLEM_WOZ_DISK_3_5) {
+            return false;
+        }
+    } else {
+        return false;
+    }
+
+    clem_iwm_insert_disk(&clem->mmio.dev_iwm, drive_type, disk);
+    return true;
+}
+
+bool clemens_has_disk(
+    ClemensMachine* clem,
+    enum ClemensDriveType drive_type
+) {
+    struct ClemensDrive* drive = _clem_drive_get(clem, drive_type);
+    return drive != NULL ? (drive->data != NULL) : false;
+}
+
+
 uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed) {
     if (clem->mmio.speed_c036 & CLEM_MMIO_SPEED_FAST_ENABLED) {
         *is_slow_speed = false;

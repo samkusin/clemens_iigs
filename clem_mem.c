@@ -1320,6 +1320,7 @@ void _clem_mmio_init(
     clem_adb_reset(&mmio->dev_adb);
     clem_sound_reset(&mmio->dev_audio);
     clem_vgc_init(&mmio->vgc);
+    clem_iwm_reset(&mmio->dev_iwm);
 }
 
 
