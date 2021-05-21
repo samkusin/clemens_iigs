@@ -10,6 +10,8 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
+* C036 Disk Motor flags
+* IWM? Disk support?
 * CLEM_MMIO_REG_VGC_IRQ_BYTE
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
 * C022 Text Color Mode
@@ -24,7 +26,6 @@ This is a running todo list.
 * C046 phase 2 - Mouse
 * remaining //e softswitches
 * Decimal math
-* IWM? Disk support?
 * Test ROM 1
 * VGC Pass 2 : Graphics modes (not SHGR)
 * C039 Register (Serial Communications Command register )

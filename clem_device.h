@@ -136,30 +136,35 @@ void clem_sound_write_switch(struct ClemensDeviceAudio* glu, uint8_t ioreg,
 uint8_t clem_sound_read_switch(struct ClemensDeviceAudio* glu, uint8_t ioreg,
                              uint8_t flags);
 
+/**
+ * @brief
+ *
+ * @param drives
+ */
+void clem_disk_reset_drives(struct ClemensDriveBay* drives);
 
 /**
  * @brief Resets the IWM controller state
  *
- * @param glu Device data
+ * @param iwm Device data
  */
-void clem_iwm_reset(struct ClemensDeviceIWM* glu);
+void clem_iwm_reset(struct ClemensDeviceIWM* iwm);
 
 /**
  * @brief
  *
- * @param glu
+ * @param iwm
  * @param drive_type
  */
-void clem_iwm_insert_disk(struct ClemensDeviceIWM* glu,
-                          enum ClemensDriveType drive_type,
-                          struct ClemensWOZDisk* disk);
+void clem_iwm_insert_disk(struct ClemensDeviceIWM* iwm,
+                          enum ClemensDriveType drive_type);
 /**
  * @brief
  *
- * @param glu
+ * @param iwm
  * @param drive_type
  */
-void clem_iwm_eject_disk(struct ClemensDeviceIWM* glu,
+void clem_iwm_eject_disk(struct ClemensDeviceIWM* iwm,
                          enum ClemensDriveType drive_type);
 
 /**
@@ -169,31 +174,39 @@ void clem_iwm_eject_disk(struct ClemensDeviceIWM* glu,
  * most emulation will occur on demand via swtiches.   This function is here
  * to be consistent with our device/controller pattern.
  *
- * @param glu device data
- * @param delta_us Microsecond increment since last sync
+ * Also note, this function takes a nanosecond time value indexed from reset
+ *
+ * TODO: remove if not needed
+ *
+ * @param iwm device data
+ * @param delta_ns Nanosecond increment since last sync
  */
-void clem_iwm_glu_sync(struct ClemensDeviceIWM* glu, uint32_t delta_us);
+void clem_iwm_glu_sync(struct ClemensDeviceIWM* iwm, uint32_t delta_ns);
 
 /**
  * @brief Executed from the memory subsystem for MMIO
  *
- * @param glu GLU data
+ * @param iwm IWM data
+ * @param drives Drives to be managed by the IWM
  * @param ioreg The MMIO register accessed
  * @param value The value written to the MMIO register
  */
-void clem_iwm_write_switch(struct ClemensDeviceIWM* glu, uint8_t ioreg,
-                           uint8_t value);
+void clem_iwm_write_switch(struct ClemensDeviceIWM* iwm,
+                           struct ClemensDriveBay* drives,
+                           uint8_t ioreg, uint8_t value);
 
 /**
  * @brief Executed from the memory subsystem for MMIO
  *
- * @param glu GLU data
+ * @param iwm IWM data
+ * @param drives Drives to be managed by the IWM
  * @param ioreg The MMIO register accessed
  * @param flags Access flags used to determine if the read is a no-op
  * @return uint8_t The value read from the MMIO register
  */
-uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM* glu, uint8_t ioreg,
-                             uint8_t flags);
+uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM* iwm,
+                             struct ClemensDriveBay* drives,
+                             uint8_t ioreg, uint8_t flags);
 
 
 

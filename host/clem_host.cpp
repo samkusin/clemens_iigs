@@ -649,6 +649,8 @@ void ClemensHost::createMachine()
 
   clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
 
+  clemens_assign_disk(&machine_, kClemensDrive_5_25_D1, &disks525_[0]);
+
   memoryViewBank_[0] = 0x00;
   memoryViewBank_[1] = 0x00;
 
@@ -735,6 +737,7 @@ bool ClemensHost::parseWOZDisk(
   size_t dataSize
 ) {
   const uint8_t* current = clem_woz_check_header(data, dataSize);
+  const uint8_t* end = data + dataSize;
   if (!current) {
     return false;
   }
@@ -745,7 +748,7 @@ bool ClemensHost::parseWOZDisk(
     current = clem_woz_parse_chunk_header(
                   &chunkHeader,
                   current,
-                  current - data)
+                  end - current)
     ) != nullptr
   ) {
     switch (chunkHeader.type) {

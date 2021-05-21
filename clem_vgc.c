@@ -136,10 +136,9 @@ uint8_t clem_vgc_get_region(struct ClemensVGC* vgc) {
 
 
 
-uint32_t clem_vgc_sync(
+void clem_vgc_sync(
     struct ClemensVGC* vgc,
-    uint32_t delta_ns,
-    uint32_t irq_line
+    uint32_t delta_ns
 ) {
     vgc->timer_ns += delta_ns;
 
@@ -148,5 +147,4 @@ uint32_t clem_vgc_sync(
         ++vgc->vbl_counter;
         vgc->timer_ns -= CLEM_VGC_VSYNC_TIME_NS;
     }
-    return irq_line;
 }

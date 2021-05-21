@@ -1412,6 +1412,10 @@
 
 "Comments":{
 "131184":"Tool Locator Init",
+"214767":"Setting 3.5\" IWM",
+"214801":"Disabling the current drive",
+"214804":"Read the IWM status",
+"214810":"Wait for it to be disabled",
 "226816":"TBD - A=$fb at this time, so storing $fbfb?",
 "226826":"Storing vectors into bank $e1 used during initialization?",
 "226836":"JML $FF7629",
@@ -1422,6 +1426,7 @@
 "229324":"Disable SRQ Keyboard?",
 "236808":"Maybe this tests ROM 01?",
 "236842":"Setup RTC registers",
+"236846":";Some kind of disk access - maybe boot?",
 "244013":"Maybe this is the default BRAM table?",
 "244025":"blank param?",
 "244034":"$A0-$C0 if self diagnostics set to $FF",
@@ -1714,6 +1719,18 @@
 
 "131217":{
 "Text":"This block is copied into $e10180\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"221562":{
+"Text":"This may be setting up fast-mode for disk access?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"214749":{
+"Text":"This block seems to be looking at the 3.5\" drive and disabling it?",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -3433,6 +3450,20 @@
 "236802":{
 "Label":"tool_init",
 "Value":16751874,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"218624":{
+"Label":"SUB_HOOK_TMP_DISK_START",
+"Value":16733696,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"214807":{
+"Label":"query_iwm_status",
+"Value":16729879,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},

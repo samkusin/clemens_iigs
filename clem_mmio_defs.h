@@ -184,7 +184,7 @@
 /** Speaker click */
 #define CLEM_MMIO_REG_SPKR              0x30
 /** Write Disk access 3.5" */
-#define CLEM_MMIO_REG_DISK35            0x31
+#define CLEM_MMIO_REG_DISK_INTERFACE    0x31
 /** Write Scan interrupts (VGC, RTC) clear  */
 #define CLEM_MMIO_REG_RTC_SCANINT       0x32
 /** Real time clock data register */
@@ -283,6 +283,24 @@
 #define CLEM_MMIO_REG_LC1_ROM_WP        0x8A
 /** R2 - LC Bank 1, Read and Write Enable */
 #define CLEM_MMIO_REG_LC1_RAM_WE        0x8B
+
+/** IWM registers */
+#define CLEM_MMIO_REG_IWM_PHASE0_LO     0xE0
+#define CLEM_MMIO_REG_IWM_PHASE0_HI     0xE1
+#define CLEM_MMIO_REG_IWM_PHASE1_LO     0xE2
+#define CLEM_MMIO_REG_IWM_PHASE1_HI     0xE3
+#define CLEM_MMIO_REG_IWM_PHASE2_LO     0xE4
+#define CLEM_MMIO_REG_IWM_PHASE2_HI     0xE5
+#define CLEM_MMIO_REG_IWM_PHASE3_LO     0xE6
+#define CLEM_MMIO_REG_IWM_PHASE3_HI     0xE7
+#define CLEM_MMIO_REG_IWM_DRIVE_DISABLE 0xE8
+#define CLEM_MMIO_REG_IWM_DRIVE_ENABLE  0xE9
+#define CLEM_MMIO_REG_IWM_DRIVE_0       0xEA
+#define CLEM_MMIO_REG_IWM_DRIVE_1       0xEB
+#define CLEM_MMIO_REG_IWM_Q6_LO         0xEC
+#define CLEM_MMIO_REG_IWM_Q6_HI         0xED
+#define CLEM_MMIO_REG_IWM_Q7_LO         0xEE
+#define CLEM_MMIO_REG_IWM_Q7_HI         0xEF
 
 /** New video (C029) bitflag defines */
 #define CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT  0x01

@@ -190,15 +190,21 @@ struct ClemensVGC {
     unsigned text_fg_color;
     unsigned text_bg_color;
     unsigned text_language;
+
+    uint32_t irq_line;          /**< IRQ flags passed to machine */
 };
 
-
 /**
- * IWM emulation of c0x0-c0xf for IWM devices
+ * IWM emulation of c0x0-c0xf for IWM devices.   Note that the IWM can only
+ * access one drive at a time (in tandem with the disk interface register)
  *
  */
 struct ClemensDeviceIWM {
-    unsigned i;
+    uint64_t current_time_ns;           /**< Nanosecond time from reset */
+    unsigned io_flags;                  /**< Disk port I/O flags */
+    unsigned out_phase;                 /**< PH0-PH3 bits sent to drive */
+    bool q6_switch;                     /**< Q6 state switch */
+    bool q7_switch;                     /**< Q7 stage switch */
 };
 
 /**
@@ -252,25 +258,19 @@ struct ClemensMMIO {
 
 struct ClemensWOZDisk;
 
-enum ClemensDriveType {
-    kClemensDrive_3_5,
-    kClemensDrive_3_5_D1 = kClemensDrive_3_5,
-    kClemensDrive_3_5_D2,
-    kClemensDrive_5_25,
-    kClemensDrive_5_25_D1 = kClemensDrive_5_25,
-    kClemensDrive_5_25_D2
-};
-
 /**
  * @brief
  *
  */
 struct ClemensDrive {
     struct ClemensWOZDisk* data;    /**< The parsed WOZ data */
+    unsigned qtr_track_index;       /**< Current track position of the head */
+    unsigned track_step;            /**< Byte index into the track */
+    unsigned q03_switch;            /**< 4-bit Q0-3 entry (5.25" = stepper switch) */
+    unsigned motor_switch_us;       /**< Motor on/off time in microseconds */
 };
 
 struct ClemensDriveSeries {
-    enum ClemensDriveType drive_type;
     struct ClemensDrive drive1;
     struct ClemensDrive drive2;
 };
@@ -278,6 +278,19 @@ struct ClemensDriveSeries {
 struct ClemensDriveBay {
     struct ClemensDriveSeries slot5;
     struct ClemensDriveSeries slot6;
+};
+
+/**
+ * @brief
+ *
+ */
+enum ClemensDriveType {
+    kClemensDrive_3_5,
+    kClemensDrive_3_5_D1 = kClemensDrive_3_5,
+    kClemensDrive_3_5_D2,
+    kClemensDrive_5_25,
+    kClemensDrive_5_25_D1 = kClemensDrive_5_25,
+    kClemensDrive_5_25_D2
 };
 
 
