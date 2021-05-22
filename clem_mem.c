@@ -471,9 +471,9 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_SPKR:
             result = clem_sound_read_switch(&mmio->dev_audio, ioreg, flags);
             break;
-        case CLEM_MMIO_REG_DISK35:
-            result = 0x00;
-            //result = clem_iwm_read_switch(&mmio->dev_iwm, ioreg, flags);
+        case CLEM_MMIO_REG_DISK_INTERFACE:
+            result = clem_iwm_read_switch(
+                &mmio->dev_iwm, &clem->active_drives, ioreg, flags);
             break;
         case CLEM_MMIO_REG_SHADOW:
             result = _clem_mmio_shadow_c035(mmio);
@@ -558,6 +558,25 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_LC1_ROM_WP:
         case CLEM_MMIO_REG_LC1_RAM_WE:
             result = _clem_mmio_read_bank_select(mmio, ioreg, flags);
+            break;
+        case CLEM_MMIO_REG_IWM_PHASE0_LO:
+        case CLEM_MMIO_REG_IWM_PHASE0_HI:
+        case CLEM_MMIO_REG_IWM_PHASE1_LO:
+        case CLEM_MMIO_REG_IWM_PHASE1_HI:
+        case CLEM_MMIO_REG_IWM_PHASE2_LO:
+        case CLEM_MMIO_REG_IWM_PHASE2_HI:
+        case CLEM_MMIO_REG_IWM_PHASE3_LO:
+        case CLEM_MMIO_REG_IWM_PHASE3_HI:
+        case CLEM_MMIO_REG_IWM_DRIVE_DISABLE:
+        case CLEM_MMIO_REG_IWM_DRIVE_ENABLE:
+        case CLEM_MMIO_REG_IWM_DRIVE_0:
+        case CLEM_MMIO_REG_IWM_DRIVE_1:
+        case CLEM_MMIO_REG_IWM_Q6_LO:
+        case CLEM_MMIO_REG_IWM_Q6_HI:
+        case CLEM_MMIO_REG_IWM_Q7_LO:
+        case CLEM_MMIO_REG_IWM_Q7_HI:
+            result = clem_iwm_read_switch(
+                &mmio->dev_iwm, &clem->active_drives,  ioreg, flags);
             break;
         default:
             if (ioreg >= 0x71 && ioreg < 0x80) {
@@ -681,6 +700,9 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_SPKR:
             clem_sound_write_switch(&mmio->dev_audio, ioreg, data);
             break;
+        case CLEM_MMIO_REG_DISK_INTERFACE:
+            clem_iwm_write_switch(&mmio->dev_iwm, &clem->active_drives, ioreg, data);
+            break;
         case CLEM_MMIO_REG_RTC_CTL:
             mmio->dev_rtc.ctl_c034 = data;
             clem_rtc_command(&mmio->dev_rtc, clem->clocks_spent, CLEM_IO_WRITE);
@@ -756,6 +778,24 @@ static void _clem_mmio_write(
             break;
         case CLEM_MMIO_REG_STATEREG:
             _clem_mmio_statereg_c068_set(mmio, data);
+            break;
+        case CLEM_MMIO_REG_IWM_PHASE0_LO:
+        case CLEM_MMIO_REG_IWM_PHASE0_HI:
+        case CLEM_MMIO_REG_IWM_PHASE1_LO:
+        case CLEM_MMIO_REG_IWM_PHASE1_HI:
+        case CLEM_MMIO_REG_IWM_PHASE2_LO:
+        case CLEM_MMIO_REG_IWM_PHASE2_HI:
+        case CLEM_MMIO_REG_IWM_PHASE3_LO:
+        case CLEM_MMIO_REG_IWM_PHASE3_HI:
+        case CLEM_MMIO_REG_IWM_DRIVE_DISABLE:
+        case CLEM_MMIO_REG_IWM_DRIVE_ENABLE:
+        case CLEM_MMIO_REG_IWM_DRIVE_0:
+        case CLEM_MMIO_REG_IWM_DRIVE_1:
+        case CLEM_MMIO_REG_IWM_Q6_LO:
+        case CLEM_MMIO_REG_IWM_Q6_HI:
+        case CLEM_MMIO_REG_IWM_Q7_LO:
+        case CLEM_MMIO_REG_IWM_Q7_HI:
+            clem_iwm_write_switch(&mmio->dev_iwm, &clem->active_drives, ioreg, data);
             break;
         default:
             if (!is_noop) {

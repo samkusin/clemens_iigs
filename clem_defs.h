@@ -161,6 +161,7 @@
 #define CLEM_OPC_JMP_ABSL_INDIRECT          (0xDC)
 #define CLEM_OPC_JSL                        (0x22)
 #define CLEM_OPC_JSR                        (0x20)
+#define CLEM_OPC_JSR_INDIRECT_IDX           (0xFC)
 #define CLEM_OPC_LDA_IMM                    (0xA9)
 #define CLEM_OPC_LDA_ABS                    (0xAD)
 #define CLEM_OPC_LDA_ABSL                   (0xAF)

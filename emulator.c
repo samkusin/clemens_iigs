@@ -530,8 +530,12 @@ void _clem_init_instruction_map() {
     _opcode_description(CLEM_OPC_JMP_ABSL_INDIRECT, "JML",
                         kClemensCPUAddrMode_PCLongIndirect);
 
-    _opcode_description(CLEM_OPC_JSL,     "JSL", kClemensCPUAddrMode_AbsoluteLong);
-    _opcode_description(CLEM_OPC_JSR,     "JSR", kClemensCPUAddrMode_Absolute);
+    _opcode_description(CLEM_OPC_JSL, "JSL", kClemensCPUAddrMode_AbsoluteLong);
+    _opcode_description(CLEM_OPC_JSR, "JSR",
+                        kClemensCPUAddrMode_Absolute);
+    _opcode_description(CLEM_OPC_JSR_INDIRECT_IDX,  "JSR",
+                        kClemensCPUAddrMode_PCIndirect_X);
+
 
     _opcode_description(CLEM_OPC_LDA_IMM, "LDA", kClemensCPUAddrMode_Immediate);
     _opcode_description(CLEM_OPC_LDA_ABS, "LDA", kClemensCPUAddrMode_Absolute);
@@ -920,7 +924,7 @@ bool clemens_assign_disk(
         return false;
     }
 
-    clem_iwm_insert_disk(&clem->mmio.dev_iwm, drive_type, disk);
+    clem_iwm_insert_disk(&clem->mmio.dev_iwm, drive_type);
     return true;
 }
 
@@ -2797,6 +2801,23 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             clem_debug_jsr(&clem->mmio.dev_debug, cpu, tmp_addr, cpu->regs.PBR);
             tmp_pc = tmp_addr;      // set next PC to the JSR routine
             break;
+        case CLEM_OPC_JSR_INDIRECT_IDX:
+            // +2 cycles accounted for by the extra 16-bit read from the index
+            _clem_read_pba_16(clem, &tmp_addr, &tmp_pc);
+            --tmp_pc;       // point to last byte in operand
+            _clem_cycle(clem, 1);
+            _clem_opc_push_pc16(clem, tmp_pc);
+            if (x_status) {
+                tmp_eaddr = tmp_addr + (cpu->regs.X & 0x00ff);
+            } else {
+                tmp_eaddr = tmp_addr + cpu->regs.X;
+            }
+            _clem_read_16(clem, &tmp_eaddr, tmp_addr, cpu->regs.PBR, CLEM_MEM_FLAG_DATA);
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, x_status);
+            CLEM_CPU_I_JSR_LOG(cpu, tmp_eaddr);
+            clem_debug_jsr(&clem->mmio.dev_debug, cpu, tmp_eaddr, cpu->regs.PBR);
+            tmp_pc = tmp_eaddr;
+            break;
         case CLEM_OPC_RTS:
             //  Stack [PCH, PCL]
             _clem_cycle(clem, 2);
@@ -3104,8 +3125,8 @@ void clemens_emulate(ClemensMachine* clem) {
 
     delta_ns = (1023 * (clem->clocks_spent - last_clocks_spent)) / (
         clem->clocks_step_mega2);
-    mmio->irq_line = clem_vgc_sync(
-            &mmio->vgc, CLEM_MEGA2_CYCLES_PER_60TH, mmio->irq_line);
+    clem_vgc_sync(&mmio->vgc, CLEM_MEGA2_CYCLES_PER_60TH);
+    clem_iwm_glu_sync(&mmio->dev_iwm, delta_ns);
 
     delta_mega2_cycles = (uint32_t)(
         (clem->clocks_spent / clem->clocks_step_mega2) - mmio->mega2_cycles);
@@ -3123,7 +3144,10 @@ void clemens_emulate(ClemensMachine* clem) {
     }
 
     mmio->irq_line &= ~(CLEM_IRQ_ADB_MASK | CLEM_IRQ_TIMER_MASK);
-    mmio->irq_line |= (mmio->dev_adb.irq_line | mmio->dev_timer.irq_line);
+    mmio->irq_line |= (
+        mmio->dev_adb.irq_line |
+        mmio->dev_timer.irq_line |
+        mmio->vgc.irq_line);
 
     /* IRQB low triggers an interrupt next frame */
     cpu->pins.irqbIn = mmio->irq_line == 0;
