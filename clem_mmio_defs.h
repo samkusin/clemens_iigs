@@ -306,6 +306,7 @@
 #define CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT  0x01
 
 /** Speed register (C036) bitflag defines */
+#define CLEM_MMIO_SPEED_DISK_FLAGS      0x0f
 #define CLEM_MMIO_SPEED_POWERED_ON      0x40
 #define CLEM_MMIO_SPEED_FAST_ENABLED    0x80
 

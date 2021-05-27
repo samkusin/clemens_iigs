@@ -10,7 +10,6 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* C036 Disk Motor flags
 * IWM? Disk support?
 * CLEM_MMIO_REG_VGC_IRQ_BYTE
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
@@ -42,6 +41,7 @@ This is a running todo list.
 
 ## DONE
 
+* C036 Disk Motor Detector flags
 * Quality of life host app improvements
 * RTC register instructions
 * Read write from empty ROM (for invalid banks)

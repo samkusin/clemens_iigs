@@ -243,6 +243,7 @@ struct ClemensMMIO {
     uint32_t mmap_register;     // memory map flags- CLEM_MMIO_MMAP_
     uint8_t new_video_c029;     // see kClemensMMIONewVideo_xxx
     uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
+    uint8_t disk_motor_on;      // bits 0-3 represent ports 4-7
     uint8_t flags_c08x;         // used to detect double reads
 
     uint64_t mega2_cycles;      // number of mega2 pulses/ticks since startup
@@ -264,20 +265,17 @@ struct ClemensWOZDisk;
  */
 struct ClemensDrive {
     struct ClemensWOZDisk* data;    /**< The parsed WOZ data */
-    unsigned qtr_track_index;       /**< Current track position of the head */
-    unsigned track_step;            /**< Byte index into the track */
-    unsigned q03_switch;            /**< 4-bit Q0-3 entry (5.25" = stepper switch) */
-    unsigned motor_switch_us;       /**< Motor on/off time in microseconds */
-};
-
-struct ClemensDriveSeries {
-    struct ClemensDrive drive1;
-    struct ClemensDrive drive2;
+    uint64_t clock_ns;          /**< Drive clock */
+    unsigned qtr_track_index;   /**< Current track position of the head */
+    unsigned track_step;        /**< Byte index into the track */
+    unsigned q03_switch;        /**< 4-bit Q0-3 entry (5.25" = stepper ) */
+    unsigned motor_switch_us;   /**< Motor clock used for spin-up-down */
+    bool motor_on;              /**< Used with motor_switch_us */
 };
 
 struct ClemensDriveBay {
-    struct ClemensDriveSeries slot5;
-    struct ClemensDriveSeries slot6;
+    struct ClemensDrive slot5[2];
+    struct ClemensDrive slot6[2];
 };
 
 /**
@@ -451,7 +449,9 @@ typedef struct {
     struct Clemens65C816 cpu;
     /* clocks spent per cycle */
     clem_clocks_duration_t clocks_step;
-    /* typically FPI speed mhz * clocks_step */
+    /* clocks spent per cycle in fast mode */
+    clem_clocks_duration_t clocks_step_fast;
+    /* typically FPI speed mhz * clocks_step_fast */
     clem_clocks_duration_t clocks_step_mega2;
     /* clock timer - never change once system has been started */
     clem_clocks_time_t clocks_spent;

@@ -85,6 +85,15 @@ static void _clem_mmio_memory_map(struct ClemensMMIO* mmio,
 static void _clem_mmio_shadow_map(struct ClemensMMIO* mmio,
                                   uint32_t shadow_flags);
 
+static inline void _clem_mem_cycle(
+    ClemensMachine* clem,
+    bool mega2_access
+) {
+    clem->clocks_spent += mega2_access ? clem->clocks_step_mega2 : (
+        clem->clocks_step);
+    ++clem->cpu.cycles_spent;
+}
+
 static void _clem_mmio_create_page_direct_mapping(
     struct ClemensMMIOPageInfo* page,
     uint8_t page_idx
@@ -205,22 +214,36 @@ static void _clem_mmio_shadow_c035_set(
     _clem_mmio_memory_map(mmio, mmap);
 }
 
-static inline uint8_t _clem_mmio_speed_c036(struct ClemensMMIO* mmio) {
-    return mmio->speed_c036;
-}
-
 static void _clem_mmio_speed_c036_set(
-    struct ClemensMMIO* mmio,
+    ClemensMachine* clem,
     uint8_t value
 ) {
-    uint8_t setflags = mmio->speed_c036 ^ value;
+    uint8_t setflags = clem->mmio.speed_c036 ^ value;
+
+    if (setflags & CLEM_MMIO_SPEED_FAST_ENABLED) {
+        if (value & CLEM_MMIO_SPEED_FAST_ENABLED) {
+            //CLEM_LOG("C036: Fast Mode");
+            clem->clocks_step = clem->clocks_step_fast;
+        } else {
+            //CLEM_LOG("C036: Slow Mode");
+            clem->clocks_step = clem->clocks_step_mega2;
+        }
+    }
+    if (setflags & CLEM_MMIO_SPEED_POWERED_ON) {
+        if (value & CLEM_MMIO_SPEED_POWERED_ON) {
+            CLEM_LOG("C036: Power On");
+        } else {
+            CLEM_LOG("C036: Power Off");
+        }
+    }
+    if (setflags & CLEM_MMIO_SPEED_DISK_FLAGS) {
+        CLEM_LOG("C036: Disk motor detect mask: %02X",
+                 value & CLEM_MMIO_SPEED_DISK_FLAGS);
+    }
+
     /* bit 5 should always be 0 */
     /* for ROM 3, bit 6 can be on or off - for ROM 1, must be off */
-    mmio->speed_c036 = (value & 0xdf);
-
-    if (!(mmio->speed_c036 & CLEM_MMIO_SPEED_POWERED_ON)) {
-        CLEM_LOG("SPEED C036 PowerOn set to zero");
-    }
+    clem->mmio.speed_c036 = (value & 0xdf);
 }
 
 static uint8_t _clem_mmio_inttype_c046(
@@ -392,11 +415,31 @@ static uint8_t _clem_mmio_read_bank_select(
     return 0;
 }
 
+void _clem_mmio_speed_disk_gate(ClemensMachine* clem, uint8_t ioreg) {
+    uint8_t slot_index = (ioreg >> 4) & 0x03;
+    if ((clem->mmio.speed_c036 & 0x0f) & (1 << slot_index)) {
+        if ((ioreg & 0x0f) == 0x08) {
+            clem->mmio.disk_motor_on &= ~(1 << slot_index);
+        } else if ((ioreg & 0x0f) == 0x09) {
+            clem->mmio.disk_motor_on |= (1 << slot_index);
+        }
+        if (clem->mmio.disk_motor_on) {
+            clem->clocks_step = clem->clocks_step_mega2;
+        } else {
+            if (clem->mmio.speed_c036 & CLEM_MMIO_SPEED_FAST_ENABLED) {
+                clem->clocks_step = clem->clocks_step_fast;
+            } else {
+                clem->clocks_step = clem->clocks_step_mega2;
+            }
+        }
+    }
+}
+
 static uint8_t _clem_mmio_read(
     ClemensMachine* clem,
     uint16_t addr,
-    clem_clocks_duration_t* clocks_spent,
-    uint8_t flags
+    uint8_t flags,
+    bool* mega2_access
 ) {
     struct ClemensMMIO* mmio = &clem->mmio;
     uint8_t result = 0x00;
@@ -479,7 +522,7 @@ static uint8_t _clem_mmio_read(
             result = _clem_mmio_shadow_c035(mmio);
             break;
         case CLEM_MMIO_REG_SPEED:
-            result = _clem_mmio_speed_c036(mmio);
+            result = mmio->speed_c036;
             break;
         case CLEM_MMIO_REG_RTC_CTL:
             if (!is_noop) {
@@ -588,7 +631,14 @@ static uint8_t _clem_mmio_read(
             break;
     }
 
-    *clocks_spent = !(flags & CLEM_MMIO_READ_NO_OP) ? clem->clocks_step_mega2 : 0;
+    if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+        /* disk motor speed registers */
+        if (ioreg & 0xc0) {
+            _clem_mmio_speed_disk_gate(clem, ioreg);
+        }
+        *mega2_access = true;
+    }
+
 
     return result;
 }
@@ -597,11 +647,11 @@ static void _clem_mmio_write(
     ClemensMachine* clem,
     uint8_t data,
     uint16_t addr,
-    clem_clocks_duration_t* clocks_spent,
-    uint8_t flags
+    uint8_t mem_flags,
+    bool *mega2_access
 ) {
     struct ClemensMMIO* mmio = &clem->mmio;
-    bool is_noop = (flags & CLEM_MMIO_READ_NO_OP) != 0;
+    bool is_noop = (mem_flags & CLEM_MMIO_READ_NO_OP) != 0;
     uint8_t ioreg;
     if (addr >= 0xC100) {
         //  TODO: MMIO slot ROM - it seems this needs to be treated differently
@@ -714,7 +764,7 @@ static void _clem_mmio_write(
             _clem_mmio_shadow_c035_set(mmio, data);
             break;
         case CLEM_MMIO_REG_SPEED:
-            _clem_mmio_speed_c036_set(mmio, data);
+            _clem_mmio_speed_c036_set(clem, data);
             break;
         case CLEM_MMIO_REG_SCC_B_CMD:
             CLEM_WARN("ioreg %02X <- %02X TODO", ioreg, data);
@@ -804,10 +854,11 @@ static void _clem_mmio_write(
             }
             break;
     }
-    if (flags != CLEM_MEM_FLAG_NULL) {
-        *clocks_spent = clem->clocks_step_mega2;
-    } else {
-        *clocks_spent = 0;
+    if (mem_flags != CLEM_MEM_FLAG_NULL) {
+        if (ioreg & 0xc0) {
+            _clem_mmio_speed_disk_gate(clem, ioreg);
+        }
+        *mega2_access = true;
     }
 }
 
@@ -1373,16 +1424,16 @@ void clem_read(
 ) {
     struct ClemensMMIOPageMap* bank_page_map = clem->mmio.bank_page_map[bank];
     struct ClemensMMIOPageInfo* page = &bank_page_map->pages[adr >> 8];
-    clem_clocks_duration_t clocks_spent;
     uint16_t offset = ((uint16_t)page->read << 8) | (adr & 0xff);
     bool read_only = (flags == CLEM_MEM_FLAG_NULL);
+    bool mega2_access = false;
 
     // TODO: store off if read_reg has a read_count of 1 here
     //       reset it automatically if true at the end of this function
     if (page->flags & CLEM_MMIO_IO_MEMORY) {
         if (page->flags & CLEM_MMIO_PAGE_IOADDR) {
-            *data = _clem_mmio_read(clem, offset, &clocks_spent,
-                    read_only ? CLEM_MMIO_READ_NO_OP : 0);
+            *data = _clem_mmio_read(
+                clem, offset, read_only ? CLEM_MMIO_READ_NO_OP : 0, &mega2_access);
         } else if (page->flags & CLEM_MMIO_PAGE_CARDMEM) {
             if (page->bank_read == 0x00) {
                 *data = clem->card_slot_memory[page->read][offset & 0xff];
@@ -1395,7 +1446,7 @@ void clem_read(
                 //CLEM_ASSERT(false);
             }
             /* assuming reads from card memory via MEGA2 are slow */
-            clocks_spent = clem->clocks_step_mega2;
+            mega2_access = true;
         } else {
             CLEM_ASSERT(false);
         }
@@ -1411,12 +1462,12 @@ void clem_read(
         } else {
             bank_actual = page->bank_read;
         }
-        bank_mem = _clem_get_memory_bank(clem, bank_actual, &clocks_spent);
+        bank_mem = _clem_get_memory_bank(clem, bank_actual, &mega2_access);
 
         //  TODO: when reading from e0/e1 banks, is it always slow?
         //          internal ROM, peripheral?
         if (bank_actual == 0xe0 || bank_actual == 0xe1) {
-            clocks_spent = clem->clocks_step_mega2;
+            mega2_access = true;
         }
         *data = bank_mem[offset];
     } else {
@@ -1428,8 +1479,7 @@ void clem_read(
         clem->cpu.pins.adr = adr;
         clem->cpu.pins.bank = bank;
         clem->cpu.pins.data = *data;
-        clem->clocks_spent += clocks_spent;
-        ++clem->cpu.cycles_spent;
+        _clem_mem_cycle(clem, mega2_access);
     }
 }
 
@@ -1438,21 +1488,20 @@ void clem_write(
     uint8_t data,
     uint16_t adr,
     uint8_t bank,
-    uint8_t flags
+    uint8_t mem_flags
 ) {
     struct ClemensMMIOPageMap* bank_page_map = clem->mmio.bank_page_map[bank];
     struct ClemensMMIOShadowMap* shadow_map = bank_page_map->shadow_map;
     struct ClemensMMIOPageInfo* page = &bank_page_map->pages[adr >> 8];
-    clem_clocks_duration_t clocks_spent;
     uint16_t offset = ((uint16_t)page->write << 8) | (adr & 0xff);
+    bool mega2_access = false;
+
     if (page->flags & CLEM_MMIO_IO_MEMORY) {
         if (page->flags & CLEM_MMIO_PAGE_IOADDR) {
-            //  TODO: bring clocks_spent out of _clem_mmio_write (and other
-            //          utility methods - just keep inside clem_read/clem_write)
             if (page->flags & CLEM_MMIO_PAGE_WRITE_OK) {
-                _clem_mmio_write(clem, data, offset, &clocks_spent, flags);
+                _clem_mmio_write(clem, data, offset, mem_flags, &mega2_access);
             } else {
-                clocks_spent = clem->clocks_step_mega2;
+                mega2_access = true;
             }
         } else if (page->flags & CLEM_MMIO_PAGE_CARDMEM) {
             //  Always ROM?
@@ -1465,6 +1514,7 @@ void clem_write(
     ) {
         uint8_t* bank_mem;
         uint8_t bank_actual;
+
         if (page->flags & CLEM_MMIO_PAGE_DIRECT) {
             bank_actual = bank;
         } else if (page->flags & CLEM_MMIO_PAGE_MAINAUX) {
@@ -1472,29 +1522,27 @@ void clem_write(
         } else {
             bank_actual = page->bank_write;
         }
-        bank_mem = _clem_get_memory_bank(clem, bank_actual, &clocks_spent);
+        bank_mem = _clem_get_memory_bank(clem, bank_actual, &mega2_access);
         if (page->flags & CLEM_MMIO_PAGE_WRITE_OK) {
             bank_mem[offset] = data;
         }
         if (shadow_map && shadow_map->pages[page->write]) {
             bank_mem = _clem_get_memory_bank(
-                clem, (0xE0) | (bank_actual & 0x1), &clocks_spent);
+                clem, (0xE0) | (bank_actual & 0x1), &mega2_access);
             if (page->flags & CLEM_MMIO_PAGE_WRITE_OK) {
                 bank_mem[offset] = data;
             }
         }
-
-        if (bank == 0xe0 || bank == 0xe1) {
-            clocks_spent = clem->clocks_step_mega2;
+        if (bank_actual == 0xe0 || bank_actual == 0xe1) {
+            mega2_access = true;
         }
     } else {
         CLEM_ASSERT(false);
     }
-    if (flags != CLEM_MEM_FLAG_NULL) {
+    if (mem_flags != CLEM_MEM_FLAG_NULL) {
         clem->cpu.pins.adr = adr;
         clem->cpu.pins.bank = bank;
         clem->cpu.pins.data = data;
-        clem->clocks_spent += clocks_spent;
-        ++clem->cpu.cycles_spent;
+        _clem_mem_cycle(clem, mega2_access);
     }
 }

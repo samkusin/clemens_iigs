@@ -316,9 +316,10 @@ void _clem_debug_memory_dump(
     if (fp) {
         uint16_t mem_addr = (uint16_t)mem_page << 8;
         while (page_count > 0) {
-            clem_clocks_duration_t clocks_spent;
             uint8_t mem_next_bank = mem_bank;
-            fwrite(_clem_get_memory_bank(clem, mem_bank, &clocks_spent) + mem_addr, 256, 1, fp);
+            bool mega2 = false;
+            fwrite(_clem_get_memory_bank(
+                clem, mem_bank, &mega2) + mem_addr, 256, 1, fp);
             if (mem_addr + 0x0100 < mem_addr) {
                 _clem_next_dbr(clem, &mem_next_bank, mem_bank);
             }
@@ -825,6 +826,7 @@ int clemens_init(
 ) {
     machine->cpu.pins.resbIn = true;
     machine->clocks_step = clocks_step;
+    machine->clocks_step_fast = clocks_step;
     machine->clocks_step_mega2 = speed_factor;
     machine->clocks_spent = 0;
     if (romSize != CLEM_IIGS_ROM3_SIZE || rom == NULL) {
@@ -882,10 +884,10 @@ static inline struct ClemensDrive* _clem_drive_get(
 ) {
     struct ClemensDrive* drive;
     switch (drive_type) {
-        case kClemensDrive_3_5_D1: drive = &clem->active_drives.slot5.drive1; break;
-        case kClemensDrive_3_5_D2: drive = &clem->active_drives.slot5.drive2; break;
-        case kClemensDrive_5_25_D1: drive = &clem->active_drives.slot6.drive1; break;
-        case kClemensDrive_5_25_D2: drive = &clem->active_drives.slot6.drive2; break;
+        case kClemensDrive_3_5_D1: drive = &clem->active_drives.slot5[0]; break;
+        case kClemensDrive_3_5_D2: drive = &clem->active_drives.slot5[1]; break;
+        case kClemensDrive_5_25_D1: drive = &clem->active_drives.slot6[0]; break;
+        case kClemensDrive_5_25_D2: drive = &clem->active_drives.slot6[1]; break;
         default: drive = NULL; break;
     }
     return drive;
@@ -3048,6 +3050,7 @@ void clemens_emulate(ClemensMachine* clem) {
             cpu->pins.readyOut = true;
             cpu->enabled = true;
 
+            clem_disk_reset_drives(&clem->active_drives);
             _clem_mmio_init(mmio, clem->clocks_step_mega2);
             _clem_cycle(clem, 1);
         }
