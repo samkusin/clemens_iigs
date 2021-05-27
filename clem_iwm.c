@@ -27,6 +27,7 @@
 #define CLEM_IWM_FLAG_DRIVE_2                0x00000010
 
 
+
 /*
     Emulation of disk drives and the IWM Controller.
 
@@ -58,13 +59,57 @@
     interface with the floppy controller chip.
 */
 
-void _clem_disk_reset_drive_series(struct ClemensDriveSeries* series) {
+void _clem_disk_reset_drive(struct ClemensDrive* drive) {
+   drive->motor_on = false;
+   drive->motor_switch_us = 0;
+   drive->qtr_track_index = 0;
+   drive->q03_switch = 0;
+}
+
+void _clem_disk_update_state_35(
+   struct ClemensDrive* drive,
+   uint64_t current_time_ns,
+   unsigned io_flags,
+   unsigned in_phase
+) {
 
 }
 
+void _clem_disk_update_state_525(
+   struct ClemensDrive* drive,
+   uint64_t current_time_ns,
+   unsigned io_flags,
+   unsigned in_phase
+) {
+   unsigned dt_us = (unsigned)((current_time_ns - drive->clock_ns) / 1000);
+   if (io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
+      if (!drive->motor_on) {
+         drive->motor_on = true;
+      }
+      drive->motor_switch_us += dt_us;
+      if (drive->motor_switch_us > 1000000) {
+         drive->motor_switch_us = 1000000;
+      }
+   } else {
+      if (drive->motor_on) {
+         drive->motor_on = false;
+      }
+      if (drive->motor_switch_us - dt_us > drive->motor_switch_us) {
+         drive->motor_switch_us = 0;
+      } else {
+         drive->motor_switch_us -= dt_us;
+      }
+   }
+
+   drive->clock_ns = current_time_ns;
+}
+
+
 void clem_disk_reset_drives(struct ClemensDriveBay* drives) {
-   _clem_disk_reset_drive_series(&drives->slot5);
-   _clem_disk_reset_drive_series(&drives->slot6);
+   _clem_disk_reset_drive(&drives->slot5[0]);
+   _clem_disk_reset_drive(&drives->slot5[1]);
+   _clem_disk_reset_drive(&drives->slot6[0]);
+   _clem_disk_reset_drive(&drives->slot6[1]);
 }
 
 void _clem_disk_update_state(
@@ -73,7 +118,23 @@ void _clem_disk_update_state(
    unsigned io_flags,
    unsigned in_phase
 ) {
-
+   if (io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+      if (io_flags & CLEM_IWM_FLAG_DRIVE_1) {
+         _clem_disk_update_state_35(
+            &drives->slot5[0], current_time_ns, io_flags, in_phase);
+      } else if (io_flags & CLEM_IWM_FLAG_DRIVE_2) {
+         _clem_disk_update_state_35(
+            &drives->slot5[1], current_time_ns, io_flags, in_phase);
+      }
+   } else {
+      if (io_flags & CLEM_IWM_FLAG_DRIVE_1) {
+         _clem_disk_update_state_525(
+            &drives->slot6[0], current_time_ns, io_flags, in_phase);
+      } else if (io_flags & CLEM_IWM_FLAG_DRIVE_2) {
+         _clem_disk_update_state_525(
+            &drives->slot6[1], current_time_ns, io_flags, in_phase);
+      }
+   }
 }
 
 
@@ -191,10 +252,8 @@ void clem_iwm_write_switch(
          }
          if (value & 0x40) {
             iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_35;
-            _clem_disk_reset_drive_series(&drives->slot5);
          } else {
             iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_35;
-            _clem_disk_reset_drive_series(&drives->slot6);
          }
          if (value & 0x3f) {
             CLEM_LOG("Setting unexpected flags for %0X: %02X", ioreg, value);
