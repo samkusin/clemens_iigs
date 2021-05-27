@@ -200,11 +200,11 @@ struct ClemensVGC {
  *
  */
 struct ClemensDeviceIWM {
-    uint64_t current_time_ns;           /**< Nanosecond time from reset */
-    unsigned io_flags;                  /**< Disk port I/O flags */
-    unsigned out_phase;                 /**< PH0-PH3 bits sent to drive */
-    bool q6_switch;                     /**< Q6 state switch */
-    bool q7_switch;                     /**< Q7 stage switch */
+    uint64_t time_slice_ns;     /**< Nanosecond time slice since last update */
+    unsigned io_flags;          /**< Disk port I/O flags */
+    unsigned out_phase;         /**< PH0-PH3 bits sent to drive */
+    bool q6_switch;             /**< Q6 state switch */
+    bool q7_switch;             /**< Q7 stage switch */
 };
 
 /**
@@ -265,12 +265,11 @@ struct ClemensWOZDisk;
  */
 struct ClemensDrive {
     struct ClemensWOZDisk* data;    /**< The parsed WOZ data */
-    uint64_t clock_ns;          /**< Drive clock */
-    unsigned qtr_track_index;   /**< Current track position of the head */
-    unsigned track_step;        /**< Byte index into the track */
+    int qtr_track_index;        /**< Current track position of the head */
+    int track_position;         /**< bit index into the track */
     unsigned q03_switch;        /**< 4-bit Q0-3 entry (5.25" = stepper ) */
     unsigned motor_switch_us;   /**< Motor clock used for spin-up-down */
-    bool motor_on;              /**< Used with motor_switch_us */
+    unsigned motor_state;       /**< See CLEM_DISK_MOTOR_XXX in clem_iwm.c */
 };
 
 struct ClemensDriveBay {
