@@ -266,10 +266,17 @@ struct ClemensWOZDisk;
 struct ClemensDrive {
     struct ClemensWOZDisk* data;    /**< The parsed WOZ data */
     int qtr_track_index;        /**< Current track position of the head */
-    int track_position;         /**< bit index into the track */
+    unsigned track_byte_index;  /**< byte index into track */
+    unsigned track_bit_shift;   /**< bit offset into current byte */
+    unsigned track_bit_length;  /**< current track bit length */
     unsigned q03_switch;        /**< 4-bit Q0-3 entry (5.25" = stepper ) */
     unsigned motor_switch_us;   /**< Motor clock used for spin-up-down */
     unsigned motor_state;       /**< See CLEM_DISK_MOTOR_XXX in clem_iwm.c */
+
+    uint32_t random_bits[8];    /**< used for random pulse generation */
+    uint8_t random_bit_index;   /**< bit index into 32-byte buffer */
+    uint8_t read_buffer;        /**< Incoming bits from stream shifted in */
+    uint8_t real_track_index;   /**< the index into the raw woz track data */
 };
 
 struct ClemensDriveBay {
