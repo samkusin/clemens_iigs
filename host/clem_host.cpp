@@ -636,7 +636,7 @@ void ClemensHost::createMachine()
   // Apple II line (including Mega2) was 1.023mhz
   // A Mega2 cycle is equivalent to 1 full cycle of the 2.8mhz clock
   // TODO: allows 1.023, 2.8, 8mhz without any loss due to integer div
-  const uint32_t kClocksPerFastCycle = 1023;
+  const uint32_t kClocksPerFastCycle = CLEM_MEGA2_CYCLE_NS;
   const uint32_t kClocksPerSlowCycle = 2864;
   clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle,
                romMemory, romMemorySize,

@@ -200,7 +200,13 @@ struct ClemensVGC {
  *
  */
 struct ClemensDeviceIWM {
-    uint64_t time_slice_ns;     /**< Nanosecond time slice since last update */
+    /** Number of ns executed since iwm sync().  Used by MMIO code to
+     *  'catch up' a disk with the current machine timestamp.  The step
+     *  matches the current machine nanosecond step per cycle */
+    int ns_lag;
+    unsigned ns_per_cycle;
+    unsigned cycle_counter;     /* Cycle count stamp at sync() */
+
     unsigned io_flags;          /**< Disk port I/O flags */
     unsigned out_phase;         /**< PH0-PH3 bits sent to drive */
     bool q6_switch;             /**< Q6 state switch */
@@ -453,7 +459,7 @@ typedef struct {
  */
 typedef struct {
     struct Clemens65C816 cpu;
-    /* clocks spent per cycle */
+    /* clocks spent per cycle as set by the current speed settings */
     clem_clocks_duration_t clocks_step;
     /* clocks spent per cycle in fast mode */
     clem_clocks_duration_t clocks_step_fast;
@@ -461,6 +467,8 @@ typedef struct {
     clem_clocks_duration_t clocks_step_mega2;
     /* clock timer - never change once system has been started */
     clem_clocks_time_t clocks_spent;
+    /* nanosecond increment per cycle, pre-calculated */
+    uint32_t ns_per_cycle;
 
     uint8_t* fpi_bank_map[256];     // $00 - $ff
     uint8_t* mega2_bank_map[2];     // $e0 - $e1

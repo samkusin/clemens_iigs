@@ -150,10 +150,7 @@ Jim Sather's Output of the Disk II LSS
 
 addr = 0
 latch = ? (data byte)
-if bit_in then addr=0 else addr = 1
-if latch:7==1 then addr |= 0x02
-if q6:hi(load) then addr |= 0x04
-if q7:hi(write) then addr |= 0x08
+
 addr |= (state << 4)
 
 command = rom[addr]
@@ -167,3 +164,4 @@ state = (command >> 4)
 0xD SL1 = shift left, bit 0 = 1
 
 execute two instructions per cycle (2mhz on a 1mhz speed = 2 instructions per 1us)
+
