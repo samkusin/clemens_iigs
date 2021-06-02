@@ -244,6 +244,7 @@ static void _clem_mmio_speed_c036_set(
     /* bit 5 should always be 0 */
     /* for ROM 3, bit 6 can be on or off - for ROM 1, must be off */
     clem->mmio.speed_c036 = (value & 0xdf);
+    clem->ns_per_cycle = _clem_calc_ns_step_from_clocks(clem, clem->clocks_step);
 }
 
 static uint8_t _clem_mmio_inttype_c046(
@@ -525,8 +526,11 @@ static uint8_t _clem_mmio_read(
             result = clem_sound_read_switch(&mmio->dev_audio, ioreg, flags);
             break;
         case CLEM_MMIO_REG_DISK_INTERFACE:
-            result = clem_iwm_read_switch(
-                &mmio->dev_iwm, &clem->active_drives, ioreg, flags);
+            result = clem_iwm_read_switch(&mmio->dev_iwm,
+                                          &clem->active_drives,
+                                          clem->cpu.cycles_spent,
+                                          ioreg,
+                                          flags);
             break;
         case CLEM_MMIO_REG_SHADOW:
             result = _clem_mmio_shadow_c035(mmio);
@@ -628,8 +632,11 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_IWM_Q6_HI:
         case CLEM_MMIO_REG_IWM_Q7_LO:
         case CLEM_MMIO_REG_IWM_Q7_HI:
-            result = clem_iwm_read_switch(
-                &mmio->dev_iwm, &clem->active_drives,  ioreg, flags);
+            result = clem_iwm_read_switch(&mmio->dev_iwm,
+                                          &clem->active_drives,
+                                          clem->cpu.cycles_spent,
+                                          ioreg,
+                                          flags);
             break;
         default:
             if (ioreg >= 0x71 && ioreg < 0x80) {
@@ -761,7 +768,11 @@ static void _clem_mmio_write(
             clem_sound_write_switch(&mmio->dev_audio, ioreg, data);
             break;
         case CLEM_MMIO_REG_DISK_INTERFACE:
-            clem_iwm_write_switch(&mmio->dev_iwm, &clem->active_drives, ioreg, data);
+            clem_iwm_write_switch(&mmio->dev_iwm,
+                                  &clem->active_drives,
+                                  clem->cpu.cycles_spent,
+                                  ioreg,
+                                  data);
             break;
         case CLEM_MMIO_REG_RTC_CTL:
             mmio->dev_rtc.ctl_c034 = data;
@@ -855,7 +866,11 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_IWM_Q6_HI:
         case CLEM_MMIO_REG_IWM_Q7_LO:
         case CLEM_MMIO_REG_IWM_Q7_HI:
-            clem_iwm_write_switch(&mmio->dev_iwm, &clem->active_drives, ioreg, data);
+            clem_iwm_write_switch(&mmio->dev_iwm,
+                                  &clem->active_drives,
+                                  clem->cpu.cycles_spent,
+                                  ioreg,
+                                  data);
             break;
         default:
             if (!is_noop) {

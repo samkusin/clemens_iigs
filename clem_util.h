@@ -20,3 +20,23 @@ static inline uint8_t* _clem_get_memory_bank(
     }
     return clem->fpi_bank_map[bank];
 }
+
+static inline uint32_t _clem_calc_ns_step_from_clocks(
+    ClemensMachine* clem,
+    clem_clocks_duration_t clocks_step
+) {
+    return  (uint32_t)(
+        CLEM_MEGA2_CYCLE_NS * clocks_step / clem->clocks_step_mega2);
+}
+
+static inline uint32_t _clem_calc_cycles_diff(
+    uint32_t cycles_a,
+    uint32_t cycles_b
+) {
+    uint32_t diff = cycles_b - cycles_a;
+    if (cycles_b > cycles_a) {
+        return cycles_b - cycles_a;
+    } else {
+        return cycles_b + (UINT32_MAX - cycles_a) + 1;
+    }
+}
