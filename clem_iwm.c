@@ -27,6 +27,8 @@
 #define CLEM_IWM_FLAG_DRIVE_1                0x00000008
 /*  Drive 2 selected */
 #define CLEM_IWM_FLAG_DRIVE_2                0x00000010
+/*  Write protect for disk */
+#define CLEM_IWM_FLAG_WRPROTECT              0x00000080
 /*  Read pulse from the disk/drive bitstream is on */
 #define CLEM_IWM_FLAG_READ_DATA              0x00000100
 
@@ -96,6 +98,28 @@ static int s_disk2_phase_states[16][16] = {
 /* xx */ {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 }
 };
 
+/* cut from Jim Slater's decompilation of the LSS ROM for the Disk II "DOS 3.3"
+   5.25 disk encoding
+*/
+static uint8_t s_lss_525_rom[256] = {
+    0x18, 0x18, 0x18, 0x18, 0x0A, 0x0A, 0x0A, 0x0A, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18,
+    0x2D, 0x2D, 0x38, 0x38, 0x0A, 0x0A, 0x0A, 0x0A, 0x28, 0x28, 0x28, 0x28, 0x28, 0x28, 0x28, 0x28,
+    0xD8, 0x38, 0x08, 0x28, 0x0A, 0x0A, 0x0A, 0x0A, 0x39, 0x39, 0x39, 0x39, 0x3B, 0x3B, 0x3B, 0x3B,
+    0xD8, 0x48, 0x48, 0x48, 0x0A, 0x0A, 0x0A, 0x0A, 0x48, 0x48, 0x48, 0x48, 0x48, 0x48, 0x48, 0x48,
+    0xD8, 0x58, 0xD8, 0x58, 0x0A, 0x0A, 0x0A, 0x0A, 0x58, 0x58, 0x58, 0x58, 0x58, 0x58, 0x58, 0x58,
+    0xD8, 0x68, 0xD8, 0x68, 0x0A, 0x0A, 0x0A, 0x0A, 0x68, 0x68, 0x68, 0x68, 0x68, 0x68, 0x68, 0x68,
+    0xD8, 0x78, 0xD8, 0x78, 0x0A, 0x0A, 0x0A, 0x0A, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78,
+    0xD8, 0x88, 0xD8, 0x88, 0x0A, 0x0A, 0x0A, 0x0A, 0x08, 0x08, 0x88, 0x88, 0x08, 0x08, 0x88, 0x88,
+    0xD8, 0x98, 0xD8, 0x98, 0x0A, 0x0A, 0x0A, 0x0A, 0x98, 0x98, 0x98, 0x98, 0x98, 0x98, 0x98, 0x98,
+    0xD8, 0x29, 0xD8, 0xA8, 0x0A, 0x0A, 0x0A, 0x0A, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8,
+    0xCD, 0xBD, 0xD8, 0xB8, 0x0A, 0x0A, 0x0A, 0x0A, 0xB9, 0xB9, 0xB9, 0xB9, 0xBB, 0xBB, 0xBB, 0xBB,
+    0xD9, 0x59, 0xD8, 0xC8, 0x0A, 0x0A, 0x0A, 0x0A, 0xC8, 0xC8, 0xC8, 0xC8, 0xC8, 0xC8, 0xC8, 0xC8,
+    0xD9, 0xD9, 0xD8, 0xA0, 0x0A, 0x0A, 0x0A, 0x0A, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8,
+    0xD8, 0x08, 0xE8, 0xE8, 0x0A, 0x0A, 0x0A, 0x0A, 0xE8, 0xE8, 0xE8, 0xE8, 0xE8, 0xE8, 0xE8, 0xE8,
+    0xFD, 0xFD, 0xF8, 0xF8, 0x0A, 0x0A, 0x0A, 0x0A, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8,
+    0xDD, 0x4D, 0xE0, 0xE0, 0x0A, 0x0A, 0x0A, 0x0A, 0x88, 0x88, 0x08, 0x08, 0x88, 0x88, 0x08, 0x08
+};
+
 
 /*
     Emulation of disk drives and the IWM Controller.
@@ -111,34 +135,34 @@ static int s_disk2_phase_states[16][16] = {
 */
 
 inline static unsigned _clem_disk_timer_decrement(
-    unsigned timer_us,
-    unsigned dt_us
+    unsigned timer_ns,
+    unsigned dt_ns
 ) {
-    return (timer_us - dt_us < timer_us) ? (timer_us - dt_us) : 0;
+    return (timer_ns - dt_ns < timer_ns) ? (timer_ns - dt_ns) : 0;
 }
 
 inline static unsigned _clem_disk_timer_increment(
-    unsigned timer_us,
-    unsigned timer_max_us,
-    unsigned dt_us
+    unsigned timer_ns,
+    unsigned timer_max_ns,
+    unsigned dt_ns
 ) {
-    if (timer_us + dt_us > timer_us) {
-        timer_us += dt_us;
+    if (timer_ns + dt_ns > timer_ns) {
+        timer_ns += dt_ns;
     }
-    if (timer_us + dt_us < timer_us) {
-        timer_us = UINT32_MAX;
+    if (timer_ns + dt_ns < timer_ns) {
+        timer_ns = UINT32_MAX;
     } else {
-        timer_us += dt_us;
+        timer_ns += dt_ns;
     }
-    if (timer_us > timer_max_us) {
-        timer_us = timer_max_us;
+    if (timer_ns > timer_max_ns) {
+        timer_ns = timer_max_ns;
     }
-    return timer_us;
+    return timer_ns;
 }
 
 static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
     drive->q03_switch = 0;
-    drive->motor_switch_us = 0;
+    drive->pulse_ns = 0;
     drive->track_byte_index = 0;
     drive->track_bit_shift = 8;
     drive->read_buffer = 0;
@@ -246,26 +270,30 @@ static void _clem_disk_update_state_525(
     if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
         return;
     }
-    --drive->track_bit_shift;
-    if (drive->track_bit_shift == 0) {
-        ++drive->track_byte_index;
-        drive->track_bit_shift = 8;
-    }
-    /* read a pulse from the bitstream, following WOZ emulation suggestions
-        to emulate errors - this is effectively a copypasta from
-        https://applesaucefdc.com/woz/reference2/ */
-    drive->read_buffer <<= 1;
-    if (drive->real_track_index != 0xff) {
-        drive->read_buffer |= _clem_disk_read_bit_525(drive);
-        if ((drive->read_buffer & 0x0f) != 0) {
-            if (drive->read_buffer & 0x02) {
-                *io_flags |= CLEM_IWM_FLAG_READ_DATA;
+    drive->pulse_ns += dt_ns;
+    if (drive->pulse_ns >= drive->data->bit_timing_ns) {
+        --drive->track_bit_shift;
+        if (drive->track_bit_shift == 0) {
+            ++drive->track_byte_index;
+            drive->track_bit_shift = 8;
+        }
+        /* read a pulse from the bitstream, following WOZ emulation suggestions
+            to emulate errors - this is effectively a copypasta from
+            https://applesaucefdc.com/woz/reference2/ */
+        drive->read_buffer <<= 1;
+        if (drive->real_track_index != 0xff) {
+            drive->read_buffer |= _clem_disk_read_bit_525(drive);
+            if ((drive->read_buffer & 0x0f) != 0) {
+                if (drive->read_buffer & 0x02) {
+                    *io_flags |= CLEM_IWM_FLAG_READ_DATA;
+                }
+            } else {
+                *io_flags |= _clem_disk_read_fake_bit_525(drive);
             }
         } else {
             *io_flags |= _clem_disk_read_fake_bit_525(drive);
         }
-    } else {
-        *io_flags |= _clem_disk_read_fake_bit_525(drive);
+        drive->pulse_ns -= drive->data->bit_timing_ns;
     }
 
     if (in_phase != drive->q03_switch) {
@@ -277,7 +305,7 @@ static void _clem_disk_update_state_525(
         else if (qtr_track_index >= 160) qtr_track_index = 160;
         CLEM_LOG("Disk525[%u]: Motor: %u; Head @ (%d,%d)",
             (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
-            drive->motor_state,
+            (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
             qtr_track_index / 4, qtr_track_index % 4);
         drive->q03_switch = in_phase;
     }
@@ -353,6 +381,9 @@ void clem_disk_reset_drives(struct ClemensDriveBay* drives) {
 
 void clem_iwm_reset(struct ClemensDeviceIWM* iwm) {
     memset(iwm, 0, sizeof(*iwm));
+
+    /* Jim Sather's 'example' initial state - evaluate if it's necessary */
+    iwm->lss_seq = 0x02;
 }
 
 void clem_iwm_insert_disk(
@@ -372,6 +403,53 @@ void clem_iwm_eject_disk(
     // after timeout, reset drive state
 }
 
+
+void _clem_iwm_lss(struct ClemensDeviceIWM* iwm) {
+    /* indexing rom instructions generated by Jim Slater,
+       seq | read/write | shift/load | QA | pulse
+
+       This is only relevant for 5.25 drives.  3.5" drives have their own
+
+    */
+    unsigned adr = (unsigned)(iwm->lss_seq) << 4 |
+                   (iwm->q7_switch ? 0x08 : 00) |
+                   (iwm->q6_switch ? 0x04 : 00) |
+                   ((iwm->latch & 0x80) ? 0x02 : 00) |
+                   ((iwm->io_flags & CLEM_IWM_FLAG_READ_DATA) ? 0x01 : 00);
+    unsigned cmd = s_lss_525_rom[adr];
+
+    if (cmd & 0x08) {
+        switch (cmd & 0xf) {
+            case 0x08:              /* NOP */
+            case 0x0C:
+                break;
+            case 0x09:              /* SL0 */
+                iwm->latch <<= 1;
+                break;
+            case 0x0A:              /* SR, WRPROTECT -> HI */
+            case 0x0E:
+                iwm->latch >>= 1;
+                if (iwm->io_flags & CLEM_IWM_FLAG_WRPROTECT) {
+                    iwm->latch |= 0x80;
+                }
+                break;
+            case 0x0B:              /* LD from data to latch */
+            case 0x0F:
+                iwm->latch = iwm->data;
+                break;
+            case 0x0D:              /* SL1 append 1 bit */
+                iwm->latch <<= 1;
+                iwm->latch |= 0x01;
+                break;
+        }
+    } else {
+        /* CLR */
+        iwm->latch = 0;
+    }
+
+    iwm->lss_seq = (cmd & 0xf0) >> 4;
+}
+
 void clem_iwm_glu_sync(
     struct ClemensDeviceIWM* iwm,
     struct ClemensDriveBay* drives,
@@ -383,6 +461,7 @@ void clem_iwm_glu_sync(
         iwm->ns_lag += delta_ns;
         iwm->ns_lag -=_clem_disk_update_state(
             drives, &iwm->io_flags, iwm->out_phase, iwm->ns_lag);
+        _clem_iwm_lss(iwm);
     } else {
         iwm->ns_lag = 0;
     }
@@ -408,11 +487,6 @@ void _clem_iwm_io_switch(
    uint8_t ioreg,
    uint8_t op
 ) {
-    unsigned old_io_flags = iwm->io_flags;
-    unsigned old_out_phase = iwm->out_phase;
-    bool old_q6 = iwm->q6_switch;
-    bool old_q7 = iwm->q7_switch;
-
     switch (ioreg) {
         case CLEM_MMIO_REG_IWM_DRIVE_DISABLE:
             iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
@@ -455,11 +529,6 @@ void _clem_iwm_io_switch(
             break;
     }
 
-    /* IWM state switch */
-    if (old_q6 != iwm->q6_switch || old_q7 != iwm->q7_switch) {
-
-    }
-
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
         /* emulate the drive just enough to catch up with the current
            cycles spent executing the instruction that invokes this IO.
@@ -472,6 +541,7 @@ void _clem_iwm_io_switch(
             &iwm->io_flags,
             iwm->out_phase,
             (int)(cycles_spent - iwm->cycle_counter) * iwm->ns_per_cycle);
+        _clem_iwm_lss(iwm);
     }
 }
 
@@ -499,6 +569,7 @@ void clem_iwm_write_switch(
             }
             break;
         default:
+            iwm->data = value;
             _clem_iwm_io_switch(iwm, drives, cycles_spent, ioreg, CLEM_IO_WRITE);
             if (ioreg & 1) {
                 /* write data */

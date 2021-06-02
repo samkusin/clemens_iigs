@@ -209,6 +209,11 @@ struct ClemensDeviceIWM {
 
     unsigned io_flags;          /**< Disk port I/O flags */
     unsigned out_phase;         /**< PH0-PH3 bits sent to drive */
+
+    uint8_t data;               /**< IO data (bus data) */
+    uint8_t latch;              /**< data latch */
+    uint8_t lss_seq;            /**< lss state */
+
     bool q6_switch;             /**< Q6 state switch */
     bool q7_switch;             /**< Q7 stage switch */
 };
@@ -276,8 +281,7 @@ struct ClemensDrive {
     unsigned track_bit_shift;   /**< bit offset into current byte */
     unsigned track_bit_length;  /**< current track bit length */
     unsigned q03_switch;        /**< 4-bit Q0-3 entry (5.25" = stepper ) */
-    unsigned motor_switch_us;   /**< Motor clock used for spin-up-down */
-    unsigned motor_state;       /**< See CLEM_DISK_MOTOR_XXX in clem_iwm.c */
+    unsigned pulse_ns;          /**< nanosecond timer for pulse input */
 
     uint32_t random_bits[8];    /**< used for random pulse generation */
     uint8_t random_bit_index;   /**< bit index into 32-byte buffer */
