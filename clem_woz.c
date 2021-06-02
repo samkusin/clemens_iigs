@@ -237,17 +237,18 @@ const uint8_t* clem_woz_parse_info_chunk(
         } else {
             disk->boot_type = CLEM_WOZ_BOOT_UNDEFINED;
         }
-        disk->bit_timing_ns = _clem_woz_read_u8(&woz_iter);
+        /* WOZ timing here is in 125 ns increments */
+        disk->bit_timing_ns = _clem_woz_read_u8(&woz_iter) * 125;
         disk->flags |= _clem_woz_read_u16(&woz_iter);
         disk->required_ram_kb = _clem_woz_read_u16(&woz_iter);
         disk->max_track_size_bytes = _clem_woz_read_u16(&woz_iter) * 512;
 
     } else {
         if (disk->disk_type == CLEM_WOZ_DISK_5_25) {
-            disk->bit_timing_ns = 4;
+            disk->bit_timing_ns = 4 * 1000;
             disk->max_track_size_bytes = 6646;  /* v1 max track size */
         } else if (disk->disk_type == CLEM_WOZ_DISK_3_5) {
-            disk->bit_timing_ns = 2;
+            disk->bit_timing_ns = 2 * 1000;
             /* this appears to be the upper limit of all tracks on 3.5" disks
                according to experiments with WOZ files - may be overkill
             */
