@@ -174,34 +174,26 @@ void clem_iwm_eject_disk(struct ClemensDeviceIWM* iwm,
  * most emulation will occur on demand via swtiches.   This function is here
  * to be consistent with our device/controller pattern.
  *
- * Also note, this function takes a nanosecond time value indexed from reset
- *
- * TODO: remove if not needed
- *
  * @param iwm device data
  * @param drives the IWM managed drives
- * @param delta_ns Nanosecond increment since last sync
- * @param ns_per_cycle Nanosecond step per machine cycle
- * @param cycle_counter The current CPU cycle count
+ * @param clock Current clock referemce time
  */
 void clem_iwm_glu_sync(struct ClemensDeviceIWM* iwm,
                        struct ClemensDriveBay* drives,
-                       uint32_t delta_ns,
-                       uint32_t ns_per_cycle,
-                       uint32_t cycle_counter);
+                       struct ClemensClock* clock);
 
 /**
  * @brief Executed from the memory subsystem for MMIO
  *
  * @param iwm IWM data
  * @param drives Drives to be managed by the IWM
- * @param cycles_spent Current CPU cycles spent counter (not a difference)
+ * @param clock The current reference clock*
  * @param ioreg The MMIO register accessed
  * @param value The value written to the MMIO register
  */
 void clem_iwm_write_switch(struct ClemensDeviceIWM* iwm,
                            struct ClemensDriveBay* drives,
-                           uint32_t cycles_spent,
+                           struct ClemensClock* clock,
                            uint8_t ioreg, uint8_t value);
 
 /**
@@ -209,14 +201,14 @@ void clem_iwm_write_switch(struct ClemensDeviceIWM* iwm,
  *
  * @param iwm IWM data
  * @param drives Drives to be managed by the IWM
- * @param cycles_spent Current CPU cycles spent counter (not a difference)
+ * @param clock The current reference clock
  * @param ioreg The MMIO register accessed
  * @param flags Access flags used to determine if the read is a no-op
  * @return uint8_t The value read from the MMIO register
  */
 uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM* iwm,
                              struct ClemensDriveBay* drives,
-                             uint32_t cycles_spent,
+                             struct ClemensClock* clock,
                              uint8_t ioreg,
                              uint8_t flags);
 

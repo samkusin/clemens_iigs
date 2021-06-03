@@ -829,8 +829,6 @@ int clemens_init(
     machine->clocks_step_fast = clocks_step;
     machine->clocks_step_mega2 = speed_factor;
     machine->clocks_spent = 0;
-    machine->ns_per_cycle = _clem_calc_ns_step_from_clocks(
-        machine, machine->clocks_step);
 
     if (romSize != CLEM_IIGS_ROM3_SIZE || rom == NULL) {
         return -1;
@@ -3021,9 +3019,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
 void clemens_emulate(ClemensMachine* clem) {
     struct Clemens65C816* cpu = &clem->cpu;
     struct ClemensMMIO* mmio = &clem->mmio;
-    clem_clocks_time_t last_clocks_spent = clem->clocks_spent;
+    struct ClemensClock clock;
     uint32_t delta_mega2_cycles;
-    uint32_t delta_ns;
 
     if (!cpu->pins.resbIn) {
         /*  the reset interrupt overrides any other state
@@ -3128,15 +3125,12 @@ void clemens_emulate(ClemensMachine* clem) {
 
     // TODO: calculate delta_ns per emulate call to call 'real-time' systems
     //      like VGC
-
-    delta_ns = _clem_calc_ns_step_from_clocks(
-        clem, clem->clocks_spent - last_clocks_spent);
+    clock.ts = clem->clocks_spent;
+    clock.ref_step = clem->clocks_step_mega2;
     clem_vgc_sync(&mmio->vgc, CLEM_MEGA2_CYCLES_PER_60TH);
     clem_iwm_glu_sync(&mmio->dev_iwm,
                       &clem->active_drives,
-                      delta_ns,
-                      clem->ns_per_cycle,
-                      cpu->cycles_spent);
+                      &clock);
 
     delta_mega2_cycles = (uint32_t)(
         (clem->clocks_spent / clem->clocks_step_mega2) - mmio->mega2_cycles);
