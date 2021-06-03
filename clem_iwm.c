@@ -15,22 +15,29 @@
 #include "clem_mmio_defs.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 /*  Enable 3.5 drive seris */
-#define CLEM_IWM_FLAG_DRIVE_35               0x00000001
-/* device flag, 3.5" side 2 (not used for 5.25") */
-#define CLEM_IWM_FLAG_HEAD_SEL               0x00000002
+#define CLEM_IWM_FLAG_DRIVE_35              0x00000001
 /*  Drive system is active - in tandem with drive index selected */
-#define CLEM_IWM_FLAG_DRIVE_ON               0x00000004
+#define CLEM_IWM_FLAG_DRIVE_ON              0x00000002
 /*  Drive 1 selected - note IWM only allows one drive at a time, but the
     disk port has two pins for drive, so emulating that aspect */
-#define CLEM_IWM_FLAG_DRIVE_1                0x00000008
+#define CLEM_IWM_FLAG_DRIVE_1               0x00000004
 /*  Drive 2 selected */
-#define CLEM_IWM_FLAG_DRIVE_2                0x00000010
-/*  Write protect for disk */
-#define CLEM_IWM_FLAG_WRPROTECT              0x00000080
+#define CLEM_IWM_FLAG_DRIVE_2               0x00000008
+/*  Congolmerate mask for any-drive selected */
+#define CLEM_IWM_FLAG_DRIVE_ANY             (CLEM_IWM_FLAG_DRIVE_1 + \
+                                             CLEM_IWM_FLAG_DRIVE_2)
+/* device flag, 3.5" side 2 (not used for 5.25")
+   note, this really is used for 3.5" drive controller actions:
+   https://llx.com/Neil/a2/disk
+*/
+#define CLEM_IWM_FLAG_HEAD_SEL              0x00000010
+/*  Write protect for disk for 5.25", and the sense input bit for 3.5" drives*/
+#define CLEM_IWM_FLAG_WRPROTECT_SENSE       0x00000080
 /*  Read pulse from the disk/drive bitstream is on */
-#define CLEM_IWM_FLAG_READ_DATA              0x00000100
+#define CLEM_IWM_FLAG_READ_DATA             0x00000100
 
 
 /*  Disk II stepper emulation
@@ -98,8 +105,11 @@ static int s_disk2_phase_states[16][16] = {
 /* xx */ {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 }
 };
 
-/* cut from Jim Slater's decompilation of the LSS ROM for the Disk II "DOS 3.3"
-   5.25 disk encoding
+/* Cut from Jim Slater's decompilation of the LSS ROM for the Disk II "DOS 3.3"
+   5.25 disk encoding, indexed with (sequence in the upper nibble, Qx/Pulse in
+   the lower nibble) addresses.   See Understanding the Apple //e for more
+   information.   There appears to be no IWM/IIgs equivalent that's readily
+   available.
 */
 static uint8_t s_lss_525_rom[256] = {
     0x18, 0x18, 0x18, 0x18, 0x0A, 0x0A, 0x0A, 0x0A, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18,
@@ -120,6 +130,30 @@ static uint8_t s_lss_525_rom[256] = {
     0xDD, 0x4D, 0xE0, 0xE0, 0x0A, 0x0A, 0x0A, 0x0A, 0x88, 0x88, 0x08, 0x08, 0x88, 0x88, 0x08, 0x08
 };
 
+
+/*  Follows the status and control values from https://llx.com/Neil/a2/disk
+ */
+#define CLEM_IWM_DISK35_QUERY_STEP_DIR      0x00
+#define CLEM_IWM_DISK35_QUERY_IO_HEAD_LOWER 0x01
+#define CLEM_IWM_DISK35_QUERY_DISK_IN_DRIVE 0x02
+#define CLEM_IWM_DISK35_QUERY_IO_HEAD_UPPER 0x03
+#define CLEM_IWM_DISK35_QUERY_IS_STEPPING   0x04
+#define CLEM_IWM_DISK35_QUERY_WRITE_PROTECT 0x06
+#define CLEM_IWM_DISK35_QUERY_MOTOR_ON      0x08
+#define CLEM_IWM_DISK35_QUERY_DOUBLE_SIDED  0x09
+#define CLEM_IWM_DISK35_QUERY_TRACK_0       0x0A
+#define CLEM_IWM_DISK35_QUERY_READ_READY    0x0B
+#define CLEM_IWM_DISK35_QUERY_EJECTED       0x0C
+#define CLEM_IWM_DISK35_QUERY_60HZ_ROTATION 0x0E
+#define CLEM_IWM_DISK35_QUERY_ENABLED       0x0F
+
+#define CLEM_IWM_DISK35_CTL_STEP_IN         0x00
+#define CLEM_IWM_DISK35_CTL_STEP_OUT        0x01
+#define CLEM_IWM_DISK35_CTL_EJECTED_RESET   0x03
+#define CLEM_IWM_DISK35_CTL_STEP_ONE        0x04
+#define CLEM_IWM_DISK35_CTL_MOTOR_ON        0x08
+#define CLEM_IWM_DISK35_CTL_MOTOR_OFF       0x09
+#define CLEM_IWM_DISK35_CTL_EJECT           0x0D
 
 /*
     Emulation of disk drives and the IWM Controller.
@@ -184,13 +218,47 @@ static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
     drive->random_bits[0] = 0xf00f003;
 }
 
+/*
+    control/status set/get params:
+        in_phase = PH0, PH1, PH2
+        io_flags = HEAD_SEL
+
+        control is set by toggling the PH3 bit from off -> on -> off
+ */
 static void _clem_disk_update_state_35(
     struct ClemensDrive* drive,
     unsigned *io_flags,
     unsigned in_phase,
     unsigned dt_ns
 ) {
+    bool next_select = (*io_flags & CLEM_IWM_FLAG_HEAD_SEL) != 0;
 
+    if (in_phase != drive->q03_switch || drive->select_35 != next_select) {
+        if (!(drive->q03_switch & 0x08) && (in_phase & 0x08)) {
+            /* do control action */
+        } else if (!(in_phase & 0x08)) {
+            /* do status query */
+            unsigned query = ((in_phase << 2)     & 0x08) |
+                             ((in_phase << 2)     & 0x04) |
+                             (!next_select ? 0x00 : 0x02) |
+                             ((in_phase >> 2)     & 0x01);
+            if (drive->query_35 != query) {
+                drive->query_35 = query;
+                CLEM_LOG("clem_iwm: Disk35[%u]: Power: %u; Query: %02X",
+                    (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
+                    (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
+                    drive->query_35);
+            }
+
+            switch (drive->query_35) {
+                case CLEM_IWM_DISK35_QUERY_STEP_DIR:
+                case 0x01:
+                break;
+            }
+        }
+        drive->q03_switch = in_phase;
+        drive->select_35 = next_select;
+    }
 }
 
 /*  Mechanical Summary: 5.25"
@@ -270,7 +338,7 @@ static void _clem_disk_update_state_525(
     if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
         return;
     }
-    drive->pulse_ns += dt_ns;
+    drive->pulse_ns = _clem_disk_timer_increment(drive->pulse_ns, 1000000, dt_ns);
     if (drive->pulse_ns >= drive->data->bit_timing_ns) {
         --drive->track_bit_shift;
         if (drive->track_bit_shift == 0) {
@@ -303,7 +371,7 @@ static void _clem_disk_update_state_525(
         qtr_track_index += qtr_track_delta;
         if (qtr_track_index < 0) qtr_track_index = 0;
         else if (qtr_track_index >= 160) qtr_track_index = 160;
-        CLEM_LOG("Disk525[%u]: Motor: %u; Head @ (%d,%d)",
+        CLEM_LOG("clem_iwm: Disk525[%u]: Motor: %u; Head @ (%d,%d)",
             (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
             (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
             qtr_track_index / 4, qtr_track_index % 4);
@@ -349,7 +417,8 @@ static int _clem_disk_update_state(
             if (*io_flags & CLEM_IWM_FLAG_DRIVE_1) {
                 _clem_disk_update_state_35(
                     &drives->slot5[0], io_flags, in_phase, CLEM_IWM_LSS_CYCLE_NS);
-            } else if (*io_flags & CLEM_IWM_FLAG_DRIVE_2) {
+            }
+            if (*io_flags & CLEM_IWM_FLAG_DRIVE_2) {
                 _clem_disk_update_state_35(
                     &drives->slot5[1], io_flags, in_phase, CLEM_IWM_LSS_CYCLE_NS);
             }
@@ -357,7 +426,8 @@ static int _clem_disk_update_state(
             if (*io_flags & CLEM_IWM_FLAG_DRIVE_1) {
                 _clem_disk_update_state_525(
                     &drives->slot6[0], io_flags, in_phase, CLEM_IWM_LSS_CYCLE_NS);
-            } else if (*io_flags & CLEM_IWM_FLAG_DRIVE_2) {
+            }
+            if (*io_flags & CLEM_IWM_FLAG_DRIVE_2) {
                 _clem_disk_update_state_525(
                     &drives->slot6[1], io_flags, in_phase, CLEM_IWM_LSS_CYCLE_NS);
             }
@@ -429,7 +499,7 @@ void _clem_iwm_lss(struct ClemensDeviceIWM* iwm) {
             case 0x0A:              /* SR, WRPROTECT -> HI */
             case 0x0E:
                 iwm->latch >>= 1;
-                if (iwm->io_flags & CLEM_IWM_FLAG_WRPROTECT) {
+                if (iwm->io_flags & CLEM_IWM_FLAG_WRPROTECT_SENSE) {
                     iwm->latch |= 0x80;
                 }
                 break;
@@ -457,6 +527,16 @@ void clem_iwm_glu_sync(
     uint32_t ns_per_cycle,
     uint32_t cycle_counter
 ) {
+    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
+        /* handle the 1 second drive motor timer */
+        if (iwm->ns_drive_hold > 0) {
+            iwm->ns_drive_hold = _clem_disk_timer_decrement(
+                iwm->ns_drive_hold, delta_ns);
+        }
+        if (iwm->ns_drive_hold == 0 || iwm->timer_1sec_disabled) {
+            iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
+        }
+    }
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
         iwm->ns_lag += delta_ns;
         iwm->ns_lag -=_clem_disk_update_state(
@@ -489,10 +569,17 @@ void _clem_iwm_io_switch(
 ) {
     switch (ioreg) {
         case CLEM_MMIO_REG_IWM_DRIVE_DISABLE:
-            iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
+            if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
+                if (iwm->timer_1sec_disabled) {
+                    iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
+                } else if (iwm->ns_drive_hold == 0) {
+                    iwm->ns_drive_hold = CLEM_1SEC_NS;
+                }
+            }
             break;
         case CLEM_MMIO_REG_IWM_DRIVE_ENABLE:
             iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_ON;
+            iwm->ns_drive_hold = 0;
             break;
         case CLEM_MMIO_REG_IWM_DRIVE_0:
             iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_1;
@@ -509,10 +596,10 @@ void _clem_iwm_io_switch(
             iwm->q6_switch = true;
             break;
         case CLEM_MMIO_REG_IWM_Q7_LO:
-            iwm->q6_switch = false;
+            iwm->q7_switch = false;
             break;
         case CLEM_MMIO_REG_IWM_Q7_HI:
-            iwm->q6_switch = true;
+            iwm->q7_switch = true;
             break;
         default:
             if (ioreg >= CLEM_MMIO_REG_IWM_PHASE0_LO &&
@@ -545,6 +632,35 @@ void _clem_iwm_io_switch(
     }
 }
 
+static void _clem_iwm_write_mode(struct ClemensDeviceIWM* iwm, uint8_t value) {
+    if (value & 0x10) {
+        iwm->clock_8mhz = true;
+        CLEM_WARN("clem_iwm: 8mhz mode requested");
+    } else {
+        iwm->clock_8mhz = false;
+    }
+    if (value & 0x08) {
+        iwm->fast_mode = true;
+    } else {
+        iwm->fast_mode = false;
+    }
+    if (value & 0x04) {
+        iwm->timer_1sec_disabled = true;
+    } else {
+        iwm->timer_1sec_disabled = false;
+    }
+    if (value & 0x02) {
+        iwm->async_write_mode = true;
+    } else {
+        iwm->async_write_mode = false;
+    }
+    if (value & 0x01) {
+        iwm->latch_mode = true;
+    } else {
+        iwm->latch_mode = false;
+    }
+}
+
 void clem_iwm_write_switch(
     struct ClemensDeviceIWM* iwm,
     struct ClemensDriveBay* drives,
@@ -572,12 +688,47 @@ void clem_iwm_write_switch(
             iwm->data = value;
             _clem_iwm_io_switch(iwm, drives, cycles_spent, ioreg, CLEM_IO_WRITE);
             if (ioreg & 1) {
-                /* write data */
+                if (iwm->q7_switch && iwm->q6_switch) {
+                    if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
+                        _clem_iwm_write_mode(iwm, value);
+                    }
+                }
             }
             break;
     }
+}
 
-    /* access IWM registers if ioreg address is odd */
+static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM* iwm) {
+    uint8_t result = 0;
+
+    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON &&
+        iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ANY
+    ) {
+        result |= 0x20;
+    }
+
+    if (iwm->io_flags & CLEM_IWM_FLAG_WRPROTECT_SENSE) {
+        result |= 0x80;
+    }
+    /* mode flags reflected here */
+    /* TODO: a bunch of IIgs specfic modes */
+    if (iwm->clock_8mhz) {
+        result |= 0x10;
+    }
+    if (iwm->fast_mode) {
+        result |= 0x08;
+    }
+    if (iwm->timer_1sec_disabled) {
+        result |= 0x04;
+    }
+    if (iwm->async_write_mode) {
+        result |= 0x02;
+    }
+    if (iwm->latch_mode) {
+        result |= 0x01;
+    }
+
+    return result;
 }
 
 uint8_t clem_iwm_read_switch(
@@ -608,6 +759,17 @@ uint8_t clem_iwm_read_switch(
             }
             if (!(ioreg & 1)) {
                 /* read data latch */
+                if (!iwm->q6_switch) {
+                    if (!iwm->q7_switch) {
+                        result = iwm->latch;
+                    } else {
+
+                    }
+                } else {
+                    if (!iwm->q7_switch) {
+                        result = _clem_iwm_read_status(iwm);
+                    }
+                }
             }
             break;
     }
