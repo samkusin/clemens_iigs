@@ -548,6 +548,23 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"IO_SLOTROMSEL_E1":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_SLOTROMSEL_E1",
+"Value":14794797,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "IO_SPEED_C036":{
 "DataDescriptor":{
 "Length":1,
@@ -1426,7 +1443,7 @@
 "229324":"Disable SRQ Keyboard?",
 "236808":"Maybe this tests ROM 01?",
 "236842":"Setup RTC registers",
-"236846":";Some kind of disk access - maybe boot?",
+"236846":"Some kind of disk access - maybe boot?",
 "244013":"Maybe this is the default BRAM table?",
 "244025":"blank param?",
 "244034":"$A0-$C0 if self diagnostics set to $FF",
@@ -1731,6 +1748,12 @@
 
 "214749":{
 "Text":"This block seems to be looking at the 3.5\" drive and disabling it?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"219561":{
+"Text":"Set slow mode and wait a few cycles, then restore the old speed mode",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -3466,9 +3489,59 @@
 "Value":16729879,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"221227":{
+"Label":"SUB_SET_DBANK_E1_2",
+"Value":16736299,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215491":{
+"Label":"SUB_IWM_DRIVE_SELECT_ENABLE_X",
+"Value":16730563,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"219554":{
+"Label":"delay_loop",
+"Value":16734626,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215419":{
+"Label":"SUB_IWM_STAT35",
+"Value":16730491,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215439":{
+"Label":"SUB_IWM_SEL35_CTL",
+"Value":16730511,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215429":{
+"Label":"SUB_IWM_CONT35",
+"Value":16730501,
+"Source":"User",
+"Type":"GlobalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
+"221253":{
+"Length":3,
+"Format":"NumericLE",
+"SubFormat":"Symbol",
+"SymbolRef":{
+"Label":"IO_SLOTROMSEL_E1",
+"Part":"Low"}},
+
 "226934":{
 "Length":2,
 "Format":"NumericLE",
@@ -4017,4 +4090,12 @@
 
 "228354":{
 "FollowPbr":false,
-"Bank":0}}}
+"Bank":0},
+
+"221556":{
+"FollowPbr":false,
+"Bank":225},
+
+"221250":{
+"FollowPbr":false,
+"Bank":225}}}
