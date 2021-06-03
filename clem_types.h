@@ -205,7 +205,9 @@ struct ClemensDeviceIWM {
      *  matches the current machine nanosecond step per cycle */
     int ns_lag;
     unsigned ns_per_cycle;
-    unsigned cycle_counter;     /* Cycle count stamp at sync() */
+    unsigned cycle_counter;     /**< Cycle count stamp at sync() */
+    unsigned ns_latch_hold;     /**< The latch value expiration timer */
+    unsigned ns_drive_hold;     /**< Time until drive motor off */
 
     unsigned io_flags;          /**< Disk port I/O flags */
     unsigned out_phase;         /**< PH0-PH3 bits sent to drive */
@@ -216,6 +218,11 @@ struct ClemensDeviceIWM {
 
     bool q6_switch;             /**< Q6 state switch */
     bool q7_switch;             /**< Q7 stage switch */
+    bool timer_1sec_disabled;   /**< Turn motor off immediately */
+    bool async_write_mode;      /**< If True, IWM delays writes until ready */
+    bool fast_mode;             /**< If True, bit cells are handled every 2us */
+    bool latch_mode;            /**< If True, latch value lasts for full 8 xfer */
+    bool clock_8mhz;            /**< If True, use a 8mhz clock... what? */
 };
 
 /**
@@ -280,8 +287,15 @@ struct ClemensDrive {
     unsigned track_byte_index;  /**< byte index into track */
     unsigned track_bit_shift;   /**< bit offset into current byte */
     unsigned track_bit_length;  /**< current track bit length */
-    unsigned q03_switch;        /**< 4-bit Q0-3 entry (5.25" = stepper ) */
     unsigned pulse_ns;          /**< nanosecond timer for pulse input */
+
+    /**
+     * 4-bit Q0-3 entry 5.25" = stepper control
+     * Control/Status/Strobe bits for 3.5"
+     */
+    unsigned q03_switch;
+    unsigned query_35;          /**< 3.5" status query  */
+    bool select_35;             /**< 3.5" select state */
 
     uint32_t random_bits[8];    /**< used for random pulse generation */
     uint8_t random_bit_index;   /**< bit index into 32-byte buffer */
