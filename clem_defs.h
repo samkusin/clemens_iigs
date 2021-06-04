@@ -9,6 +9,7 @@
 #define CLEM_MEGA2_CYCLE_NS                 1023
 #define CLEM_IWM_LSS_CYCLE_NS               (CLEM_MEGA2_CYCLE_NS/2)
 #define CLEM_1SEC_NS                        1000000000
+#define CLEM_1MS_NS                         1000000
 
 /** Setting: ADB keyboard buffer size - this doesn't need to be large since
  *  Apple II apps typically expect to consume events via ISR or prompt polling
