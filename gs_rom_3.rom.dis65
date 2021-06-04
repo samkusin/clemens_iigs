@@ -3531,6 +3531,20 @@
 "Value":16730501,
 "Source":"User",
 "Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215422":{
+"Label":"SUB_IWM_READ_STATUS",
+"Value":16730494,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215432":{
+"Label":"SUB_IWM_LSTROBE",
+"Value":16730504,
+"Source":"User",
+"Type":"GlobalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{

@@ -244,7 +244,6 @@ static void _clem_mmio_speed_c036_set(
     /* bit 5 should always be 0 */
     /* for ROM 3, bit 6 can be on or off - for ROM 1, must be off */
     clem->mmio.speed_c036 = (value & 0xdf);
-    clem->ns_per_cycle = _clem_calc_ns_step_from_clocks(clem, clem->clocks_step);
 }
 
 static uint8_t _clem_mmio_inttype_c046(
@@ -453,6 +452,7 @@ static uint8_t _clem_mmio_read(
     bool* mega2_access
 ) {
     struct ClemensMMIO* mmio = &clem->mmio;
+    struct ClemensClock ref_clock;
     uint8_t result = 0x00;
     uint8_t ioreg = addr & 0xff;
     bool is_noop = (flags & CLEM_MMIO_READ_NO_OP) != 0;
@@ -460,6 +460,17 @@ static uint8_t _clem_mmio_read(
     if (!is_noop) {
         ++mmio->dev_debug.ioreg_read_ctr[ioreg];
     }
+
+    if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+        /* disk motor speed registers */
+        if (ioreg & 0xc0) {
+            _clem_mmio_speed_disk_gate(clem, ioreg);
+        }
+        *mega2_access = true;
+    }
+
+    ref_clock.ts = clem->clocks_spent;
+    ref_clock.ref_step = clem->clocks_step_mega2;
 
     switch (ioreg) {
         case CLEM_MMIO_REG_KEYB_READ:
@@ -528,7 +539,7 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_DISK_INTERFACE:
             result = clem_iwm_read_switch(&mmio->dev_iwm,
                                           &clem->active_drives,
-                                          clem->cpu.cycles_spent,
+                                          &ref_clock,
                                           ioreg,
                                           flags);
             break;
@@ -634,7 +645,7 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_IWM_Q7_HI:
             result = clem_iwm_read_switch(&mmio->dev_iwm,
                                           &clem->active_drives,
-                                          clem->cpu.cycles_spent,
+                                          &ref_clock,
                                           ioreg,
                                           flags);
             break;
@@ -646,14 +657,6 @@ static uint8_t _clem_mmio_read(
                                  CLEM_DEBUG_BREAK_UNIMPL_IOREAD, addr, 0x0000);
             }
             break;
-    }
-
-    if (!(flags & CLEM_MMIO_READ_NO_OP)) {
-        /* disk motor speed registers */
-        if (ioreg & 0xc0) {
-            _clem_mmio_speed_disk_gate(clem, ioreg);
-        }
-        *mega2_access = true;
     }
 
 
@@ -668,8 +671,10 @@ static void _clem_mmio_write(
     bool *mega2_access
 ) {
     struct ClemensMMIO* mmio = &clem->mmio;
+    struct ClemensClock ref_clock;
     bool is_noop = (mem_flags & CLEM_MMIO_READ_NO_OP) != 0;
     uint8_t ioreg;
+
     if (addr >= 0xC100) {
         //  TODO: MMIO slot ROM - it seems this needs to be treated differently
         return;
@@ -679,6 +684,16 @@ static void _clem_mmio_write(
     if (!is_noop) {
         ++mmio->dev_debug.ioreg_write_ctr[ioreg];
     }
+    if (mem_flags != CLEM_MEM_FLAG_NULL) {
+        if (ioreg & 0xc0) {
+            _clem_mmio_speed_disk_gate(clem, ioreg);
+        }
+        *mega2_access = true;
+    }
+
+    ref_clock.ts = clem->clocks_spent;
+    ref_clock.ref_step = clem->clocks_step_mega2;
+
     switch (ioreg) {
         case CLEM_MMIO_REG_80STOREOFF_WRITE:
             _clem_mmio_memory_map(mmio, mmio->mmap_register & ~CLEM_MMIO_MMAP_80COLSTORE);
@@ -770,7 +785,7 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_DISK_INTERFACE:
             clem_iwm_write_switch(&mmio->dev_iwm,
                                   &clem->active_drives,
-                                  clem->cpu.cycles_spent,
+                                  &ref_clock,
                                   ioreg,
                                   data);
             break;
@@ -868,7 +883,7 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_IWM_Q7_HI:
             clem_iwm_write_switch(&mmio->dev_iwm,
                                   &clem->active_drives,
-                                  clem->cpu.cycles_spent,
+                                  &ref_clock,
                                   ioreg,
                                   data);
             break;
@@ -878,12 +893,6 @@ static void _clem_mmio_write(
                                  CLEM_DEBUG_BREAK_UNIMPL_IOWRITE, addr, data);
             }
             break;
-    }
-    if (mem_flags != CLEM_MEM_FLAG_NULL) {
-        if (ioreg & 0xc0) {
-            _clem_mmio_speed_disk_gate(clem, ioreg);
-        }
-        *mega2_access = true;
     }
 }
 

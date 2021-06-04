@@ -13,6 +13,7 @@
 #include "clem_debug.h"
 #include "clem_woz.h"
 #include "clem_mmio_defs.h"
+#include "clem_util.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -155,6 +156,12 @@ static uint8_t s_lss_525_rom[256] = {
 #define CLEM_IWM_DISK35_CTL_MOTOR_OFF       0x09
 #define CLEM_IWM_DISK35_CTL_EJECT           0x0D
 
+#define CLEM_IWM_STATE_READ_DATA            0x00
+#define CLEM_IWM_STATE_READ_STATUS          0x01
+#define CLEM_IWM_STATE_WRITE_HANDSHAKE      0x02
+#define CLEM_IWM_STATE_WRITE_MODE           0x03
+#define CLEM_IWM_STATE_WRITE_DATA           0x13
+
 /*
     Emulation of disk drives and the IWM Controller.
 
@@ -232,10 +239,19 @@ static void _clem_disk_update_state_35(
     unsigned dt_ns
 ) {
     bool next_select = (*io_flags & CLEM_IWM_FLAG_HEAD_SEL) != 0;
+    bool sense_input = false;
 
     if (in_phase != drive->q03_switch || drive->select_35 != next_select) {
         if (!(drive->q03_switch & 0x08) && (in_phase & 0x08)) {
             /* do control action */
+            unsigned ctl = ((in_phase << 2)       & 0x08) |
+                           ((in_phase << 2)       & 0x04) |
+                           (!next_select ? 0x00 :   0x02) |
+                           ((in_phase >> 2)       & 0x01);
+            CLEM_LOG("clem_iwm: Disk35[%u]: Power: %u; Ctl: %02X",
+                (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
+                (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
+                ctl);
         } else if (!(in_phase & 0x08)) {
             /* do status query */
             unsigned query = ((in_phase << 2)     & 0x08) |
@@ -252,12 +268,44 @@ static void _clem_disk_update_state_35(
 
             switch (drive->query_35) {
                 case CLEM_IWM_DISK35_QUERY_STEP_DIR:
-                case 0x01:
-                break;
+                    break;
+                case CLEM_IWM_DISK35_QUERY_IO_HEAD_LOWER:
+                    break;
+                case CLEM_IWM_DISK35_QUERY_DISK_IN_DRIVE:
+                    sense_input = true;
+                    break;
+                case CLEM_IWM_DISK35_QUERY_IO_HEAD_UPPER:
+                    break;
+                case CLEM_IWM_DISK35_QUERY_IS_STEPPING:
+                    break;
+                case CLEM_IWM_DISK35_QUERY_WRITE_PROTECT:
+                    break;
+                case CLEM_IWM_DISK35_QUERY_MOTOR_ON:
+                    sense_input = true;
+                    break;
+                case CLEM_IWM_DISK35_QUERY_DOUBLE_SIDED:
+                    break;
+                case CLEM_IWM_DISK35_QUERY_TRACK_0:
+                    break;
+                case CLEM_IWM_DISK35_QUERY_READ_READY:
+                    sense_input = true;
+                    break;
+                case CLEM_IWM_DISK35_QUERY_EJECTED:
+                    break;
+                case CLEM_IWM_DISK35_QUERY_60HZ_ROTATION:
+                    break;
+                case CLEM_IWM_DISK35_QUERY_ENABLED:
+                    sense_input = true;
+                    break;
             }
         }
         drive->q03_switch = in_phase;
         drive->select_35 = next_select;
+    }
+    if (sense_input) {
+        *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
+    } else {
+        *io_flags &= ~CLEM_IWM_FLAG_WRPROTECT_SENSE;
     }
 }
 
@@ -399,6 +447,12 @@ static void _clem_disk_update_state_525(
         drive->track_byte_index = track_cur_pos / 8;
         drive->track_bit_shift = 8 - (track_cur_pos % 8);
     }
+
+    if (drive->data->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) {
+        *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
+    } else {
+        *io_flags &= ~CLEM_IWM_FLAG_WRPROTECT_SENSE;
+    }
 }
 
 static int _clem_disk_update_state(
@@ -432,8 +486,6 @@ static int _clem_disk_update_state(
                     &drives->slot6[1], io_flags, in_phase, CLEM_IWM_LSS_CYCLE_NS);
             }
         }
-
-        /* TODO: LSS */
         ns_budget -= CLEM_IWM_LSS_CYCLE_NS;
         ns_spent += CLEM_IWM_LSS_CYCLE_NS;
     }
@@ -523,31 +575,57 @@ void _clem_iwm_lss(struct ClemensDeviceIWM* iwm) {
 void clem_iwm_glu_sync(
     struct ClemensDeviceIWM* iwm,
     struct ClemensDriveBay* drives,
-    uint32_t delta_ns,
-    uint32_t ns_per_cycle,
-    uint32_t cycle_counter
+    struct ClemensClock* clock
 ) {
+    int delta_ns = _clem_calc_ns_step_from_clocks(
+        clock->ts - iwm->last_clocks_ts, clock->ref_step);
+    int ns_budget = 0;
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
         /* handle the 1 second drive motor timer */
         if (iwm->ns_drive_hold > 0) {
             iwm->ns_drive_hold = _clem_disk_timer_decrement(
                 iwm->ns_drive_hold, delta_ns);
-        }
-        if (iwm->ns_drive_hold == 0 || iwm->timer_1sec_disabled) {
-            iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
+            if (iwm->ns_drive_hold == 0 || iwm->timer_1sec_disabled) {
+                iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
+            }
         }
     }
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
-        iwm->ns_lag += delta_ns;
-        iwm->ns_lag -=_clem_disk_update_state(
-            drives, &iwm->io_flags, iwm->out_phase, iwm->ns_lag);
-        _clem_iwm_lss(iwm);
-    } else {
-        iwm->ns_lag = 0;
+        ns_budget = delta_ns;
+        while (ns_budget >= CLEM_IWM_LSS_CYCLE_NS) {
+            if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
+                    _clem_disk_update_state_35(&drives->slot5[0],
+                                               &iwm->io_flags,
+                                               iwm->out_phase,
+                                               CLEM_IWM_LSS_CYCLE_NS);
+                }
+                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) {
+                    _clem_disk_update_state_35(&drives->slot5[1],
+                                               &iwm->io_flags,
+                                               iwm->out_phase,
+                                               CLEM_IWM_LSS_CYCLE_NS);
+                }
+            } else {
+                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
+                    _clem_disk_update_state_525(&drives->slot6[0],
+                                                &iwm->io_flags,
+                                                iwm->out_phase,
+                                                CLEM_IWM_LSS_CYCLE_NS);
+                }
+                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
+                    _clem_disk_update_state_525(&drives->slot6[0],
+                                                &iwm->io_flags,
+                                                iwm->out_phase,
+                                                CLEM_IWM_LSS_CYCLE_NS);
+                }
+            }
+            _clem_iwm_lss(iwm);
+            ns_budget -= CLEM_IWM_LSS_CYCLE_NS;
+        }
     }
-
-    iwm->ns_per_cycle = ns_per_cycle;
-    iwm->cycle_counter = cycle_counter;
+    iwm->last_clocks_ts = clock->ts - _clem_calc_clocks_step_from_ns(
+        ns_budget, clock->ref_step);
 }
 
 /*
@@ -563,10 +641,12 @@ void clem_iwm_glu_sync(
 void _clem_iwm_io_switch(
    struct ClemensDeviceIWM* iwm,
    struct ClemensDriveBay* drives,
-   uint32_t cycles_spent,
+   struct ClemensClock* clock,
    uint8_t ioreg,
    uint8_t op
 ) {
+    bool old_q6 = iwm->q6_switch, old_q7 = iwm->q7_switch;
+
     switch (ioreg) {
         case CLEM_MMIO_REG_IWM_DRIVE_DISABLE:
             if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
@@ -606,14 +686,25 @@ void _clem_iwm_io_switch(
                 ioreg <= CLEM_MMIO_REG_IWM_PHASE3_HI
             ) {
                 if (ioreg & 1) {
-                iwm->out_phase |= (
-                    1 << ((ioreg - CLEM_MMIO_REG_IWM_PHASE0_HI) >> 1));
+                    iwm->out_phase |= (
+                        1 << ((ioreg - CLEM_MMIO_REG_IWM_PHASE0_HI) >> 1));
                 } else {
-                iwm->out_phase &= ~(
-                    1 << ((ioreg - CLEM_MMIO_REG_IWM_PHASE0_LO) >> 1));
+                    iwm->out_phase &= ~(
+                        1 << ((ioreg - CLEM_MMIO_REG_IWM_PHASE0_LO) >> 1));
                 }
             }
             break;
+    }
+
+    if (old_q6 != iwm->q6_switch || old_q7 != iwm->q7_switch) {
+        unsigned last_state = iwm->state;
+        iwm->state = (iwm->q7_switch ? 0x02 : 0x00) | (iwm->q6_switch ? 0x01 : 0x00);
+        if (iwm->state == 0x03 && (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
+            iwm->state |= 0x10;
+        } else {
+            iwm->state &= ~0x10;
+        }
+        CLEM_LOG("clem_iwm: state from %0X to %0X", last_state, iwm->state);
     }
 
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
@@ -623,12 +714,8 @@ void _clem_iwm_io_switch(
            call to glu_sync() will only IWM frames for the remaining time
            budget this emulation frame
         */
-        iwm->ns_lag -= _clem_disk_update_state(
-            drives,
-            &iwm->io_flags,
-            iwm->out_phase,
-            (int)(cycles_spent - iwm->cycle_counter) * iwm->ns_per_cycle);
-        _clem_iwm_lss(iwm);
+       /* TODO: use clocks instead of cycles here... and in the IWM struct */
+       clem_iwm_glu_sync(iwm, drives, clock);
     }
 }
 
@@ -664,7 +751,7 @@ static void _clem_iwm_write_mode(struct ClemensDeviceIWM* iwm, uint8_t value) {
 void clem_iwm_write_switch(
     struct ClemensDeviceIWM* iwm,
     struct ClemensDriveBay* drives,
-    uint32_t cycles_spent,
+    struct ClemensClock* clock,
     uint8_t ioreg,
     uint8_t value
 ) {
@@ -686,7 +773,7 @@ void clem_iwm_write_switch(
             break;
         default:
             iwm->data = value;
-            _clem_iwm_io_switch(iwm, drives, cycles_spent, ioreg, CLEM_IO_WRITE);
+            _clem_iwm_io_switch(iwm, drives, clock, ioreg, CLEM_IO_WRITE);
             if (ioreg & 1) {
                 if (iwm->q7_switch && iwm->q6_switch) {
                     if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
@@ -734,7 +821,7 @@ static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM* iwm) {
 uint8_t clem_iwm_read_switch(
     struct ClemensDeviceIWM* iwm,
     struct ClemensDriveBay* drives,
-    uint32_t cycles_spent,
+    struct ClemensClock* clock,
     uint8_t ioreg,
     uint8_t flags
 ) {
@@ -755,7 +842,7 @@ uint8_t clem_iwm_read_switch(
             break;
         default:
             if (!(flags & CLEM_MMIO_READ_NO_OP)) {
-                _clem_iwm_io_switch(iwm, drives, cycles_spent, ioreg, CLEM_IO_READ);
+                _clem_iwm_io_switch(iwm, drives, clock, ioreg, CLEM_IO_READ);
             }
             if (!(ioreg & 1)) {
                 /* read data latch */

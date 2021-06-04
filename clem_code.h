@@ -2,14 +2,6 @@
 #include "clem_mem.h"
 
 
-static inline void _clem_cycle(
-    ClemensMachine* clem,
-    uint32_t cycle_count
-) {
-    clem->clocks_spent += clem->clocks_step * cycle_count;
-    ++clem->cpu.cycles_spent;
-}
-
 static inline void _cpu_p_flags_n_data(
     struct Clemens65C816* cpu,
     uint8_t data
@@ -163,6 +155,14 @@ static inline void _cpu_sp_inc(
 
 
 */
+static inline void _clem_cycle(
+    ClemensMachine* clem,
+    uint32_t cycle_count
+) {
+    clem->clocks_spent += clem->clocks_step * cycle_count;
+    ++clem->cpu.cycles_spent;
+}
+
 static inline void _clem_next_dbr(
     ClemensMachine* clem,
     uint8_t* next_dbr,

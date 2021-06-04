@@ -22,11 +22,19 @@ static inline uint8_t* _clem_get_memory_bank(
 }
 
 static inline uint32_t _clem_calc_ns_step_from_clocks(
-    ClemensMachine* clem,
-    clem_clocks_duration_t clocks_step
+    clem_clocks_duration_t clocks_step,
+    clem_clocks_duration_t clocks_step_reference
 ) {
     return  (uint32_t)(
-        CLEM_MEGA2_CYCLE_NS * clocks_step / clem->clocks_step_mega2);
+        CLEM_MEGA2_CYCLE_NS * clocks_step / clocks_step_reference);
+}
+
+static inline clem_clocks_duration_t _clem_calc_clocks_step_from_ns(
+    unsigned ns,
+    clem_clocks_duration_t clocks_step_reference
+) {
+    return  (clem_clocks_duration_t)(ns * clocks_step_reference) / (
+        CLEM_MEGA2_CYCLE_NS);
 }
 
 static inline uint32_t _clem_calc_cycles_diff(

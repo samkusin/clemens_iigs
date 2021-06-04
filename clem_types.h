@@ -12,6 +12,11 @@ typedef uint32_t clem_clocks_duration_t;
 
 #define CLEM_TIME_UNINITIALIZED         ((clem_clocks_time_t)(-1))
 
+struct ClemensClock {
+    clem_clocks_time_t ts;
+    clem_clocks_duration_t ref_step;
+};
+
 /* Typically used as parameters to MMIO functions that require context on how
    they were called (as part of a MMIO read or write operation)
 */
@@ -200,12 +205,9 @@ struct ClemensVGC {
  *
  */
 struct ClemensDeviceIWM {
-    /** Number of ns executed since iwm sync().  Used by MMIO code to
-     *  'catch up' a disk with the current machine timestamp.  The step
-     *  matches the current machine nanosecond step per cycle */
-    int ns_lag;
-    unsigned ns_per_cycle;
-    unsigned cycle_counter;     /**< Cycle count stamp at sync() */
+    /** A reference clocks value at the last disk update. */
+    clem_clocks_time_t last_clocks_ts;
+
     unsigned ns_latch_hold;     /**< The latch value expiration timer */
     unsigned ns_drive_hold;     /**< Time until drive motor off */
 
@@ -216,6 +218,7 @@ struct ClemensDeviceIWM {
     uint8_t latch;              /**< data latch */
     uint8_t lss_seq;            /**< lss state */
 
+    unsigned state;             /**< Internal state based on q6,q7 */
     bool q6_switch;             /**< Q6 state switch */
     bool q7_switch;             /**< Q7 stage switch */
     bool timer_1sec_disabled;   /**< Turn motor off immediately */
@@ -485,8 +488,6 @@ typedef struct {
     clem_clocks_duration_t clocks_step_mega2;
     /* clock timer - never change once system has been started */
     clem_clocks_time_t clocks_spent;
-    /* nanosecond increment per cycle, pre-calculated */
-    uint32_t ns_per_cycle;
 
     uint8_t* fpi_bank_map[256];     // $00 - $ff
     uint8_t* mega2_bank_map[2];     // $e0 - $e1
