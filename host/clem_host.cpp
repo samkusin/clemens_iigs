@@ -15,10 +15,10 @@ namespace {
   constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
   constexpr float kMinDebugHistoryHeight = 256;
   constexpr float kMinDebugHistoryScalar = 0.500f;
-  constexpr float kMinDebugStatusHeight = 96;
-  constexpr float kMinDebugStatusScalar = 0.175f;
-  constexpr float kMinDebugTerminalHeight = 192;
-  constexpr float kMinDebugTerminalScalar = 0.325f;
+  constexpr float kMinDebugStatusHeight = 104;
+  constexpr float kMinDebugStatusScalar = 0.180f;
+  constexpr float kMinDebugTerminalHeight = 184;
+  constexpr float kMinDebugTerminalScalar = 0.320f;
 
   constexpr float kMinConsoleWidth = 384;
   constexpr float kMinConsoleHeight = kMinDebugHistoryHeight +
@@ -172,17 +172,11 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   windowCursorPos.y += windowSize.y;
   windowSize.y = std::max(kMinDebugStatusHeight, height * kMinDebugStatusScalar);
 
-  char windowTitle[64];
-  if (emulationRan) {
-    snprintf(windowTitle, sizeof(windowTitle), "Status (fps: %.2f)", ImGui::GetIO().Framerate);
-  } else {
-    snprintf(windowTitle, sizeof(windowTitle), "Status", ImGui::GetIO().Framerate);
-  }
   ImGui::SetNextWindowPos(windowCursorPos);
   ImGui::SetNextWindowSize(windowSize);
-  ImGui::Begin(windowTitle, nullptr, ImGuiWindowFlags_NoResize |
-                                     ImGuiWindowFlags_NoCollapse |
-                                     ImGuiWindowFlags_NoBringToFrontOnFocus);
+  ImGui::Begin("Status", nullptr, ImGuiWindowFlags_NoResize |
+                                  ImGuiWindowFlags_NoCollapse |
+                                  ImGuiWindowFlags_NoBringToFrontOnFocus);
   {
     //  N, V, M, B, D, I, Z, C
     //  N, V, M, X, D, I, Z, C
@@ -295,6 +289,13 @@ void ClemensHost::frame(int width, int height, float deltaTime)
       ImGui::TableNextRow();
       ImGui::TableNextColumn(); ImGui::Text("Exec time");
       ImGui::TableNextColumn(); ImGui::Text("%.4f secs", emulationRunTime_);
+      ImGui::TableNextColumn(); ImGui::Text("FPS");
+      ImGui::TableNextColumn();
+      if (emulationRan) {
+        ImGui::Text("%.1f",  ImGui::GetIO().Framerate);
+      } else {
+        ImGui::Text("----");
+      }
     }
     ImGui::EndTable();
 

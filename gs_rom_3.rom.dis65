@@ -1433,6 +1433,7 @@
 "214801":"Disabling the current drive",
 "214804":"Read the IWM status",
 "214810":"Wait for it to be disabled",
+"221049":"this initiates a bunch of disk IO",
 "226816":"TBD - A=$fb at this time, so storing $fbfb?",
 "226826":"Storing vectors into bank $e1 used during initialization?",
 "226836":"JML $FF7629",
@@ -3543,6 +3544,13 @@
 "215432":{
 "Label":"SUB_IWM_LSTROBE",
 "Value":16730504,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"214749":{
+"Label":"SUB_IWM_SET_35_MODE",
+"Value":16729821,
 "Source":"User",
 "Type":"GlobalAddr",
 "LabelAnno":"None"}},
