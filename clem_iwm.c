@@ -258,49 +258,43 @@ static void _clem_disk_update_state_35(
                              ((in_phase << 2)     & 0x04) |
                              (!next_select ? 0x00 : 0x02) |
                              ((in_phase >> 2)     & 0x01);
-            if (drive->query_35 != query) {
-                drive->query_35 = query;
-                CLEM_LOG("clem_iwm: Disk35[%u]: Power: %u; Query: %02X",
-                    (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
-                    (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
-                    drive->query_35);
-            }
-
-            switch (drive->query_35) {
-                case CLEM_IWM_DISK35_QUERY_STEP_DIR:
-                    break;
-                case CLEM_IWM_DISK35_QUERY_IO_HEAD_LOWER:
-                    break;
-                case CLEM_IWM_DISK35_QUERY_DISK_IN_DRIVE:
-                    sense_input = true;
-                    break;
-                case CLEM_IWM_DISK35_QUERY_IO_HEAD_UPPER:
-                    break;
-                case CLEM_IWM_DISK35_QUERY_IS_STEPPING:
-                    break;
-                case CLEM_IWM_DISK35_QUERY_WRITE_PROTECT:
-                    break;
-                case CLEM_IWM_DISK35_QUERY_MOTOR_ON:
-                    sense_input = true;
-                    break;
-                case CLEM_IWM_DISK35_QUERY_DOUBLE_SIDED:
-                    break;
-                case CLEM_IWM_DISK35_QUERY_TRACK_0:
-                    break;
-                case CLEM_IWM_DISK35_QUERY_READ_READY:
-                    sense_input = true;
-                    break;
-                case CLEM_IWM_DISK35_QUERY_EJECTED:
-                    break;
-                case CLEM_IWM_DISK35_QUERY_60HZ_ROTATION:
-                    break;
-                case CLEM_IWM_DISK35_QUERY_ENABLED:
-                    sense_input = true;
-                    break;
-            }
+            drive->query_35 = query;
         }
         drive->q03_switch = in_phase;
         drive->select_35 = next_select;
+    }
+
+    switch (drive->query_35) {
+        case CLEM_IWM_DISK35_QUERY_STEP_DIR:
+            break;
+        case CLEM_IWM_DISK35_QUERY_IO_HEAD_LOWER:
+            break;
+        case CLEM_IWM_DISK35_QUERY_DISK_IN_DRIVE:
+            sense_input = true;
+            break;
+        case CLEM_IWM_DISK35_QUERY_IO_HEAD_UPPER:
+            break;
+        case CLEM_IWM_DISK35_QUERY_IS_STEPPING:
+            break;
+        case CLEM_IWM_DISK35_QUERY_WRITE_PROTECT:
+            break;
+        case CLEM_IWM_DISK35_QUERY_MOTOR_ON:
+            sense_input = true;
+            break;
+        case CLEM_IWM_DISK35_QUERY_DOUBLE_SIDED:
+            break;
+        case CLEM_IWM_DISK35_QUERY_TRACK_0:
+            break;
+        case CLEM_IWM_DISK35_QUERY_READ_READY:
+            sense_input = true;
+            break;
+        case CLEM_IWM_DISK35_QUERY_EJECTED:
+            break;
+        case CLEM_IWM_DISK35_QUERY_60HZ_ROTATION:
+            break;
+        case CLEM_IWM_DISK35_QUERY_ENABLED:
+            sense_input = true;
+            break;
     }
     if (sense_input) {
         *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
