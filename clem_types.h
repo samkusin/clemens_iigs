@@ -208,17 +208,16 @@ struct ClemensDeviceIWM {
     /** A reference clocks value at the last disk update. */
     clem_clocks_time_t last_clocks_ts;
 
-    unsigned ns_latch_hold;     /**< The latch value expiration timer */
-    unsigned ns_drive_hold;     /**< Time until drive motor off */
-
     unsigned io_flags;          /**< Disk port I/O flags */
     unsigned out_phase;         /**< PH0-PH3 bits sent to drive */
+
+    unsigned ns_latch_hold;     /**< The latch value expiration timer */
+    unsigned ns_drive_hold;     /**< Time until drive motor off */
 
     uint8_t data;               /**< IO data (bus data) */
     uint8_t latch;              /**< data latch */
     uint8_t lss_seq;            /**< lss state */
 
-    unsigned state;             /**< Internal state based on q6,q7 */
     bool q6_switch;             /**< Q6 state switch */
     bool q7_switch;             /**< Q7 stage switch */
     bool timer_1sec_disabled;   /**< Turn motor off immediately */
@@ -297,7 +296,9 @@ struct ClemensDrive {
      * Control/Status/Strobe bits for 3.5"
      */
     unsigned q03_switch;
+    unsigned state_35;          /**< 3.5" state machine */
     unsigned query_35;          /**< 3.5" status query  */
+    unsigned step_timer_35_ns;  /**< 3.5" track step timer */
     bool select_35;             /**< 3.5" select state */
 
     uint32_t random_bits[8];    /**< used for random pulse generation */

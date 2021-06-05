@@ -908,6 +908,41 @@
 "Hint":"Code"},
 
 {
+"Low":212574,
+"High":212574,
+"Hint":"Code"},
+
+{
+"Low":212692,
+"High":212692,
+"Hint":"Code"},
+
+{
+"Low":212935,
+"High":212935,
+"Hint":"Code"},
+
+{
+"Low":212938,
+"High":212938,
+"Hint":"Code"},
+
+{
+"Low":213283,
+"High":213283,
+"Hint":"Code"},
+
+{
+"Low":214273,
+"High":214273,
+"Hint":"Code"},
+
+{
+"Low":214345,
+"High":214345,
+"Hint":"Code"},
+
+{
 "Low":226857,
 "High":226857,
 "Hint":"Code"},
@@ -1409,6 +1444,7 @@
 "55990":2097424,
 "56207":304,
 "131708":304,
+"212574":256,
 "226857":11796739,
 "226964":3145984,
 "228339":3145984,
@@ -1429,11 +1465,27 @@
 
 "Comments":{
 "131184":"Tool Locator Init",
+"212016":"Setting 5.25\" mode",
+"212574":"==5 on startup with default BRAM",
 "214767":"Setting 3.5\" IWM",
 "214801":"Disabling the current drive",
 "214804":"Read the IWM status",
 "214810":"Wait for it to be disabled",
-"221049":"this initiates a bunch of disk IO",
+"218759":"Drive 0",
+"218762":"Motor On",
+"218765":"Motor Off",
+"218774":"Drive 0 motor on",
+"218787":"slow speed",
+"218793":"q7 off",
+"218796":"verify write protect?",
+"218801":"got here, there\u0027s a writable disk?",
+"218821":"writing a byte to the drive (write protected though)",
+"218823":"q7 = on",
+"218829":"q6 = off - initiate write and check handshake",
+"218834":"write data and q6 = on",
+"219992":"writing IWM mode",
+"219999":"ensure only mode flags are used",
+"221049":"this initiates a bunch of 3.5\" disk IO",
 "226816":"TBD - A=$fb at this time, so storing $fbfb?",
 "226826":"Storing vectors into bank $e1 used during initialization?",
 "226836":"JML $FF7629",
@@ -1755,6 +1807,30 @@
 
 "219561":{
 "Text":"Set slow mode and wait a few cycles, then restore the old speed mode",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"212574":{
+"Text":"Appears to be the jump point from FF/3E5A after a redirect from the $E1 jump table\r\n\r\nContinues some initial IWM/disk access on startup",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"219980":{
+"Text":"Set IWM mode to Y",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"218801":{
+"Text":"TODO: figure out what\u0027s going on when we hit this case...",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"218811":{
+"Text":"q6 = on.  5.25 on\r\n",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -3553,9 +3629,141 @@
 "Value":16729821,
 "Source":"User",
 "Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"212692":{
+"Label":"TFF3ED4",
+"Value":16727764,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"Generated"},
+
+"212935":{
+"Label":"TFF3FC7",
+"Value":16728007,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"Generated"},
+
+"212938":{
+"Label":"TFF3FCA",
+"Value":16728010,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"Generated"},
+
+"213283":{
+"Label":"TFF4123",
+"Value":16728355,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"Generated"},
+
+"214273":{
+"Label":"TFF4501",
+"Value":16729345,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"Generated"},
+
+"214345":{
+"Label":"TFF4549",
+"Value":16729417,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"Generated"},
+
+"219602":{
+"Label":"SUB_IWM_CLEAR_PHASES",
+"Value":16734674,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"219980":{
+"Label":"SUB_IWM_SET_MODE_Y",
+"Value":16735052,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"219991":{
+"Label":"write_mode",
+"Value":16735063,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"219995":{
+"Label":"get_mode",
+"Value":16735067,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"218811":{
+"Label":"write_prot_525",
+"Value":16733883,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"Uncertain"},
+
+"218829":{
+"Label":"query_handshake",
+"Value":16733901,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
+"212652":{
+"Length":2,
+"Format":"NumericLE",
+"SubFormat":"Symbol",
+"SymbolRef":{
+"Label":"TFF3ED4",
+"Part":"Low"}},
+
+"212654":{
+"Length":2,
+"Format":"NumericLE",
+"SubFormat":"Symbol",
+"SymbolRef":{
+"Label":"TFF3FC7",
+"Part":"Low"}},
+
+"212656":{
+"Length":2,
+"Format":"NumericLE",
+"SubFormat":"Symbol",
+"SymbolRef":{
+"Label":"TFF3FCA",
+"Part":"Low"}},
+
+"212658":{
+"Length":2,
+"Format":"NumericLE",
+"SubFormat":"Symbol",
+"SymbolRef":{
+"Label":"TFF4123",
+"Part":"Low"}},
+
+"212660":{
+"Length":2,
+"Format":"NumericLE",
+"SubFormat":"Symbol",
+"SymbolRef":{
+"Label":"TFF4501",
+"Part":"Low"}},
+
+"212662":{
+"Length":2,
+"Format":"NumericLE",
+"SubFormat":"Symbol",
+"SymbolRef":{
+"Label":"TFF4549",
+"Part":"Low"}},
+
 "221253":{
 "Length":3,
 "Format":"NumericLE",
@@ -4119,5 +4327,9 @@
 "Bank":225},
 
 "221250":{
+"FollowPbr":false,
+"Bank":225},
+
+"219980":{
 "FollowPbr":false,
 "Bank":225}}}

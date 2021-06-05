@@ -752,7 +752,7 @@ void _clem_init_instruction_map() {
     _opcode_description(CLEM_OPC_TSB_DP,  "TSB", kClemensCPUAddrMode_DirectPage);
 
     _opcode_description(CLEM_OPC_TAX,     "TAX", kClemensCPUAddrMode_None);
-    _opcode_description(CLEM_OPC_TAY,     "TAX", kClemensCPUAddrMode_None);
+    _opcode_description(CLEM_OPC_TAY,     "TAY", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_TCD,     "TCD", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_TDC,     "TDC", kClemensCPUAddrMode_None);
     _opcode_description(CLEM_OPC_TCS,     "TCS", kClemensCPUAddrMode_None);
@@ -1763,7 +1763,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 tmp_eaddr = tmp_addr + cpu->regs.X;
             }
             _clem_cycle(clem, 1);
-            _clem_read_16(clem, &tmp_eaddr, tmp_addr, cpu->regs.PBR, CLEM_MEM_FLAG_DATA);
+            _clem_read_16(clem, &tmp_eaddr, tmp_eaddr, cpu->regs.PBR, CLEM_MEM_FLAG_DATA);
             tmp_pc = tmp_eaddr;
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, x_status);
             break;

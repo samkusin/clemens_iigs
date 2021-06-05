@@ -136,3 +136,65 @@ sequence = (command >> 4)
 
 execute two instructions per cycle (2mhz on a 1mhz speed = 2 instructions per 1us)
 
+
+
+## Analysis
+
+### IWM stuff
+
+- Synchronous mode uses normal clock (2mhz LSS timings)
+- Asynchrnous mode uses different clock (higher resolution )
+- As a shortcut, use us/ns timings from the IWM spec for slow/fast modes instead
+  of trying to calculate timings based on a clock frequency
+- Synchronous mode keeps the current code
+- Asynchronous mode requires a different path
+-
+
+### ROM stuff
+
+After performing some 3.5" IWM disk checks, the ROM proceeds with similar
+checks for the 5.25".
+
+One interesting note is that the ROM switches the IWM mode to slow mode (4us
+bit cell timings) as expected.  The ROM *also* keeps the value of the remaining
+mode bits 2-0.  These bits were all enabled; asynchronous write handshaking is
+also enabled for 5.25" disk access.  Note, this is an unusual setting - and
+it seems limited to the ROM during startup (TBD.)
+
+During ROM startup, the 5.25" check does the following:
+
+- Enable 5.25 mode in the DISKREG
+- Sets the IWM mode register to 0x07 (slow mode, async handshaking, full latch)
+- Set the stepper phase to PH1 + PH3 active (this would be a no-op track op)
+- Checks if the write protect sense input is HIGH
+  - this can happen with an empty drive
+- If write protect is HIGH
+  - set PH0 active (PH0, PH1, PH3 are on, which would be a quarter track displacement?)
+  - write a byte to the write register (maybe?)
+  - wait until write register is ready for another byte (no timeout, handshake check)
+    - uses a read, modify, write instruction (ASL) on the Q6 low register
+    - if the IWM were bad, this would hang startup
+  - if ready, then write a byte from the C5E8 + Y memory (internal ROM, slot 5?)
+  - this happens 5 times (loop Y = 5, --Y)
+    -
+
+FF/59C9 sets some odd valies for the phase when in 5.25" drive... phases that
+  would not move the stepper...
+- KEGS seems to treat this specially ('enable2'?) which always returns write
+  protect (sense==1)
+- ROM code seems to detect write protect in this case... but why on startup?
+- Needs thorough analysis when we actually boot disks...
+- Seems the code then checks the handshake register to check if a byte ($ff)
+  was written to the disk (or at least checking the handshake register until
+  no write overrun was detected)
+- KEGS seems to special case this section with 'enable2' - but what IS IT?
+
+
+
+Take a look at how legacy Disk II reads the write protect flag using the LSS and
+  data latch.  This differs from the IWM status method
+
+C0EC reads are treated differently?  Verify with tech notes/hw ref/iwm spec
+
+"fast mode" should trigger lss every 250ns vs 500ns
+in 5.25 mode, ignore the IWM mode flags (but still persist them?)
