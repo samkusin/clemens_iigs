@@ -5,7 +5,6 @@
 #include <stdint.h>
 
 #include "clem_defs.h"
-#include "clem_woz.h"
 
 typedef uint64_t clem_clocks_time_t;
 typedef uint32_t clem_clocks_duration_t;
@@ -208,15 +207,13 @@ struct ClemensDeviceIWM {
     /** A reference clocks value at the last disk update. */
     clem_clocks_time_t last_clocks_ts;
 
+    /** Drive I/O */
     unsigned io_flags;          /**< Disk port I/O flags */
     unsigned out_phase;         /**< PH0-PH3 bits sent to drive */
 
-    unsigned ns_latch_hold;     /**< The latch value expiration timer */
-    unsigned ns_drive_hold;     /**< Time until drive motor off */
-
-    uint8_t data;               /**< IO data (bus data) */
-    uint8_t latch;              /**< data latch */
-    uint8_t lss_seq;            /**< lss state */
+    /** Internal Registers */
+    uint8_t data;               /**< IO switch data (D0-D7) */
+    uint8_t latch;              /**< data latch (work register for IWM) */
 
     bool q6_switch;             /**< Q6 state switch */
     bool q7_switch;             /**< Q7 stage switch */
@@ -225,6 +222,10 @@ struct ClemensDeviceIWM {
     bool fast_mode;             /**< If True, bit cells are handled every 2us */
     bool latch_mode;            /**< If True, latch value lasts for full 8 xfer */
     bool clock_8mhz;            /**< If True, use a 8mhz clock... what? */
+
+    unsigned state;             /**< The current IWM register state */
+    unsigned ns_latch_hold;     /**< The latch value expiration timer */
+    unsigned ns_drive_hold;     /**< Time until drive motor off */
 };
 
 /**
