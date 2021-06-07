@@ -8,9 +8,11 @@
 #include "emulator.h"
 
 #include "clem_code.h"
+#include "clem_drive.h"
 #include "clem_util.h"
 #include "clem_device.h"
 #include "clem_vgc.h"
+#include "clem_woz.h"
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"

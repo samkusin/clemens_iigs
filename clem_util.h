@@ -48,3 +48,29 @@ static inline uint32_t _clem_calc_cycles_diff(
         return cycles_b + (UINT32_MAX - cycles_a) + 1;
     }
 }
+
+static inline unsigned clem_util_timer_decrement(
+    unsigned timer_ns,
+    unsigned dt_ns
+) {
+    return (timer_ns - dt_ns < timer_ns) ? (timer_ns - dt_ns) : 0;
+}
+
+static inline unsigned clem_util_timer_increment(
+    unsigned timer_ns,
+    unsigned timer_max_ns,
+    unsigned dt_ns
+) {
+    if (timer_ns + dt_ns > timer_ns) {
+        timer_ns += dt_ns;
+    }
+    if (timer_ns + dt_ns < timer_ns) {
+        timer_ns = UINT32_MAX;
+    } else {
+        timer_ns += dt_ns;
+    }
+    if (timer_ns > timer_max_ns) {
+        timer_ns = timer_max_ns;
+    }
+    return timer_ns;
+}
