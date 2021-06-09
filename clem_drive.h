@@ -21,10 +21,15 @@
    https://llx.com/Neil/a2/disk
 */
 #define CLEM_IWM_FLAG_HEAD_SEL              0x00000010
+/* Places drive in 'write' mode */
+#define CLEM_IWM_FLAG_WRITE_REQUEST         0x00000040
 /*  Write protect for disk for 5.25", and the sense input bit for 3.5" drives*/
 #define CLEM_IWM_FLAG_WRPROTECT_SENSE       0x00000080
 /*  Read pulse from the disk/drive bitstream is on */
 #define CLEM_IWM_FLAG_READ_DATA             0x00000100
+/*  Write pulse input to drive */
+#define CLEM_IWM_FLAG_WRITE_DATA            0x00000200
+
 
 #ifdef __cplusplus
 extern "C" {

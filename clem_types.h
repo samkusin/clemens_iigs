@@ -221,9 +221,10 @@ struct ClemensDeviceIWM {
     bool async_write_mode;      /**< If True, IWM delays writes until ready */
     bool fast_mode;             /**< If True, bit cells are handled every 2us */
     bool latch_mode;            /**< If True, latch value lasts for full 8 xfer */
-    bool clock_8mhz;            /**< If True, use a 8mhz clock... what? */
+    bool clock_8mhz;            /**< If True, 8mhz clock - never used? */
 
     unsigned state;             /**< The current IWM register state */
+    unsigned lss_state;         /**< State of our custom LSS */
     unsigned ns_latch_hold;     /**< The latch value expiration timer */
     unsigned ns_drive_hold;     /**< Time until drive motor off */
 };

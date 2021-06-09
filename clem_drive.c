@@ -385,7 +385,6 @@ void clem_disk_update_state_525(
         /* also we need to fake it being write protected?  check this? */
         *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
         if (drive->pulse_ns >= 4000) {
-            *io_flags &= ~CLEM_IWM_FLAG_READ_DATA;
             drive->pulse_ns -= 4000;
         }
     } else if (drive->pulse_ns >= drive->data->bit_timing_ns) {
