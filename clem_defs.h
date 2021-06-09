@@ -1,15 +1,28 @@
 #ifndef CLEMENS_DEFS_H
 #define CLEMENS_DEFS_H
 
-/** Setting: Mega2 tick interval for polling the ADB (effectively microseconds)
+/** A bit confusing... used for calculating our system clock.  These values
+ *  are relative to each other.
+ *
+ *  The clocks per mega2 cycle value will always be the largest.
+ *
+ *  If you divide the CLEM_CLOCKS_MEGA2_CYCLE by the CLEM_CLOCKS_FAST_CYCLE
+ *  the value will be the effective maximum clock speed in Mhz of the CPU.
  */
+#define CLEM_CLOCKS_FAST_CYCLE              1023
+#define CLEM_CLOCKS_MEGA2_CYCLE             2864
+
 #define CLEM_MEGA2_CYCLES_PER_60TH          16667
 #define CLEM_MEGA2_TIMER_1SEC_US            1000000
 #define CLEM_MEGA2_TIMER_QSEC_US            266667
 #define CLEM_MEGA2_CYCLE_NS                 1023
-#define CLEM_IWM_LSS_CYCLE_NS               (CLEM_MEGA2_CYCLE_NS/2)
+
 #define CLEM_1SEC_NS                        1000000000
 #define CLEM_1MS_NS                         1000000
+
+/** Emulataed duration of every 'step' iwm_glu_sync runs. */
+#define CLEM_IWM_SYNC_FRAME_NS              500
+
 
 /** Setting: ADB keyboard buffer size - this doesn't need to be large since
  *  Apple II apps typically expect to consume events via ISR or prompt polling
