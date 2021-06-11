@@ -72,17 +72,24 @@
 #define CLEM_IWM_STATE_WRITE_MODE           0x03
 #define CLEM_IWM_STATE_WRITE_DATA           0x13
 
-/* States are:
-   Bits 0-7  : ID
-*/
-#define CLEM_IWM_LSS_STATE_IDLE             0x00
-#define CLEM_IWM_LSS_STATE_WAIT_READ        0x01
-#define CLEM_IWM_LSS_STATE_WAIT_READ_2      0x02
-#define CLEM_IWM_LSS_STATE_CLR_READ_10      0x03
-#define CLEM_IWM_LSS_STATE_CLR_READ_11      0x04
-
-#define CLEM_IWM_LSS_STATE_LOAD_WRITE       0x11
-#define CLEM_IWM_LSS_STATE_NEXT_WRITE       0x12
+static uint8_t s_lss_rom[256] = {
+    0x18, 0x18, 0x18, 0x18, 0x0A, 0x0A, 0x0A, 0x0A, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18,
+    0x2D, 0x2D, 0x38, 0x38, 0x0A, 0x0A, 0x0A, 0x0A, 0x28, 0x28, 0x28, 0x28, 0x28, 0x28, 0x28, 0x28,
+    0xD8, 0x38, 0x08, 0x28, 0x0A, 0x0A, 0x0A, 0x0A, 0x39, 0x39, 0x39, 0x39, 0x3B, 0x3B, 0x3B, 0x3B,
+    0xD8, 0x48, 0x48, 0x48, 0x0A, 0x0A, 0x0A, 0x0A, 0x48, 0x48, 0x48, 0x48, 0x48, 0x48, 0x48, 0x48,
+    0xD8, 0x58, 0xD8, 0x58, 0x0A, 0x0A, 0x0A, 0x0A, 0x58, 0x58, 0x58, 0x58, 0x58, 0x58, 0x58, 0x58,
+    0xD8, 0x68, 0xD8, 0x68, 0x0A, 0x0A, 0x0A, 0x0A, 0x68, 0x68, 0x68, 0x68, 0x68, 0x68, 0x68, 0x68,
+    0xD8, 0x78, 0xD8, 0x78, 0x0A, 0x0A, 0x0A, 0x0A, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78,
+    0xD8, 0x88, 0xD8, 0x88, 0x0A, 0x0A, 0x0A, 0x0A, 0x08, 0x08, 0x88, 0x88, 0x08, 0x08, 0x88, 0x88,
+    0xD8, 0x98, 0xD8, 0x98, 0x0A, 0x0A, 0x0A, 0x0A, 0x98, 0x98, 0x98, 0x98, 0x98, 0x98, 0x98, 0x98,
+    0xD8, 0x29, 0xD8, 0xA8, 0x0A, 0x0A, 0x0A, 0x0A, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8,
+    0xCD, 0xBD, 0xD8, 0xB8, 0x0A, 0x0A, 0x0A, 0x0A, 0xB9, 0xB9, 0xB9, 0xB9, 0xBB, 0xBB, 0xBB, 0xBB,
+    0xD9, 0x59, 0xD8, 0xC8, 0x0A, 0x0A, 0x0A, 0x0A, 0xC8, 0xC8, 0xC8, 0xC8, 0xC8, 0xC8, 0xC8, 0xC8,
+    0xD9, 0xD9, 0xD8, 0xA0, 0x0A, 0x0A, 0x0A, 0x0A, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8,
+    0xD8, 0x08, 0xE8, 0xE8, 0x0A, 0x0A, 0x0A, 0x0A, 0xE8, 0xE8, 0xE8, 0xE8, 0xE8, 0xE8, 0xE8, 0xE8,
+    0xFD, 0xFD, 0xF8, 0xF8, 0x0A, 0x0A, 0x0A, 0x0A, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8,
+    0xDD, 0x4D, 0xE0, 0xE0, 0x0A, 0x0A, 0x0A, 0x0A, 0x88, 0x88, 0x08, 0x08, 0x88, 0x88, 0x08, 0x08
+};
 
 
 static inline unsigned _clem_iwm_get_access_state(struct ClemensDeviceIWM* iwm) {
@@ -98,8 +105,6 @@ static inline unsigned _clem_iwm_get_access_state(struct ClemensDeviceIWM* iwm) 
 
 void clem_iwm_reset(struct ClemensDeviceIWM* iwm) {
     memset(iwm, 0, sizeof(*iwm));
-
-    iwm->lss_state = CLEM_IWM_LSS_STATE_IDLE;
 }
 
 void clem_iwm_insert_disk(
@@ -119,149 +124,79 @@ void clem_iwm_eject_disk(
     // after timeout, reset drive state
 }
 
-static inline void _clem_iwm_lss_set_state(
-    struct ClemensDeviceIWM* iwm,
-    unsigned lss_state,
-    unsigned nop_ctr
-) {
-    iwm->state = (nop_ctr << 24) | lss_state;
-}
-
-static inline void _clem_iwm_lss_set_cycles(
-    struct ClemensDeviceIWM* iwm,
-    unsigned cycles
-) {
-    iwm->state &= 0xff00ffff;
-    iwm->state |= (cycles << 16);
-}
-
-static void _clem_iwm_lss_write(struct ClemensDeviceIWM* iwm) {
-    unsigned nop_ctr = (iwm->lss_state >> 24) & 0xff;
-    unsigned lss_state = iwm->lss_state & 0xff;
-
-    if (nop_ctr > 0) {
-        --nop_ctr;
-        _clem_iwm_lss_set_state(iwm, lss_state, nop_ctr);
-        return;
-    }
-    switch (lss_state) {
-        case CLEM_IWM_LSS_STATE_LOAD_WRITE:
-            if (iwm->state == CLEM_IWM_STATE_READ_HANDSHAKE) {
-                iwm->latch <<= 1;
-            } else {
-                iwm->latch = iwm->data;
-                iwm->io_flags |= CLEM_IWM_FLAG_WRITE_REQUEST;
-            }
-            iwm->io_flags &= ~CLEM_IWM_FLAG_WRITE_DATA;
-            if (iwm->latch & 0x80) {
-                iwm->io_flags |= CLEM_IWM_FLAG_WRITE_DATA;
-            }
-            _clem_iwm_lss_set_state(iwm, CLEM_IWM_LSS_STATE_NEXT_WRITE, 4);
-            break;
-        case CLEM_IWM_LSS_STATE_NEXT_WRITE:
-            _clem_iwm_lss_set_state(iwm, CLEM_IWM_LSS_STATE_LOAD_WRITE, 2);
-            break;
-    }
-
-}
-
-static void _clem_iwm_lss_read(struct ClemensDeviceIWM* iwm) {
-    unsigned nop_ctr = (iwm->lss_state >> 24) & 0xff;
-    unsigned lss_cycle = (iwm->lss_state >> 16) & 0xff;
-    unsigned lss_state = iwm->lss_state & 0xff;
-    bool read_pulse = (iwm->io_flags & CLEM_IWM_FLAG_READ_DATA) != 0;
-
-    if (nop_ctr > 0) {
-        --nop_ctr;
-        _clem_iwm_lss_set_state(iwm, lss_state, nop_ctr);
-        return;
-    }
-    switch (lss_state) {
-        case CLEM_IWM_LSS_STATE_WAIT_READ:
-            /* QA Wait */
-            if (read_pulse) {
-                _clem_iwm_lss_set_state(iwm, CLEM_IWM_LSS_STATE_WAIT_READ_2, 3);
-            }
-            break;
-        case CLEM_IWM_LSS_STATE_WAIT_READ_2:
-            /* QA wait between up to 8 steps, CLR_READ_11 else CLR_READ_10 */
-            if (read_pulse) {
-                _clem_iwm_lss_set_state(iwm, CLEM_IWM_LSS_STATE_CLR_READ_11, 3)
-            } else {
-                ++lss_cycle;
-                if (lss_cycle == 8) {
-                    _clem_iwm_lss_set_state(iwm, CLEM_IWM_LSS_STATE_CLR_READ_10, 0)
-                } else {
-                    _clem_iwm_lss_set_cycles(iwm, lss_cycle);
-                }
-            }
-            break;
-        case CLEM_IWM_LSS_STATE_CLR_READ_10:
-            break;
-        case CLEM_IWM_LSS_STATE_CLR_READ_11:
-            break;
-    }
-
-}
-
 static void _clem_iwm_lss(struct ClemensDeviceIWM* iwm) {
-    /* This is a specialized version of the original Disk II LSS with the
-       following differences:
-
-        - custom state machine (NO PROM decoding... using READ/WRITE flowcharts
-            from Understanding the Apple //e)
-        - support fast mode (2 us bit cell)
-        - no write-protect switch support (Q6 ON, Q7 OFF - this is done via
-             iwm_read_switch)
-        - read handshake timing (Q6 OFF, Q7 ON)
-
-       All states have a prefix NOP option, where the state executes x NOPs
-       before the actual state action/transition. This 'x' is pulled from
-       the upper 8-bits of the state variable.
+    /* Uses the Disk II sequencer.
+       Some assumptions taken from Understanding the Apple //e
+       Generally speaking, our IO reads for status, handshake and writes for
+       mode use the IWM registers versus the latch generated here.
+       Still we execute the LSS for all variations of Q6,Q7 to maintain the
+       latch value to maximize compatibility with legacy Disk I/O.
     */
-    switch (iwm->state) {
-        case CLEM_IWM_STATE_READ_HANDSHAKE: /* shift */;
-        case CLEM_IWM_STATE_WRITE_DATA:     /* load */
-            _clem_iwm_lss_write(iwm);
-            break;
-        case CLEM_IWM_STATE_READ_DATA:
-            /* read sequence */
-            _clem_iwm_lss_read(iwm);
-            break;
+    unsigned adr = (unsigned)(iwm->lss_state) << 4 |
+                   (iwm->q7_switch ? 0x08 : 00) |
+                   (iwm->q6_switch ? 0x04 : 00) |
+                   ((iwm->latch & 0x80) ? 0x02 : 00) |
+                   ((iwm->io_flags & CLEM_IWM_FLAG_READ_DATA) ? 0x01 : 00);
+    unsigned cmd = s_lss_rom[adr];
+
+    if (cmd & 0x08) {
+        switch (cmd & 0xf) {
+            case 0x08:              /* NOP */
+            case 0x0C:
+                break;
+            case 0x09:              /* SL0 */
+                iwm->latch <<= 1;
+                if (iwm->lss_write_counter & 0x80) {
+                    ++iwm->lss_write_counter;
+                }
+                break;
+            case 0x0A:              /* SR, WRPROTECT -> HI */
+            case 0x0E:
+                iwm->latch >>= 1;
+                if (iwm->io_flags & CLEM_IWM_FLAG_WRPROTECT_SENSE) {
+                    iwm->latch |= 0x80;
+                }
+                break;
+            case 0x0B:              /* LD from data to latch */
+            case 0x0F:
+                iwm->latch = iwm->data;
+                if (iwm->state & 0x02) {
+                    iwm->lss_write_counter = 0x80;
+                } else {
+                    CLEM_WARN("clem_iwm: state: %02X load byte %02X in read?",
+                        iwm->state, iwm->data);
+                }
+                break;
+            case 0x0D:              /* SL1 append 1 bit */
+                iwm->latch <<= 1;
+                iwm->latch |= 0x01;
+                break;
+        }
+    } else {
+        /* CLR */
+        iwm->latch = 0;
     }
 
+    if (iwm->state & 0x02) {
+        /* write mode */
+        iwm->io_flags |= CLEM_IWM_FLAG_WRITE_DATA;
+    } else {
+        /* read mode - data = latch except when holding the current read byte
+           note, that the LSS ROM does this for us, but when IIgs latch mode is
+           enabled, we need to extend the life of the read-value on the data
+           'bus'.  once the hold has expired, we can resume updating the
+           'bus' with the latch's current value*/
+        iwm->io_flags &= ~CLEM_IWM_FLAG_WRITE_DATA;
+        /*
+        if ((iwm->latch & 0x80) && iwm->latch_mode) {
+            if ns_latch_hold == 0, ns_latch_hold = 16us or 32us
 
-    // if (cmd & 0x08) {
-    //     switch (cmd & 0xf) {
-    //         case 0x08:              /* NOP */
-    //         case 0x0C:
-    //             break;
-    //         case 0x09:              /* SL0 */
-    //             iwm->latch <<= 1;
-    //             break;
-    //         case 0x0A:              /* SR, WRPROTECT -> HI */
-    //         case 0x0E:
-    //             iwm->latch >>= 1;
-    //             if (iwm->io_flags & CLEM_IWM_FLAG_WRPROTECT_SENSE) {
-    //                 iwm->latch |= 0x80;
-    //             }
-    //             break;
-    //         case 0x0B:              /* LD from data to latch */
-    //         case 0x0F:
-    //             iwm->latch = iwm->data;
-    //             break;
-    //         case 0x0D:              /* SL1 append 1 bit */
-    //             iwm->latch <<= 1;
-    //             iwm->latch |= 0x01;
-    //             break;
-    //     }
-    // } else {
-    //     /* CLR */
-    //     iwm->latch = 0;
-    // }
+        }
+        */
+        iwm->data = iwm->latch;
+    }
 
-    // iwm->lss_seq = (cmd & 0xf0) >> 4;
-
+    iwm->lss_state = (cmd & 0xf0) >> 4;
 }
 
 
@@ -289,7 +224,6 @@ void clem_iwm_glu_sync(
             }
         }
     }
-
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
         while (spent_ns <= delta_ns - CLEM_IWM_SYNC_FRAME_NS) {
             if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
@@ -361,9 +295,11 @@ void _clem_iwm_io_switch(
         case CLEM_MMIO_REG_IWM_DRIVE_ENABLE:
             if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
                 CLEM_LOG("clem_iwm: turning drive on");
+                iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_ON;
+                iwm->lss_state = 0;
+                iwm->lss_write_counter = 0;
+                iwm->ns_drive_hold = 0;
             }
-            iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_ON;
-            iwm->ns_drive_hold = 0;
             break;
         case CLEM_MMIO_REG_IWM_DRIVE_0:
             if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1)) {
@@ -410,10 +346,15 @@ void _clem_iwm_io_switch(
     if (current_state != iwm->state) {
         if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
             if (!(current_state & 0x2) && (iwm->state & 0x02)) {
-                iwm->lss_state = CLEM_IWM_LSS_STATE_LOAD_WRITE;
+                iwm->lss_state = 0;     /* initial write state */
             }
             if ((current_state & 0x02) && !(iwm->state & 0x02)) {
-                iwm->lss_state = CLEM_IWM_LSS_STATE_WAIT_READ;
+                iwm->lss_state = 2;     /* initial read state */
+                iwm->lss_write_counter = 0x00;
+            }
+            if (iwm->state == CLEM_IWM_STATE_WRITE_DATA) {
+                iwm->last_write_clocks_ts = clock->ts;
+                iwm->lss_write_counter = 0x80;
             }
         }
         CLEM_LOG("clem_iwm: state %02X => %02X", current_state, iwm->state);
@@ -486,12 +427,15 @@ void clem_iwm_write_switch(
         default:
             _clem_iwm_io_switch(iwm, drives, clock, ioreg, CLEM_IO_WRITE);
             if (ioreg & 1) {
+                iwm->data = value;
                 switch (iwm->state) {
                     case CLEM_IWM_STATE_WRITE_MODE:
                         _clem_iwm_write_mode(iwm, value);
                         break;
+                    case CLEM_IWM_STATE_WRITE_DATA:
+                        /* TODO: async handshake timer starts here */
+                        break;
                     default:
-                        iwm->latch = value;
                         break;
                 }
             }
@@ -534,9 +478,14 @@ static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM* iwm) {
     return result;
 }
 
-static uint8_t _clem_iwm_read_handshake(struct ClemensDeviceIWM* iwm) {
+static uint8_t _clem_iwm_read_handshake(
+    struct ClemensDeviceIWM* iwm,
+    struct ClemensClock* clock
+) {
     uint8_t result = 0;
-
+    /* TODO: detect write overrun and write ready based on lss_write_counter
+             and last_write_clock_ts
+    */
     return result;
 }
 
@@ -575,10 +524,10 @@ uint8_t clem_iwm_read_switch(
                         result = _clem_iwm_read_status(iwm);
                         break;
                     case CLEM_IWM_STATE_READ_HANDSHAKE:
-                        result = _clem_iwm_read_handshake(iwm);
+                        result = _clem_iwm_read_handshake(iwm, clock);
                         break;
                     default:
-                        result = iwm->latch;
+                        result = iwm->data;
                         break;
                 }
             }
