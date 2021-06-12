@@ -206,6 +206,8 @@ struct ClemensVGC {
 struct ClemensDeviceIWM {
     /** A reference clocks value at the last disk update. */
     clem_clocks_time_t last_clocks_ts;
+    /** Used for async write timing */
+    clem_clocks_time_t last_write_clocks_ts;
 
     /** Drive I/O */
     unsigned io_flags;          /**< Disk port I/O flags */
@@ -224,9 +226,10 @@ struct ClemensDeviceIWM {
     bool clock_8mhz;            /**< If True, 8mhz clock - never used? */
 
     unsigned state;             /**< The current IWM register state */
-    unsigned lss_state;         /**< State of our custom LSS */
     unsigned ns_latch_hold;     /**< The latch value expiration timer */
     unsigned ns_drive_hold;     /**< Time until drive motor off */
+    unsigned lss_state;         /**< State of our custom LSS */
+    unsigned lss_write_counter; /**< Used for detecting write underruns */
 };
 
 /**

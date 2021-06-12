@@ -3130,7 +3130,6 @@ void clemens_emulate(ClemensMachine* clem) {
     clock.ts = clem->clocks_spent;
     clock.ref_step = clem->clocks_step_mega2;
     clem_vgc_sync(&mmio->vgc, CLEM_MEGA2_CYCLES_PER_60TH);
-    mmio->dev_iwm.data = cpu->pins.data;
     clem_iwm_glu_sync(&mmio->dev_iwm,
                       &clem->active_drives,
                       &clock);
