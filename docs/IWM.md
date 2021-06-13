@@ -198,3 +198,10 @@ C0EC reads are treated differently?  Verify with tech notes/hw ref/iwm spec
 
 "fast mode" should trigger lss every 250ns vs 500ns
 in 5.25 mode, ignore the IWM mode flags (but still persist them?)
+
+Current state:
+Debugging:  first 5.25 mode set at PC:FF/3C33
+First IWM writes:  FF/56bb
+  Status: if write protect is off, then unknown for now...
+          if write protect is on then attempt to write a few bytes from
+            $C5E8 to $C5E8 + 5?
