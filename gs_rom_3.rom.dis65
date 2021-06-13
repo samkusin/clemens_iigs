@@ -1833,6 +1833,12 @@
 "Text":"q6 = on.  5.25 on\r\n",
 "BoxMode":false,
 "MaxWidth":80,
+"BackgroundColor":0},
+
+"218746":{
+"Text":"We\u0027re in 5.25 mode but still enable async writes?  Long latch?  What\u0027s going on?",
+"BoxMode":false,
+"MaxWidth":80,
 "BackgroundColor":0}},
 
 "Notes":{
@@ -3713,6 +3719,20 @@
 "Value":16733901,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"218826":{
+"Label":"next_write",
+"Value":16733898,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"218746":{
+"Label":"SUB_IWM_TMP_525_BOOT",
+"Value":16733818,
+"Source":"User",
+"Type":"GlobalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{

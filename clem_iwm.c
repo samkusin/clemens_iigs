@@ -105,6 +105,7 @@ static inline unsigned _clem_iwm_get_access_state(struct ClemensDeviceIWM* iwm) 
 
 void clem_iwm_reset(struct ClemensDeviceIWM* iwm) {
     memset(iwm, 0, sizeof(*iwm));
+    iwm->lss_update_dt_ns = CLEM_IWM_SYNC_FRAME_NS;
 }
 
 void clem_iwm_insert_disk(
@@ -145,10 +146,17 @@ static void _clem_iwm_lss(struct ClemensDeviceIWM* iwm) {
             case 0x0C:
                 break;
             case 0x09:              /* SL0 */
-                iwm->latch <<= 1;
                 if (iwm->lss_write_counter & 0x80) {
+                    iwm->write_out <<= 1;
+                    iwm->write_out |= (iwm->latch & 0x80) ? 0x01 : 0x00;
                     ++iwm->lss_write_counter;
+                    if (iwm->lss_write_counter >= 0x88) {
+                        CLEM_LOG("diskwr(%u): %02X",
+                            iwm->write_out,
+                            iwm->lss_write_counter - 0x80);
+                    }
                 }
+                iwm->latch <<= 1;
                 break;
             case 0x0A:              /* SR, WRPROTECT -> HI */
             case 0x0E:
@@ -162,6 +170,7 @@ static void _clem_iwm_lss(struct ClemensDeviceIWM* iwm) {
                 iwm->latch = iwm->data;
                 if (iwm->state & 0x02) {
                     iwm->lss_write_counter = 0x80;
+                    iwm->write_out = 0x00;
                 } else {
                     CLEM_WARN("clem_iwm: state: %02X load byte %02X in read?",
                         iwm->state, iwm->data);
@@ -224,37 +233,37 @@ void clem_iwm_glu_sync(
             }
         }
     }
-    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
-        while (spent_ns <= delta_ns - CLEM_IWM_SYNC_FRAME_NS) {
+    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON && iwm->lss_update_dt_ns <= delta_ns ) {
+        while (spent_ns <= delta_ns - iwm->lss_update_dt_ns) {
             if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
                 if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
                     clem_disk_update_state_35(&drives->slot5[0],
                                               &iwm->io_flags,
                                               iwm->out_phase,
-                                              CLEM_IWM_SYNC_FRAME_NS);
+                                              iwm->lss_update_dt_ns);
                 }
                 if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) {
                     clem_disk_update_state_35(&drives->slot5[1],
                                               &iwm->io_flags,
                                               iwm->out_phase,
-                                              CLEM_IWM_SYNC_FRAME_NS);
+                                              iwm->lss_update_dt_ns);
                 }
             } else {
                 if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
                     clem_disk_update_state_525(&drives->slot6[0],
                                                &iwm->io_flags,
                                                iwm->out_phase,
-                                               CLEM_IWM_SYNC_FRAME_NS);
+                                               iwm->lss_update_dt_ns);
                 }
                 if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) {
                     clem_disk_update_state_525(&drives->slot6[1],
                                                &iwm->io_flags,
                                                iwm->out_phase,
-                                               CLEM_IWM_SYNC_FRAME_NS);
+                                               iwm->lss_update_dt_ns);
                 }
             }
             _clem_iwm_lss(iwm);
-            spent_ns += CLEM_IWM_SYNC_FRAME_NS;
+            spent_ns += iwm->lss_update_dt_ns;
         }
     }
     iwm->last_clocks_ts = clock->ts - _clem_calc_clocks_step_from_ns(
@@ -347,6 +356,7 @@ void _clem_iwm_io_switch(
         if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
             if (!(current_state & 0x2) && (iwm->state & 0x02)) {
                 iwm->lss_state = 0;     /* initial write state */
+                iwm->lss_write_counter = 0x00;
             }
             if ((current_state & 0x02) && !(iwm->state & 0x02)) {
                 iwm->lss_state = 2;     /* initial read state */
@@ -354,7 +364,6 @@ void _clem_iwm_io_switch(
             }
             if (iwm->state == CLEM_IWM_STATE_WRITE_DATA) {
                 iwm->last_write_clocks_ts = clock->ts;
-                iwm->lss_write_counter = 0x80;
             }
         }
         CLEM_LOG("clem_iwm: state %02X => %02X", current_state, iwm->state);
@@ -369,9 +378,9 @@ static void _clem_iwm_write_mode(struct ClemensDeviceIWM* iwm, uint8_t value) {
         iwm->clock_8mhz = false;
     }
     if (value & 0x08) {
-        iwm->fast_mode = true;
+        iwm->lss_update_dt_ns = CLEM_IWM_SYNC_FRAME_NS / 2;
     } else {
-        iwm->fast_mode = false;
+        iwm->lss_update_dt_ns = CLEM_IWM_SYNC_FRAME_NS;
     }
     if (value & 0x04) {
         iwm->timer_1sec_disabled = true;
@@ -462,7 +471,7 @@ static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM* iwm) {
     if (iwm->clock_8mhz) {
         result |= 0x10;
     }
-    if (iwm->fast_mode) {
+    if (iwm->lss_update_dt_ns != CLEM_IWM_SYNC_FRAME_NS) {
         result |= 0x08;
     }
     if (iwm->timer_1sec_disabled) {
@@ -480,12 +489,26 @@ static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM* iwm) {
 
 static uint8_t _clem_iwm_read_handshake(
     struct ClemensDeviceIWM* iwm,
-    struct ClemensClock* clock
+    struct ClemensClock* clock,
+    bool is_noop
 ) {
-    uint8_t result = 0;
-    /* TODO: detect write overrun and write ready based on lss_write_counter
-             and last_write_clock_ts
+    uint8_t result = 0x80;  /* start with ready */
+    unsigned ns_write = _clem_calc_ns_step_from_clocks(
+        clock->ts - iwm->last_write_clocks_ts, clock->ref_step);
+    /* TODO: IWM is busy during a valid write? Then clear result.
     */
+    if ((iwm->lss_write_counter & 0xf) > 8) {
+        result |= 0x04;     /* we should be loading the next write byte */
+        if (!is_noop) {
+            CLEM_WARN("clem_iwm: write_ovr dt = %.3f us", ns_write * 0.001f);
+        }
+    } else if ((iwm->lss_write_counter % 8) != 0) {
+        result &= ~0x80;
+    } else {
+        if (!is_noop) {
+            CLEM_LOG("clem_iwm: write_rdy dt = %.3f us", ns_write * 0.001f);
+        }
+    }
     return result;
 }
 
@@ -497,6 +520,7 @@ uint8_t clem_iwm_read_switch(
     uint8_t flags
 ) {
     uint8_t result = 0x00;
+    bool is_noop = (flags & CLEM_MMIO_READ_NO_OP) != 0;
 
     switch (ioreg) {
         case CLEM_MMIO_REG_DISK_INTERFACE:
@@ -512,7 +536,7 @@ uint8_t clem_iwm_read_switch(
             }
             break;
         default:
-            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+            if (!is_noop) {
                 _clem_iwm_io_switch(iwm, drives, clock, ioreg, CLEM_IO_READ);
             }
             if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
@@ -524,7 +548,7 @@ uint8_t clem_iwm_read_switch(
                         result = _clem_iwm_read_status(iwm);
                         break;
                     case CLEM_IWM_STATE_READ_HANDSHAKE:
-                        result = _clem_iwm_read_handshake(iwm, clock);
+                        result = _clem_iwm_read_handshake(iwm, clock, is_noop);
                         break;
                     default:
                         result = iwm->data;

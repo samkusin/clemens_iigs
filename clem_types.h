@@ -216,12 +216,12 @@ struct ClemensDeviceIWM {
     /** Internal Registers */
     uint8_t data;               /**< IO switch data (D0-D7) */
     uint8_t latch;              /**< data latch (work register for IWM) */
+    uint8_t write_out;          /**< TODO: Remove.. written byte out */
 
     bool q6_switch;             /**< Q6 state switch */
     bool q7_switch;             /**< Q7 stage switch */
     bool timer_1sec_disabled;   /**< Turn motor off immediately */
     bool async_write_mode;      /**< If True, IWM delays writes until ready */
-    bool fast_mode;             /**< If True, bit cells are handled every 2us */
     bool latch_mode;            /**< If True, latch value lasts for full 8 xfer */
     bool clock_8mhz;            /**< If True, 8mhz clock - never used? */
 
@@ -230,6 +230,7 @@ struct ClemensDeviceIWM {
     unsigned ns_drive_hold;     /**< Time until drive motor off */
     unsigned lss_state;         /**< State of our custom LSS */
     unsigned lss_write_counter; /**< Used for detecting write underruns */
+    unsigned lss_update_dt_ns;  /**< Fast mode = 250ns, Slow = 500ns */
 };
 
 /**
