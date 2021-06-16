@@ -20,9 +20,9 @@
 #define CLEM_1SEC_NS                        1000000000
 #define CLEM_1MS_NS                         1000000
 
-/** Emulataed duration of every 'step' iwm_glu_sync runs. */
-#define CLEM_IWM_SYNC_FRAME_NS              500
-
+/** Emulataed duration of every 'step' iwm_glu_sync runs. 1.023 / 2 ~ 0.511 */
+#define CLEM_IWM_SYNC_FRAME_NS              511
+#define CLEM_IWM_SYNC_FRAME_NS_FAST         256
 
 /** Setting: ADB keyboard buffer size - this doesn't need to be large since
  *  Apple II apps typically expect to consume events via ISR or prompt polling

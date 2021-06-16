@@ -205,3 +205,7 @@ First IWM writes:  FF/56bb
   Status: if write protect is off, then unknown for now...
           if write protect is on then attempt to write a few bytes from
             $C5E8 to $C5E8 + 5?
+          One overrun - determine if that's a bug or not
+  At this point, once we continue run, 5.25 boot sequence seems to start
+    Analyze debug spew during 5.25 boot sequence to see if everything looks ok
+  An I/O at C019 causes an assert (unimpl?)
