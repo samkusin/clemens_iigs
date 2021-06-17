@@ -184,6 +184,8 @@ struct ClemensVGC {
     struct ClemensScanline hgr_2_scanlines[CLEM_VGC_HGR_SCANLINE_COUNT];
     struct ClemensScanline shgr_scanlines[CLEM_VGC_SHGR_SCANLINE_COUNT];
 
+    clem_clocks_time_t last_clocks_ts;
+
     unsigned timer_ns;
     unsigned vbl_counter;
     unsigned v_counter;
@@ -208,6 +210,8 @@ struct ClemensDeviceIWM {
     clem_clocks_time_t last_clocks_ts;
     /** Used for async write timing */
     clem_clocks_time_t last_write_clocks_ts;
+    /** Used for lss processing per frame */
+    clem_clocks_duration_t lss_clocks_lag;
 
     /** Drive I/O */
     unsigned io_flags;          /**< Disk port I/O flags */

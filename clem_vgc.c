@@ -1,4 +1,5 @@
 #include "clem_vgc.h"
+#include "clem_util.h"
 
 /* References:
 
@@ -138,8 +139,19 @@ uint8_t clem_vgc_get_region(struct ClemensVGC* vgc) {
 
 void clem_vgc_sync(
     struct ClemensVGC* vgc,
-    uint32_t delta_ns
+    struct ClemensClock* clock
 ) {
+    /* TODO: OMG -
+        my calculation of delta_clocks/ref_step is not going to work
+        because of resolution issues (2 fast cycles/ 1 mega cycle == 0)
+        this is likely part of the problems with the IWM timing
+
+        Solution is using an accumulator of clocks that is incremented until
+        we can 'exhaust it'.  Continue this over every frame.
+
+    */
+    unsigned delta_ns = _clem_calc_ns_step_from_clocks(
+        clock->ts - vgc->last_clocks_ts,  clock->ref_step);
     vgc->timer_ns += delta_ns;
 
     while (vgc->timer_ns >= CLEM_VGC_VSYNC_TIME_NS) {
@@ -147,4 +159,5 @@ void clem_vgc_sync(
         ++vgc->vbl_counter;
         vgc->timer_ns -= CLEM_VGC_VSYNC_TIME_NS;
     }
+    vgc->last_clocks_ts = clock->ts;
 }

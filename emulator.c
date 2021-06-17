@@ -3127,19 +3127,15 @@ void clemens_emulate(ClemensMachine* clem) {
 
     // TODO: calculate delta_ns per emulate call to call 'real-time' systems
     //      like VGC
-    clock.ts = clem->clocks_spent;
-    clock.ref_step = clem->clocks_step_mega2;
-    clem_vgc_sync(&mmio->vgc, CLEM_MEGA2_CYCLES_PER_60TH);
-    clem_iwm_glu_sync(&mmio->dev_iwm,
-                      &clem->active_drives,
-                      &clock,
-                      false);
-
     delta_mega2_cycles = (uint32_t)(
         (clem->clocks_spent / clem->clocks_step_mega2) - mmio->mega2_cycles);
     mmio->mega2_cycles += delta_mega2_cycles;
     mmio->timer_60hz_us += delta_mega2_cycles;
 
+    clock.ts = clem->clocks_spent;
+    clock.ref_step = clem->clocks_step_mega2;
+    clem_vgc_sync(&mmio->vgc, &clock);
+    clem_iwm_glu_sync(&mmio->dev_iwm, &clem->active_drives, &clock);
 
     /* background execution of some async devices on the 60 hz timer */
     while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {

@@ -180,8 +180,7 @@ void clem_iwm_eject_disk(struct ClemensDeviceIWM* iwm,
  */
 void clem_iwm_glu_sync(struct ClemensDeviceIWM* iwm,
                        struct ClemensDriveBay* drives,
-                       struct ClemensClock* clock,
-                       bool inside_inst);
+                       struct ClemensClock* clock);
 
 /**
  * @brief Executed from the memory subsystem for MMIO

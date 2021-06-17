@@ -125,6 +125,14 @@ void clem_iwm_eject_disk(
     // after timeout, reset drive state
 }
 
+static void _clem_iwm_reset_lss(struct ClemensDeviceIWM* iwm) {
+    iwm->lss_state = 0;
+    iwm->lss_write_counter = 0;
+    iwm->lss_clocks_lag = 0;
+    iwm->ns_drive_hold = 0;
+}
+
+
 static void _clem_iwm_lss(
     struct ClemensDeviceIWM* iwm,
     struct ClemensClock* clock
@@ -223,20 +231,53 @@ static void _clem_iwm_lss(
 void clem_iwm_glu_sync(
     struct ClemensDeviceIWM* iwm,
     struct ClemensDriveBay* drives,
-    struct ClemensClock* clock,
-    bool inside_inst
+    struct ClemensClock* clock
 ) {
     unsigned delta_ns;
-    unsigned spent_ns = 0;
     struct ClemensClock next_clock;
 
-    if (iwm->last_clocks_ts > clock->ts) return;
-
-    delta_ns = _clem_calc_ns_step_from_clocks(
-        clock->ts - iwm->last_clocks_ts, clock->ref_step);
-
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
-        //CLEM_LOG("sks(%u): dt=%u ns", inside_inst, delta_ns);
+        iwm->lss_clocks_lag += (clock->ts - iwm->last_clocks_ts);
+        delta_ns = _clem_calc_ns_step_from_clocks(
+            iwm->lss_clocks_lag, clock->ref_step);
+        next_clock.ts = clock->ts;
+        next_clock.ref_step = clock->ref_step;
+        while (delta_ns >= iwm->lss_update_dt_ns) {
+            //CLEM_LOG("SKS: dt=%u", delta_ns);
+            if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
+                    clem_disk_update_state_35(&drives->slot5[0],
+                                            &iwm->io_flags,
+                                            iwm->out_phase,
+                                            iwm->lss_update_dt_ns);
+                }
+                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) {
+                    clem_disk_update_state_35(&drives->slot5[1],
+                                            &iwm->io_flags,
+                                            iwm->out_phase,
+                                            iwm->lss_update_dt_ns);
+                }
+            } else {
+                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
+                    clem_disk_update_state_525(&drives->slot6[0],
+                                            &iwm->io_flags,
+                                            iwm->out_phase,
+                                            iwm->lss_update_dt_ns);
+                }
+                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) {
+                    clem_disk_update_state_525(&drives->slot6[1],
+                                            &iwm->io_flags,
+                                            iwm->out_phase,
+                                            iwm->lss_update_dt_ns);
+                }
+            }
+            next_clock.ts += _clem_calc_clocks_step_from_ns(
+                iwm->lss_update_dt_ns, next_clock.ref_step);
+            _clem_iwm_lss(iwm, &next_clock);
+            delta_ns -= iwm->lss_update_dt_ns;
+        }
+        iwm->lss_clocks_lag = _clem_calc_clocks_step_from_ns(delta_ns, clock->ref_step);
+
         /* handle the 1 second drive motor timer */
         if (iwm->ns_drive_hold > 0) {
             iwm->ns_drive_hold = clem_util_timer_decrement(
@@ -247,48 +288,8 @@ void clem_iwm_glu_sync(
             }
         }
     }
-    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON && iwm->lss_update_dt_ns <= delta_ns ) {
-        //CLEM_LOG("SKS: dt=%u", delta_ns);
-        while (spent_ns <= delta_ns - iwm->lss_update_dt_ns) {
-            if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
-                    clem_disk_update_state_35(&drives->slot5[0],
-                                              &iwm->io_flags,
-                                              iwm->out_phase,
-                                              iwm->lss_update_dt_ns);
-                }
-                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) {
-                    clem_disk_update_state_35(&drives->slot5[1],
-                                              &iwm->io_flags,
-                                              iwm->out_phase,
-                                              iwm->lss_update_dt_ns);
-                }
-            } else {
-                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
-                    clem_disk_update_state_525(&drives->slot6[0],
-                                               &iwm->io_flags,
-                                               iwm->out_phase,
-                                               iwm->lss_update_dt_ns);
-                }
-                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) {
-                    clem_disk_update_state_525(&drives->slot6[1],
-                                               &iwm->io_flags,
-                                               iwm->out_phase,
-                                               iwm->lss_update_dt_ns);
-                }
-            }
-            next_clock.ts = clock->ts + _clem_calc_clocks_step_from_ns(
-                spent_ns, clock->ref_step);
-            next_clock.ref_step = clock->ref_step;
-            _clem_iwm_lss(iwm, &next_clock);
-            spent_ns += iwm->lss_update_dt_ns;
-        }
-        //CLEM_LOG("sks(%u): sp=%u, st=%u", inside_inst, spent_ns, iwm->lss_update_dt_ns);
-    } else {
-        spent_ns = delta_ns;
-    }
-    iwm->last_clocks_ts = clock->ts - _clem_calc_clocks_step_from_ns(
-        delta_ns - spent_ns, clock->ref_step);
+
+    iwm->last_clocks_ts = clock->ts;
 }
 
 /*
@@ -326,9 +327,7 @@ void _clem_iwm_io_switch(
             if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
                 CLEM_LOG("clem_iwm: turning drive on");
                 iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_ON;
-                iwm->lss_state = 0;
-                iwm->lss_write_counter = 0;
-                iwm->ns_drive_hold = 0;
+                _clem_iwm_reset_lss(iwm);
             }
             break;
         case CLEM_MMIO_REG_IWM_DRIVE_0:
@@ -337,6 +336,7 @@ void _clem_iwm_io_switch(
             }
             iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_1;
             iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_2;
+            _clem_iwm_reset_lss(iwm);
             break;
         case CLEM_MMIO_REG_IWM_DRIVE_1:
             if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2)) {
@@ -344,6 +344,7 @@ void _clem_iwm_io_switch(
             }
             iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_2;
             iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_1;
+            _clem_iwm_reset_lss(iwm);
             break;
         case CLEM_MMIO_REG_IWM_Q6_LO:
             iwm->q6_switch = false;
@@ -452,7 +453,7 @@ void clem_iwm_write_switch(
             }
             break;
         default:
-            clem_iwm_glu_sync(iwm, drives, clock, true);
+            clem_iwm_glu_sync(iwm, drives, clock);
             _clem_iwm_io_switch(iwm, drives, clock, ioreg, CLEM_IO_WRITE);
             if (ioreg & 1) {
                 iwm->data = value;
@@ -552,7 +553,7 @@ uint8_t clem_iwm_read_switch(
             break;
         default:
             if (!is_noop) {
-                clem_iwm_glu_sync(iwm, drives, clock, true);
+                clem_iwm_glu_sync(iwm, drives, clock);
                 _clem_iwm_io_switch(iwm, drives, clock, ioreg, CLEM_IO_READ);
             }
             if (!(ioreg & 1)) {
