@@ -126,7 +126,8 @@ void _clem_iwm_lss(struct ClemensDeviceIWM* iwm) {
 void clem_iwm_glu_sync(
     struct ClemensDeviceIWM* iwm,
     struct ClemensDriveBay* drives,
-    struct ClemensClock* clock
+    struct ClemensClock* clock,
+    bool inside_inst
 ) {
     int delta_ns = _clem_calc_ns_step_from_clocks(
         clock->ts - iwm->last_clocks_ts, clock->ref_step);

@@ -3132,7 +3132,8 @@ void clemens_emulate(ClemensMachine* clem) {
     clem_vgc_sync(&mmio->vgc, CLEM_MEGA2_CYCLES_PER_60TH);
     clem_iwm_glu_sync(&mmio->dev_iwm,
                       &clem->active_drives,
-                      &clock);
+                      &clock,
+                      false);
 
     delta_mega2_cycles = (uint32_t)(
         (clem->clocks_spent / clem->clocks_step_mega2) - mmio->mega2_cycles);

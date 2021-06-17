@@ -427,18 +427,18 @@ void _clem_mmio_speed_disk_gate(ClemensMachine* clem, uint8_t ioreg) {
         if (clem->mmio.disk_motor_on) {
             clem->clocks_step = clem->clocks_step_mega2;
             if (old_disk_flags == 0) {
-                CLEM_LOG("SPEED SLOW Disk: %0X2", clem->mmio.disk_motor_on);
+                CLEM_LOG("SPEED SLOW Disk: %02X", clem->mmio.disk_motor_on);
             }
         } else {
             if (clem->mmio.speed_c036 & CLEM_MMIO_SPEED_FAST_ENABLED) {
                 clem->clocks_step = clem->clocks_step_fast;
                 if (old_disk_flags) {
-                    CLEM_LOG("SPEED FAST Disk: Off", clem->mmio.disk_motor_on);
+                    CLEM_LOG("SPEED FAST Disk: %02X", clem->mmio.disk_motor_on);
                 }
             } else {
                 clem->clocks_step = clem->clocks_step_mega2;
                 if (old_disk_flags) {
-                    CLEM_LOG("SPEED SLOW Disk: Off", clem->mmio.disk_motor_on);
+                    CLEM_LOG("SPEED SLOW Disk: %02X", clem->mmio.disk_motor_on);
                 }
             }
         }

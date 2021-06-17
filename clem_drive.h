@@ -30,7 +30,6 @@
 /*  Write pulse input to drive */
 #define CLEM_IWM_FLAG_WRITE_DATA            0x00000200
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
