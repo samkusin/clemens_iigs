@@ -24,6 +24,16 @@
 #define CLEM_IWM_SYNC_FRAME_NS              511
 #define CLEM_IWM_SYNC_FRAME_NS_FAST         256
 
+#define CLEM_VGC_HORIZ_SCAN_TIME_NS         63700
+#define CLEM_VGC_NTSC_SCANLINE_COUNT        262
+#define CLEM_VGC_NTSC_SCAN_TIME_NS          (CLEM_VGC_HORIZ_SCAN_TIME_NS * \
+                                             CLEM_VGC_NTSC_SCANLINE_COUNT)
+#define CLEM_VGC_VBL_NTSC_UPPER_BOUND       198
+#define CLEM_VGC_VBL_NTSC_LOWER_BOUND       (CLEM_VGC_NTSC_SCANLINE_COUNT-1)
+#define CLEM_VGC_PAL_SCANLINE_COUNT         312
+#define CLEM_VGC_PAL_SCAN_TIME_NS           (CLEM_VGC_HORIZ_SCAN_TIME_NS * \
+                                             CLEM_VGC_PAL_SCAN_TIME_NS)
+
 /** Setting: ADB keyboard buffer size - this doesn't need to be large since
  *  Apple II apps typically expect to consume events via ISR or prompt polling
  *  of IO registers.  Our host should have the opportunity to send input to the

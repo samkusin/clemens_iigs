@@ -1,5 +1,7 @@
+#include "clem_mmio_defs.h"
 #include "clem_vgc.h"
 #include "clem_util.h"
+#include "clem_debug.h"
 
 /* References:
 
@@ -18,9 +20,6 @@ void clem_vgc_init(struct ClemensVGC* vgc) {
     struct ClemensScanline* line;
     unsigned offset;
     unsigned row, inner;
-
-    vgc->timer_ns = 0;
-    vgc->vbl_counter = 0;
 
     vgc->text_fg_color = CLEM_VGC_COLOR_WHITE;
     vgc->text_bg_color = CLEM_VGC_COLOR_MEDIUM_BLUE;
@@ -141,23 +140,81 @@ void clem_vgc_sync(
     struct ClemensVGC* vgc,
     struct ClemensClock* clock
 ) {
-    /* TODO: OMG -
-        my calculation of delta_clocks/ref_step is not going to work
-        because of resolution issues (2 fast cycles/ 1 mega cycle == 0)
-        this is likely part of the problems with the IWM timing
-
-        Solution is using an accumulator of clocks that is incremented until
-        we can 'exhaust it'.  Continue this over every frame.
-
+    /* TODO: VBL detection depends on NTSC/PAL switch
+                @ specific time within a scan until end of scan
+             Calculate v_counter and h_counter on demand given:
+                NTSC/PAL mode
+                Timer/cycle
+             Trigger IRQ (vgc->irq_line) if inside VBL region
+             And of course, super hi-res
     */
-    unsigned delta_ns = _clem_calc_ns_step_from_clocks(
-        clock->ts - vgc->last_clocks_ts,  clock->ref_step);
-    vgc->timer_ns += delta_ns;
-
-    while (vgc->timer_ns >= CLEM_VGC_VSYNC_TIME_NS) {
-
-        ++vgc->vbl_counter;
-        vgc->timer_ns -= CLEM_VGC_VSYNC_TIME_NS;
+    unsigned scanline_ns;
+    unsigned frame_ns;
+    unsigned counter;
+    vgc->dt_scanline += (clock->ts - vgc->ts_last_frame);
+    scanline_ns = _clem_calc_ns_step_from_clocks(
+        vgc->dt_scanline, clock->ref_step);
+    if (scanline_ns > CLEM_VGC_HORIZ_SCAN_TIME_NS) {
+        vgc->dt_scanline = _clem_calc_clocks_step_from_ns(
+            CLEM_VGC_HORIZ_SCAN_TIME_NS - vgc->dt_scanline, clock->ref_step);
     }
-    vgc->last_clocks_ts = clock->ts;
+    frame_ns = _clem_calc_ns_step_from_clocks(
+        clock->ts - vgc->ts_scanline_0, clock->ref_step);
+    if (frame_ns >= CLEM_VGC_NTSC_SCAN_TIME_NS) {
+        vgc->ts_scanline_0 = clock->ts - _clem_calc_clocks_step_from_ns(
+            CLEM_VGC_NTSC_SCAN_TIME_NS - frame_ns, clock->ref_step);
+    }
+    vgc->ts_last_frame = clock->ts;
+}
+
+uint8_t clem_vgc_read_switch(
+    struct ClemensVGC* vgc,
+    struct ClemensClock* clock,
+    uint8_t ioreg,
+    uint8_t flags
+) {
+    uint8_t result = 0x00;
+    unsigned scan_time_ns;
+    unsigned v_counter;
+    unsigned h_counter;
+
+    if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+        clem_vgc_sync(vgc, clock);
+    }
+    scan_time_ns = _clem_calc_ns_step_from_clocks(
+        clock->ts - vgc->ts_scanline_0, clock->ref_step);
+    /* 65 cycles per horizontal scanline, 980 ns per horizontal count = 63.7us*/
+    v_counter = scan_time_ns / CLEM_VGC_HORIZ_SCAN_TIME_NS;
+    h_counter = _clem_calc_ns_step_from_clocks(
+        vgc->dt_scanline, clock->ref_step) / 980;
+
+    switch (ioreg) {
+        case CLEM_MMIO_REG_VBLBAR:
+            /* IIgs sets bit 7 if scanline is within vertical blank region */
+            if (v_counter >= CLEM_VGC_VBL_NTSC_UPPER_BOUND) {
+                result |= 0x80;
+            }
+            break;
+        case CLEM_MMIO_REG_VGC_VERTCNT:
+            result = (uint8_t)(((v_counter + 0xFA) >> 1) & 0xff);
+            break;
+        case CLEM_MMIO_REG_VGC_HORIZCNT:
+            if (h_counter < 1) {
+                result = 0x00;
+            } else {
+                result = 0x3F + h_counter;
+            }
+            result |= ((v_counter + 0xFA) & 1) << 7;
+            break;
+    }
+    return result;
+}
+
+void clem_vgc_write_switch(
+    struct ClemensVGC* vgc,
+    struct ClemensClock* clock,
+    uint8_t ioreg,
+    uint8_t value
+) {
+
 }

@@ -38,6 +38,17 @@ void clem_vgc_set_text_colors(struct ClemensVGC* vgc, unsigned fg_color,
 void clem_vgc_set_region(struct ClemensVGC* vgc, uint8_t c02b_value);
 uint8_t clem_vgc_get_region(struct ClemensVGC* vgc);
 
+uint8_t clem_vgc_read_switch(struct ClemensVGC* vgc,
+                             struct ClemensClock* clock,
+                             uint8_t ioreg,
+                             uint8_t flags);
+
+void clem_vgc_write_switch(struct ClemensVGC* vgc,
+                          struct ClemensClock* clock,
+                          uint8_t ioreg,
+                          uint8_t value);
+
+
 #ifdef __cplusplus
 }
 #endif
