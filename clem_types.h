@@ -184,12 +184,11 @@ struct ClemensVGC {
     struct ClemensScanline hgr_2_scanlines[CLEM_VGC_HGR_SCANLINE_COUNT];
     struct ClemensScanline shgr_scanlines[CLEM_VGC_SHGR_SCANLINE_COUNT];
 
-    clem_clocks_time_t last_clocks_ts;
+    /* Used for precise-ish timing of vertical blank and scanline irqs */
+    clem_clocks_time_t ts_last_frame;
+    clem_clocks_time_t ts_scanline_0;
+    clem_clocks_duration_t dt_scanline;
 
-    unsigned timer_ns;
-    unsigned vbl_counter;
-    unsigned v_counter;
-    unsigned h_counter;
 
     /* amalgom of possible display modes */
     unsigned mode_flags;

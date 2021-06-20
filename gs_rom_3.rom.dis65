@@ -208,6 +208,57 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"IO_KEY_CAPPL_E1_C062":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_KEY_CAPPL_E1_C062",
+"Value":14794850,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_KEY_OPEN_APPLE_E1_C061":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_KEY_OPEN_APPLE_E1_C061",
+"Value":14794849,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_KEYB_E1_C000":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_KEYB_E1_C000",
+"Value":14794752,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "IO_KMSTATUS_C027":{
 "DataDescriptor":{
 "Length":1,
@@ -357,6 +408,23 @@
 "MultiMask":null,
 "Label":"IO_PADDL0_C064",
 "Value":49252,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_RD_VBLBAR_E1_C019":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_RD_VBLBAR_E1_C019",
+"Value":14794777,
 "Source":"Project",
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
@@ -1497,6 +1565,8 @@
 "236808":"Maybe this tests ROM 01?",
 "236842":"Setup RTC registers",
 "236846":"Some kind of disk access - maybe boot?",
+"239015":"Use alternate character display set",
+"239072":"Open/Closed Apple Control-N",
 "244013":"Maybe this is the default BRAM table?",
 "244025":"blank param?",
 "244034":"$A0-$C0 if self diagnostics set to $FF",
@@ -1837,6 +1907,18 @@
 
 "218746":{
 "Text":"We\u0027re in 5.25 mode but still enable async writes?  Long latch?  What\u0027s going on?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"239066":{
+"Text":"Easter Egg Key Check - Open-Apple-Ctrl-N \"Apple II\" speaker sample",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"239015":{
+"Text":"This code may be displaying the \"sliding apple\" prompt at the \"Check Startup Drive\" screen!  Also included is a check for the easter egg \"Apple II\" startup sound!",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -3733,6 +3815,27 @@
 "Value":16733818,
 "Source":"User",
 "Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"239066":{
+"Label":"SUB_EEGG_APPLEII_SOUND_KEY_CHECK",
+"Value":16754138,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"239089":{
+"Label":"not_on_vblank",
+"Value":16754161,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"239094":{
+"Label":"on_vblank",
+"Value":16754166,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{

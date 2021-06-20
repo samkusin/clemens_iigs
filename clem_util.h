@@ -26,7 +26,7 @@ static inline uint32_t _clem_calc_ns_step_from_clocks(
     clem_clocks_duration_t clocks_step_reference
 ) {
     return  (uint32_t)(
-        CLEM_MEGA2_CYCLE_NS * clocks_step / clocks_step_reference);
+        CLEM_MEGA2_CYCLE_NS * (uint64_t)clocks_step / clocks_step_reference);
 }
 
 static inline clem_clocks_duration_t _clem_calc_clocks_step_from_ns(

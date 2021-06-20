@@ -506,6 +506,9 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_80COLSTORE_TEST:
             result = (mmio->mmap_register & CLEM_MMIO_MMAP_80COLSTORE) ? 0x80 : 00;
             break;
+        case CLEM_MMIO_REG_VBLBAR:
+            result = clem_vgc_read_switch(&mmio->vgc, &ref_clock, ioreg, flags);
+            break;
         case CLEM_MMIO_REG_TXT_TEST:
             result = (mmio->vgc.mode_flags & CLEM_VGC_GRAPHICS_MODE) ? 0x00 : 0x80;
             break;
