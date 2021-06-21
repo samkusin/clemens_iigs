@@ -10,7 +10,7 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* IWM? Disk support?
+* Display video
 * CLEM_MMIO_REG_VGC_IRQ_BYTE
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
 * C022 Text Color Mode
@@ -35,12 +35,15 @@ This is a running todo list.
 * Emulation vs Native on some microinstructions (i.e. choosing a long address mode while in emulation does... what?)
 * Test ROM iteration?
 * Ghosting banks?
+* IWM 3.5" read write support
 * VGC Pass 3: SHGR
 * Ensoniq!
 * ADB Mouse on Keypad Feature
 
 ## DONE
 
+* C019 (vblbar)
+* IWM? Disk support? 5.25 for now...
 * C036 Disk Motor Detector flags
 * Quality of life host app improvements
 * RTC register instructions
