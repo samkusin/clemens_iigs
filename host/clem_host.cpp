@@ -1,5 +1,7 @@
 #include "clem_host.hpp"
+#include "clem_display.hpp"
 #include "clem_mem.h"
+#include "clem_vgc.h"
 
 #include "fmt/format.h"
 #include "imgui/imgui.h"
@@ -54,7 +56,8 @@ ClemensHost::ClemensHost() :
   cpuRegsSaved_ {},
   cpuPinsSaved_ {},
   cpu6502EmulationSaved_(true),
-  widgetInputContext_(InputContext::None)
+  widgetInputContext_(InputContext::None),
+  display_(nullptr)
 {
   void* slabMemory = malloc(kSlabMemorySize);
   slab_ = cinek::FixedStack(kSlabMemorySize, slabMemory);
@@ -79,10 +82,12 @@ ClemensHost::ClemensHost() :
     free(tmp);
   }
 
+  display_ = new ClemensDisplay();
 }
 
 ClemensHost::~ClemensHost()
 {
+  delete display_;
   void* slabMemory = slab_.getHead();
   if (slabMemory) {
     free(slabMemory);
@@ -138,6 +143,35 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     emulate(deltaTime);
     emulationRan = true;
   }
+  if (clemens_is_initialized(&machine_)) {
+    ClemensVideo video;
+    if (clemens_get_text_video(&video, &machine_)) {
+      display_->renderText(
+        video, machine_.mega2_bank_map[0], machine_.mega2_bank_map[1],
+        (machine_.mmio.vgc.mode_flags & CLEM_VGC_ALTCHARSET) ? true : false);
+    }
+  }
+
+  ImGui::SetNextWindowPos(ImVec2(512, 32), ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2(640, 480));
+  ImGui::Begin("Display", nullptr, ImGuiWindowFlags_NoResize |
+                                   ImGuiWindowFlags_NoCollapse |
+                                   ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+  if (clemens_is_initialized(&machine_)) {
+    ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);   // No tint
+    ImTextureID texId { (void *)((uintptr_t)display_->getScreenTarget().id) };
+    ImVec2 p = ImGui::GetCursorScreenPos();
+    ImVec2 avail = ImGui::GetWindowContentRegionMax();
+    ImVec2 display_uv(280.0f/1024, 192.0f/256);
+    ImGui::GetWindowDrawList()->AddImage(
+      texId,
+      p, ImVec2(p.x + 560, p.y + 384),
+      ImVec2(0, 0), display_uv,
+      ImGui::GetColorU32(tint_col));
+  }
+
+  ImGui::End();
 
   const struct ClemensCPURegs& cpuRegsNext = machine_.cpu.regs;
   const struct ClemensCPUPins& cpuPinsNext = machine_.cpu.pins;

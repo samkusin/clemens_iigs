@@ -1,0 +1,50 @@
+#ifndef CLEM_HOST_DISPLAY_H
+#define CLEM_HOST_DISPLAY_H
+
+#include "clem_types.h"
+#include "sokol/sokol_gfx.h"
+
+// all rendering occurs to an offscreen render target that will be rendered
+// as a texture to the UI
+class ClemensDisplay
+{
+public:
+  ClemensDisplay();
+  ~ClemensDisplay();
+
+
+  bool renderText(const ClemensVideo& video,
+    const uint8_t* mainMemory, const uint8_t* auxMemory,
+    bool useAlternateCharacterSet);
+
+  // Returns the color texture for the display for rendering
+  sg_image getScreenTarget() const { return screenTarget_; }
+
+private:
+  struct DrawVertex
+  {
+    float pos[2];
+    float uvs[2];
+    uint32_t color;
+    uint32_t pad;
+  };
+
+  struct DisplayVertexParams
+  {
+    float render_dims[2];
+    float display_ratio[2];
+    float virtual_dims[2];
+  };
+
+
+  sg_image systemFontImage_;
+  sg_shader textShader_;
+  sg_pipeline textPipeline_;
+
+  sg_buffer textVertexBuffer_;
+  sg_image screenTarget_;
+  sg_pass screenPass_;
+
+};
+
+#endif
