@@ -35,6 +35,7 @@ endif()
 
 add_executable(clemens_iigs
     ${PLATFORM_SOURCES}
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_display.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_app.cpp"
     ${FMT_SOURCES}

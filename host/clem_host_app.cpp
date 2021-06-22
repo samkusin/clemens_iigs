@@ -7,17 +7,18 @@
 
 #include "imgui/imgui.h"
 
+#include <array>
+
+#include <cstdio>
+
+#include "clem_host.hpp"
+
 #define SOKOL_IMPL
 #include "sokol/sokol_app.h"
 #include "sokol/sokol_gfx.h"
 #include "sokol/sokol_glue.h"
 #include "sokol/sokol_imgui.h"
 
-#include <array>
-
-#include <cstdio>
-
-#include "clem_host.hpp"
 
 static ClemensHost* g_Host = nullptr;
 static ClemensHostTimePoint g_LastTimepoint;
@@ -159,6 +160,7 @@ static void onFrame()
     &currentTimepoint, &g_LastTimepoint);
 
   simgui_new_frame(frameWidth, frameHeight, deltaTime);
+
   g_Host->frame(frameWidth, frameHeight, deltaTime);
 
   sg_begin_default_pass(&g_sgPassAction, frameWidth, frameHeight);
@@ -205,6 +207,7 @@ static void onEvent(const sapp_event* evt)
 static void onCleanup()
 {
   delete g_Host;
+
   g_Host = nullptr;
 
   simgui_shutdown();

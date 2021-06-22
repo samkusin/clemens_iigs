@@ -23,6 +23,8 @@ struct ClemensHostInputEvent
   };
 };
 
+class ClemensDisplay;
+
 
 class ClemensHost
 {
@@ -33,6 +35,8 @@ public:
   void frame(int width, int height, float deltaTime);
 
   void input(const ClemensInputEvent& input);
+
+  void setDisplayImage(ImTextureID texId);
 
 private:
   void emulate(float deltaTime);
@@ -111,6 +115,8 @@ private:
   uint8_t memoryViewBank_[2];
 
   std::vector<char> terminalOutput_;
+
+  ClemensDisplay* display_;
 };
 
 
