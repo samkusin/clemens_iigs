@@ -87,3 +87,20 @@ References: HW p. 58-60
 * Super Hi-res scanline interrupt
   * each line has an on/off for interrupt triggering
   * not supported for Apple II modes
+
+
+## Display
+
+* Expose when vertical blanking starts to the host
+  * The host should wait until vertical blanking starts
+  * Render emulated screen to a texture
+  * Draw the screen when vertical blanking ends?
+* Offscreen texture is 512x256 (will be expanded once dbl/super hires supported)
+  * Render Apple IIx character sets onto textures (stb?)
+  * Draw monospaced characters based on clemens text data at specific areas
+* Just copy the screen data from the clemens buffers and process them separately
+  * Can offload emulator to a thread/core when everything works
+  * For now isolate all of the rendering code into a separate module/function
+  *
+
+### Text Rendering (40 column)
