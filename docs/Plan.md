@@ -10,14 +10,11 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Display video
+* ctrl-reset handling (ADB, IRQ)
 * CLEM_MMIO_REG_VGC_IRQ_BYTE
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
 * C022 Text Color Mode
 * C01F 80COL yes/no state
-* VGC Pass 0.1 - Find apple ii fonts to use
-* VGC Pass 0.2 - define API to access the text page
-* VGC pass 1 : text modes and switches
 * C07F? - AN3?
 * C041 INTEN - enable Mega II, VBL, quartersec interrupts
 * C047 clearing timer interrupt flags for VBL and quartersec
@@ -42,6 +39,10 @@ This is a running todo list.
 
 ## DONE
 
+* Display video
+* VGC Pass 0.1 - Find apple ii fonts to use
+* VGC Pass 0.2 - define API to access the text page
+* VGC pass 1 : text modes and switches
 * C019 (vblbar)
 * IWM? Disk support? 5.25 for now...
 * C036 Disk Motor Detector flags

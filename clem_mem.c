@@ -580,30 +580,48 @@ static uint8_t _clem_mmio_read(
             result = _clem_mmio_inttype_c046(mmio);
             break;
         case CLEM_MMIO_REG_TXTCLR:
-            clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_GRAPHICS_MODE);
+            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+                clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_GRAPHICS_MODE);
+            }
             break;
         case CLEM_MMIO_REG_TXTSET:
-            clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_GRAPHICS_MODE);
+            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+                clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_GRAPHICS_MODE);
+            }
             break;
         case CLEM_MMIO_REG_MIXCLR:
-            clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_MIXED_TEXT);
+            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+                clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_MIXED_TEXT);
+            }
             break;
         case CLEM_MMIO_REG_MIXSET:
-            clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_MIXED_TEXT);
+            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+                clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_MIXED_TEXT);
+            }
             break;
         case CLEM_MMIO_REG_TXTPAGE1:
-            _clem_mmio_memory_map(mmio, mmio->mmap_register & ~CLEM_MMIO_MMAP_TXTPAGE2);
+            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+                _clem_mmio_memory_map(
+                    mmio, mmio->mmap_register & ~CLEM_MMIO_MMAP_TXTPAGE2);
+            }
             break;
         case CLEM_MMIO_REG_TXTPAGE2:
-            _clem_mmio_memory_map(mmio, mmio->mmap_register | CLEM_MMIO_MMAP_TXTPAGE2);
+            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+                _clem_mmio_memory_map(
+                    mmio, mmio->mmap_register | CLEM_MMIO_MMAP_TXTPAGE2);
+            }
             break;
         case CLEM_MMIO_REG_LORES:
             /* implicitly clears hires */
-            clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_LORES);
+            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+                clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_LORES);
+            }
             break;
         case CLEM_MMIO_REG_HIRES:
             /* implicitly clears lores */
-            clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_HIRES);
+            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+                clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_HIRES);
+            }
             break;
         case CLEM_MMIO_REG_AN0_OFF:
         case CLEM_MMIO_REG_AN0_ON:
