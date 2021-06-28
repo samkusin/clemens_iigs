@@ -51,6 +51,8 @@ private:
   bool parseCommandDebugStatus(const char* line);
   bool parseCommandStep(const char* line);
   bool parseCommandBreak(const char* line);
+  bool parseCommandListBreak(const char* line);
+  bool parseCommandRemoveBreak(const char* line);
   bool parseCommandRun(const char* line);
 
   void createMachine();
@@ -62,6 +64,7 @@ private:
 
   bool isRunningEmulation() const;
   bool isRunningEmulationStep() const;
+  bool hitBreakpoint();
 
   static void emulatorOpcodePrint(struct ClemensInstruction* inst,
                                   const char* operand,
@@ -91,7 +94,17 @@ private:
   //  0x00xxxxxx, run PC target (if never hit, runs indefinitely)
   uint32_t emulationRunTarget_;
 
-  std::vector<uint32_t> breakpoints_;
+  struct Breakpoint {
+    enum Op {
+      Read,
+      Write,
+      PC
+    };
+    Op op;
+    uint32_t addr;
+  };
+
+  std::vector<Breakpoint> breakpoints_;
 
   struct ClemensCPURegs cpuRegsSaved_;
   struct ClemensCPUPins cpuPinsSaved_;

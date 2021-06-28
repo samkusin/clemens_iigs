@@ -127,7 +127,6 @@ void clem_adb_reset(struct ClemensDeviceADB* adb) {
     adb->version = CLEM_ADB_ROM_3;      /* TODO - input to reset? */
     adb->mode_flags = CLEM_ADB_MODE_AUTOPOLL_KEYB |
                       CLEM_ADB_MODE_AUTOPOLL_MOUSE;
-    adb->keyb.size = 0;
 }
 
 static void _clem_adb_expect_data(
@@ -382,7 +381,7 @@ static uint8_t _clem_adb_glu_keyb_parse(
     uint8_t key_event
 ) {
     uint8_t key_index = key_event & 0x7f;
-    bool is_key_down = (key_event & 0x80) != 0;
+    bool is_key_down = (key_event & 0x80) == 0;     /* up = b7 at this point */
     uint8_t ascii_key;
 
     uint8_t* ascii_table = &g_a2_to_ascii[key_index][0];
@@ -412,6 +411,7 @@ static uint8_t _clem_adb_glu_keyb_parse(
             else modifiers &= ~CLEM_ADB_GLU_REG2_KEY_CAPS;
         }
         adb->keyb_reg[2] = modifiers;
+        CLEM_LOG("SKS: mods: %04X", adb->keyb_reg[2]);
     }
     /* Additional parsing needed for MMIO registers */
     if (modifiers & (CLEM_ADB_GLU_REG2_KEY_CTRL+CLEM_ADB_GLU_REG2_KEY_SHIFT)) {
@@ -458,8 +458,14 @@ static void _clem_adb_glu_keyb_talk(struct ClemensDeviceADB* adb) {
        for the first unqueue, only allow one read from the key queue
     */
     if ((key_event & 0x7f) == CLEM_ADB_KEY_RESET) {
-        if (key_event & 0x80) adb->keyb_reg[0] = 0x7f7f;
-        else adb->keyb_reg[0] = 0xffff;
+        if (key_event & 0x80) {
+            adb->keyb_reg[0] = 0x7f7f;
+            if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_CTRL) {
+                adb->keyb.reset_key = true;
+            }
+        } else {
+            adb->keyb_reg[0] = 0xffff;
+        }
     } else {
         adb->keyb_reg[0] = _clem_adb_glu_keyb_parse(adb, key_event);
         if (adb->keyb.size > 0 && adb->keyb.keys[0] != CLEM_ADB_KEY_RESET) {
@@ -588,12 +594,12 @@ static uint8_t _clem_adb_glu_read_memory(
                 break;
             case 0xe8:
                 /* Support just the apple keys */
-                if (adb->keyb_reg[2] & CLEM_ADB_KEY_MOD_APPLE) {
+                if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_APPLE) {
                     result = 0x20;
                 } else {
                     result = 0x00;
                 }
-                if (adb->keyb_reg[2] & CLEM_ADB_KEY_MOD_OPTION) {
+                if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_OPTION) {
                     result |= 0x10;
                 } else {
                     result &= ~0x10;
@@ -851,14 +857,25 @@ void clem_adb_device_input(
     unsigned key_index = input->value & 0x7f;
     switch (input->type) {
         case kClemensInputType_KeyDown:
-            CLEM_LOG("Key Dn: %02X", input->value);
+            if (!adb->keyb.states[CLEM_ADB_KEY_RESET]) {
+                /* TODO: something else than F12?  */
+                if (key_index == CLEM_ADB_KEY_F12) {
+                    key_index = CLEM_ADB_KEY_RESET;
+                }
+            }
+            CLEM_LOG("Key Dn: %02X", key_index);
             if (!adb->keyb.states[key_index]) {
                 _clem_adb_glu_queue_key(adb, key_index);
                 adb->keyb.states[key_index] = 1;
             }
             break;
         case kClemensInputType_KeyUp:
-            CLEM_LOG("Key Up: %02X", input->value);
+            if (adb->keyb.states[CLEM_ADB_KEY_RESET]) {
+                if (key_index == CLEM_ADB_KEY_F12) {
+                    key_index = CLEM_ADB_KEY_RESET;
+                }
+            }
+            CLEM_LOG("Key Up: %02X", key_index);
             if (adb->keyb.states[key_index]) {
                 _clem_adb_glu_queue_key(adb, 0x80 | key_index);
                 adb->keyb.states[key_index] = 0;
@@ -1063,22 +1080,22 @@ static uint8_t _clem_adb_read_cmd(struct ClemensDeviceADB* adb, uint8_t flags) {
 
 static uint8_t _clem_adb_read_modkeys(struct ClemensDeviceADB* adb) {
     uint8_t modkeys = 0;
-    if (adb->keyb_reg[2] & CLEM_ADB_KEY_MOD_APPLE) {
+    if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_APPLE) {
         modkeys |= 0x80;
     }
-    if (adb->keyb_reg[2] & CLEM_ADB_KEY_MOD_OPTION) {
+    if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_OPTION) {
         modkeys |= 0x40;
     }
     if (adb->is_keypad_down) {
         modkeys |= 0x10;
     }
-    if (adb->keyb_reg[2] & CLEM_ADB_KEY_CAPSLOCK) {
+    if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_CAPS) {
         modkeys |= 0x04;
     }
-    if (adb->keyb_reg[2] & CLEM_ADB_KEY_MOD_CTRL) {
+    if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_CTRL) {
         modkeys |= 0x02;
     }
-    if (adb->keyb_reg[2] & CLEM_ADB_KEY_MOD_SHIFT) {
+    if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_SHIFT) {
         modkeys |= 0x01;
     }
     if (adb->is_asciikey_down) {
@@ -1118,10 +1135,7 @@ uint8_t clem_adb_read_switch(
                    (adb->io_key_last_ascii & 0x7f);
             break;
         case CLEM_MMIO_REG_ADB_MODKEY:
-            if (adb->keyb_reg[2] & CLEM_ADB_KEY_MOD_APPLE) {
-                return _clem_adb_read_modkeys(adb);
-            }
-            break;
+            return _clem_adb_read_modkeys(adb);
         case CLEM_MMIO_REG_ADB_CMD_DATA:
             return _clem_adb_read_cmd(adb, flags);
         case CLEM_MMIO_REG_ADB_STATUS:

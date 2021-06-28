@@ -1561,6 +1561,13 @@
 "226880":"Slot 3 Peripheral RAM byte",
 "227902":"inhibit text page 2 shadowing",
 "227909":"bit 5 has no effect on the 256k board",
+"229266":"open apple status",
+"229273":"close apple status",
+"229279":"check not closed apple then simple reset",
+"229281":"check not open apple then plain reset",
+"229295":"burn-in diagnostics?",
+"229303":"if no apple key is pressed",
+"229311":"clear user reset handler",
 "229324":"Disable SRQ Keyboard?",
 "236808":"Maybe this tests ROM 01?",
 "236842":"Setup RTC registers",
@@ -3300,14 +3307,14 @@
 "LabelAnno":"None"},
 
 "229324":{
-"Label":"SUB_SELF_DIAGNOSTICS",
+"Label":"SUB_PLAIN_RESET",
 "Value":16744396,
 "Source":"User",
 "Type":"GlobalAddr",
 "LabelAnno":"None"},
 
 "229283":{
-"Label":"SUB_BURN_IN_DIAGNOSTICS",
+"Label":"SUB_RESET_REBOOT",
 "Value":16744355,
 "Source":"User",
 "Type":"GlobalAddr",
@@ -3370,7 +3377,7 @@
 "LabelAnno":"None"},
 
 "229469":{
-"Label":"skip_rom3_adb",
+"Label":"warm_boot",
 "Value":16744541,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
@@ -3834,6 +3841,20 @@
 "239094":{
 "Label":"on_vblank",
 "Value":16754166,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"229292":{
+"Label":"SUB_TMP_PLAIN_RESET",
+"Value":16744364,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"229453":{
+"Label":"cold_boot_reset",
+"Value":16744525,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},

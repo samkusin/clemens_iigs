@@ -464,6 +464,12 @@ void ClemensHost::emulate(float deltaTime)
       }
     }
     clemens_emulate(&machine_);
+    if (!breakpoints_.empty()) {
+      if (hitBreakpoint()) {
+        emulationBreak();
+        break;
+      }
+    }
 
     --emulationStepCount_;
     ++emulationStepCountSinceReset_;
@@ -473,6 +479,35 @@ void ClemensHost::emulate(float deltaTime)
   sampleDuration_ += deltaTime;
   emulationSpeedSampled_ = machineCyclesSpentDuringSample_ / (1e6 * sampleDuration_);
   emulationRunTime_ += deltaTime;
+}
+
+bool ClemensHost::hitBreakpoint() {
+  for (auto it = breakpoints_.begin(); it != breakpoints_.end(); ++it) {
+    uint16_t b_adr = (uint16_t)(it->addr & 0xffff);
+    uint8_t b_bank = (uint8_t)(it->addr >> 16);
+    bool b_adr_hit = (machine_.cpu.pins.bank == b_bank &&
+                      machine_.cpu.pins.adr == b_adr);
+    if (b_adr_hit) {
+      switch (it->op) {
+        case Breakpoint::Read:
+          if (machine_.cpu.pins.rwbOut && machine_.cpu.pins.vdaOut) {
+            return true;
+          }
+          break;
+        case Breakpoint::Write:
+          if (!machine_.cpu.pins.rwbOut && machine_.cpu.pins.vdaOut) {
+            return true;
+          }
+          break;
+        case Breakpoint::PC:
+          if (machine_.cpu.pins.vpaOut) {
+            return true;
+          }
+          break;
+      }
+    }
+  }
+  return false;
 }
 
 static const char* trimCommand(const char* buffer)
@@ -528,6 +563,12 @@ bool ClemensHost::parseCommand(const char* buffer)
       }  else if (!strncasecmp(start, "break", end - start) ||
                  !strncasecmp(start, "b", end - start)) {
         return parseCommandBreak(end);
+      } else if (!strncasecmp(start, "lbreak", end-start) ||
+               !strncasecmp(start, "lb", end - start)) {
+        return parseCommandListBreak(end);
+      } else if (!strncasecmp(start, "rbreak", end-start) ||
+               !strncasecmp(start, "rb", end - start)) {
+        return parseCommandRemoveBreak(end);
       } else if (!strncasecmp(start, "clear", end - start) ||
                  !strncasecmp(start, "c", end - start)) {
         // clear some UI states
@@ -622,7 +663,45 @@ bool ClemensHost::parseCommandBreak(const char* line) {
       char number[16];
       strncpy(number, start, std::min(sizeof(number) - 1, size_t(end - start)));
       number[15] = '\0';
-      //stepMachine(strtol(number, nullptr, 10));
+      if (size_t(end - start) > 2) {
+        unsigned addr = strtoul(&number[2], nullptr, 16);
+        if (number[0] == 'r' && number[1] == ':') {
+          breakpoints_.emplace_back(Breakpoint { Breakpoint::Read, addr });
+        } else if (number[0] == 'w' && number[1] == ':') {
+          breakpoints_.emplace_back(Breakpoint { Breakpoint::Write, addr });
+        } else if (addr != 0) {
+          breakpoints_.emplace_back(Breakpoint { Breakpoint::PC, addr });
+        } else {
+          return false;
+        }
+        return true;
+      }
+      return false;
+    });
+}
+
+bool ClemensHost::parseCommandListBreak(const char* line) {
+  const char* start = trimCommand(line);
+  FormatView fv(terminalOutput_);
+  fv.format("1");
+  fv.format("2");
+  return true;
+}
+
+bool ClemensHost::parseCommandRemoveBreak(const char* line) {
+  const char* start = trimCommand(line);
+  FormatView fv(terminalOutput_);
+  if (!start) {
+    breakpoints_.clear();
+    fv.format("Breakpoints cleared");
+    return true;
+  }
+  return parseCommandToken(start,
+    [this](const char* start, const char* end) {
+      char number[16];
+      strncpy(number, start, std::min(sizeof(number) - 1, size_t(end - start)));
+      number[15] = '\0';
+      //  TODO
       return false;
     });
 }
@@ -645,7 +724,7 @@ bool ClemensHost::parseCommandRun(const char* line)
       char number[16];
       strncpy(number, start, std::min(sizeof(number) - 1, size_t(end - start)));
       number[15] = '\0';
-      return emulationRun(strtol(number, nullptr, 16));
+      return emulationRun(strtoul(number, nullptr, 16));
     });
 }
 

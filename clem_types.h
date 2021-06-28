@@ -63,6 +63,7 @@ struct ClemensDeviceKeyboard {
     uint8_t keys[CLEM_ADB_KEYB_BUFFER_LIMIT];
     uint8_t states[CLEM_ADB_KEY_CODE_LIMIT];    // should be ascii, so 128
     int size;
+    bool reset_key;
 };
 
 struct ClemensDeviceMouse {
@@ -425,11 +426,11 @@ struct ClemensCPUPins {
     bool readyOut;                      // if false, then WAIT
     bool resbIn;                        // RESET
     bool emulation;                     // Emulation Status
-    /*
-    bool vpbOut;                        // Vector Pull
-    bool rwbOut;                        // Read/Write byte
     bool vdaOut;                        // Valid Data Address
     bool vpaOut;                        // Valid Program Address
+    bool rwbOut;                        // Read/Write byte
+    /*
+    bool vpbOut;                        // Vector Pull
     bool mlbOut;                        // Memory Lock
     */
 };
@@ -508,6 +509,9 @@ typedef struct {
      *  memory with the correct IO instructions.  Each area should be 2K in
      *  size.  As with card slot memory, slot 3 is ignored */
     uint8_t* card_slot_expansion_memory[7];
+
+    /** Internal, tracks cycle count for holding down the reset key */
+    int resb_counter;
 
     struct ClemensMMIO mmio;
     struct ClemensDriveBay active_drives;

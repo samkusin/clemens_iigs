@@ -877,6 +877,7 @@ int clemens_init(
     }
 
     _clem_init_instruction_map();
+    _clem_mmio_init(&machine->mmio, machine->clocks_step_mega2);
 
     return 0;
 }
@@ -3053,10 +3054,15 @@ void clemens_emulate(ClemensMachine* clem) {
             cpu->enabled = true;
 
             clem_disk_reset_drives(&clem->active_drives);
-            _clem_mmio_init(mmio, clem->clocks_step_mega2);
+            _clem_mmio_reset(mmio, clem->clocks_step_mega2);
             _clem_cycle(clem, 1);
         }
         _clem_cycle(clem, 1);
+        if (clem->resb_counter > 0) {
+            if (--clem->resb_counter <= 0) {
+                cpu->pins.resbIn = true;
+            }
+        }
         return;
     }
     //  RESB high during reset invokes our interrupt microcode
@@ -3143,6 +3149,11 @@ void clemens_emulate(ClemensMachine* clem) {
         clem_adb_glu_sync(&mmio->dev_adb, CLEM_MEGA2_CYCLES_PER_60TH);
         /* TODO: move sound into the frequent update loop 16khz? */
         clem_sound_glu_sync(&mmio->dev_audio, CLEM_MEGA2_CYCLES_PER_60TH);
+        if (clem->resb_counter <= 0 && mmio->dev_adb.keyb.reset_key) {
+            /* TODO: move into its own utility */
+            clem->resb_counter = 2;
+            clem->cpu.pins.resbIn = false;
+        }
         mmio->timer_60hz_us -= CLEM_MEGA2_CYCLES_PER_60TH;
     }
 
