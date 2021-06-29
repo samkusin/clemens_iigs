@@ -1417,6 +1417,11 @@ void _clem_mmio_init_page_maps(
     for (bank_idx = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT; bank_idx < 0x80; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->empty_page_map;
     }
+    /* Handles unavailable banks beyond the 0x80 bank IIgs hard RAM limit */
+    for (bank_idx = 0x80; bank_idx < 0xF0; ++bank_idx) {
+        mmio->bank_page_map[bank_idx] = &mmio->empty_page_map;
+    }
+    /* Mega II banks */
     mmio->bank_page_map[0xE0] = &mmio->mega2_main_page_map;
     mmio->bank_page_map[0xE1] = &mmio->mega2_aux_page_map;
     /* TODO: handle expansion ROM and 128K firmware ROM 01*/
