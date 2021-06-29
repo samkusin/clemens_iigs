@@ -580,22 +580,25 @@ static inline void _cpu_rol(
     bool is8
 ) {
     uint8_t p = cpu->regs.P;
+    bool next_carry;
     if (is8) {
         uint8_t v = (uint8_t)(*value);
-        if (v & 0x80) p |= kClemensCPUStatus_Carry;
-        else p &= ~kClemensCPUStatus_Carry;
+        next_carry = (v & 0x80) != 0;
         v <<= 1;
         if (p & kClemensCPUStatus_Carry) v |= 0x01;
         else v &= 0xfe;
+        if (next_carry) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
         cpu->regs.P = p;
         _cpu_p_flags_n_z_data(cpu, v);
         *value = CLEM_UTIL_set16_lo(*value, v);
     } else {
-        if (*value & 0x8000) p |= kClemensCPUStatus_Carry;
-        else p &= ~kClemensCPUStatus_Carry;
+        next_carry = (*value & 0x8000) != 0;
         *value <<= 1;
-        if (p & kClemensCPUStatus_Carry) *value |= 0x0001;
+        if (p & kClemensCPUStatus_Carry) *value |= 0x01;
         else *value &= 0xfffe;
+        if (next_carry) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
         cpu->regs.P = p;
         _cpu_p_flags_n_z_data_16(cpu, *value);
     }
@@ -630,22 +633,23 @@ static inline void _cpu_ror(
     bool is8
 ) {
     uint8_t p = cpu->regs.P;
+    bool next_carry = (*value & 0x01) != 0;
     if (is8) {
         uint8_t v = (uint8_t)(*value);
-        if (v & 0x01) p |= kClemensCPUStatus_Carry;
-        else p &= ~kClemensCPUStatus_Carry;
         v >>= 1;
         if (p & kClemensCPUStatus_Carry) v |= 0x80;
         else v &= 0x7f;
+        if (next_carry) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
         cpu->regs.P = p;
         _cpu_p_flags_n_z_data(cpu, v);
         *value = CLEM_UTIL_set16_lo(*value, v);
     } else {
-        if (*value & 0x0001) p |= kClemensCPUStatus_Carry;
-        else p &= ~kClemensCPUStatus_Carry;
         *value >>= 1;
         if (p & kClemensCPUStatus_Carry) *value |= 0x8000;
         else *value &= 0x7fff;
+        if (next_carry) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
         cpu->regs.P = p;
         _cpu_p_flags_n_z_data_16(cpu, *value);
     }

@@ -231,9 +231,9 @@ static void _clem_mmio_speed_c036_set(
     }
     if (setflags & CLEM_MMIO_SPEED_POWERED_ON) {
         if (value & CLEM_MMIO_SPEED_POWERED_ON) {
-            CLEM_LOG("C036: Power On");
+            CLEM_LOG("C036: Powered On SET");
         } else {
-            CLEM_LOG("C036: Power Off");
+            CLEM_LOG("C036: Powered On CLEARED");
         }
     }
     if (setflags & CLEM_MMIO_SPEED_DISK_FLAGS) {
@@ -1439,6 +1439,19 @@ void _clem_mmio_init_page_maps(
     _clem_mmio_memory_map(mmio, memory_flags);
 }
 
+void _clem_mmio_reset(
+    struct ClemensMMIO* mmio,
+    clem_clocks_duration_t mega2_clocks_step
+) {
+    clem_debug_reset(&mmio->dev_debug);
+    clem_timer_reset(&mmio->dev_timer);
+    clem_rtc_reset(&mmio->dev_rtc, mega2_clocks_step);
+    clem_adb_reset(&mmio->dev_adb);
+    clem_sound_reset(&mmio->dev_audio);
+    clem_vgc_init(&mmio->vgc);
+    clem_iwm_reset(&mmio->dev_iwm);
+}
+
 void _clem_mmio_init(
     struct ClemensMMIO* mmio,
     clem_clocks_duration_t mega2_clocks_step
@@ -1449,6 +1462,7 @@ void _clem_mmio_init(
     //  TODO: support enabling bank latch if we ever need to as this would be
     //        the likely value at reset (bit set to 0 vs 1)
     mmio->new_video_c029 = CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT;
+    //  TODO: ROM 01 will not use bit 6 and expect it to be cleared
     mmio->speed_c036 = CLEM_MMIO_SPEED_FAST_ENABLED |
                        CLEM_MMIO_SPEED_POWERED_ON;
     mmio->flags_c08x = 0;
@@ -1460,13 +1474,7 @@ void _clem_mmio_init(
                               CLEM_MMIO_MMAP_WRLCRAM |
                               CLEM_MMIO_MMAP_LCBANK2);
 
-    clem_debug_reset(&mmio->dev_debug);
-    clem_timer_reset(&mmio->dev_timer);
-    clem_rtc_reset(&mmio->dev_rtc, mega2_clocks_step);
-    clem_adb_reset(&mmio->dev_adb);
-    clem_sound_reset(&mmio->dev_audio);
-    clem_vgc_init(&mmio->vgc);
-    clem_iwm_reset(&mmio->dev_iwm);
+    _clem_mmio_reset(mmio, mega2_clocks_step);
 }
 
 
@@ -1534,6 +1542,9 @@ void clem_read(
         clem->cpu.pins.adr = adr;
         clem->cpu.pins.bank = bank;
         clem->cpu.pins.data = *data;
+        clem->cpu.pins.vpaOut = (flags & CLEM_MEM_FLAG_PROGRAM) != 0;
+        clem->cpu.pins.vdaOut = (flags & CLEM_MEM_FLAG_DATA) != 0;
+        clem->cpu.pins.rwbOut = true;
         _clem_mem_cycle(clem, mega2_access);
     }
 }
@@ -1598,6 +1609,9 @@ void clem_write(
         clem->cpu.pins.adr = adr;
         clem->cpu.pins.bank = bank;
         clem->cpu.pins.data = data;
+        clem->cpu.pins.vpaOut = false;
+        clem->cpu.pins.vdaOut = (mem_flags & CLEM_MEM_FLAG_DATA) != 0;
+        clem->cpu.pins.rwbOut = false;
         _clem_mem_cycle(clem, mega2_access);
     }
 }
