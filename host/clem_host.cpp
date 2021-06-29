@@ -665,9 +665,9 @@ bool ClemensHost::parseCommandBreak(const char* line) {
       number[15] = '\0';
       if (size_t(end - start) > 2) {
         unsigned addr = strtoul(&number[2], nullptr, 16);
-        if (number[0] == 'r' && number[1] == ':') {
+        if (number[0] == 'r' && number[1] == '@') {
           breakpoints_.emplace_back(Breakpoint { Breakpoint::Read, addr });
-        } else if (number[0] == 'w' && number[1] == ':') {
+        } else if (number[0] == 'w' && number[1] == '@') {
           breakpoints_.emplace_back(Breakpoint { Breakpoint::Write, addr });
         } else if (addr != 0) {
           breakpoints_.emplace_back(Breakpoint { Breakpoint::PC, addr });
@@ -683,8 +683,19 @@ bool ClemensHost::parseCommandBreak(const char* line) {
 bool ClemensHost::parseCommandListBreak(const char* line) {
   const char* start = trimCommand(line);
   FormatView fv(terminalOutput_);
-  fv.format("1");
-  fv.format("2");
+  if (breakpoints_.empty()) {
+    fv.format("No breakpoints.");
+  } else {
+    int i = 0;
+    for (auto& breakpoint : breakpoints_) {
+      fv.format("{0}: {1} @ {2:x}", i,
+        breakpoint.op == Breakpoint::PC ? "PC" :
+        breakpoint.op == Breakpoint::Read ? "Rd" :
+        breakpoint.op == Breakpoint::Write ? "Wr" : "??",
+        breakpoint.addr);
+    }
+  }
+
   return true;
 }
 

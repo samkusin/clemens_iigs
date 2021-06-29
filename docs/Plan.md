@@ -10,6 +10,8 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
+* Investigate crash - currently looking at SetWAPT during reset
+  * Look at fe/079f (this method is where we call SetWAPT again for toolset 0x16)
 * ctrl-reset handling (ADB, IRQ)
 * CLEM_MMIO_REG_VGC_IRQ_BYTE
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
