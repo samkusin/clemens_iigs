@@ -96,7 +96,7 @@ static void onInit()
   g_sokolToADBKey[SAPP_KEYCODE_TAB] = CLEM_ADB_KEY_TAB;
   g_sokolToADBKey[SAPP_KEYCODE_BACKSPACE] = CLEM_ADB_KEY_DELETE;
   g_sokolToADBKey[SAPP_KEYCODE_INSERT] = CLEM_ADB_KEY_HELP_INSERT;
-  g_sokolToADBKey[SAPP_KEYCODE_DELETE] = CLEM_ADB_KEY_PAD_DELETE;
+  g_sokolToADBKey[SAPP_KEYCODE_DELETE] = CLEM_ADB_KEY_RESET;
   g_sokolToADBKey[SAPP_KEYCODE_RIGHT] = CLEM_ADB_KEY_RIGHT;
   g_sokolToADBKey[SAPP_KEYCODE_LEFT] = CLEM_ADB_KEY_LEFT;
   g_sokolToADBKey[SAPP_KEYCODE_DOWN] = CLEM_ADB_KEY_DOWN;
@@ -142,9 +142,11 @@ static void onInit()
   g_sokolToADBKey[SAPP_KEYCODE_LEFT_SHIFT] = CLEM_ADB_KEY_LSHIFT;
   g_sokolToADBKey[SAPP_KEYCODE_LEFT_CONTROL] = CLEM_ADB_KEY_LCTRL;
   g_sokolToADBKey[SAPP_KEYCODE_LEFT_ALT] = CLEM_ADB_KEY_OPTION;
+  g_sokolToADBKey[SAPP_KEYCODE_LEFT_SUPER] = CLEM_ADB_KEY_COMMAND_APPLE;
   g_sokolToADBKey[SAPP_KEYCODE_RIGHT_SHIFT] = CLEM_ADB_KEY_RSHIFT;
   g_sokolToADBKey[SAPP_KEYCODE_RIGHT_CONTROL] = CLEM_ADB_KEY_RCTRL;
   g_sokolToADBKey[SAPP_KEYCODE_RIGHT_ALT] = CLEM_ADB_KEY_ROPTION;
+  //g_sokolToADBKey[SAPP_KEYCODE_RIGHT_SUPER] = CLEM_ADB_KEY_COMMAND_APPLE;
 
   g_Host = new ClemensHost();
 }
@@ -199,7 +201,9 @@ static void onEvent(const sapp_event* evt)
       clemInput.type = kClemensInputType_None;
       break;
   }
-  g_Host->input(clemInput);
+  if (clemInput.type != kClemensInputType_None) {
+    g_Host->input(clemInput);
+  }
 
   simgui_handle_event(evt);
 }
