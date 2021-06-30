@@ -123,10 +123,12 @@
 #define CLEM_ADB_GLU_SRQ_60HZ_CYCLES        600
 
 void clem_adb_reset(struct ClemensDeviceADB* adb) {
-    memset(adb, 0, sizeof(*adb));
     adb->version = CLEM_ADB_ROM_3;      /* TODO - input to reset? */
     adb->mode_flags = CLEM_ADB_MODE_AUTOPOLL_KEYB |
                       CLEM_ADB_MODE_AUTOPOLL_MOUSE;
+    adb->keyb.size = false;
+    adb->keyb.reset_key = false;
+    adb->keyb.size = 0;
 }
 
 static void _clem_adb_expect_data(
@@ -386,7 +388,7 @@ static uint8_t _clem_adb_glu_keyb_parse(
 
     uint8_t* ascii_table = &g_a2_to_ascii[key_index][0];
     uint16_t modifiers = adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_MODKEY_MASK;
-    uint16_t old_modifiers = modifiers & CLEM_ADB_GLU_REG2_MODKEY_MASK;
+    uint16_t old_modifiers = modifiers;
 
     if (is_key_down) {
         adb->io_key_last_a2key = key_index;
@@ -411,19 +413,21 @@ static uint8_t _clem_adb_glu_keyb_parse(
             else modifiers &= ~CLEM_ADB_GLU_REG2_KEY_CAPS;
         }
         adb->keyb_reg[2] = modifiers;
-        CLEM_LOG("SKS: mods: %04X", adb->keyb_reg[2]);
     }
     /* Additional parsing needed for MMIO registers */
-    if (modifiers & (CLEM_ADB_GLU_REG2_KEY_CTRL+CLEM_ADB_GLU_REG2_KEY_SHIFT)) {
-        ascii_key = ascii_table[3];
-    } else if (modifiers & CLEM_ADB_GLU_REG2_KEY_SHIFT) {
-        ascii_key = ascii_table[2];
+    if (modifiers & CLEM_ADB_GLU_REG2_KEY_SHIFT) {
+        if (modifiers & CLEM_ADB_GLU_REG2_KEY_CTRL) {
+            ascii_key = ascii_table[3];
+        } else {
+            ascii_key = ascii_table[2];
+        }
     } else if (modifiers & CLEM_ADB_GLU_REG2_KEY_CTRL) {
         ascii_key = ascii_table[1];
     } else {
         ascii_key = ascii_table[0];
     }
     if (ascii_key != 0xff) {
+        CLEM_LOG("SKS: ascii: %02X", ascii_key);
         if (is_key_down) {
             adb->io_key_last_ascii =  0x80 | ascii_key;
             /* via HWRef, but FWRef contradicts? */
@@ -436,7 +440,6 @@ static uint8_t _clem_adb_glu_keyb_parse(
 
     /* FIXME: sketchy - is this doing what a  modifier key latch does? */
     if ((modifiers ^ old_modifiers) && !adb->is_asciikey_down) {
-        modifiers &= CLEM_ADB_GLU_REG2_MODKEY_MASK;
         adb->has_modkey_changed = true;
     }
 
@@ -644,7 +647,7 @@ void _clem_adb_glu_set_register(
             adb->mouse_reg[device_register % 4] = ((unsigned)hi << 8) | lo;
             break;
         default:
-            CLEM_WARN("GLU read device register unsupported: %0X", address);
+            CLEM_WARN("GLU set device register unsupported: %0X", address);
             break;
     }
 }
@@ -857,28 +860,21 @@ void clem_adb_device_input(
     unsigned key_index = input->value & 0x7f;
     switch (input->type) {
         case kClemensInputType_KeyDown:
-            if (!adb->keyb.states[CLEM_ADB_KEY_RESET]) {
-                /* TODO: something else than F12?  */
-                if (key_index == CLEM_ADB_KEY_F12) {
-                    key_index = CLEM_ADB_KEY_RESET;
+            if (input->value == key_index) {    /* filter unsupported keys */
+                CLEM_LOG("Key Dn: %02X", key_index);
+                if (!adb->keyb.states[key_index]) {
+                    _clem_adb_glu_queue_key(adb, key_index);
+                    adb->keyb.states[key_index] = 1;
                 }
-            }
-            CLEM_LOG("Key Dn: %02X", key_index);
-            if (!adb->keyb.states[key_index]) {
-                _clem_adb_glu_queue_key(adb, key_index);
-                adb->keyb.states[key_index] = 1;
             }
             break;
         case kClemensInputType_KeyUp:
-            if (adb->keyb.states[CLEM_ADB_KEY_RESET]) {
-                if (key_index == CLEM_ADB_KEY_F12) {
-                    key_index = CLEM_ADB_KEY_RESET;
+            if (input->value == key_index) {    /* filter unsupported keys */
+                CLEM_LOG("Key Up: %02X", key_index);
+                if (adb->keyb.states[key_index]) {
+                    _clem_adb_glu_queue_key(adb, 0x80 | key_index);
+                    adb->keyb.states[key_index] = 0;
                 }
-            }
-            CLEM_LOG("Key Up: %02X", key_index);
-            if (adb->keyb.states[key_index]) {
-                _clem_adb_glu_queue_key(adb, 0x80 | key_index);
-                adb->keyb.states[key_index] = 0;
             }
             break;
     }

@@ -10,12 +10,17 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Investigate crash - currently looking at SetWAPT during reset
-  * Look at fe/079f (this method is where we call SetWAPT again for toolset 0x16)
-* ctrl-reset handling (ADB, IRQ)
-* CLEM_MMIO_REG_VGC_IRQ_BYTE
+* test cold reset
+* look at typing to see if there are bugs and fix them at the basic prompt
+* Border and text colors
+  * C022 Text Color Mode
+* Decimal math
+* 80 column text (PR#3)
+* First 5.25" disk boot (DOS 3.3)
+* Writable disk data
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
-* C022 Text Color Mode
+* Audio Phase I (just get the system beeps working, speaker clicks too)
+* CLEM_MMIO_REG_VGC_IRQ_BYTE
 * C01F 80COL yes/no state
 * C07F? - AN3?
 * C041 INTEN - enable Mega II, VBL, quartersec interrupts
@@ -23,11 +28,9 @@ This is a running todo list.
 * ADB Mouse Support and Data Interrupts
 * C046 phase 2 - Mouse
 * remaining //e softswitches
-* Decimal math
 * Test ROM 1
 * VGC Pass 2 : Graphics modes (not SHGR)
 * C039 Register (Serial Communications Command register )
-* Border screen color
 * Data accesses across banks are allowed (but not stack accesses?)
 * Audit Direct Page in emulation mode (wrap zero page, only if D=0000 for 6502
   instructions, but for 65816 instructions there is no wrapping?)
@@ -38,9 +41,12 @@ This is a running todo list.
 * VGC Pass 3: SHGR
 * Ensoniq!
 * ADB Mouse on Keypad Feature
+* Flashing characters
 
 ## DONE
 
+* Investigate crash - currently looking at SetWAPT during reset
+  * Look at fe/079f (this method is where we call SetWAPT again for toolset 0x16)
 * Display video
 * VGC Pass 0.1 - Find apple ii fonts to use
 * VGC Pass 0.2 - define API to access the text page
