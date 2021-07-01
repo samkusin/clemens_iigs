@@ -10,18 +10,19 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* test cold reset
-* look at typing to see if there are bugs and fix them at the basic prompt
+
+* 80 column text (PR#3)
+* C01F 80COL yes/no state
 * Border and text colors
   * C022 Text Color Mode
-* Decimal math
-* 80 column text (PR#3)
+  Decimal Math
+* VGC Pass 2 : Graphics modes (not SHGR)
 * First 5.25" disk boot (DOS 3.3)
 * Writable disk data
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
 * Audio Phase I (just get the system beeps working, speaker clicks too)
 * CLEM_MMIO_REG_VGC_IRQ_BYTE
-* C01F 80COL yes/no state
+
 * C07F? - AN3?
 * C041 INTEN - enable Mega II, VBL, quartersec interrupts
 * C047 clearing timer interrupt flags for VBL and quartersec
@@ -29,7 +30,7 @@ This is a running todo list.
 * C046 phase 2 - Mouse
 * remaining //e softswitches
 * Test ROM 1
-* VGC Pass 2 : Graphics modes (not SHGR)
+
 * C039 Register (Serial Communications Command register )
 * Data accesses across banks are allowed (but not stack accesses?)
 * Audit Direct Page in emulation mode (wrap zero page, only if D=0000 for 6502
@@ -42,9 +43,13 @@ This is a running todo list.
 * Ensoniq!
 * ADB Mouse on Keypad Feature
 * Flashing characters
+* clipboard (paste)
+
 
 ## DONE
 
+* look at typing to see if there are bugs and fix them at the basic prompt
+* test cold reset
 * Investigate crash - currently looking at SetWAPT during reset
   * Look at fe/079f (this method is where we call SetWAPT again for toolset 0x16)
 * Display video
