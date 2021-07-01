@@ -82,12 +82,12 @@ ClemensHost::ClemensHost() :
     free(tmp);
   }
 
-  display_ = new ClemensDisplay();
+  displayProvider_ = std::make_unique<ClemensDisplayProvider>();
+  display_ = std::make_unique<ClemensDisplay>(*displayProvider_);
 }
 
 ClemensHost::~ClemensHost()
 {
-  delete display_;
   void* slabMemory = slab_.getHead();
   if (slabMemory) {
     free(slabMemory);
@@ -146,9 +146,15 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   if (clemens_is_initialized(&machine_)) {
     ClemensVideo video;
     if (clemens_get_text_video(&video, &machine_)) {
-      display_->renderText(
-        video, machine_.mega2_bank_map[0], machine_.mega2_bank_map[1],
-        (machine_.mmio.vgc.mode_flags & CLEM_VGC_ALTCHARSET) ? true : false);
+      if (!(machine_.mmio.vgc.mode_flags & CLEM_VGC_80COLUMN_TEXT)) {
+        display_->renderText40Col(
+          video, machine_.mega2_bank_map[0],
+          (machine_.mmio.vgc.mode_flags & CLEM_VGC_ALTCHARSET) ? true : false);
+      } else {
+        display_->renderText80Col(
+          video, machine_.mega2_bank_map[0], machine_.mega2_bank_map[1],
+          (machine_.mmio.vgc.mode_flags & CLEM_VGC_ALTCHARSET) ? true : false);
+      }
     }
   }
 
@@ -163,7 +169,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     ImTextureID texId { (void *)((uintptr_t)display_->getScreenTarget().id) };
     ImVec2 p = ImGui::GetCursorScreenPos();
     ImVec2 avail = ImGui::GetWindowContentRegionMax();
-    ImVec2 display_uv(280.0f/1024, 192.0f/256);
+    ImVec2 display_uv(560.0f/1024, 384.0f/512);
     ImGui::GetWindowDrawList()->AddImage(
       texId,
       p, ImVec2(p.x + 560, p.y + 384),
