@@ -3186,7 +3186,6 @@ ClemensVideo* clemens_get_text_video(
     } else {
         return NULL;
     }
-    // TODO: support the alternate text character set
     video->format = kClemensVideoFormat_Text;
     video->scanline_byte_cnt = 40;
     if ((clem->mmio.mmap_register & CLEM_MMIO_MMAP_TXTPAGE2) &&

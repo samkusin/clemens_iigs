@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <vector>
 #include <array>
+#include <memory>
 
 struct ClemensHostInputEvent
 {
@@ -24,6 +25,7 @@ struct ClemensHostInputEvent
 };
 
 class ClemensDisplay;
+class ClemensDisplayProvider;
 
 
 class ClemensHost
@@ -129,7 +131,8 @@ private:
 
   std::vector<char> terminalOutput_;
 
-  ClemensDisplay* display_;
+  std::unique_ptr<ClemensDisplayProvider> displayProvider_;
+  std::unique_ptr<ClemensDisplay> display_;
 };
 
 

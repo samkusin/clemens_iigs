@@ -29,20 +29,21 @@ static const int kDisplayTextColumnLimit = 80;
 static const int kDisplayTextRowLimit = 24;
 
 static stbtt_bakedchar kGlyphSet40col[512];
+static stbtt_bakedchar kGlyphSet80col[512];
 
 static unsigned kPrimarySetToGlyph[256];
 static unsigned kAlternateSetToGlyph[256];
 
 
-static int kFontTextureSize = 256;
+static int kFontTextureWidth = 512;
+static int kFontTextureHeight = 256;
 
-ClemensDisplay::ClemensDisplay() :
-  systemFontImage_ {}
+static sg_image loadFont(const char* pathname, stbtt_bakedchar* glyphSet)
 {
-  //  TODO: move font load and setup into a shared class or static data
-  FILE* fp = fopen("fonts/PrintChar21.ttf", "rb");
+//  TODO: move font load and setup into a shared class or static data
+  FILE* fp = fopen(pathname, "rb");
   if (!fp) {
-    return;
+    return sg_image{};
   }
   fseek(fp, 0, SEEK_END);
 
@@ -53,14 +54,36 @@ ClemensDisplay::ClemensDisplay() :
   fclose(fp);
 
   unsigned char *textureData = (unsigned char *)malloc(
-    kFontTextureSize * kFontTextureSize);
+    kFontTextureWidth * kFontTextureHeight);
 
-  stbtt_BakeFontBitmap(buf, 0, 8.0f,
-                       textureData, kFontTextureSize, kFontTextureSize,
+  stbtt_BakeFontBitmap(buf, 0, 16.0f,
+                       textureData, kFontTextureWidth, kFontTextureHeight,
                        0xe000, 512,
-                       kGlyphSet40col);
+                       glyphSet);
 
-  //  map screen byte code to glyph index (40 column)
+  sg_image_desc imageDesc = {};
+  imageDesc.width = kFontTextureWidth;
+  imageDesc.height = kFontTextureHeight;
+  imageDesc.pixel_format = SG_PIXELFORMAT_R8;
+  imageDesc.min_filter = SG_FILTER_LINEAR;
+  imageDesc.mag_filter = SG_FILTER_LINEAR;
+  imageDesc.usage = SG_USAGE_IMMUTABLE;
+  imageDesc.data.subimage[0][0].ptr = textureData;
+  imageDesc.data.subimage[0][0].size = imageDesc.width * imageDesc.height;
+  sg_image fontImage = sg_make_image(imageDesc);
+
+  free(buf);
+  free(textureData);
+
+  return fontImage;
+}
+
+
+ClemensDisplayProvider::ClemensDisplayProvider() {
+  systemFontImage_ = loadFont("fonts/PrintChar21.ttf", kGlyphSet40col);
+  systemFontImageHi_ = loadFont("fonts/PRNumber3.ttf", kGlyphSet80col);
+
+  //  map screen byte code to glyph index
   //    a 32-bit word split into two 16-bit half-words.  half-word values will
   //    differ if the character code is flashing
   for (int i = 0; i < 0x20; ++i) {
@@ -82,20 +105,6 @@ ClemensDisplay::ClemensDisplay() :
     kAlternateSetToGlyph[i + 0xC0] =  (0x40 + i)  | ((0x40 + i) << 16);
     kAlternateSetToGlyph[i + 0xE0] =  (0x60 + i)  | ((0x60 + i) << 16);
   }
-
-  sg_image_desc imageDesc = {};
-  imageDesc.width = 256;
-  imageDesc.height = 256;
-  imageDesc.pixel_format = SG_PIXELFORMAT_R8;
-  imageDesc.min_filter = SG_FILTER_LINEAR;
-  imageDesc.mag_filter = SG_FILTER_LINEAR;
-  imageDesc.usage = SG_USAGE_IMMUTABLE;
-  imageDesc.data.subimage[0][0].ptr = textureData;
-  imageDesc.data.subimage[0][0].size = imageDesc.width * imageDesc.height;
-  systemFontImage_ = sg_make_image(imageDesc);
-
-  free(buf);
-  free(textureData);
 
 
   //  create shader
@@ -121,6 +130,18 @@ ClemensDisplay::ClemensDisplay() :
   renderPipelineDesc.face_winding = SG_FACEWINDING_CCW;
   renderPipelineDesc.depth.pixel_format = SG_PIXELFORMAT_NONE;
   textPipeline_ = sg_make_pipeline(renderPipelineDesc);
+}
+
+ClemensDisplayProvider::~ClemensDisplayProvider() {
+  sg_destroy_pipeline(textPipeline_);
+  sg_destroy_shader(textShader_);
+  sg_destroy_image(systemFontImageHi_);
+  sg_destroy_image(systemFontImage_);
+}
+
+ClemensDisplay::ClemensDisplay(ClemensDisplayProvider& provider) :
+  provider_(provider)
+{
 
   //  This data is specific to display and should be instanced per display
   sg_buffer_desc vertexBufDesc = { };
@@ -134,7 +155,7 @@ ClemensDisplay::ClemensDisplay() :
   sg_image_desc renderTargetDesc = {};
   renderTargetDesc.render_target = true;
   renderTargetDesc.width = 1024;
-  renderTargetDesc.height = 256;
+  renderTargetDesc.height = 512;
   renderTargetDesc.min_filter = SG_FILTER_LINEAR;
   renderTargetDesc.mag_filter = SG_FILTER_LINEAR;
   renderTargetDesc.sample_count = 1;
@@ -150,58 +171,92 @@ ClemensDisplay::~ClemensDisplay()
   sg_destroy_pass(screenPass_);
   sg_destroy_image(screenTarget_);
   sg_destroy_buffer(textVertexBuffer_);
-
-  sg_destroy_pipeline(textPipeline_);
-  sg_destroy_shader(textShader_);
-  sg_destroy_image(systemFontImage_);
 }
 
 
-bool ClemensDisplay::renderText(
+void ClemensDisplay::renderText40Col(
   const ClemensVideo& video,
   const uint8_t* mainMemory,
-  const uint8_t* auxMemory,
+  bool useAlternateCharacterSet
+) {
+  sg_pass_action passAction = {};
+  passAction.colors[0].action = SG_ACTION_CLEAR;
+  passAction.colors[0].value = { 0.0f, 0.0f, 0.0f, 1.0f };
+  sg_begin_pass(screenPass_, &passAction);
+  renderTextPlane(video, 40, mainMemory, 0, useAlternateCharacterSet);
+  sg_end_pass();
+}
+
+void ClemensDisplay::renderText80Col(
+  const ClemensVideo& video,
+  const uint8_t* mainMemory, const uint8_t* auxMemory,
+  bool useAlternateCharacterSet
+) {
+  sg_pass_action passAction = {};
+  passAction.colors[0].action = SG_ACTION_CLEAR;
+  passAction.colors[0].value = { 0.0f, 0.0f, 0.0f, 1.0f };
+  sg_begin_pass(screenPass_, &passAction);
+  renderTextPlane(video, 80, auxMemory, 0, useAlternateCharacterSet);
+  renderTextPlane(video, 80, mainMemory, 1, useAlternateCharacterSet);
+  sg_end_pass();
+}
+
+
+void ClemensDisplay::renderTextPlane(
+  const ClemensVideo& video,
+  int columns,
+  const uint8_t* memory,
+  int phase,
   bool useAlternateCharacterSet
 ) {
   if (video.format != kClemensVideoFormat_Text &&
       video.format != kClemensVideoFormat_Text_Alternate
   ) {
-    return false;
+    return;
   }
 
-  sg_pass_action passAction = {};
-  passAction.colors[0].action = SG_ACTION_CLEAR;
-  passAction.colors[0].value = { 0.0f, 0.0f, 0.0f, 1.0f };
+  const int kPhaseCount = columns / 40;
+  float emulatorDisplayDims[2] = { 560, 384 };
+
+  DisplayVertexParams vertexParams;
+  vertexParams.virtual_dims[0] = columns;
+  vertexParams.virtual_dims[1] = 24;
+  vertexParams.display_ratio[0] = emulatorDisplayDims[0] / vertexParams.virtual_dims[0];
+  vertexParams.display_ratio[1] = emulatorDisplayDims[1] / vertexParams.virtual_dims[1];
+  vertexParams.render_dims[0] = 1024;
+  vertexParams.render_dims[1] = 512;
+
+  stbtt_bakedchar* glyphSet;
 
   sg_bindings textBindings_ = {};
   textBindings_.vertex_buffers[0] = textVertexBuffer_;
-  textBindings_.fs_images[0] = systemFontImage_;
-
-  DisplayVertexParams vertexParams;
-  vertexParams.render_dims[0] = 1024;
-  vertexParams.render_dims[1] = 256;
-  vertexParams.virtual_dims[0] = 40;
-  vertexParams.virtual_dims[1] = 24;
-  vertexParams.display_ratio[0] = 280 / vertexParams.virtual_dims[0];
-  vertexParams.display_ratio[1] = 192 / vertexParams.virtual_dims[1];
+  if (columns == 80) {
+    textBindings_.fs_images[0] = provider_.systemFontImageHi_;
+    glyphSet = kGlyphSet80col;
+  } else {
+    textBindings_.fs_images[0] = provider_.systemFontImage_;
+    glyphSet = kGlyphSet40col;
+  }
 
   sg_range rangeParam;
   rangeParam.ptr = &vertexParams;
   rangeParam.size = sizeof(vertexParams);
 
+  sg_pass_action passAction = {};
+  passAction.colors[0].action = SG_ACTION_CLEAR;
+  passAction.colors[0].value = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-  DrawVertex vertices[80 * 6];
+  DrawVertex vertices[40 * 6];
   sg_range verticesRange;
   verticesRange.ptr = &vertices[0];
   verticesRange.size = video.scanline_byte_cnt * 6 * sizeof(DrawVertex);
 
-  sg_begin_pass(screenPass_, &passAction);
-  sg_apply_pipeline(textPipeline_);
+  sg_apply_pipeline(provider_.textPipeline_);
   sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, rangeParam);
 
   for (int i = 0; i < video.scanline_count; ++i) {
     int row = i + video.scanline_start;
-    const uint8_t* scanline = mainMemory + video.scanlines[row].offset;
+    const uint8_t* scanline = memory + video.scanlines[row].offset;
     auto* vertex = &vertices[0];
     for (int j = 0; j < video.scanline_byte_cnt; ++j) {
       //  TODO: handle flashing chars
@@ -212,11 +267,11 @@ bool ClemensDisplay::renderText(
         glyphIndex =  kPrimarySetToGlyph[scanline[j]];
       }
       glyphIndex &= 0xffff;
-      auto* glyph = &kGlyphSet40col[glyphIndex];
+      auto* glyph = &glyphSet[glyphIndex];
       stbtt_aligned_quad quad;
-      float xpos = j * vertexParams.display_ratio[0];
+      float xpos = ((j * kPhaseCount) + phase) * vertexParams.display_ratio[0];
       float ypos = row * vertexParams.display_ratio[1] + (vertexParams.display_ratio[1] - 1);
-      stbtt_GetBakedQuad(kGlyphSet40col, 256, 256, glyphIndex, &xpos, &ypos, &quad, 1);
+      stbtt_GetBakedQuad(glyphSet, kFontTextureWidth, kFontTextureHeight, glyphIndex, &xpos, &ypos, &quad, 1);
       float l = quad.x0 / vertexParams.display_ratio[0];
       float r = quad.x1 / vertexParams.display_ratio[0];
       float t = quad.y0 / vertexParams.display_ratio[1];
@@ -234,8 +289,4 @@ bool ClemensDisplay::renderText(
     sg_apply_bindings(textBindings_);
     sg_draw(0, 6 * video.scanline_byte_cnt, 1);
   }
-
-  sg_end_pass();
-
-  return true;
 }
