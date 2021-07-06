@@ -427,7 +427,7 @@ static uint8_t _clem_adb_glu_keyb_parse(
         ascii_key = ascii_table[0];
     }
     if (ascii_key != 0xff) {
-        CLEM_LOG("SKS: ascii: %02X", ascii_key);
+        //CLEM_LOG("SKS: ascii: %02X", ascii_key);
         if (is_key_down) {
             adb->io_key_last_ascii =  0x80 | ascii_key;
             /* via HWRef, but FWRef contradicts? */
@@ -861,7 +861,7 @@ void clem_adb_device_input(
     switch (input->type) {
         case kClemensInputType_KeyDown:
             if (input->value == key_index) {    /* filter unsupported keys */
-                CLEM_LOG("Key Dn: %02X", key_index);
+                //CLEM_LOG("Key Dn: %02X", key_index);
                 if (!adb->keyb.states[key_index]) {
                     _clem_adb_glu_queue_key(adb, key_index);
                     adb->keyb.states[key_index] = 1;
@@ -870,7 +870,7 @@ void clem_adb_device_input(
             break;
         case kClemensInputType_KeyUp:
             if (input->value == key_index) {    /* filter unsupported keys */
-                CLEM_LOG("Key Up: %02X", key_index);
+                //CLEM_LOG("Key Up: %02X", key_index);
                 if (adb->keyb.states[key_index]) {
                     _clem_adb_glu_queue_key(adb, 0x80 | key_index);
                     adb->keyb.states[key_index] = 0;
@@ -1119,17 +1119,17 @@ uint8_t clem_adb_read_switch(
             /* FIXME: HWRef says this is cleared when reading here */
             if (!is_noop) {
                 adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
+                //CLEM_LOG("c0%02x: %02X", ioreg, adb->io_key_last_ascii);
             }
             return adb->io_key_last_ascii;
-            break;
         case CLEM_MMIO_REG_ANYKEY_STROBE:
             /* clear strobe bit and return any-key status */
             if (!is_noop) {
                 adb->io_key_last_ascii &= ~0x80;
+                //CLEM_LOG("c0%02x: %02X", ioreg, adb->io_key_last_ascii & 0x7f);
             }
             return (adb->is_asciikey_down ? 0x80 : 0x00) |
                    (adb->io_key_last_ascii & 0x7f);
-            break;
         case CLEM_MMIO_REG_ADB_MODKEY:
             return _clem_adb_read_modkeys(adb);
         case CLEM_MMIO_REG_ADB_CMD_DATA:

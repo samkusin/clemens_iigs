@@ -145,6 +145,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   }
   if (clemens_is_initialized(&machine_)) {
     ClemensVideo video;
+    display_->start();
     if (clemens_get_text_video(&video, &machine_)) {
       if (!(machine_.mmio.vgc.mode_flags & CLEM_VGC_80COLUMN_TEXT)) {
         display_->renderText40Col(
@@ -156,6 +157,12 @@ void ClemensHost::frame(int width, int height, float deltaTime)
           (machine_.mmio.vgc.mode_flags & CLEM_VGC_ALTCHARSET) ? true : false);
       }
     }
+    if (clemens_get_graphics_video(&video, &machine_)) {
+      if (machine_.mmio.vgc.mode_flags & CLEM_VGC_HIRES) {
+        display_->renderHiresGraphics(video, machine_.mega2_bank_map[0]);
+      }
+    }
+    display_->finish();
   }
 
   ImGui::SetNextWindowPos(ImVec2(512, 32), ImGuiCond_FirstUseEver);

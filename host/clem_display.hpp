@@ -35,7 +35,9 @@ private:
   sg_image systemFontImage_;
   sg_image systemFontImageHi_;
   sg_shader textShader_;
+  sg_shader hiresShader_;
   sg_pipeline textPipeline_;
+  sg_pipeline hiresPipeline_;
 };
 
 // all rendering occurs to an offscreen render target that will be rendered
@@ -47,12 +49,21 @@ public:
   ~ClemensDisplay();
 
 
+  void start();
+  void finish();
+
+  //  all memory blocks passed to render functions are assumed to be 64K banks
+  //  from the emulator.  The 'video' structures represent scanline data
+  //  containing offsets into these banks.
+  //
   void renderText40Col(const ClemensVideo& video,
     const uint8_t* mainMemory,
     bool useAlternateCharacterSet);
   void renderText80Col(const ClemensVideo& video,
     const uint8_t* mainMemory, const uint8_t* auxMemory,
     bool useAlternateCharacterSet);
+
+  void renderHiresGraphics(const ClemensVideo& video, const uint8_t* memory);
 
 
   // Returns the color texture for the display for rendering
@@ -68,8 +79,13 @@ private:
   using DisplayVertexParams = ClemensDisplayVertexParams;
 
   sg_buffer textVertexBuffer_;
+  sg_buffer vertexBuffer_;
+  sg_image colorArray_;
+  sg_image graphicsTarget_;
   sg_image screenTarget_;
   sg_pass screenPass_;
+
+  uint8_t* emulatorVideoBuffer_;
 };
 
 #endif

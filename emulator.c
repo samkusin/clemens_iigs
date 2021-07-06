@@ -3177,12 +3177,12 @@ ClemensVideo* clemens_get_text_video(
     ClemensMachine* clem
 ) {
     struct ClemensVGC* vgc = &clem->mmio.vgc;
-    if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
-        video->scanline_count = 4;
-        video->scanline_start = 20;
-    } else if (!(vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE)) {
+    if (!(vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE)) {
         video->scanline_count = 24;
         video->scanline_start = 0;
+    } else if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
+        video->scanline_count = 4;
+        video->scanline_start = 20;
     } else {
         return NULL;
     }

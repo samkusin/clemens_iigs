@@ -1567,6 +1567,10 @@ void clem_write(
     uint16_t offset = ((uint16_t)page->write << 8) | (adr & 0xff);
     bool mega2_access = false;
 
+    if (bank == 0x00 && adr >= 0x2000 && adr <= 0x2001) {
+        CLEM_LOG("%04X: %02X", adr, data);
+    }
+
     if (page->flags & CLEM_MMIO_IO_MEMORY) {
         if (page->flags & CLEM_MMIO_PAGE_IOADDR) {
             if (page->flags & CLEM_MMIO_PAGE_WRITE_OK) {
