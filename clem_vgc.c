@@ -53,36 +53,35 @@ void clem_vgc_init(struct ClemensVGC* vgc) {
     */
     line = &vgc->hgr_1_scanlines[0];
     offset = 0x2000;
-    for (row = 0; row < 8; ++row, ++line) {
-        for (inner = 0; inner < 8; ++inner) {
-            line[0+inner].offset = offset + inner*1024;
-            line[0+inner].meta = 0;
+    for (row = 0; row < 8; ++row) {
+        line[0 + row * 8].offset = offset + row * 128;
+        line[0 + row * 8].meta = 0;
+        line[64 + row * 8].offset = (offset + 0x28) + row * 128;
+        line[64 + row * 8].meta = 0;
+        line[128 + row * 8].offset = (offset + 0x50) + row * 128;
+        line[128 + row * 8].meta = 0;
+    }
+    for (row = 0; row < 24; ++row) {
+        for (inner = 1; inner < 8; ++inner) {
+            line[row * 8 + inner].offset = line[row * 8 + (inner - 1)].offset + 0x400;
+            line[row * 8 + inner].meta = 0;
         }
-        for (inner = 0; inner < 8; ++inner) {
-            line[64+inner].offset = offset + 40 + inner*1024;
-            line[64+inner].meta = 0;
-        }
-        for (inner = 0; inner < 8; ++inner) {
-            line[128+inner].offset = offset + 80 + inner*1024;
-            line[128+inner].meta = 0;
-        }
-        offset += 128;
     }
     line = &vgc->hgr_2_scanlines[0];
-    for (row = 0; row < 8; ++row, ++line) {
-        for (inner = 0; inner < 8; ++inner) {
-            line[0+inner].offset = offset + inner*1024;
-            line[0+inner].meta = 0;
+    offset = 0x4000;
+    for (row = 0; row < 8; ++row) {
+        line[0 + row * 8].offset = offset + row * 128;
+        line[0 + row * 8].meta = 0;
+        line[64 + row * 8].offset = (offset + 0x28) + row * 128;
+        line[64 + row * 8].meta = 0;
+        line[128 + row * 8].offset = (offset + 0x50) + row * 128;
+        line[128 + row * 8].meta = 0;
+    }
+    for (row = 0; row < 24; ++row) {
+        for (inner = 1; inner < 8; ++inner) {
+            line[row * 8 + inner].offset = line[row * 8 + (inner - 1)].offset + 0x400;
+            line[row * 8 + inner].meta = 0;
         }
-        for (inner = 0; inner < 8; ++inner) {
-            line[64+inner].offset = offset + 40 + inner*1024;
-            line[64+inner].meta = 0;
-        }
-        for (inner = 0; inner < 8; ++inner) {
-            line[128+inner].offset = offset + 80 + inner*1024;
-            line[128+inner].meta = 0;
-        }
-        offset += 128;
     }
     line = &vgc->shgr_scanlines[0];
     offset = 0x2000;
@@ -95,7 +94,7 @@ void clem_vgc_init(struct ClemensVGC* vgc) {
 
 void clem_vgc_set_mode(struct ClemensVGC* vgc, unsigned mode_flags) {
     if (mode_flags & CLEM_VGC_RESOLUTION_MASK) {
-        mode_flags &= ~CLEM_VGC_RESOLUTION_MASK;
+        clem_vgc_clear_mode(vgc, CLEM_VGC_RESOLUTION_MASK);
     }
     vgc->mode_flags |= mode_flags;
 }

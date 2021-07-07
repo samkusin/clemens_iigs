@@ -10,8 +10,7 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-
-* 80 column text (PR#3)
+* HGR -> TEXT does not restore text mode?
 * C01F 80COL yes/no state
 * Border and text colors
   * C022 Text Color Mode
@@ -48,6 +47,7 @@ This is a running todo list.
 
 ## DONE
 
+* 80 column text (PR#3)
 * look at typing to see if there are bugs and fix them at the basic prompt
 * test cold reset
 * Investigate crash - currently looking at SetWAPT during reset
