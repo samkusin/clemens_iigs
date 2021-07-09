@@ -96,6 +96,8 @@ private:
   //  0x00xxxxxx, run PC target (if never hit, runs indefinitely)
   uint32_t emulationRunTarget_;
 
+  bool emulatorHasKeyboardFocus_;
+
   struct Breakpoint {
     enum Op {
       Read,
