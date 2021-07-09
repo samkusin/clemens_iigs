@@ -10,6 +10,8 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
+* Debug monitor set memory bug:
+  * Look at parameters coming in to ff/ff82 when inputting 2000:01
 * HGR -> TEXT does not restore text mode?
 * C01F 80COL yes/no state
 * Border and text colors

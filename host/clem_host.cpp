@@ -53,6 +53,7 @@ ClemensHost::ClemensHost() :
   sampleDuration_(0.0f),
   emulationSpeedSampled_(0.0f),
   emulationRunTarget_(0xffffffff),
+  emulatorHasKeyboardFocus_(false),
   cpuRegsSaved_ {},
   cpuPinsSaved_ {},
   cpu6502EmulationSaved_(true),
@@ -131,7 +132,7 @@ void ClemensHost::emulatorImguiMemoryWrite(
 
 void ClemensHost::input(const ClemensInputEvent& input)
 {
-  if (isRunningEmulation()) {
+  if (isRunningEmulation() && emulatorHasKeyboardFocus_) {
     clemens_input(&machine_, &input);
   }
 }
@@ -170,6 +171,13 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   ImGui::Begin("Display", nullptr, ImGuiWindowFlags_NoResize |
                                    ImGuiWindowFlags_NoCollapse |
                                    ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+  if (ImGui::IsWindowFocused()) {
+    ImGui::SetKeyboardFocusHere(0);
+    emulatorHasKeyboardFocus_ = true;
+  } else {
+    emulatorHasKeyboardFocus_ = false;
+  }
 
   if (clemens_is_initialized(&machine_)) {
     ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);   // No tint

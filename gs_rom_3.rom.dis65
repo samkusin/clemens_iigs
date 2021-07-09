@@ -89,6 +89,23 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"IO_80COLTEST_E1_c01f":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_80COLTEST_E1_c01f",
+"Value":14794783,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "IO_ADB_KEYDATA_C000":{
 "DataDescriptor":{
 "Length":1,
@@ -136,6 +153,23 @@
 "MultiMask":null,
 "Label":"IO_ADB_LANGSEL_E1_C02B",
 "Value":14794795,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_ALTCHARSET_TEST_E1_c01e":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_ALTCHARSET_TEST_E1_c01e",
+"Value":14794782,
 "Source":"Project",
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
@@ -272,6 +306,23 @@
 "MultiMask":null,
 "Label":"IO_KEYB_E1_C000",
 "Value":14794752,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_KEYSTROBE_E1_c010":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_KEYSTROBE_E1_c010",
+"Value":14794768,
 "Source":"Project",
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
@@ -612,6 +663,23 @@
 "MultiMask":null,
 "Label":"IO_SHADOW_E1_C035",
 "Value":14794805,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_SLOTCXROM_c006":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_SLOTCXROM_c006",
+"Value":14794758,
 "Source":"Project",
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
@@ -1472,6 +1540,11 @@
 "Hint":"Code"},
 
 {
+"Low":236577,
+"High":236577,
+"Hint":"Code"},
+
+{
 "Low":236735,
 "High":236735,
 "Hint":"Code"},
@@ -1532,6 +1605,11 @@
 "Hint":"Code"},
 
 {
+"Low":240042,
+"High":240042,
+"Hint":"Code"},
+
+{
 "Low":240120,
 "High":240120,
 "Hint":"Code"},
@@ -1577,6 +1655,11 @@
 "Hint":"Code"},
 
 {
+"Low":242251,
+"High":242251,
+"Hint":"Code"},
+
+{
 "Low":242288,
 "High":242288,
 "Hint":"Code"},
@@ -1592,8 +1675,28 @@
 "Hint":"Code"},
 
 {
+"Low":242576,
+"High":242576,
+"Hint":"Code"},
+
+{
+"Low":242603,
+"High":242603,
+"Hint":"Code"},
+
+{
 "Low":242669,
 "High":242669,
+"Hint":"Code"},
+
+{
+"Low":242739,
+"High":242739,
+"Hint":"Code"},
+
+{
+"Low":242778,
+"High":242778,
 "Hint":"Code"},
 
 {
@@ -1694,6 +1797,11 @@
 {
 "Low":260304,
 "High":260304,
+"Hint":"Code"},
+
+{
+"Low":260309,
+"High":260309,
 "Hint":"Code"},
 
 {
@@ -1847,6 +1955,11 @@
 "Hint":"Code"},
 
 {
+"Low":261643,
+"High":261643,
+"Hint":"Code"},
+
+{
 "Low":261663,
 "High":261663,
 "Hint":"Code"},
@@ -1962,6 +2075,7 @@
 "236737":2097424,
 "238899":304,
 "239345":304,
+"242251":3145984,
 "244055":304,
 "244080":3408328,
 "244248":304,
@@ -2023,6 +2137,13 @@
 "236846":"Some kind of disk access - maybe boot?",
 "239015":"Use alternate character display set",
 "239072":"Open/Closed Apple Control-N",
+"242275":"is A a digit?",
+"242582":"pointer to line R",
+"242590":"loads number of text columns?",
+"242594":"increment row counter",
+"242595":"compares against number of text rows",
+"242600":"increment $28/$29 pointer to next line",
+"242603":"copy text from line R to line R-1",
 "244013":"Maybe this is the default BRAM table?",
 "244025":"blank param?",
 "244034":"$A0-$C0 if self diagnostics set to $FF",
@@ -2060,6 +2181,9 @@
 "244772":"Set border color",
 "244778":"Resets chargen to english and NTSC",
 "244783":"Set text display + NTSC/PAL switches",
+"249249":"in 80 column mode?",
+"249759":"checks if EventManager is active",
+"249767":"if active, then do something else?",
 "260096":"Lores plot",
 "260110":"Lores modify plot",
 "260121":"Lores draw horizontal line",
@@ -2069,6 +2193,7 @@
 "260191":"Lores Increment color by 3",
 "260196":"Set lores graphics color",
 "260209":"Read lores graphics screen ",
+"260232":"might parse the monitor input buffer?",
 "260236":"LDA (PCL,X) then Calculate length of instruciton",
 "260238":"Calculate length of 6502 instruction",
 "260304":"Display disassembled instruction",
@@ -2099,7 +2224,7 @@
 "260955":"Vertical Tab",
 "260960":"Display Apple IIGS",
 "260975":"Create powerup byte",
-"260984":"Check for pause request (key)",
+"260984":"Check for enter key",
 "261000":"Wait for keypress",
 "261043":"ID byte Apple iie enhanced or later",
 "261055":"ID byte Apple iie enhanced or later",
@@ -2124,21 +2249,30 @@
 "261300":"Increment A4 Pointer (A4L, A4H)",
 "261306":"Increment A1 Pointer (A1L, A1H)",
 "261321":"Obsolete",
+"261326":"is input \u003c \u0027a\u0027",
+"261330":"input \u003e= \u0027{\u0027",
+"261334":"input == [a-z]",
 "261388":"Get an input character and display old cursor",
 "261392":"\"FD10\"",
 "261400":"Get an input character",
 "261403":"Read the keyboard",
 "261429":"Get an input character and process escape codes",
+"261432":"escape pressed?",
 "261479":"Get an input line after CR",
 "261482":"Get an input line with prompt",
 "261484":"Get an input line with prompt (alt)",
 "261487":"Get an input line with no prompt",
+"261496":"right arrow?",
+"261511":"return key?",
 "261515":"Clear to end of line and CR",
 "261518":"Print CR",
 "261522":"Print CR and A1L/A1H",
+"261566":"A = Del key?",
+"261587":"Store keypress into buffer",
 "261594":"Output a hex byte",
 "261603":"Output hex digit",
 "261616":"Output character to screen",
+"261617":"space?",
 "261622":"Output character to screen without inv mask",
 "261663":"Return Identification of System (iigs sig)",
 "261676":"Monitor Move (Original Version)",
@@ -2424,6 +2558,36 @@
 
 "132052":{
 "Text":"This block seems to call reset on a bunch of tools in sequence",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"242582":{
+"Text":"Scroll screen text up one line\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"248910":{
+"Text":"Clears the line (40/80) columns at ($28)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"249776":{
+"Text":"Event manager is active, then do something?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"249669":{
+"Text":"A key was pressed in the monitor?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"261322":{
+"Text":"Scanning the input buffer",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -3483,11 +3647,11 @@
 "LabelAnno":"Generated"},
 
 "242288":{
-"Label":"TFFB270",
+"Label":"SUB_TOOL_94_MONITOR",
 "Value":16757360,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Generated"},
+"LabelAnno":"None"},
 
 "238601":{
 "Label":"TFFA409",
@@ -3987,11 +4151,11 @@
 "LabelAnno":"Generated"},
 
 "242576":{
-"Label":"TFFB390",
+"Label":"SUB_TOOL_SCROLL_ONE_LINE",
 "Value":16757648,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Generated"},
+"LabelAnno":"None"},
 
 "242739":{
 "Label":"TFFB433",
@@ -4551,6 +4715,132 @@
 "Value":16648086,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"242612":{
+"Label":"done",
+"Value":16757684,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"249255":{
+"Label":"is_80_column",
+"Value":16764327,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"248420":{
+"Label":"SUB_TXT_PTR_TO_NEXT_LINE",
+"Value":16763492,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"249239":{
+"Label":"SUB_TXT_INC_PTR_DP_28",
+"Value":16764311,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"249244":{
+"Label":"SUB_TXT_INC_PTR_DP_28_2",
+"Value":16764316,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"248910":{
+"Label":"SUB_TXT_SETCHARS_AT_DP_28",
+"Value":16763982,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"242741":{
+"Label":"SUB_TXT_CLRLINE_AT_DP_28",
+"Value":16757813,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"262102":{
+"Label":"SUB_RESTORE_SPEED_TO_SETTING",
+"Value":16777174,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"249748":{
+"Label":"SUB_TMP_POLL_KEY",
+"Value":16764820,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"Uncertain"},
+
+"249596":{
+"Label":"SUB_POLL_KEY",
+"Value":16764668,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"Uncertain"},
+
+"249331":{
+"Label":"SUB_TMP_TXT_CURSOR_FLASH",
+"Value":16764403,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"Uncertain"},
+
+"249675":{
+"Label":"no_keypress",
+"Value":16764747,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"249715":{
+"Label":"key_not_pressed",
+"Value":16764787,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"249707":{
+"Label":"key_pressed",
+"Value":16764779,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"249716":{
+"Label":"SUB_TMP_READ_KEY",
+"Value":16764788,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"226972":{
+"Label":"exit",
+"Value":16742044,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"261587":{
+"Label":"buffer_key",
+"Value":16776659,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"261566":{
+"Label":"SUB_TMP_BUFFER_KEY_OR_DELETE",
+"Value":16776638,
+"Source":"User",
+"Type":"GlobalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -4707,7 +4997,7 @@
 "Format":"NumericLE",
 "SubFormat":"Symbol",
 "SymbolRef":{
-"Label":"TFFB390",
+"Label":"SUB_TOOL_SCROLL_ONE_LINE",
 "Part":"Low"}},
 
 "226948":{
@@ -4939,7 +5229,7 @@
 "Format":"NumericLE",
 "SubFormat":"Symbol",
 "SymbolRef":{
-"Label":"TFFB270",
+"Label":"SUB_TOOL_94_MONITOR",
 "Part":"Low"}},
 
 "227036":{
@@ -5067,6 +5357,14 @@
 "Format":"NumericLE",
 "SubFormat":"None",
 "SymbolRef":null},
+
+"240065":{
+"Length":3,
+"Format":"NumericLE",
+"SubFormat":"Symbol",
+"SymbolRef":{
+"Label":"SUB_EMULATION_MODE",
+"Part":"Low"}},
 
 "260865":{
 "Length":1,
