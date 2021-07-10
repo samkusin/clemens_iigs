@@ -485,6 +485,14 @@ typedef struct {
     enum ClemensVideoFormat format;
 } ClemensVideo;
 
+typedef struct {
+    unsigned int signal;        /**< See CLEM_MONITOR_xxx */
+    unsigned int color;         /**< See CLEM_MONITOR_xxx */
+    unsigned width;
+    unsigned height;
+    unsigned border_color;      /**< See CLEM_VGC_COLOR_xxx */
+} ClemensMonitor;
+
 /**
  * @brief
  *

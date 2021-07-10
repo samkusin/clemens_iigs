@@ -20,7 +20,13 @@
 #define CLEM_1SEC_NS                        1000000000
 #define CLEM_1MS_NS                         1000000
 
-/** Emulataed duration of every 'step' iwm_glu_sync runs. 1.023 / 2 ~ 0.511 */
+#define CLEM_MONITOR_SIGNAL_NTSC            0
+#define CLEM_MONITOR_SIGNAL_PAL             1
+
+#define CLEM_MONITOR_COLOR_RGB              0
+#define CLEM_MONITOR_COLOR_MONO             1
+
+/** Emulated duration of every 'step' iwm_glu_sync runs. 1.023 / 2 ~ 0.511 */
 #define CLEM_IWM_SYNC_FRAME_NS              511
 #define CLEM_IWM_SYNC_FRAME_NS_FAST         256
 

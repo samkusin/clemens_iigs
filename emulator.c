@@ -3172,6 +3172,19 @@ void clemens_emulate(ClemensMachine* clem) {
     }
 }
 
+ClemensMonitor* clemens_get_monitor(
+    ClemensMonitor* monitor,
+    ClemensMachine* clem
+) {
+    //  TODO: use vgc flags to detect NTSC vs PAL, Mono vs RGB
+    monitor->signal = CLEM_MONITOR_SIGNAL_NTSC;
+    monitor->signal = CLEM_MONITOR_COLOR_RGB;
+    monitor->width = 560;
+    monitor->height = 384;
+    monitor->border_color = clem->mmio.dev_rtc.ctl_c034 & 0x0f;
+    return monitor;
+}
+
 ClemensVideo* clemens_get_text_video(
     ClemensVideo* video,
     ClemensMachine* clem

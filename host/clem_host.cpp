@@ -144,9 +144,13 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     emulate(deltaTime);
     emulationRan = true;
   }
+  ClemensMonitor monitor = {};
+  float screenUVs[2];
   if (clemens_is_initialized(&machine_)) {
     ClemensVideo video;
-    display_->start();
+    clemens_get_monitor(&monitor, &machine_);
+
+    display_->start(monitor);
     if (clemens_get_text_video(&video, &machine_)) {
       if (!(machine_.mmio.vgc.mode_flags & CLEM_VGC_80COLUMN_TEXT)) {
         display_->renderText40Col(
@@ -163,11 +167,11 @@ void ClemensHost::frame(int width, int height, float deltaTime)
         display_->renderHiresGraphics(video, machine_.mega2_bank_map[0]);
       }
     }
-    display_->finish();
+    display_->finish(screenUVs);
   }
 
   ImGui::SetNextWindowPos(ImVec2(512, 32), ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(ImVec2(640, 480));
+  ImGui::SetNextWindowContentSize(ImVec2(720, 480));
   ImGui::Begin("Display", nullptr, ImGuiWindowFlags_NoResize |
                                    ImGuiWindowFlags_NoCollapse |
                                    ImGuiWindowFlags_NoBringToFrontOnFocus);
@@ -183,11 +187,12 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);   // No tint
     ImTextureID texId { (void *)((uintptr_t)display_->getScreenTarget().id) };
     ImVec2 p = ImGui::GetCursorScreenPos();
-    ImVec2 avail = ImGui::GetWindowContentRegionMax();
-    ImVec2 display_uv(560.0f/1024, 384.0f/512);
+    ImVec2 display_uv(screenUVs[0], screenUVs[1]);
+    p.x += 360.0f - monitor.width*0.5f;
+    p.y += 240.0f - monitor.height*0.5f;
     ImGui::GetWindowDrawList()->AddImage(
       texId,
-      p, ImVec2(p.x + 560, p.y + 384),
+      p, ImVec2(p.x + monitor.width, p.y + monitor.height),
       ImVec2(0, 0), display_uv,
       ImGui::GetColorU32(tint_col));
   }
