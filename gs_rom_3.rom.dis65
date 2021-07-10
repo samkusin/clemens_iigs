@@ -2076,6 +2076,9 @@
 "238899":304,
 "239345":304,
 "242251":3145984,
+"242374":3145984,
+"242386":256,
+"242442":256,
 "244055":304,
 "244080":3408328,
 "244248":304,
@@ -2138,6 +2141,8 @@
 "239015":"Use alternate character display set",
 "239072":"Open/Closed Apple Control-N",
 "242275":"is A a digit?",
+"242374":"\u0027:\u0027?",
+"242406":"\u0027F\u0027?",
 "242582":"pointer to line R",
 "242590":"loads number of text columns?",
 "242594":"increment row counter",
@@ -2274,6 +2279,7 @@
 "261616":"Output character to screen",
 "261617":"space?",
 "261622":"Output character to screen without inv mask",
+"261636":"if A==\u0027:\u0027 then jump else branch",
 "261663":"Return Identification of System (iigs sig)",
 "261676":"Monitor Move (Original Version)",
 "261760":"Set Inverse Text Mode",
@@ -2425,7 +2431,7 @@
 "BackgroundColor":0},
 
 "226857":{
-"Text":"Y = command code\r\n  = $A3 during reset sequence ",
+"Text":"Y = command code\r\n  = $85 parse after \u0027colon\u0027 ?\r\n  = $94 parse before \u0027colon\u0027 ?\r\n  = $A3 during reset sequence \r\n",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},
@@ -2588,6 +2594,12 @@
 
 "261322":{
 "Text":"Scanning the input buffer",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"260252":{
+"Text":"Monitor commands?\r\nY = command\r\n",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -4841,7 +4853,21 @@
 "Value":16776638,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"None"}},
+"LabelAnno":"None"},
+
+"261878":{
+"Label":"SUB_MON_PARSE_COLON",
+"Value":16776950,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"261629":{
+"Label":"SUB_MON_PARSE_EXPR",
+"Value":16776701,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"Uncertain"}},
 
 "OperandFormats":{
 "131385":{

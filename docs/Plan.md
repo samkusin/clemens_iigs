@@ -10,28 +10,27 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Debug monitor set memory bug:
-  * Look at parameters coming in to ff/ff82 when inputting 2000:01
-* HGR -> TEXT does not restore text mode?
-* C01F 80COL yes/no state
+
 * Border and text colors
   * C022 Text Color Mode
   Decimal Math
-* VGC Pass 2 : Graphics modes (not SHGR)
+* VGC Pass 2 : Lores Graphics (not SHGR)
 * First 5.25" disk boot (DOS 3.3)
 * Writable disk data
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
 * Audio Phase I (just get the system beeps working, speaker clicks too)
+* Some Simple Apple II games testing
 * CLEM_MMIO_REG_VGC_IRQ_BYTE
-
 * C07F? - AN3?
+* remaining //e softswitches
+* VGC Pass 3 : Dblhires Graphics (not SHGR)
+* Some Apple II games testing
 * C041 INTEN - enable Mega II, VBL, quartersec interrupts
 * C047 clearing timer interrupt flags for VBL and quartersec
 * ADB Mouse Support and Data Interrupts
 * C046 phase 2 - Mouse
-* remaining //e softswitches
+* Flashing characters
 * Test ROM 1
-
 * C039 Register (Serial Communications Command register )
 * Data accesses across banks are allowed (but not stack accesses?)
 * Audit Direct Page in emulation mode (wrap zero page, only if D=0000 for 6502
@@ -40,15 +39,20 @@ This is a running todo list.
 * Test ROM iteration?
 * Ghosting banks?
 * IWM 3.5" read write support
-* VGC Pass 3: SHGR
+* VGC Pass 4: SHGR
 * Ensoniq!
 * ADB Mouse on Keypad Feature
-* Flashing characters
 * clipboard (paste)
 
 
 ## DONE
 
+* C01F 80COL yes/no state
+* HGR -> TEXT fix
+* Fixed bad TYA instruction for 16-bit A <- 8-bit Y register
+  * a 2 day headache to debug a monitor memory set issue
+  * ended up affecting boot time (faster now)
+  * This could've been caught by tests...
 * 80 column text (PR#3)
 * look at typing to see if there are bugs and fix them at the basic prompt
 * test cold reset
