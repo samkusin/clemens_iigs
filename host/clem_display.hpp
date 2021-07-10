@@ -17,8 +17,8 @@ struct ClemensDisplayVertexParams
   float render_dims[2];
   float display_ratio[2];
   float virtual_dims[2];
+  float offsets[2];
 };
-
 
 class ClemensDisplayProvider
 {
@@ -34,9 +34,12 @@ private:
 
   sg_image systemFontImage_;
   sg_image systemFontImageHi_;
+  sg_image blankImage_;
   sg_shader textShader_;
+  sg_shader backShader_;
   sg_shader hiresShader_;
   sg_pipeline textPipeline_;
+  sg_pipeline backPipeline_;
   sg_pipeline hiresPipeline_;
 };
 
@@ -48,7 +51,7 @@ public:
   ClemensDisplay(ClemensDisplayProvider& provider);
   ~ClemensDisplay();
 
-  void start(const ClemensMonitor& monitor);
+  void start(const ClemensMonitor& monitor, int screen_w, int screen_h);
   void finish(float* uvs);
 
   //  all memory blocks passed to render functions are assumed to be 64K banks
@@ -86,6 +89,8 @@ private:
 
   uint8_t* emulatorVideoBuffer_;
   float emulatorVideoDimensions_[2];
+  float emulatorMonitorDimensions_[2];
+  unsigned emulatorTextColor_;
 };
 
 #endif

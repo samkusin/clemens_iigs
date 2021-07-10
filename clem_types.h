@@ -491,6 +491,7 @@ typedef struct {
     unsigned width;
     unsigned height;
     unsigned border_color;      /**< See CLEM_VGC_COLOR_xxx */
+    unsigned text_color;        /**< bits 0-3 = foreground, 4-7 = background */
 } ClemensMonitor;
 
 /**

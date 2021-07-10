@@ -3182,6 +3182,8 @@ ClemensMonitor* clemens_get_monitor(
     monitor->width = 560;
     monitor->height = 384;
     monitor->border_color = clem->mmio.dev_rtc.ctl_c034 & 0x0f;
+    monitor->text_color = ((clem->mmio.vgc.text_bg_color & 0xf) << 4) |
+                          (clem->mmio.vgc.text_fg_color & 0xf);
     return monitor;
 }
 
