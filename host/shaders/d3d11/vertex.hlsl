@@ -2,6 +2,7 @@ cbuffer Globals {
     float2 render_dims;     //  Render Target Resolution
     float2 display_ratio;   //  Ratio convert virtual to target
     float2 virtual_dims;    //  Emulator 'pixel' resolution
+    float2 offsets;         //  x,y offset from top, left
 };
 
 struct Input {
@@ -18,7 +19,7 @@ struct Output {
 
 Output main(Input input) {
     Output output;
-    float2 t_pos = (input.pos * display_ratio) / render_dims;
+    float2 t_pos = (input.pos * display_ratio + offsets) / render_dims;
     t_pos = (t_pos - 0.5) * float2(2.0, -2.0);
     output.pos = float4(t_pos, 0.5, 1.0);
     output.uv = input.uv;
