@@ -1,8 +1,8 @@
-# Clements GS
+# Clemens GS
 
 ## Summary
 
-The Clements GS emulator's goal is to *emulate* the Apple IIgs design (ROM3
+The Clemens GS emulator's goal is to *emulate* the Apple IIgs design (ROM3
 with ROM1 if possible compatibility.)
 
 
@@ -13,8 +13,10 @@ This is a running todo list.
 
 * Border and text colors
   * C022 Text Color Mode
-  Decimal Math
+* Fix repeat/key issues (and reset key should be mapped to f11?)
+* Decimal Math
 * VGC Pass 2 : Lores Graphics (not SHGR)
+* Get Control Panel Working
 * First 5.25" disk boot (DOS 3.3)
 * Writable disk data
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)

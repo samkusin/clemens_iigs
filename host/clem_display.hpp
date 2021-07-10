@@ -48,9 +48,8 @@ public:
   ClemensDisplay(ClemensDisplayProvider& provider);
   ~ClemensDisplay();
 
-
-  void start();
-  void finish();
+  void start(const ClemensMonitor& monitor);
+  void finish(float* uvs);
 
   //  all memory blocks passed to render functions are assumed to be 64K banks
   //  from the emulator.  The 'video' structures represent scanline data
@@ -86,6 +85,7 @@ private:
   sg_pass screenPass_;
 
   uint8_t* emulatorVideoBuffer_;
+  float emulatorVideoDimensions_[2];
 };
 
 #endif

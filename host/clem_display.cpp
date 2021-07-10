@@ -70,7 +70,7 @@ static const float kHiresColors[8][4] = {
 */
 
 //  Apple IIgs colors
-static const float kHiresColors[8][4] = {
+static const uint8_t kHiresColors[8][4] = {
   { 0x00, 0x00, 0x00, 0xFF },       // black group 1
   { 0x11, 0xDD, 0x00, 0xFF },       // green (light green)
   { 0xDD, 0x22, 0xDD, 0xFF },       // purple
@@ -81,6 +81,25 @@ static const float kHiresColors[8][4] = {
   { 0xFF, 0xFF, 0xFF, 0xFF }        // white group 2
 };
 
+
+static const uint8_t kGr16Colors[16][4] = {
+  {   0,    0,    0,    255 },      // black
+  { 221,    0,   51,    255 },      // deep red
+  {   0,    0,  153,    255 },      // dark blue
+  { 221,   34,  221,    255 },      // purple
+  {   0,  119,   34,    255 },      // dark green
+  {  85,   85,   85,    255 },      // dark gray
+  {  34,   34,  255,    255 },      // med blue
+  { 102,  170,  255,    255 },      // light blue
+  { 136,   85,    0,    255 },      // brown
+  { 255,  102,    0,    255 },      // orange
+  { 170,  170,  170,    255 },      // lt. gray
+  { 255,  153,  136,    255 },      // pink
+  {  17,  221,    0,    255 },      // lt. green
+  { 255,  255,    0,    255 },      // yellow
+  {  68,  255,  153,    255 },      // aquamarine
+  { 255,  255,  255,    255 }       // white
+};
 
 
 enum {
@@ -412,18 +431,23 @@ ClemensDisplay::~ClemensDisplay()
   sg_destroy_buffer(textVertexBuffer_);
 }
 
-void ClemensDisplay::start()
+void ClemensDisplay::start(const ClemensMonitor& monitor)
 {
   sg_pass_action passAction = {};
   passAction.colors[0].action = SG_ACTION_CLEAR;
   passAction.colors[0].value = { 0.0f, 0.0f, 0.0f, 1.0f };
 
   sg_begin_pass(screenPass_, &passAction);
+
+  emulatorVideoDimensions_[0] = monitor.width;
+  emulatorVideoDimensions_[1] = monitor.height;
 }
 
-void ClemensDisplay::finish()
+void ClemensDisplay::finish(float *uvs)
 {
   sg_end_pass();
+  uvs[0] = emulatorVideoDimensions_[0] / kRenderTargetWidth;
+  uvs[1] = emulatorVideoDimensions_[1] / kRenderTargetHeight;
 }
 
 

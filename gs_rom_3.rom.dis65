@@ -2140,7 +2140,9 @@
 "236846":"Some kind of disk access - maybe boot?",
 "239015":"Use alternate character display set",
 "239072":"Open/Closed Apple Control-N",
+"240365":"Ptr in DP to memory to perform write/read",
 "242275":"is A a digit?",
+"242360":"$2f is a counter of bytes to write?",
 "242374":"\u0027:\u0027?",
 "242406":"\u0027F\u0027?",
 "242582":"pointer to line R",
@@ -2600,6 +2602,18 @@
 
 "260252":{
 "Text":"Monitor commands?\r\nY = command\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"240355":{
+"Text":"Y = address?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"242353":{
+"Text":"DEBUG: this routine call alters the read/write ptr?\r\n",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -4867,7 +4881,14 @@
 "Value":16776701,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Uncertain"}},
+"LabelAnno":"Uncertain"},
+
+"243692":{
+"Label":"SUB_TMP_MON_WRITE_INDIRECT_X",
+"Value":16758764,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"}},
 
 "OperandFormats":{
 "131385":{

@@ -146,6 +146,25 @@ void clemens_debug_status(ClemensMachine* clem);
  * @return ClemensVideo*
  */
 
+
+/**
+ * @brief Returns the current monitor settings.
+ *
+ * This should be used to render the video display on the host.  The return
+ * values are tuned to Apple II peculiarities (i.e. Hires, Double Hires).  For
+ * example, while ClemensMonitor identifies the display at 'NTSC', 'PAL', and
+ * 'color' vs 'monochrome', display resolution is specialized for Apple II
+ * scaled (560x384) vs Apple IIgs scaled (640x400).   These resolutions are
+ * suggested ones, designed to reflect maximum resolutions and easily
+ * downscaled 'lo-res' equivalents.
+ *
+ * @param monitor
+ * @param clem
+ * @return ClemensMonitor*
+ */
+ClemensMonitor* clemens_get_monitor(ClemensMonitor* monitor,
+                                    ClemensMachine* clem);
+
 /**
  * @brief Returns the current text video data to be displayed by the host
  *
