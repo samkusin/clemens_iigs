@@ -2705,7 +2705,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, cpu->regs.Y);
                 _cpu_p_flags_n_z_data(cpu, (uint8_t)cpu->regs.A);
             } else {
-                cpu->regs.A = x_status ? (uint8_t)cpu->regs.A : cpu->regs.Y;
+                cpu->regs.A = x_status ? (uint8_t)cpu->regs.Y : cpu->regs.Y;
                 _cpu_p_flags_n_z_data_16(cpu, cpu->regs.A);
             }
             break;
