@@ -62,10 +62,10 @@ static void _clem_rtc_dispatch_cmd(
                 } else if (rtc->index == 0x7) {
                     rtc->state = CLEM_RTC_EXECUTE_REG_UNKNOWN;
                 } else {
-                    CLEM_UNIMPLEMENTED("clem_rtc: register op is unsupported", rtc->index);
+                    CLEM_UNIMPLEMENTED("RTC: register op is unsupported", rtc->index);
                 }
             } else {
-                CLEM_WARN("clem_rtc: reg read is unsupported", cmd);
+                CLEM_WARN("RTC: reg read is unsupported", cmd);
             }
             break;
         case CLEM_RTC_CMD_BRAM:
@@ -151,7 +151,7 @@ void clem_rtc_command(
                 _clem_rtc_dispatch_cmd(rtc, rtc->data_c033);
             }
             else {
-                CLEM_WARN("clem_rtc: unexpected ctrl %02X, state: %02X",
+                CLEM_WARN("RTC: unexpected ctrl %02X, state: %02X",
                     rtc->ctl_c034, rtc->state);
             }
             break;
@@ -161,7 +161,7 @@ void clem_rtc_command(
                 _clem_rtc_bram_state(rtc, rtc->data_c033);
             }
             else {
-                CLEM_WARN("clem_rtc: unexpected ctrl %02X, state: %02X",
+                CLEM_WARN("RTC: unexpected ctrl %02X, state: %02X",
                     rtc->ctl_c034, rtc->state);
             }
             break;
@@ -171,7 +171,7 @@ void clem_rtc_command(
                     rtc->data_c033 = _clem_rtc_bram_read(rtc);
                 }
                 else {
-                    CLEM_WARN("clem_rtc: unexpected ctrl $02X, state: %02X",
+                    CLEM_WARN("RTC: unexpected ctrl $02X, state: %02X",
                         rtc->ctl_c034, rtc->state);
                 }
             }
@@ -182,7 +182,7 @@ void clem_rtc_command(
                     _clem_rtc_bram_write(rtc, rtc->data_c033);
                 }
                 else {
-                    CLEM_WARN("clem_rtc: unexpected ctrl $02X, state: %02X",
+                    CLEM_WARN("RTC: unexpected ctrl $02X, state: %02X",
                         rtc->ctl_c034, rtc->state);
                 }
             }
@@ -190,9 +190,9 @@ void clem_rtc_command(
         case CLEM_RTC_EXECUTE_REG_TEST:
             if (rtc->data_c033 & 0xc0) {
                 /* bits 6-7 must be zero */
-                CLEM_WARN("clem_rtc: non zero bits 6,7 set: %02X", rtc->data_c033);
+                CLEM_WARN("RTC: non zero bits 6,7 set: %02X", rtc->data_c033);
             } else {
-                CLEM_LOG("clem_rtc: test register set to %02X", rtc->data_c033);
+                CLEM_LOG("RTC: test register set to %02X", rtc->data_c033);
             }
             break;
         case CLEM_RTC_EXECUTE_REG_WRITE_PROTECT:
@@ -201,10 +201,10 @@ void clem_rtc_command(
             } else {
                 rtc->flags |= CLEM_RTC_FLAG_WRITE_PROTECT;
             }
-            CLEM_LOG("clem_rtc: write-protect register set to %02X", rtc->data_c033);
+            CLEM_LOG("RTC: write-protect register set to %02X", rtc->data_c033);
             break;
         case CLEM_RTC_EXECUTE_REG_UNKNOWN:
-            CLEM_LOG("clem_rtc: register_unknown data %02X", rtc->data_c033);
+            CLEM_LOG("RTC: register_unknown data %02X", rtc->data_c033);
             break;
         default:
             break;

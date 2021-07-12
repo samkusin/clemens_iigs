@@ -191,7 +191,7 @@ static void _clem_iwm_lss(
                         clock->ts - iwm->last_write_clocks_ts, clock->ref_step) / 1000,
                         iwm->write_out);
                 } else {
-                    CLEM_WARN("clem_iwm: state: %02X load byte %02X in read?",
+                    CLEM_WARN("IWM: state: %02X load byte %02X in read?",
                         iwm->state, iwm->data);
                 }
                 break;
@@ -283,7 +283,7 @@ void clem_iwm_glu_sync(
             iwm->ns_drive_hold = clem_util_timer_decrement(
                 iwm->ns_drive_hold, delta_ns);
             if (iwm->ns_drive_hold == 0 || iwm->timer_1sec_disabled) {
-                CLEM_LOG("clem_iwm: turning drive off in sync");
+                CLEM_LOG("IWM: turning drive off in sync");
                 iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
             }
         }
@@ -315,24 +315,24 @@ void _clem_iwm_io_switch(
         case CLEM_MMIO_REG_IWM_DRIVE_DISABLE:
             if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
                 if (iwm->timer_1sec_disabled) {
-                    CLEM_LOG("clem_iwm: turning drive off now");
+                    CLEM_LOG("IWM: turning drive off now");
                     iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
                 } else if (iwm->ns_drive_hold == 0) {
-                    CLEM_LOG("clem_iwm: turning drive off in 1 second");
+                    CLEM_LOG("IWM: turning drive off in 1 second");
                     iwm->ns_drive_hold = CLEM_1SEC_NS;
                 }
             }
             break;
         case CLEM_MMIO_REG_IWM_DRIVE_ENABLE:
             if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
-                CLEM_LOG("clem_iwm: turning drive on");
+                CLEM_LOG("IWM: turning drive on");
                 iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_ON;
                 _clem_iwm_reset_lss(iwm);
             }
             break;
         case CLEM_MMIO_REG_IWM_DRIVE_0:
             if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1)) {
-                CLEM_LOG("clem_iwm: setting drive 1");
+                CLEM_LOG("IWM: setting drive 1");
             }
             iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_1;
             iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_2;
@@ -340,7 +340,7 @@ void _clem_iwm_io_switch(
             break;
         case CLEM_MMIO_REG_IWM_DRIVE_1:
             if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2)) {
-                CLEM_LOG("clem_iwm: setting drive 2");
+                CLEM_LOG("IWM: setting drive 2");
             }
             iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_2;
             iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_1;
@@ -385,14 +385,14 @@ void _clem_iwm_io_switch(
                 iwm->lss_write_counter = 0x00;
             }
         }
-        CLEM_LOG("clem_iwm: state %02X => %02X", current_state, iwm->state);
+        CLEM_LOG("IWM: state %02X => %02X", current_state, iwm->state);
     }
 }
 
 static void _clem_iwm_write_mode(struct ClemensDeviceIWM* iwm, uint8_t value) {
     if (value & 0x10) {
         iwm->clock_8mhz = true;
-        CLEM_WARN("clem_iwm: 8mhz mode requested... and ignored");
+        CLEM_WARN("IWM: 8mhz mode requested... and ignored");
     } else {
         iwm->clock_8mhz = false;
     }
@@ -419,7 +419,7 @@ static void _clem_iwm_write_mode(struct ClemensDeviceIWM* iwm, uint8_t value) {
     } else {
         iwm->latch_mode = false;
     }
-    CLEM_LOG("clem_iwm: write mode %02X", value);
+    CLEM_LOG("IWM: write mode %02X", value);
 }
 
 void clem_iwm_write_switch(
@@ -440,16 +440,16 @@ void clem_iwm_write_switch(
             if (value & 0x40) {
                 iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_35;
                 if (!(old_io_flags & CLEM_IWM_FLAG_DRIVE_35)) {
-                    CLEM_LOG("clem_iwm: setting 3.5 drive mode");
+                    CLEM_LOG("IWM: setting 3.5 drive mode");
                 }
             } else {
                 iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_35;
                 if (old_io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-                    CLEM_LOG("clem_iwm: setting 5.25 drive mode");
+                    CLEM_LOG("IWM: setting 5.25 drive mode");
                 }
             }
             if (value & 0x3f) {
-                CLEM_WARN("clem_iwm: setting unexpected diskreg flags %02X", value);
+                CLEM_WARN("IWM: setting unexpected diskreg flags %02X", value);
             }
             break;
         default:
@@ -516,13 +516,13 @@ static uint8_t _clem_iwm_read_handshake(
     if ((iwm->lss_write_counter & 0xf) > 8) {
         result |= 0x04;     /* we should be loading the next write byte */
         if (!is_noop) {
-            CLEM_WARN("clem_iwm: write_ovr dt = %.3f us", ns_write * 0.001f);
+            CLEM_WARN("IWM: write_ovr dt = %.3f us", ns_write * 0.001f);
         }
     } else if ((iwm->lss_write_counter % 8) != 0) {
         result &= ~0x80;
     } else {
         if (!is_noop) {
-            CLEM_LOG("clem_iwm: write_rdy dt = %.3f us", ns_write * 0.001f);
+            CLEM_LOG("IWM: write_rdy dt = %.3f us", ns_write * 0.001f);
         }
     }
     return result;

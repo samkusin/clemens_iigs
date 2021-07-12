@@ -63,6 +63,11 @@ struct ClemensDeviceKeyboard {
     uint8_t keys[CLEM_ADB_KEYB_BUFFER_LIMIT];
     uint8_t states[CLEM_ADB_KEY_CODE_LIMIT];    // should be ascii, so 128
     int size;
+    int delay_ms;
+    int rate_per_sec;
+    int timer_us;
+    int repeat_count;
+    uint8_t last_a2_key_down;
     bool reset_key;
 };
 
@@ -87,7 +92,6 @@ struct ClemensDeviceADB {
     bool has_modkey_changed;    /* FIXME: Used for modifier key latch? */
 
     uint8_t io_key_last_ascii;  /* The last ascii key pressed, bit 7 strobe */
-    uint8_t io_key_last_a2key;  /* The last a2 key pressed */
 
     /* Host-GLU registers */
     uint16_t keyb_reg[4];       /**< mocked GLU keyboard registers */

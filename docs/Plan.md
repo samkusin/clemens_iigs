@@ -11,8 +11,6 @@ with ROM1 if possible compatibility.)
 This is a running todo list.
 
 
-* Border and text colors
-  * C022 Text Color Mode
 * Fix repeat/key issues (and reset key should be mapped to f11?)
 * Decimal Math
 * VGC Pass 2 : Lores Graphics (not SHGR)
@@ -49,6 +47,8 @@ This is a running todo list.
 
 ## DONE
 
+* Border and text colors
+  * C022 Text Color Mode
 * C01F 80COL yes/no state
 * HGR -> TEXT fix
 * Fixed bad TYA instruction for 16-bit A <- 8-bit Y register
