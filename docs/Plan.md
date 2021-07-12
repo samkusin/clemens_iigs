@@ -10,9 +10,8 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-
-* Fix repeat/key issues (and reset key should be mapped to f11?)
 * Decimal Math
+* Fix Reset key = F11 vs Delete key
 * VGC Pass 2 : Lores Graphics (not SHGR)
 * Get Control Panel Working
 * First 5.25" disk boot (DOS 3.3)
@@ -47,6 +46,7 @@ This is a running todo list.
 
 ## DONE
 
+* Fix repeat/key issues
 * Border and text colors
   * C022 Text Color Mode
 * C01F 80COL yes/no state
