@@ -354,6 +354,28 @@ static uint8_t g_a2_to_ascii[CLEM_ADB_KEY_CODE_LIMIT][8] = {
     /* 0x7F */  { 0xff, 0xff,   0xff,   0xff,   0x00, }
 };
 
+static int g_key_delay_ms[8] = {
+    250,
+    500,
+    750,
+    1000,
+    0,
+    0,
+    0,
+    0
+};
+
+static int g_key_rate_per_sec[8] = {
+    0,
+    30,
+    24,
+    20,
+    15,
+    11,
+    8,
+    4
+};
+
 static inline void _clem_adb_glu_queue_key(
     struct ClemensDeviceADB* adb,
     uint8_t key
@@ -390,9 +412,6 @@ static uint8_t _clem_adb_glu_keyb_parse(
     uint16_t modifiers = adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_MODKEY_MASK;
     uint16_t old_modifiers = modifiers;
 
-    if (is_key_down) {
-        adb->io_key_last_a2key = key_index;
-    }
     adb->is_keypad_down = ascii_table[4] == CLEM_ADB_KEY_MOD_KEYPAD &&
                           is_key_down;
     if (ascii_table[4]) {       // key is a modifier?
@@ -413,6 +432,18 @@ static uint8_t _clem_adb_glu_keyb_parse(
             else modifiers &= ~CLEM_ADB_GLU_REG2_KEY_CAPS;
         }
         adb->keyb_reg[2] = modifiers;
+    }
+    if (ascii_table[0] != 0xff) {
+        //  this is a repeatable key - reset repeat key state here
+        if (is_key_down) {
+            if (key_index != adb->keyb.last_a2_key_down) {
+                adb->keyb.timer_us = 0;
+                adb->keyb.repeat_count = 0;
+                adb->keyb.last_a2_key_down = key_index;
+            }
+        } else if (key_index == adb->keyb.last_a2_key_down) {
+            adb->keyb.last_a2_key_down = 0;
+        }
     }
     /* Additional parsing needed for MMIO registers */
     if (modifiers & CLEM_ADB_GLU_REG2_KEY_SHIFT) {
@@ -449,10 +480,33 @@ static uint8_t _clem_adb_glu_keyb_parse(
 static void _clem_adb_glu_keyb_talk(struct ClemensDeviceADB* adb) {
     uint8_t* ascii_table;
     uint8_t key_event;
-    uint8_t key_index;
     bool is_key_down;
 
     adb->keyb_reg[0] = 0x0000;
+
+    //  handle repeat logic here so that we can queue repeated keys before
+    //      consuming them
+
+    if (adb->keyb.last_a2_key_down && adb->keyb.delay_ms && adb->keyb.rate_per_sec) {
+        int timer_ms = adb->keyb.timer_us / 1000;
+        if (adb->keyb.repeat_count == 0) {
+            if (timer_ms >= adb->keyb.delay_ms) {
+                _clem_adb_glu_queue_key(adb, adb->keyb.last_a2_key_down);
+                ++adb->keyb.repeat_count;
+                adb->keyb.timer_us = 0;
+            }
+        } else {
+            if (timer_ms >= (1000 / adb->keyb.rate_per_sec)) {
+                _clem_adb_glu_queue_key(adb, adb->keyb.last_a2_key_down);
+                ++adb->keyb.repeat_count;
+                adb->keyb.timer_us = 0;
+            }
+        }
+    }
+
+    //  investigate if the logic below is wiping out key events for quick taps
+    //      i.e. does C000 and C010 have a valid state after a quick up, down
+    //           tap?  may need to add logging and debugging
 
     if (adb->keyb.size <= 0) return;
     key_event = _clem_adb_glu_unqueue_key(adb);
@@ -511,14 +565,14 @@ static void _clem_adb_glu_set_mode_flags(
 ) {
     if (mode_flags & 0x01) {
         adb->mode_flags &= ~CLEM_ADB_MODE_AUTOPOLL_KEYB;
-        CLEM_LOG("ADB Disable Keyboard Autopoll");
+        CLEM_LOG("ADB: Disable Keyboard Autopoll");
     }
     if (mode_flags & 0x02) {
         adb->mode_flags &= ~CLEM_ADB_MODE_AUTOPOLL_MOUSE;
-        CLEM_LOG("ADB Disable Mouse Autopoll");
+        CLEM_LOG("ADB: Disable Mouse Autopoll");
     }
     if (mode_flags & 0x000000fc) {
-        CLEM_WARN("ADB SetMode %02X Unimplemented", mode_flags & 0x000000fc);
+        CLEM_WARN("ADB: SetMode %02X Unimplemented", mode_flags & 0x000000fc);
     }
 }
 
@@ -528,14 +582,14 @@ static void _clem_adb_glu_clear_mode_flags(
 ) {
     if (mode_flags & 0x01) {
         adb->mode_flags |= CLEM_ADB_MODE_AUTOPOLL_KEYB;
-        CLEM_LOG("ADB Enable Keyboard Autopoll");
+        CLEM_LOG("ADB: Enable Keyboard Autopoll");
     }
     if (mode_flags & 0x02) {
         adb->mode_flags |= CLEM_ADB_MODE_AUTOPOLL_MOUSE;
-        CLEM_LOG("ADB Enable Mouse Autopoll");
+        CLEM_LOG("ADB: Enable Mouse Autopoll");
     }
     if (mode_flags & 0x000000fc) {
-        CLEM_WARN("ADB ClearMode %02X Unimplemented", mode_flags & 0x000000fc);
+        CLEM_WARN("ADB: ClearMode %02X Unimplemented", mode_flags & 0x000000fc);
     }
 }
 
@@ -545,6 +599,20 @@ static void _clem_adb_glu_set_config(
     uint8_t keyb_setup,
     uint8_t keyb_repeat
 ) {
+    /* unsure what if anything there's to do for setting the adb addresses */
+    CLEM_LOG("ADB: setting keyb and mouse addr to %02X", keyb_mouse_adr);
+    /* TODO: language settings for keyboard */
+    CLEM_LOG("ADB: setting keyb language character set to %02X",
+             (keyb_setup & 0xf0) >> 4);
+    CLEM_LOG("ADB: setting keyb language layout to %02X",
+             (keyb_setup & 0x0f));
+
+    adb->keyb.delay_ms = g_key_delay_ms[(keyb_repeat & 0x70) >> 4];
+    adb->keyb.rate_per_sec = g_key_rate_per_sec[keyb_repeat & 0x7];
+
+    CLEM_LOG("ADB: setting keyb event delay/repeat to %d ms/%d per sec",
+             adb->keyb.delay_ms, adb->keyb.rate_per_sec);
+
     CLEM_WARN("Unimplemented ADB GLU Set Config");
 }
 
@@ -630,9 +698,10 @@ void _clem_adb_glu_set_register(
             if (device_register == 0x3) {
                 if ((hi & 0x0f) != CLEM_ADB_DEVICE_KEYBOARD) {
                     /* changing to a device address other than what's standard? */
-                    CLEM_WARN("ADB change keyboard device address to not 0x03: %0X", hi);
+                    CLEM_WARN("ADB: change keyboard device address to not "
+                              "0x03: %0X", hi);
                 }
-                CLEM_LOG("ADB keyb device handler to %0X", lo);
+                CLEM_LOG("ADB: keyb device handler to %0X", lo);
             }
             adb->keyb_reg[device_register % 4] = ((unsigned)hi << 8) | lo;
             break;
@@ -640,14 +709,15 @@ void _clem_adb_glu_set_register(
             if (device_register == 0x3) {
                 if ((hi & 0x0f) != CLEM_ADB_DEVICE_MOUSE) {
                     /* changing to a device address other than what's standard? */
-                    CLEM_WARN("Attempting to change mouse device to address: %0X", hi);
+                    CLEM_WARN("ADB: attempt to change mouse device to "
+                              "address: %0X", hi);
                 }
-                CLEM_LOG("ADB mouse device handler to %0X", lo);
+                CLEM_LOG("ADB: mouse device handler to %0X", lo);
             }
             adb->mouse_reg[device_register % 4] = ((unsigned)hi << 8) | lo;
             break;
         default:
-            CLEM_WARN("GLU set device register unsupported: %0X", address);
+            CLEM_WARN("ADB: set device register unsupported: %0X", address);
             break;
     }
 }
@@ -660,21 +730,21 @@ void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
 
     switch (adb->cmd_reg) {
         case CLEM_ADB_CMD_ABORT:
-            CLEM_LOG("ADB ABORT");
+            CLEM_LOG("ADB: ABORT");
             _clem_adb_send_none(adb);
             return;
         case CLEM_ADB_CMD_SET_MODES:
-            CLEM_LOG("ADB SET_MODES %02X", adb->cmd_data[0]);
+            CLEM_LOG("ADB: SET_MODES %02X", adb->cmd_data[0]);
             _clem_adb_glu_set_mode_flags(adb, adb->cmd_data[0]);
             _clem_adb_send_none(adb);
             break;
         case CLEM_ADB_CMD_CLEAR_MODES:
-            CLEM_LOG("ADB CLEAR_MODES %02X", adb->cmd_data[0]);
+            CLEM_LOG("ADB: CLEAR_MODES %02X", adb->cmd_data[0]);
             _clem_adb_glu_clear_mode_flags(adb, adb->cmd_data[0]);
             _clem_adb_send_none(adb);
             break;
         case CLEM_ADB_CMD_SET_CONFIG:
-            CLEM_LOG("ADB CONFIG: %02X %02X %02X",
+            CLEM_LOG("ADB: CONFIG: %02X %02X %02X",
                     adb->cmd_data[0],
                     adb->cmd_data[1],
                     adb->cmd_data[2]);
@@ -683,12 +753,12 @@ void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
             _clem_adb_send_none(adb);
             return;
         case CLEM_ADB_CMD_SYNC:
-            CLEM_LOG("ADB SYNC: %02X %02X %02X %02X",
+            CLEM_LOG("ADB: SYNC: %02X %02X %02X %02X",
                      adb->cmd_data[0],
                      adb->cmd_data[1],
                      adb->cmd_data[2],
                      adb->cmd_data[3]);
-            CLEM_LOG("ADB SYNC ROM03: %02X %02X %02X %02X",
+            CLEM_LOG("ADB: SYNC ROM03: %02X %02X %02X %02X",
                      adb->cmd_data[4],
                      adb->cmd_data[5],
                      adb->cmd_data[6],
@@ -699,14 +769,14 @@ void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
             _clem_adb_send_none(adb);
             return;
         case CLEM_ADB_CMD_WRITE_RAM:
-            CLEM_LOG("ADB WRITE RAM: %02X:%02X",
+            CLEM_LOG("ADB: WRITE RAM: %02X:%02X",
                      adb->cmd_data[0],
                      adb->cmd_data[1]);
             adb->ram[adb->cmd_data[0]] = adb->cmd_data[1];
             _clem_adb_send_none(adb);
             return;
         case CLEM_ADB_CMD_READ_MEM:
-            CLEM_LOG("ADB READ RAM: %02X:%02X",
+            CLEM_LOG("ADB: READ RAM: %02X:%02X",
                      adb->cmd_data[0],
                      adb->cmd_data[1]);
             _clem_adb_send_result(adb, 1);
@@ -714,16 +784,16 @@ void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
                 adb, adb->cmd_data[0], adb->cmd_data[1]));
             return;
         case CLEM_ADB_CMD_VERSION:
-            CLEM_LOG("ADB GET VERSION (%02X)", adb->version);
+            CLEM_LOG("ADB: GET VERSION (%02X)", adb->version);
             _clem_adb_send_result(adb, 1);
             _clem_adb_add_result(adb, (uint8_t)adb->version);
             return;
         case CLEM_ADB_CMD_UNDOCUMENTED_12:
-            CLEM_LOG("ADB UNDOC 12: %02X, %02X", adb->cmd_data[0], adb->cmd_data[1]);
+            CLEM_LOG("ADB: UNDOC 12: %02X, %02X", adb->cmd_data[0], adb->cmd_data[1]);
             _clem_adb_send_none(adb);
             break;
         case CLEM_ADB_CMD_UNDOCUMENTED_13:
-            CLEM_LOG("ADB UNDOC 13: %02X, %02X", adb->cmd_data[0], adb->cmd_data[1]);
+            CLEM_LOG("ADB: UNDOC 13: %02X, %02X", adb->cmd_data[0], adb->cmd_data[1]);
             _clem_adb_send_none(adb);
             break;
         default:
@@ -738,18 +808,18 @@ void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
             break;
 
         case CLEM_ADB_CMD_DEVICE_ENABLE_SRQ:
-            CLEM_LOG("ADB ENABLE SRQ: %0X", device_address);
+            CLEM_LOG("ADB: ENABLE SRQ: %0X", device_address);
             _clem_adb_glu_enable_srq(adb, device_address, true);
             _clem_adb_send_none(adb);
             break;
 
         case CLEM_ADB_CMD_DEVICE_FLUSH:
-            CLEM_UNIMPLEMENTED("ADB Flush: %0X", device_address);
+            CLEM_UNIMPLEMENTED("ADB: FLUSH: %0X", device_address);
             _clem_adb_send_none(adb);
             break;
 
         case CLEM_ADB_CMD_DEVICE_DISABLE_SRQ:
-            CLEM_LOG("ADB DISABLE SRQ: %0X", device_address);
+            CLEM_LOG("ADB: DISABLE SRQ: %0X", device_address);
             _clem_adb_glu_enable_srq(adb, device_address, false);
             _clem_adb_send_none(adb);
             break;
@@ -758,7 +828,7 @@ void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
         case CLEM_ADB_CMD_DEVICE_XMIT_2_R1:
         case CLEM_ADB_CMD_DEVICE_XMIT_2_R2:
         case CLEM_ADB_CMD_DEVICE_XMIT_2_R3:
-            CLEM_LOG("ADB XMIT2 ADR: %0X", device_address);
+            CLEM_LOG("ADB: XMIT2 ADR: %0X", device_address);
             _clem_adb_glu_set_register(adb,
                                        (device_command & 0x80) >> 4,
                                        device_address,
@@ -768,22 +838,22 @@ void _clem_adb_glu_command(struct ClemensDeviceADB* adb) {
             break;
 
         case CLEM_ADB_CMD_DEVICE_POLL_0:
-            CLEM_UNIMPLEMENTED("ADB Poll 0: %0X", device_address);
+            CLEM_UNIMPLEMENTED("ADB: Poll 0: %0X", device_address);
             _clem_adb_send_none(adb);
             break;
 
         case CLEM_ADB_CMD_DEVICE_POLL_1:
-            CLEM_UNIMPLEMENTED("ADB Poll 1: %0X", device_address);
+            CLEM_UNIMPLEMENTED("ADB: Poll 1: %0X", device_address);
             _clem_adb_send_none(adb);
             break;
 
         case CLEM_ADB_CMD_DEVICE_POLL_2:
-            CLEM_UNIMPLEMENTED("ADB Poll 2: %0X", device_address);
+            CLEM_UNIMPLEMENTED("ADB: Poll 2: %0X", device_address);
             _clem_adb_send_none(adb);
             break;
 
         case CLEM_ADB_CMD_DEVICE_POLL_3:
-            CLEM_UNIMPLEMENTED("ADB Poll 3: %0X", device_address);
+            CLEM_UNIMPLEMENTED("ADB: Poll 3: %0X", device_address);
             _clem_adb_send_none(adb);
             break;
     }
@@ -794,6 +864,7 @@ void clem_adb_glu_sync(
     uint32_t delta_us
 ) {
     adb->poll_timer_us += delta_us;
+    adb->keyb.timer_us += delta_us ;
 
   /*  On poll expiration, update device registers */
     while (adb->poll_timer_us  >= CLEM_MEGA2_CYCLES_PER_60TH) {
@@ -950,15 +1021,15 @@ static void _clem_adb_start_cmd(struct ClemensDeviceADB* adb, uint8_t value) {
     switch (device_command) {
         case 0:
             if (!parsed_command) {
-                CLEM_UNIMPLEMENTED("ADB Command: %02X", value);
+                CLEM_UNIMPLEMENTED("ADB: Command: %02X", value);
             }
             break;
         case CLEM_ADB_CMD_DEVICE_ENABLE_SRQ:
-            CLEM_UNIMPLEMENTED("ADB Enable SRQ: %0X", device_address);
+            CLEM_UNIMPLEMENTED("ADB: Enable SRQ: %0X", device_address);
             break;
 
         case CLEM_ADB_CMD_DEVICE_FLUSH:
-            CLEM_UNIMPLEMENTED("ADB Flush: %0X", device_address);
+            CLEM_UNIMPLEMENTED("ADB: Flush: %0X", device_address);
             break;
 
         case CLEM_ADB_CMD_DEVICE_DISABLE_SRQ:
@@ -974,23 +1045,23 @@ static void _clem_adb_start_cmd(struct ClemensDeviceADB* adb, uint8_t value) {
             break;
 
         case CLEM_ADB_CMD_DEVICE_POLL_0:
-            CLEM_UNIMPLEMENTED("ADB Poll 0: %0X", device_address);
+            CLEM_UNIMPLEMENTED("ADB: Poll 0: %0X", device_address);
             break;
 
         case CLEM_ADB_CMD_DEVICE_POLL_1:
-            CLEM_UNIMPLEMENTED("ADB Poll 1: %0X", device_address);
+            CLEM_UNIMPLEMENTED("ADB: Poll 1: %0X", device_address);
             break;
 
         case CLEM_ADB_CMD_DEVICE_POLL_2:
-            CLEM_UNIMPLEMENTED("ADB Poll 2: %0X", device_address);
+            CLEM_UNIMPLEMENTED("ADB: Poll 2: %0X", device_address);
             break;
 
         case CLEM_ADB_CMD_DEVICE_POLL_3:
-            CLEM_UNIMPLEMENTED("ADB Poll 3: %0X", device_address);
+            CLEM_UNIMPLEMENTED("ADB: Poll 3: %0X", device_address);
             break;
 
         default:                /* unimplemented? */
-            CLEM_UNIMPLEMENTED("ADB Other %02X", value);
+            CLEM_UNIMPLEMENTED("ADB: Other %02X", value);
             break;
     }
 }
@@ -1001,7 +1072,7 @@ static void _clem_adb_write_cmd(struct ClemensDeviceADB* adb, uint8_t value) {
             _clem_adb_start_cmd(adb, value);
             break;
         case CLEM_ADB_STATE_CMD_DATA:
-            CLEM_LOG("ADB Command Data [%02X]:%02X", adb->cmd_data_sent, value);
+            CLEM_LOG("ADB: Command Data [%02X]:%02X", adb->cmd_data_sent, value);
             _clem_adb_add_data(adb, value);
             break;
     }
@@ -1018,7 +1089,7 @@ void clem_adb_write_switch(
             adb->io_key_last_ascii &= ~0x80;
             break;
         case CLEM_MMIO_REG_ADB_MODKEY:
-            CLEM_LOG("IO Write %02X", ioreg);
+            CLEM_LOG("ADB: IO Write %02X", ioreg);
             break;
         case CLEM_MMIO_REG_ADB_STATUS:
             /* TODO: support enabling mouse interrupts when mouse data reg is
@@ -1038,7 +1109,7 @@ void clem_adb_write_switch(
             _clem_adb_write_cmd(adb, value);
             break;
         default:
-            CLEM_WARN("Unimplemented ADB write %02X,%02X", ioreg, value);
+            CLEM_WARN("ADB: Unimplemented write %02X,%02X", ioreg, value);
             break;
     }
 }
@@ -1180,7 +1251,7 @@ uint8_t clem_adb_read_switch(
             break;
         default:
             if (!CLEM_IS_MMIO_READ_NO_OP(flags)) {
-                CLEM_WARN("Unimplemented ADB read %02X", ioreg);
+                CLEM_WARN("ADB: Unimplemented read %02X", ioreg);
             }
             break;
     }

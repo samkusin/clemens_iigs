@@ -200,7 +200,7 @@ static unsigned _clem_disk_exec_ctl_35(
             drive->step_timer_35_ns = CLEM_1MS_NS * 5; /* very arbitrary... */
             break;
         case CLEM_IWM_DISK35_CTL_EJECTED_RESET:
-            CLEM_LOG("clem_iwm: disk switch reset?");
+            CLEM_LOG("IWM: disk switch reset?");
             break;
     }
     return drive->state_35;
@@ -231,7 +231,7 @@ void clem_disk_update_state_35(
                            ((in_phase << 2)       & 0x04) |
                            (!next_select ? 0x00 :   0x02) |
                            ((in_phase >> 2)       & 0x01);
-            CLEM_LOG("clem_iwm: Disk35[%u]: Power: %u; Ctl: %02X",
+            CLEM_LOG("IWM: Disk35[%u]: Power: %u; Ctl: %02X",
                 (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
                 (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
                 ctl);
@@ -419,7 +419,7 @@ void clem_disk_update_state_525(
         qtr_track_index += qtr_track_delta;
         if (qtr_track_index < 0) qtr_track_index = 0;
         else if (qtr_track_index >= 160) qtr_track_index = 160;
-        CLEM_LOG("clem_iwm: Disk525[%u]: Motor: %u; Head @ (%d,%d)",
+        CLEM_LOG("IWM: Disk525[%u]: Motor: %u; Head @ (%d,%d)",
             (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
             (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
             qtr_track_index / 4, qtr_track_index % 4);
