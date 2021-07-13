@@ -515,6 +515,55 @@ static inline void _cpu_adc(
     cpu->regs.P = p;
 }
 
+static inline void _cpu_adc_bcd(
+    struct Clemens65C816* cpu,
+    uint16_t value,
+    bool is8
+) {
+    /* note, invalid BCD should still function according to specific rules. see
+       https://math.stackexchange.com/questions/945320/why-do-we-add-6-in-bcd-addition
+    */
+    uint32_t adc;
+    uint8_t p;
+    bool carry = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
+    if (is8) {
+        value = value & 0xff;
+        adc = (cpu->regs.A & 0x0f) + (value & 0x0f) + carry;
+        if (adc > 0x09) adc += 0x06;
+        carry = adc > 0x0f;
+        adc = (cpu->regs.A & 0xf0) + (value & 0xf0) + (carry << 4) + (adc & 0x0f);
+        p = cpu->regs.P;
+        if (((cpu->regs.A & 0xff) ^ adc) & (value ^ adc) & 0x80) p |= kClemensCPUStatus_Overflow;
+        else p &= ~kClemensCPUStatus_Overflow;
+        if (adc > 0x9f) adc += 0x60;
+        _cpu_p_flags_n_z_data(cpu, (uint8_t)adc);
+        p = cpu->regs.P;
+        if (adc & 0x100) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
+        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, adc);
+    } else {
+        adc = (cpu->regs.A & 0x0f) + (value & 0x0f) + carry;
+        if (adc > 0x09) adc += 0x06;
+        carry = adc > 0x0f;
+        adc = (cpu->regs.A & 0xf0) + (value & 0xf0) + (carry << 4) + (adc & 0x0f);
+        if (adc > 0x9f) adc += 0x60;
+        carry = adc > 0xff;
+        adc = (cpu->regs.A & 0xf00) + (value & 0xf00) + (carry << 8) + (adc & 0xff);
+        if (adc > 0x9ff) adc += 0x600;
+        carry = adc > 0xfff;
+        adc = (cpu->regs.A & 0xf000) + (value & 0xf000) + (carry << 12) + (adc & 0xfff);
+        p = cpu->regs.P;
+        if ((cpu->regs.A ^ adc) & (value ^ adc) & 0x8000) p |= kClemensCPUStatus_Overflow;
+        else p &= ~kClemensCPUStatus_Overflow;
+        if (adc > 0x9fff) adc += 0x6000;
+        _cpu_p_flags_n_z_data_16(cpu, (uint16_t)adc);
+        p = cpu->regs.P;
+        if (adc & 0x10000) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
+        cpu->regs.A = (uint16_t)adc;
+    }
+    cpu->regs.P = p;
+}
 
 static inline void _cpu_sbc(
     struct Clemens65C816* cpu,
@@ -547,6 +596,70 @@ static inline void _cpu_sbc(
         if (adc & 0x10000) p |= kClemensCPUStatus_Carry;
         else p &= ~kClemensCPUStatus_Carry;
         cpu->regs.A = (uint16_t)adc;
+    }
+    cpu->regs.P = p;
+}
+
+static inline void _cpu_sbc_bcd(
+    struct Clemens65C816* cpu,
+    uint16_t value,
+    bool is8
+) {
+    /* note, invalid BCD should still function according to specific rules. see
+       https://math.stackexchange.com/questions/945320/why-do-we-add-6-in-bcd-addition
+    */
+    uint32_t sbc;
+    uint32_t sbc_2comp;
+    uint8_t p;
+    bool carry = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
+    if (is8) {
+        value = value & 0xff;
+        sbc = (cpu->regs.A & 0x0f) - (value & 0x0f) - !carry;
+        if (sbc & 0x10) {
+            /* borrow */
+            sbc = (sbc - 0x06) & 0x0f;
+            sbc |= ((cpu->regs.A & 0xf0) - (value & 0xf0) - 0x10);
+        } else {
+            sbc = (sbc & 0x0f);
+            sbc |= ((cpu->regs.A & 0xf0) - (value & 0xf0));
+        }
+        if (sbc & 0x100) sbc -= 0x60;
+        sbc_2comp = (cpu->regs.A & 0x80) - value  - !carry;
+        carry = (sbc_2comp < 0x100);
+        _cpu_p_flags_n_z_data(cpu, (uint8_t)sbc_2comp);
+        p = cpu->regs.P;
+	    if (((cpu->regs.A & 0xff) ^ sbc) & (value ^ sbc) & 0x80) p |= kClemensCPUStatus_Overflow;
+        else p &= ~kClemensCPUStatus_Overflow;
+        if (carry) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
+        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, sbc);
+    } else {
+        sbc = (cpu->regs.A & 0x0f) - (value & 0x0f) - !carry;
+        if (sbc & 0x10) {
+            /* borrow */
+            sbc = (sbc - 0x06) & 0x0f;
+            sbc |= ((cpu->regs.A & 0xf0) - (value & 0xf0) - 0x10);
+        } else {
+            sbc = (sbc & 0x0f);
+            sbc |= ((cpu->regs.A & 0xf0) - (value & 0xf0));
+        }
+        if (sbc & 0x100) {
+            sbc = (sbc - 0x60) & 0xff;
+            sbc |= ((cpu->regs.A & 0xf00) - (value & 0xf00) - 0x100);
+        } else {
+            sbc = (sbc & 0xff);
+            sbc |= ((cpu->regs.A & 0xf00) - (value & 0xf00));
+        }
+        if (sbc & 0x1000) sbc -= 0x600;
+        sbc_2comp = (cpu->regs.A & 0x8000) - value  - !carry;
+        carry = (sbc_2comp < 0x10000);
+        _cpu_p_flags_n_z_data_16(cpu, (uint16_t)sbc_2comp);
+        p = cpu->regs.P;
+        if ((cpu->regs.A ^ sbc) & (value ^ sbc) & 0x8000) p |= kClemensCPUStatus_Overflow;
+        else p &= ~kClemensCPUStatus_Overflow;
+        if (carry) p |= kClemensCPUStatus_Carry;
+        else p &= ~kClemensCPUStatus_Carry;
+        cpu->regs.A = (uint16_t)sbc;
     }
     cpu->regs.P = p;
 }
