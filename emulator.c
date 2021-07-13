@@ -2362,7 +2362,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
         case CLEM_OPC_ROR_ABS:
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, cpu->regs.DBR, m_status);
-            _cpu_rol(cpu, &tmp_value, m_status);
+            _cpu_ror(cpu, &tmp_value, m_status);
             _clem_cycle(clem, 1);
             _clem_write_816(clem, tmp_value, tmp_addr, cpu->regs.DBR, m_status);
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
