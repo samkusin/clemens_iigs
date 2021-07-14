@@ -7,6 +7,7 @@
 #include "imgui/imgui.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
@@ -472,6 +473,14 @@ void ClemensHost::emulate(float deltaTime)
   const float kAdjustedDeltaTime = std::min(deltaTime, 0.1f);
   const uint64_t kClocksPerFrameDesired = kAdjustedDeltaTime * kClocksPerSecond;
   uint64_t clocksSpentInitial = machine_.clocks_spent;
+
+  const time_t kEpoch1904To1970Seconds = 2082844800;
+  auto epoch_time_1904 = (
+    std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) +
+      kEpoch1904To1970Seconds);
+
+  clemens_rtc_set(&machine_, (unsigned)epoch_time_1904);
+
 
   machine_.cpu.cycles_spent = 0;
   while (emulationStepCount_ > 0 || emulationRunTarget_ != 0xffffffff) {

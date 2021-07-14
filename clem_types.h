@@ -52,6 +52,8 @@ struct ClemensDeviceRTC {
     unsigned index;
     unsigned flags;
 
+    unsigned seconds_since_1904;
+
     uint8_t bram[256];
 
     /*  these values are set by the app */

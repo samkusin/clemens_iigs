@@ -19,6 +19,8 @@
 #define CLEM_RTC_EXECUTE_REG_TEST           0x06
 #define CLEM_RTC_EXECUTE_REG_WRITE_PROTECT  0x07
 #define CLEM_RTC_EXECUTE_REG_UNKNOWN        0x08
+#define CLEM_RTC_EXECUTE_READ_CLOCK         0x09
+#define CLEM_RTC_EXECUTE_WRITE_CLOCK        0x0A
 #define CLEM_RTC_EXECUTE_ERROR              0xff
 
 #define CLEM_RTC_CMD_SECONDS_LO             0x00
@@ -43,18 +45,42 @@ void clem_rtc_reset(
     rtc->state = CLEM_RTC_EXECUTE_RECV_CMD;
 }
 
+void clem_rtc_set_clock_time(
+    struct ClemensDeviceRTC* rtc,
+    uint32_t seconds_since_1904
+) {
+    rtc->seconds_since_1904 = seconds_since_1904;
+}
+
 static void _clem_rtc_dispatch_cmd(
     struct ClemensDeviceRTC* rtc,
     unsigned data
 ) {
     unsigned cmd = (data >> 3) & 0xf;
     unsigned read = (data & 0x80);
+    unsigned opt = (data & 0x07);
     /* CLEM_LOG("clem_rtc_dispatch: ctl=%02X, data=%02X", rtc->ctl_c034, data); */
     switch (cmd) {
+        case CLEM_RTC_CMD_SECONDS_LO:
+            rtc->index = opt;
+            if (read) {
+                rtc->state = CLEM_RTC_EXECUTE_READ_CLOCK;
+            } else {
+                rtc->state = CLEM_RTC_EXECUTE_WRITE_CLOCK;
+            }
+            break;
+        case CLEM_RTC_CMD_SECONDS_HI:
+            rtc->index = (0x80000000 | opt);
+            if (read) {
+                rtc->state = CLEM_RTC_EXECUTE_READ_CLOCK;
+            } else {
+                rtc->state = CLEM_RTC_EXECUTE_WRITE_CLOCK;
+            }
+            break;
         case CLEM_RTC_CMD_REGISTER:
             /* special case registers - write only supported */
             if (!read) {
-                rtc->index = data & 0x7;
+                rtc->index = opt;
                 if (rtc->index == 0x1) {
                     rtc->state = CLEM_RTC_EXECUTE_REG_TEST;
                 } else if (rtc->index == 0x5) {
@@ -75,7 +101,7 @@ static void _clem_rtc_dispatch_cmd(
             } else {
                 rtc->state = CLEM_RTC_EXECUTE_RECV_CMD_BRAM_W;
             }
-            rtc->index = (data & 0x7) << 5;
+            rtc->index = opt << 5;
             break;
         default:
             CLEM_UNIMPLEMENTED("RTC %02X", cmd);
@@ -123,6 +149,22 @@ void _clem_rtc_bram_write(
     rtc->bram[rtc->index & 0xff] = data;
 }
 
+uint8_t _clem_rtc_clock_read(struct ClemensDeviceRTC* rtc) {
+    unsigned opt = rtc->index & 0xff;
+    if (opt & 1) {
+        if (rtc->index & 0x80000000) {
+            /* hi portion of clock data */
+            if (opt & 0x4) return (uint8_t)((rtc->seconds_since_1904 >> 24) & 0xff);
+            else return (uint8_t)((rtc->seconds_since_1904 >> 16) & 0xff);
+        } else {
+            /* lo portion of clock data */
+            if (opt & 0x4) return (uint8_t)((rtc->seconds_since_1904 >> 8) & 0xff);
+            else return (uint8_t)(rtc->seconds_since_1904 & 0xff);
+        }
+    }
+    CLEM_WARN("clem_rtc: clock read bad opt (%02X)", opt);
+    return 0;
+}
 
 void clem_rtc_command(
     struct ClemensDeviceRTC* rtc,
@@ -205,6 +247,17 @@ void clem_rtc_command(
             break;
         case CLEM_RTC_EXECUTE_REG_UNKNOWN:
             CLEM_LOG("RTC: register_unknown data %02X", rtc->data_c033);
+            break;
+        case CLEM_RTC_EXECUTE_READ_CLOCK:
+            if (has_recv_started) {
+                if (!is_write_cmd) {
+                    rtc->data_c033 = _clem_rtc_clock_read(rtc);
+                } else {
+
+                }
+            }
+            break;
+        case CLEM_RTC_EXECUTE_WRITE_CLOCK:
             break;
         default:
             break;

@@ -289,10 +289,15 @@ static void _clem_mmio_mega2_clear_irq(
     struct ClemensMMIO* mmio,
     uint8_t data
 ) {
-    // TODO: do this
-   mmio->dev_timer.irq_line &= ~CLEM_IRQ_TIMER_QSEC;
-   mmio->vgc.irq_line &= ~CLEM_IRQ_VGC_BLANK;
-   mmio->irq_line &= ~(CLEM_IRQ_TIMER_QSEC | CLEM_IRQ_VGC_BLANK);
+    if (data & 0x9f) {
+        CLEM_WARN("clem_mmio: invalid clear flags for SCANINT %02X", data);
+    }
+    if (data & 0x40) {
+        _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_QSEC);
+    }
+    if (data & 0x20) {
+        CLEM_UNIMPLEMENTED("clem_mmio: scan-line interrupt");
+    }
 }
 
 static uint8_t _clem_mmio_mega2_inten_get(struct ClemensMMIO* mmio) {
@@ -334,15 +339,29 @@ static void _clem_mmio_vgc_irq_c023_set(
     } else {
         mmio->dev_timer.flags &= ~CLEM_MMIO_TIMER_1SEC_ENABLED;
     }
-            }
-            if (data & 0x2) {
-                CLEM_UNIMPLEMENTED("VGC Scanline IRQ set");
-            }
-
+    if (data & 0x2) {
+        CLEM_UNIMPLEMENTED("VGC Scanline IRQ set");
+    }
 }
 
 static uint8_t _clem_mmio_vgc_irq_c023_get(struct ClemensMMIO* mmio) {
+    uint8_t res = 0x00;
 
+    if (mmio->irq_line & (CLEM_IRQ_VGC_SCAN_LINE + CLEM_IRQ_TIMER_RTC_1SEC)) {
+        res |= 0x80;
+        if (mmio->irq_line & CLEM_IRQ_TIMER_RTC_1SEC) {
+            res |= 0x40;
+        }
+        if (mmio->irq_line & CLEM_IRQ_VGC_SCAN_LINE) {
+            res |= 0x20;
+        }
+    }
+    if (mmio->dev_timer.flags & CLEM_MMIO_TIMER_1SEC_ENABLED) {
+        res |= 0x04;
+    }
+
+    /* TODO: VGC SCAN LINE */
+    return res;
 }
 
 /* For why we don't follow the HW Ref, see important changes documented for
@@ -639,6 +658,8 @@ static uint8_t _clem_mmio_read(
                                           ioreg,
                                           flags);
             break;
+        case CLEM_MMIO_REG_RTC_SCANINT:
+            break;
         case CLEM_MMIO_REG_SHADOW:
             result = _clem_mmio_shadow_c035(mmio);
             break;
@@ -897,6 +918,9 @@ static void _clem_mmio_write(
                                   &ref_clock,
                                   ioreg,
                                   data);
+            break;
+        case CLEM_MMIO_REG_RTC_SCANINT:
+            _clem_mmio_mega2_clear_irq(mmio, data);
             break;
         case CLEM_MMIO_REG_RTC_CTL:
             mmio->dev_rtc.ctl_c034 = data;

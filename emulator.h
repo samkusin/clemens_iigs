@@ -125,6 +125,14 @@ void clemens_input(ClemensMachine* clem,
  * @brief
  *
  * @param clem
+ * @param seconds_since_1904
+ */
+void clemens_rtc_set(ClemensMachine* clem, uint32_t seconds_since_1904);
+
+/**
+ * @brief
+ *
+ * @param clem
  */
 void clemens_emulate(ClemensMachine* clem);
 

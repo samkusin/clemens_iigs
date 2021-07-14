@@ -33,6 +33,8 @@ void clem_debug_rts(struct ClemensDeviceDebugger* dbg,
 
 void clem_rtc_reset(struct ClemensDeviceRTC* rtc,
                     clem_clocks_duration_t latency);
+void clem_rtc_set_clock_time(struct ClemensDeviceRTC* rtc,
+                             uint32_t seconds_since_1904);
 void clem_rtc_command(struct ClemensDeviceRTC* rtc, clem_clocks_time_t ts,
                       unsigned op);
 
