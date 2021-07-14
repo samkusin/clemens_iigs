@@ -10,7 +10,7 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Fix 80 column mode
+
 * Decimal Math sanity tests
 * Fix Reset key = F11 vs Delete key
 * VGC Pass 2 : Lores Graphics (not SHGR)
@@ -48,6 +48,7 @@ This is a running todo list.
 
 ## DONE
 
+* Fix 80 column mode
 * Fixed ROR Absolute (BUG!)
 * Fix repeat/key issues
 * Border and text colors

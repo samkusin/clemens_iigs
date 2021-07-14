@@ -564,12 +564,13 @@ void ClemensDisplay::renderTextPlane(
                       ((unsigned)grColor[2] << 16) |
                       ((unsigned)grColor[1] << 8) |
                       grColor[0];
+
   for (int i = 0; i < video.scanline_count; ++i) {
     int row = i + video.scanline_start;
     const uint8_t* scanline = memory + video.scanlines[row].offset;
     auto* vertex = &vertices[0];
     for (int j = 0; j < video.scanline_byte_cnt; ++j) {
-      float x0 = j;
+      float x0 = ((j * kPhaseCount) + phase);
       float y0 = i;
       float x1 = x0 + 1.0f;
       float y1 = y0 + 1.0f;
