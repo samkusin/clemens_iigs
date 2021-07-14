@@ -512,5 +512,12 @@
 #define CLEM_VGC_COLOR_AQUAMARINE           0x0E
 #define CLEM_VGC_COLOR_WHITE                0x0F
 
+#define CLEM_SCC_PORT_DTR                   0x01
+#define CLEM_SCC_PORT_HSKI                  0x02
+#define CLEM_SCC_PORT_TX_DATA_LO            0x04
+#define CLEM_SCC_PORT_TX_DATA_HI            0x08
+#define CLEM_SCC_PORT_RX_DATA_LO            0x10
+#define CLEM_SCC_PORT_RX_DATA_HI            0x20
+#define CLEM_SCC_PORT_GPI                   0x40
 
 #endif

@@ -116,6 +116,19 @@ struct ClemensDeviceADB {
     uint32_t irq_line;          /**< IRQ flags passed to machine */
 };
 
+struct ClemensDeviceSCC {
+    clem_clocks_time_t ts_last_frame;
+
+    /** Internal state that drives how the cmd/data registers are interpreted */
+    unsigned state;
+    unsigned selected_reg[2];
+
+    uint8_t serial[2];          /**< See CLEM_SCC_PORT_xxx */
+
+    uint32_t irq_line;          /**< IRQ flags passed to machine */
+};
+
+
 struct ClemensDeviceAudio {
     uint8_t sound_ram[65536];
 
@@ -274,6 +287,7 @@ struct ClemensMMIO {
     struct ClemensDeviceDebugger dev_debug;
     struct ClemensDeviceAudio dev_audio;
     struct ClemensDeviceIWM dev_iwm;
+    struct ClemensDeviceSCC dev_scc;
 
     /* Registers that do not fall easily within a device struct */
     uint32_t mmap_register;     // memory map flags- CLEM_MMIO_MMAP_
