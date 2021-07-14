@@ -10,6 +10,7 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
+* RTC clock time
 * Fix various unimplemented stuff
 * Get Control Panel Working
 * First 5.25" disk boot (DOS 3.3)

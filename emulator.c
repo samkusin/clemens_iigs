@@ -3277,7 +3277,7 @@ void clemens_emulate(ClemensMachine* clem) {
         mmio->timer_60hz_us -= CLEM_MEGA2_CYCLES_PER_60TH;
     }
 
-    mmio->irq_line == (
+    mmio->irq_line = (
         mmio->dev_adb.irq_line |
         mmio->dev_timer.irq_line |
         mmio->vgc.irq_line);
@@ -3380,6 +3380,13 @@ void clemens_input(
     const struct ClemensInputEvent* input
 ) {
     clem_adb_device_input(&machine->mmio.dev_adb, input);
+}
+
+void clemens_rtc_set(
+    ClemensMachine* machine,
+    uint32_t seconds_since_1904
+) {
+    clem_rtc_set_clock_time(&machine->mmio.dev_rtc, seconds_since_1904);
 }
 
 void clemens_debug_status(ClemensMachine* clem) {
