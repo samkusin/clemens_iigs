@@ -72,6 +72,8 @@
 
 /** IRQ line masks */
 #define CLEM_IRQ_VGC_SCAN_LINE              (0x00000010)
+#define CLEM_IRQ_VGC_BLANK                  (0x00000020)
+#define CLEM_IRQ_VGC_MASK                   (0x000000f0)
 #define CLEM_IRQ_TIMER_QSEC                 (0x00001000)
 #define CLEM_IRQ_TIMER_RTC_1SEC             (0x00002000)
 #define CLEM_IRQ_TIMER_MASK                 (0x0000f000)

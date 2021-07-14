@@ -15,6 +15,8 @@
 #define CLEM_VGC_MONOCHROME        0x00020000
 #define CLEM_VGC_PAL               0x00040000
 #define CLEM_VGC_LANGUAGE          0x00080000
+#define CLEM_VGC_ENABLE_VBL_IRQ    0x00100000
+#define CLEM_VGC_INIT              0x80000000
 
 /**
  * Video Interface

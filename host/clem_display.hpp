@@ -34,6 +34,7 @@ private:
 
   sg_image systemFontImage_;
   sg_image systemFontImageHi_;
+  sg_image loresFont_;
   sg_image blankImage_;
   sg_shader textShader_;
   sg_shader backShader_;
@@ -65,6 +66,8 @@ public:
     const uint8_t* mainMemory, const uint8_t* auxMemory,
     bool useAlternateCharacterSet);
 
+  void renderLoresGraphics(const ClemensVideo& video, const uint8_t* memory);
+
   void renderHiresGraphics(const ClemensVideo& video, const uint8_t* memory);
 
 
@@ -74,6 +77,8 @@ public:
 private:
   void renderTextPlane(const ClemensVideo& video, int columns, const uint8_t* memory,
                        int phase, bool useAlternateCharacterSet);
+  void renderLoresPlane(const ClemensVideo& video, int columns, const uint8_t* memory,
+                       int phase);
 
   ClemensDisplayProvider& provider_;
 

@@ -3277,8 +3277,7 @@ void clemens_emulate(ClemensMachine* clem) {
         mmio->timer_60hz_us -= CLEM_MEGA2_CYCLES_PER_60TH;
     }
 
-    mmio->irq_line &= ~(CLEM_IRQ_ADB_MASK | CLEM_IRQ_TIMER_MASK);
-    mmio->irq_line |= (
+    mmio->irq_line == (
         mmio->dev_adb.irq_line |
         mmio->dev_timer.irq_line |
         mmio->vgc.irq_line);

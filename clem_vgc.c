@@ -21,6 +21,7 @@ void clem_vgc_init(struct ClemensVGC* vgc) {
     unsigned offset;
     unsigned row, inner;
 
+    vgc->mode_flags = CLEM_VGC_INIT;
     vgc->text_fg_color = CLEM_VGC_COLOR_WHITE;
     vgc->text_bg_color = CLEM_VGC_COLOR_MEDIUM_BLUE;
 
@@ -134,7 +135,6 @@ uint8_t clem_vgc_get_region(struct ClemensVGC* vgc) {
 }
 
 
-
 void clem_vgc_sync(
     struct ClemensVGC* vgc,
     struct ClemensClock* clock
@@ -149,20 +149,36 @@ void clem_vgc_sync(
     */
     unsigned scanline_ns;
     unsigned frame_ns;
-    unsigned counter;
-    vgc->dt_scanline += (clock->ts - vgc->ts_last_frame);
-    scanline_ns = _clem_calc_ns_step_from_clocks(
-        vgc->dt_scanline, clock->ref_step);
-    if (scanline_ns > CLEM_VGC_HORIZ_SCAN_TIME_NS) {
-        vgc->dt_scanline = _clem_calc_clocks_step_from_ns(
-            CLEM_VGC_HORIZ_SCAN_TIME_NS - vgc->dt_scanline, clock->ref_step);
+    unsigned v_counter;
+
+    if (vgc->mode_flags & CLEM_VGC_INIT) {
+        vgc->ts_last_frame = clock->ts;
+        vgc->ts_scanline_0 = clock->ts;
+        vgc->dt_scanline = 0;
+        vgc->mode_flags &= ~CLEM_VGC_INIT;
+    } else {
+        vgc->dt_scanline += (clock->ts - vgc->ts_last_frame);
+        scanline_ns = _clem_calc_ns_step_from_clocks(
+            vgc->dt_scanline, clock->ref_step);
+        if (scanline_ns > CLEM_VGC_HORIZ_SCAN_TIME_NS) {
+            vgc->dt_scanline = _clem_calc_clocks_step_from_ns(
+                CLEM_VGC_HORIZ_SCAN_TIME_NS - vgc->dt_scanline, clock->ref_step);
+        }
+        frame_ns = _clem_calc_ns_step_from_clocks(
+            clock->ts - vgc->ts_scanline_0, clock->ref_step);
+        v_counter = frame_ns / CLEM_VGC_HORIZ_SCAN_TIME_NS;
+        if (vgc->mode_flags & CLEM_VGC_ENABLE_VBL_IRQ) {
+            if (v_counter >= CLEM_VGC_VBL_NTSC_UPPER_BOUND) {
+                vgc->irq_line |= CLEM_IRQ_VGC_BLANK;
+            }
+        }
+        if (frame_ns >= CLEM_VGC_NTSC_SCAN_TIME_NS) {
+            vgc->ts_scanline_0 = clock->ts - _clem_calc_clocks_step_from_ns(
+                CLEM_VGC_NTSC_SCAN_TIME_NS - frame_ns, clock->ref_step);
+        }
+
     }
-    frame_ns = _clem_calc_ns_step_from_clocks(
-        clock->ts - vgc->ts_scanline_0, clock->ref_step);
-    if (frame_ns >= CLEM_VGC_NTSC_SCAN_TIME_NS) {
-        vgc->ts_scanline_0 = clock->ts - _clem_calc_clocks_step_from_ns(
-            CLEM_VGC_NTSC_SCAN_TIME_NS - frame_ns, clock->ref_step);
-    }
+
     vgc->ts_last_frame = clock->ts;
 }
 
