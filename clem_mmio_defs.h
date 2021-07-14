@@ -218,9 +218,12 @@
 #define CLEM_MMIO_REG_AUDIO_ADRLO       0x3E
 /** Sound GLU Data Address Hi byte Register */
 #define CLEM_MMIO_REG_AUDIO_ADRHI       0x3F
-
+/** Enable specific Mega2 (Video, mouse, timer) interrupts */
+#define CLEM_MMIO_REG_MEGA2_INTEN       0x41
 /** Various Mega II specific interrupt flags likely used only by firmware */
 #define CLEM_MMIO_REG_DIAG_INTTYPE      0x46
+/** Clears some MEGA2 based interrupts */
+#define CLEM_MMIO_REG_CLRVBLINT         0x47
 /** R/W Display graphics mode - will be mixed if correct flags are set */
 #define CLEM_MMIO_REG_TXTCLR            0x50
 /** R/W Display text mode only */

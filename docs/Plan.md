@@ -10,12 +10,10 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-
-* Decimal Math sanity tests
-* Fix Reset key = F11 vs Delete key
-* VGC Pass 2 : Lores Graphics (not SHGR)
+* Fix various unimplemented stuff
 * Get Control Panel Working
 * First 5.25" disk boot (DOS 3.3)
+* Decimal Math sanity tests
 * Decimal math tests
 * Writable disk data
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
@@ -48,6 +46,8 @@ This is a running todo list.
 
 ## DONE
 
+* VGC Pass 2 : Lores Graphics (not SHGR)
+* Fix Reset key = F11 vs Delete key
 * Fix 80 column mode
 * Fixed ROR Absolute (BUG!)
 * Fix repeat/key issues

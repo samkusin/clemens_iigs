@@ -128,6 +128,24 @@ static void _clem_mmio_create_page_mapping(
     page->write = page_idx;
 }
 
+static void _clem_mmio_clear_irq(
+    struct ClemensMMIO* mmio,
+    unsigned irq_flags
+) {
+    if (irq_flags & CLEM_IRQ_VGC_MASK) {
+        mmio->vgc.irq_line &= ~(irq_flags & CLEM_IRQ_VGC_MASK);
+        mmio->irq_line &= ~(irq_flags & CLEM_IRQ_VGC_MASK);
+    }
+    if (irq_flags & CLEM_IRQ_TIMER_MASK) {
+        mmio->dev_timer.irq_line &= ~(irq_flags & CLEM_IRQ_TIMER_MASK);
+        mmio->irq_line &= ~(irq_flags & CLEM_IRQ_TIMER_MASK);
+    }
+    if (irq_flags & CLEM_IRQ_ADB_MASK) {
+        mmio->dev_adb.irq_line &= ~(irq_flags & CLEM_IRQ_ADB_MASK);
+        mmio->irq_line &= ~(irq_flags & CLEM_IRQ_ADB_MASK);
+    }
+}
+
 static inline uint8_t _clem_mmio_newvideo_c029(struct ClemensMMIO* mmio) {
     return mmio->new_video_c029;
 }
@@ -246,6 +264,49 @@ static void _clem_mmio_speed_c036_set(
     clem->mmio.speed_c036 = (value & 0xdf);
 }
 
+static void _clem_mmio_mega2_inten_set(struct ClemensMMIO* mmio, uint8_t data) {
+    if (data & 0xe0) {
+        CLEM_WARN("clem_mmio: invalid inten set %02X", data);
+    }
+    if (data & 0x10) {
+        mmio->dev_timer.flags |= CLEM_MMIO_TIMER_QSEC_ENABLED;
+    } else {
+        mmio->dev_timer.flags &= ~CLEM_MMIO_TIMER_QSEC_ENABLED;
+        _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_QSEC);
+    }
+    if (data & 0x08) {
+        clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_ENABLE_VBL_IRQ);
+    } else {
+        clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_ENABLE_VBL_IRQ);
+        _clem_mmio_clear_irq(mmio, CLEM_IRQ_VGC_BLANK);
+    }
+    if (data & 0x07) {
+        CLEM_WARN("clem_mmio: mega2 mouse not impl - set %02X", data);
+    }
+}
+
+static void _clem_mmio_mega2_clear_irq(
+    struct ClemensMMIO* mmio,
+    uint8_t data
+) {
+    // TODO: do this
+   mmio->dev_timer.irq_line &= ~CLEM_IRQ_TIMER_QSEC;
+   mmio->vgc.irq_line &= ~CLEM_IRQ_VGC_BLANK;
+   mmio->irq_line &= ~(CLEM_IRQ_TIMER_QSEC | CLEM_IRQ_VGC_BLANK);
+}
+
+static uint8_t _clem_mmio_mega2_inten_get(struct ClemensMMIO* mmio) {
+    uint8_t res = 0x00;
+    if (mmio->dev_timer.flags & CLEM_MMIO_TIMER_QSEC_ENABLED) {
+        res |= 0x10;
+    }
+    if (mmio->vgc.mode_flags & CLEM_VGC_ENABLE_VBL_IRQ) {
+        res |= 0x08;
+    }
+    return res;
+}
+
+
 static uint8_t _clem_mmio_inttype_c046(
     struct ClemensMMIO* mmio
 ) {
@@ -254,9 +315,34 @@ static uint8_t _clem_mmio_inttype_c046(
     if (mmio->irq_line & CLEM_IRQ_TIMER_QSEC) {
         result |= CLEM_MMIO_INTTYPE_QSEC;
     }
+    if (mmio->irq_line & CLEM_IRQ_VGC_BLANK) {
+        result |= CLEM_MMIO_INTTYPE_VBL;
+    }
+
+    /* TODO: AN3, Mouse */
 
     /* TODO: other flags, mouse, VBL, */
     return result;
+}
+
+static void _clem_mmio_vgc_irq_c023_set(
+    struct ClemensMMIO* mmio,
+    uint8_t data
+) {
+    if (data & 0x4) {
+        mmio->dev_timer.flags |= CLEM_MMIO_TIMER_1SEC_ENABLED;
+    } else {
+        mmio->dev_timer.flags &= ~CLEM_MMIO_TIMER_1SEC_ENABLED;
+    }
+            }
+            if (data & 0x2) {
+                CLEM_UNIMPLEMENTED("VGC Scanline IRQ set");
+            }
+
+}
+
+static uint8_t _clem_mmio_vgc_irq_c023_get(struct ClemensMMIO* mmio) {
+
 }
 
 /* For why we don't follow the HW Ref, see important changes documented for
@@ -527,6 +613,13 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_80COLUMN_TEST:
             result = (mmio->vgc.mode_flags & CLEM_VGC_80COLUMN_TEXT) ? 0x80 : 00;
             break;
+        case CLEM_MMIO_REG_VGC_TEXT_COLOR:
+            result = (uint8_t)(
+                (mmio->vgc.text_fg_color << 4) | mmio->vgc.text_bg_color);
+            break;
+        case CLEM_MMIO_REG_VGC_IRQ_BYTE:
+            result = _clem_mmio_vgc_irq_c023_get(mmio);
+            break;
         case CLEM_MMIO_REG_NEWVIDEO:
             result = _clem_mmio_newvideo_c029(mmio);
             break;
@@ -573,11 +666,13 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_AUDIO_ADRHI:
             result = clem_sound_read_switch(&mmio->dev_audio, ioreg, flags);
             break;
+        case CLEM_MMIO_REG_MEGA2_INTEN:
+            result = _clem_mmio_mega2_inten_get(mmio);
+            break;
         case CLEM_MMIO_REG_DIAG_INTTYPE:
-            if (!is_noop) {
-                CLEM_WARN("IO C046 partial impl");
-            }
             result = _clem_mmio_inttype_c046(mmio);
+            break;
+        case CLEM_MMIO_REG_CLRVBLINT:
             break;
         case CLEM_MMIO_REG_TXTCLR:
             if (!(flags & CLEM_MMIO_READ_NO_OP)) {
@@ -775,14 +870,7 @@ static void _clem_mmio_write(
             clem_vgc_set_text_colors(&mmio->vgc, (data & 0xf0) >> 4, data & 0x0f);
             break;
         case CLEM_MMIO_REG_VGC_IRQ_BYTE:
-            if (data & 0x4) {
-                mmio->dev_timer.flags |= CLEM_MMIO_TIMER_1SEC_ENABLED;
-            } else {
-                mmio->dev_timer.flags &= ~CLEM_MMIO_TIMER_1SEC_ENABLED;
-            }
-            if (data & 0x2) {
-                CLEM_UNIMPLEMENTED("VGC Scanline IRQ set");
-            }
+            _clem_mmio_vgc_irq_c023_set(mmio, data);
             break;
         case CLEM_MMIO_REG_ANYKEY_STROBE:
         case CLEM_MMIO_REG_ADB_MOUSE_DATA:
@@ -846,6 +934,12 @@ static void _clem_mmio_write(
             break;
         case CLEM_MMIO_REG_AUDIO_ADRHI:
             clem_sound_write_switch(&mmio->dev_audio, ioreg, data);
+            break;
+        case CLEM_MMIO_REG_MEGA2_INTEN:
+            _clem_mmio_mega2_inten_set(mmio, data);
+            break;
+        case CLEM_MMIO_REG_CLRVBLINT:
+            _clem_mmio_mega2_clear_irq(mmio, data);
             break;
         case CLEM_MMIO_REG_TXTCLR:
             clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_GRAPHICS_MODE);

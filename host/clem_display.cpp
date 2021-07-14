@@ -218,7 +218,14 @@ void a2hgrToABGR8Scale2x1(uint8_t* pixout, const uint8_t* hgr){
   pixout[xpos+1] = pixel;
 }
 
-
+uint32_t grColorToABGR(unsigned color)
+{
+  const uint8_t* grColor = &kGr16Colors[color][0];
+  unsigned abgr = ((unsigned)grColor[3] << 24) |
+                  ((unsigned)grColor[2] << 16) |
+                  ((unsigned)grColor[1] << 8) |
+                  grColor[0];
+  return abgr;
 } // namespace
 
 
@@ -263,6 +270,7 @@ static sg_image loadFont(const char* pathname, stbtt_bakedchar* glyphSet)
   return fontImage;
 }
 
+} // namespace anon
 
 ClemensDisplayProvider::ClemensDisplayProvider() {
   systemFontImage_ = loadFont("fonts/PrintChar21.ttf", kGlyphSet40col);
@@ -378,7 +386,8 @@ ClemensDisplay::ClemensDisplay(ClemensDisplayProvider& provider) :
   //  foreground
   sg_buffer_desc vertexBufDesc = { };
   vertexBufDesc.usage = SG_USAGE_STREAM;
-  vertexBufDesc.size = 2 * (kDisplayTextRowLimit * kDisplayTextColumnLimit * 6) * (
+  //  using 2 x 2 x 40x24 quads (lores has two pixels per box)
+  vertexBufDesc.size = 4 * (kDisplayTextRowLimit * kDisplayTextColumnLimit * 6) * (
     sizeof(DrawVertex));
   textVertexBuffer_ = sg_make_buffer(&vertexBufDesc);
 
@@ -559,11 +568,7 @@ void ClemensDisplay::renderTextPlane(
   sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, rangeParam);
 
   // pass 1 - background
-  const uint8_t* grColor = &kGr16Colors[(emulatorTextColor_>>4) & 0xf][0];
-  unsigned textABGR = ((unsigned)grColor[3] << 24) |
-                      ((unsigned)grColor[2] << 16) |
-                      ((unsigned)grColor[1] << 8) |
-                      grColor[0];
+  unsigned textABGR = grColorToABGR((emulatorTextColor_ >> 4) & 0xf);
 
   for (int i = 0; i < video.scanline_count; ++i) {
     int row = i + video.scanline_start;
@@ -589,11 +594,7 @@ void ClemensDisplay::renderTextPlane(
   }
 
   //  poss 2 - foreground
-  grColor = &kGr16Colors[emulatorTextColor_ & 0xf][0];
-  textABGR = ((unsigned)grColor[3] << 24) |
-              ((unsigned)grColor[2] << 16) |
-              ((unsigned)grColor[1] << 8) |
-              grColor[0];
+  textABGR = grColorToABGR(emulatorTextColor_ & 0xf);
   for (int i = 0; i < video.scanline_count; ++i) {
     int row = i + video.scanline_start;
     const uint8_t* scanline = memory + video.scanlines[row].offset;
@@ -630,6 +631,88 @@ void ClemensDisplay::renderTextPlane(
     sg_draw(0, 6 * video.scanline_byte_cnt, 1);
   }
 }
+
+void ClemensDisplay::renderLoresGraphics(
+  const ClemensVideo& video,
+  const uint8_t* memory
+) {
+  renderLoresPlane(video, 40, memory, 0);
+}
+
+void ClemensDisplay::renderLoresPlane(
+  const ClemensVideo& video,
+  int columns, const uint8_t* memory,
+  int phase
+) {
+  if (video.format != kClemensVideoFormat_Lores) {
+    return;
+  }
+
+  const int kPhaseCount = columns / 40;
+
+  DisplayVertexParams vertexParams;
+  vertexParams.virtual_dims[0] = columns;
+  vertexParams.virtual_dims[1] = 48;
+  vertexParams.display_ratio[0] = emulatorVideoDimensions_[0] / vertexParams.virtual_dims[0];
+  vertexParams.display_ratio[1] = emulatorVideoDimensions_[1] / vertexParams.virtual_dims[1];
+  vertexParams.render_dims[0] = kRenderTargetWidth;
+  vertexParams.render_dims[1] = kRenderTargetHeight;
+  vertexParams.offsets[0] = (emulatorMonitorDimensions_[0] - emulatorVideoDimensions_[0]) * 0.5f;
+  vertexParams.offsets[1] = (emulatorMonitorDimensions_[1] - emulatorVideoDimensions_[1]) * 0.5f;
+
+  sg_bindings pixelBindings_ = {};
+  pixelBindings_.vertex_buffers[0] = textVertexBuffer_;
+  pixelBindings_.fs_images[0] = provider_.blankImage_;
+
+  DrawVertex vertices[80 * 6];
+  sg_range verticesRange;
+  verticesRange.ptr = &vertices[0];
+  verticesRange.size = 2 * video.scanline_byte_cnt * 6 * sizeof(DrawVertex);
+
+  sg_range rangeParam;
+  rangeParam.ptr = &vertexParams;
+  rangeParam.size = sizeof(vertexParams);
+  sg_apply_pipeline(provider_.textPipeline_);
+  sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, rangeParam);
+
+  // pass 1 - background
+  for (int i = 0; i < video.scanline_count; ++i) {
+    int row = i + video.scanline_start;
+    const uint8_t* scanline = memory + video.scanlines[row].offset;
+    auto* vertex = &vertices[0];
+    for (int j = 0; j < video.scanline_byte_cnt; ++j) {
+      float x0 = ((j * kPhaseCount) + phase);
+      float y0 = i * 2;
+      float x1 = x0 + 1.0f;
+      float y1 = y0 + 1.0f;
+
+      uint8_t block = scanline[j];
+      unsigned textABGR = grColorToABGR(block & 0xf);
+      vertex[0] = { { x0, y0 }, { 0.0f, 0.0f }, textABGR };
+      vertex[1] = { { x0, y1 }, { 0.0f, 1.0f }, textABGR };
+      vertex[2] = { { x1, y1 }, { 1.0f, 1.0f }, textABGR };
+      vertex[3] = { { x0, y0 }, { 0.0f, 0.0f }, textABGR };
+      vertex[4] = { { x1, y1 }, { 1.0f, 1.0f }, textABGR };
+      vertex[5] = { { x1, y0 }, { 1.0f, 0.0f }, textABGR };
+      vertex += 6;
+      textABGR = grColorToABGR(block >> 4);
+      y0 = y1;
+      y1 += 1.0f;
+      vertex[0] = { { x0, y0 }, { 0.0f, 0.0f }, textABGR };
+      vertex[1] = { { x0, y1 }, { 0.0f, 1.0f }, textABGR };
+      vertex[2] = { { x1, y1 }, { 1.0f, 1.0f }, textABGR };
+      vertex[3] = { { x0, y0 }, { 0.0f, 0.0f }, textABGR };
+      vertex[4] = { { x1, y1 }, { 1.0f, 1.0f }, textABGR };
+      vertex[5] = { { x1, y0 }, { 1.0f, 0.0f }, textABGR };
+      vertex += 6;
+    }
+    auto vbOffset = sg_append_buffer(pixelBindings_.vertex_buffers[0], verticesRange);
+    pixelBindings_.vertex_buffer_offsets[0] = vbOffset;
+    sg_apply_bindings(pixelBindings_);
+    sg_draw(0, 12 * video.scanline_byte_cnt, 1);
+  }
+}
+
 
 void ClemensDisplay::renderHiresGraphics(
   const ClemensVideo& video,

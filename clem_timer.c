@@ -3,7 +3,7 @@
 
 
 void clem_timer_reset(struct ClemensDeviceTimer* timer) {
-
+    timer->flags = 0;
 }
 
 void clem_timer_sync(
