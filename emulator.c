@@ -11,6 +11,7 @@
 #include "clem_drive.h"
 #include "clem_util.h"
 #include "clem_device.h"
+#include "clem_debug.h"
 #include "clem_vgc.h"
 #include "clem_woz.h"
 
@@ -3018,28 +3019,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_read_pba(clem, &tmp_data, &tmp_pc);
             CLEM_CPU_I_INTR_LOG(cpu, "BRK");
             tmp_value = tmp_data;
-            //  push PBR (native)
-            //  push PC
-            //  push P - move PHP code into common utility for this
-            //  irq_disable is set
-            //  reset P:decimal flag to 0 (assuming before running BRK program)
-            //  PC <- use native or emulation mode vector
-            //  TODO: what to do if we are already in a brk?
-            //  native mode push PBR
-            if (!cpu->pins.emulation) {
-                _cpu_sp_dec(cpu);
-                clem_write(clem, (uint8_t)cpu->regs.PBR, cpu->regs.S + 1, 0x00,
-                           CLEM_MEM_FLAG_DATA);
-            }
-            //  push PC and status
-            _cpu_sp_dec2(cpu);
-            _clem_write_16(clem, tmp_pc, cpu->regs.S + 1, 0x00);
-            _clem_opc_push_status(clem, true);
-            cpu->regs.P |= kClemensCPUStatus_IRQDisable;
-            //  docs conflict on whether 65816 emulation mode clears the decimal
-            //  status or not.
-            //  TODO: address this conflict if the need arises
-            cpu->regs.P &= ~kClemensCPUStatus_Decimal;
+            _clem_irq_brk_setup(clem, tmp_pc, true);
+
             if (cpu->pins.emulation) {
                 clem_read(clem, &tmp_data, CLEM_6502_IRQBRK_VECTOR_LO_ADDR, 0x00,
                        CLEM_MEM_FLAG_PROGRAM);
@@ -3061,29 +3042,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
         case CLEM_OPC_COP:
             //  ignore irq disable
             _clem_read_pba(clem, &tmp_data, &tmp_pc);
+            CLEM_CPU_I_INTR_LOG(cpu, "COP");
             tmp_value = tmp_data;
-            //  push PBR (native)
-            //  push PC
-            //  push P - move PHP code into common utility for this
-            //  irq_disable is set
-            //  reset P:decimal flag to 0 (assuming before running BRK program)
-            //  PC <- use native or emulation mode vector
-            //  TODO: what to do if we are already in a brk?
-            //  native mode push PBR
-            if (!cpu->pins.emulation) {
-                _cpu_sp_dec(cpu);
-                clem_write(clem, (uint8_t)cpu->regs.PBR, cpu->regs.S + 1, 0x00,
-                           CLEM_MEM_FLAG_DATA);
-            }
-            //  push PC and status
-            _cpu_sp_dec2(cpu);
-            _clem_write_16(clem, tmp_pc, cpu->regs.S + 1, 0x00);
-            _clem_opc_push_status(clem, false);
-            cpu->regs.P |= kClemensCPUStatus_IRQDisable;
-            //  docs conflict on whether 65816 emulation mode clears the decimal
-            //  status or not.
-            //  TODO: address this conflict if the need arises
-            cpu->regs.P &= ~kClemensCPUStatus_Decimal;
+            _clem_irq_brk_setup(clem, tmp_pc, true);
+
             if (cpu->pins.emulation) {
                 clem_read(clem, &tmp_data, CLEM_6502_COP_VECTOR_LO_ADDR, 0x00,
                        CLEM_MEM_FLAG_PROGRAM);
@@ -3104,15 +3066,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_RTI:
             _clem_cycle(clem, 2);
-            _clem_opc_pull_status(clem);
-            _clem_read_16(clem, &tmp_addr, cpu->regs.S + 1, 0x00, CLEM_MEM_FLAG_DATA);
-            _cpu_sp_inc2(cpu);
-            if (!cpu->pins.emulation) {
-                clem_read(clem, &tmp_bnk0, cpu->regs.S + 1, 0x00, CLEM_MEM_FLAG_DATA);
-                _cpu_sp_inc(cpu);
-                cpu->regs.PBR = tmp_bnk0;
-            }
-            tmp_pc = tmp_addr;
+            tmp_pc = _clem_irq_brk_return(clem);
             break;
         case CLEM_OPC_WAI:
             //  the calling application should interpret ReadyOut
@@ -3218,24 +3172,12 @@ void clemens_emulate(ClemensMachine* clem) {
     } else if (cpu->state_type == kClemensCPUStateType_IRQ) {
         uint8_t tmp_data;
         uint8_t tmp_datahi;
-        // 2 cycles of 'internal ops'
-        // 2 cycles of pushing PC (next instruction to run)
-        // 1 cycle push status reg
-        // 2 cycles vector pull to PC
-        // disable interrupts, clear decimal mode
+        /* +2 cycles of 'internal ops'
+           +3/4 cycles for stack operations
+            2 cycles vector pull to PC
+        */
         _clem_cycle(clem, 2);
-        //  TODO: move the push regs logic to a utility that is executed for
-        //        BRK, COP or IRQ.  this behavior will also clear PBR and
-        //        set IRQDisable, clear decimal.  In native mode, PBR will be
-        //        pushed.
-        //        Also check that RTI does what we want for native vs emulation
-        //          and likely move that into a utilty that reverses the push
-        //          logic above.
-        if (cpu->pins.emulation) {
-            _clem_opc_push_reg_816(clem, cpu->regs.PBR, true);
-        }
-        _clem_opc_push_pc16(clem, cpu->regs.PC);
-        _clem_opc_push_status(clem, false);
+        _clem_irq_brk_setup(clem, cpu->regs.PC, false);
         if (cpu->pins.emulation) {
             // vector pull low signal while the PC is being loaded
             clem_read(clem, &tmp_data, CLEM_6502_IRQBRK_VECTOR_LO_ADDR, 0x00,
@@ -3249,8 +3191,6 @@ void clemens_emulate(ClemensMachine* clem) {
                         0x00, CLEM_MEM_FLAG_PROGRAM);
         }
         cpu->regs.PC = (uint16_t)(tmp_datahi << 8) | tmp_data;
-        cpu->regs.P |= kClemensCPUStatus_IRQDisable;
-        cpu->regs.P &= ~kClemensCPUStatus_Decimal;
         cpu->state_type = kClemensCPUStateType_Execute;
         return;
     }
@@ -3292,6 +3232,7 @@ void clemens_emulate(ClemensMachine* clem) {
     mmio->irq_line = (
         mmio->dev_adb.irq_line |
         mmio->dev_timer.irq_line |
+        mmio->dev_audio.irq_line |
         mmio->vgc.irq_line);
 
     /* IRQB low triggers an interrupt next frame */

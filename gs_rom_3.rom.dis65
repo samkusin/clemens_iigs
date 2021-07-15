@@ -89,6 +89,23 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"IO_80COLSTORE_E1_c018":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_80COLSTORE_E1_c018",
+"Value":14794776,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "IO_80COLTEST_E1_c01f":{
 "DataDescriptor":{
 "Length":1,
@@ -497,6 +514,23 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"IO_RDALTZP_E1_c016":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_RDALTZP_E1_c016",
+"Value":14794774,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "IO_RDCXROM_C015":{
 "DataDescriptor":{
 "Length":1,
@@ -561,6 +595,23 @@
 "MultiMask":null,
 "Label":"IO_SCC_A_CMD_C039",
 "Value":49209,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_SCC_CMD_A_E1_C039":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_SCC_CMD_A_E1_C039",
+"Value":14794809,
 "Source":"Project",
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
@@ -714,6 +765,57 @@
 "MultiMask":null,
 "Label":"IO_SLOTROMSEL_E1",
 "Value":14794797,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_SOUNDADRH_c03d":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_SOUNDADRH_c03d",
+"Value":49213,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_SOUNDADRL_c03e":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_SOUNDADRL_c03e",
+"Value":49214,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_SOUNDCTL_c03c":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_SOUNDCTL_c03c",
+"Value":49212,
 "Source":"Project",
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
@@ -939,6 +1041,23 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"IO_VGCINT_c023":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_VGCINT_c023",
+"Value":49187,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "SYM_BRAM_BKG_COLOR":{
 "DataDescriptor":{
 "Length":1,
@@ -1139,23 +1258,6 @@
 "MultiMask":null,
 "Label":"SYM_C036_SPEED_FLAG",
 "Value":312,
-"Source":"Project",
-"Type":"ExternalAddr",
-"LabelAnno":"None"},
-
-"SYM_IO_SOUNDCTL":{
-"DataDescriptor":{
-"Length":1,
-"Format":"NumericLE",
-"SubFormat":"Hex",
-"SymbolRef":null},
-
-"Comment":"",
-"HasWidth":false,
-"Direction":"ReadWrite",
-"MultiMask":null,
-"Label":"SYM_IO_SOUNDCTL",
-"Value":49212,
 "Source":"Project",
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
@@ -1740,6 +1842,11 @@
 "Hint":"Code"},
 
 {
+"Low":244844,
+"High":244844,
+"Hint":"Code"},
+
+{
 "Low":244903,
 "High":244903,
 "Hint":"Code"},
@@ -2090,6 +2197,7 @@
 "244311":256,
 "244335":3408128,
 "244431":3408136,
+"244844":3407872,
 "260252":19922992,
 "260706":20185088},
 
@@ -2193,6 +2301,13 @@
 "244772":"Set border color",
 "244778":"Resets chargen to english and NTSC",
 "244783":"Set text display + NTSC/PAL switches",
+"244900":"Check SCC interrupt status",
+"244977":"goto FF/BA18, which just sets the carry flag?",
+"244982":"and this branch is never taken as a result of above",
+"245157":"detect scan line interrupt",
+"245186":"check oscillator interrupt status",
+"245471":"1 second interrupt",
+"245490":"VGC external interrupt (N/A for the IIgs?)",
 "249249":"in 80 column mode?",
 "249759":"checks if EventManager is active",
 "249767":"if active, then do something else?",
@@ -2619,6 +2734,36 @@
 
 "242353":{
 "Text":"DEBUG: this routine call alters the read/write ptr?\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244896":{
+"Text":"TODO: is this how we\u0027re checking if this is a BRK vs IRQB (v==0)?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244911":{
+"Text":"SCC interrupt handling\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"244844":{
+"Text":"The Native-mode IRQ handler.\r\n\r\n- SCC\r\n- VGC\r\n- DOC (Ensoniq)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"245172":{
+"Text":"DOC oscillator interrupt handling",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"245271":{
+"Text":"Handle the VBL interrupt\r\n",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -4893,6 +5038,69 @@
 "Value":16758764,
 "Source":"User",
 "Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"244966":{
+"Label":"next_handler",
+"Value":16760038,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"245108":{
+"Label":"no_80colstore",
+"Value":16760180,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"245172":{
+"Label":"skip_vgc_int",
+"Value":16760244,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"244844":{
+"Label":"IRQ_NATIVE_HANDLER",
+"Value":16759916,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"245238":{
+"Label":"skip_doc_int",
+"Value":16760310,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"245297":{
+"Label":"no_vbl_int",
+"Value":16760369,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"245466":{
+"Label":"vgc_1_second",
+"Value":16760538,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"245485":{
+"Label":"vgc_ext_int",
+"Value":16760557,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"245630":{
+"Label":"emulation_irq",
+"Value":16760702,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -5571,5 +5779,9 @@
 "Bank":225},
 
 "244700":{
+"FollowPbr":false,
+"Bank":225},
+
+"244853":{
 "FollowPbr":false,
 "Bank":225}}}

@@ -10,9 +10,6 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Serial register read/write simple
-* Fix various unimplemented stuff
-* Get Control Panel Working
 * First 5.25" disk boot (DOS 3.3)
 * Decimal Math sanity tests
 * Decimal math tests
@@ -47,6 +44,10 @@ This is a running todo list.
 
 ## DONE
 
+* audio registers (interrupt) need implementation
+* Serial register read/write simple
+* Fix various unimplemented stuff
+* Get Control Panel Working
 * RTC clock time (read)
 * VGC Pass 2 : Lores Graphics (not SHGR)
 * Fix Reset key = F11 vs Delete key
