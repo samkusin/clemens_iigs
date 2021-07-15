@@ -44,6 +44,7 @@ set(EMULATOR_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_drive.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_iwm.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_rtc.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_scc.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_timer.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_vgc.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_woz.c"

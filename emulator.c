@@ -3214,6 +3214,7 @@ void clemens_emulate(ClemensMachine* clem) {
         cpu->regs.PC = (uint16_t)(tmp_datahi << 8) | tmp_data;
 
         cpu->state_type = kClemensCPUStateType_Execute;
+        return;
     } else if (cpu->state_type == kClemensCPUStateType_IRQ) {
         uint8_t tmp_data;
         uint8_t tmp_datahi;
@@ -3223,6 +3224,16 @@ void clemens_emulate(ClemensMachine* clem) {
         // 2 cycles vector pull to PC
         // disable interrupts, clear decimal mode
         _clem_cycle(clem, 2);
+        //  TODO: move the push regs logic to a utility that is executed for
+        //        BRK, COP or IRQ.  this behavior will also clear PBR and
+        //        set IRQDisable, clear decimal.  In native mode, PBR will be
+        //        pushed.
+        //        Also check that RTI does what we want for native vs emulation
+        //          and likely move that into a utilty that reverses the push
+        //          logic above.
+        if (cpu->pins.emulation) {
+            _clem_opc_push_reg_816(clem, cpu->regs.PBR, true);
+        }
         _clem_opc_push_pc16(clem, cpu->regs.PC);
         _clem_opc_push_status(clem, false);
         if (cpu->pins.emulation) {
@@ -3241,9 +3252,9 @@ void clemens_emulate(ClemensMachine* clem) {
         cpu->regs.P |= kClemensCPUStatus_IRQDisable;
         cpu->regs.P &= ~kClemensCPUStatus_Decimal;
         cpu->state_type = kClemensCPUStateType_Execute;
-    } else {
-        cpu_execute(cpu, clem);
+        return;
     }
+    cpu_execute(cpu, clem);
 
     //  1 mega2 cycle = 1023 nanoseconds
     //  1 fast cycle = 1023 / (2864/1023) nanoseconds
@@ -3262,6 +3273,7 @@ void clemens_emulate(ClemensMachine* clem) {
     clock.ref_step = clem->clocks_step_mega2;
     clem_vgc_sync(&mmio->vgc, &clock);
     clem_iwm_glu_sync(&mmio->dev_iwm, &clem->active_drives, &clock);
+    clem_scc_glu_sync(&mmio->dev_scc, &clock);
 
     /* background execution of some async devices on the 60 hz timer */
     while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {

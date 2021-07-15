@@ -293,7 +293,7 @@ static void _clem_mmio_mega2_clear_irq(
         CLEM_WARN("clem_mmio: invalid clear flags for SCANINT %02X", data);
     }
     if (data & 0x40) {
-        _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_QSEC);
+        _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_RTC_1SEC);
     }
     if (data & 0x20) {
         CLEM_UNIMPLEMENTED("clem_mmio: scan-line interrupt");
@@ -675,6 +675,12 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_RTC_DATA:
             result = mmio->dev_rtc.data_c033;
             break;
+        case CLEM_MMIO_REG_SCC_B_CMD:
+        case CLEM_MMIO_REG_SCC_A_CMD:
+        case CLEM_MMIO_REG_SCC_B_DATA:
+        case CLEM_MMIO_REG_SCC_A_DATA:
+            result = clem_scc_read_switch(&mmio->dev_scc, ioreg, flags);
+            break;
         case CLEM_MMIO_REG_AUDIO_CTL:
             result = clem_sound_read_switch(&mmio->dev_audio, ioreg, flags);
             break;
@@ -936,16 +942,10 @@ static void _clem_mmio_write(
             _clem_mmio_speed_c036_set(clem, data);
             break;
         case CLEM_MMIO_REG_SCC_B_CMD:
-            CLEM_WARN("ioreg %02X <- %02X TODO", ioreg, data);
-            break;
         case CLEM_MMIO_REG_SCC_A_CMD:
-            CLEM_WARN("ioreg %02X <- %02X TODO", ioreg, data);
-            break;
         case CLEM_MMIO_REG_SCC_B_DATA:
-            CLEM_WARN("ioreg %02X <- %02X TODO", ioreg, data);
-            break;
         case CLEM_MMIO_REG_SCC_A_DATA:
-            CLEM_WARN("ioreg %02X <- %02X TODO", ioreg, data);
+            clem_scc_write_switch(&mmio->dev_scc, ioreg, data);
             break;
         case CLEM_MMIO_REG_AUDIO_CTL:
             clem_sound_write_switch(&mmio->dev_audio, ioreg, data);
@@ -1573,6 +1573,7 @@ void _clem_mmio_reset(
     clem_sound_reset(&mmio->dev_audio);
     clem_vgc_init(&mmio->vgc);
     clem_iwm_reset(&mmio->dev_iwm);
+    clem_scc_reset(&mmio->dev_scc);
 }
 
 void _clem_mmio_init(
