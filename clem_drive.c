@@ -126,10 +126,10 @@ static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
     drive->q03_switch = 0;
     drive->pulse_ns = 0;
     drive->track_byte_index = 0;
-    drive->track_bit_shift = 8;
-    drive->read_buffer = 0;
-    drive->real_track_index = 0xff;
+    drive->track_bit_shift = 7;
+    drive->real_track_index = 0xfe;
     drive->random_bit_index = 0;
+    drive->qtr_track_index = 0;
     /* crappy method to randomize 30-ish percent ON bits (30% per WOZ
        recommendation, subject to experimentation
     */
@@ -337,7 +337,7 @@ static uint8_t _clem_disk_read_bit_525(struct ClemensDrive* drive) {
     uint8_t* data = drive->data->bits_data + (
         drive->data->track_byte_offset[drive->real_track_index]);
     uint8_t byte_value = data[drive->track_byte_index];
-    return (byte_value & (1 << (drive->track_bit_shift-1))) != 0;
+    return (byte_value & (1 << drive->track_bit_shift)) != 0;
 }
 
 static inline uint8_t _clem_disk_read_fake_bit_525(struct ClemensDrive* drive) {
@@ -372,6 +372,8 @@ void clem_disk_update_state_525(
 ) {
     int qtr_track_index = drive->qtr_track_index;
     unsigned track_cur_pos;
+    bool track_phase_change = false;
+    bool pulse;
 
     *io_flags &= ~CLEM_IWM_FLAG_READ_DATA;
     *io_flags &= ~CLEM_IWM_FLAG_WRPROTECT_SENSE;
@@ -379,76 +381,72 @@ void clem_disk_update_state_525(
     if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
         return;
     }
-    drive->pulse_ns = clem_util_timer_increment(drive->pulse_ns, 1000000, dt_ns);
-    if (!drive->data) {
-        /* no disk - just send empty pulses... right? */
-        /* also we need to fake it being write protected?  check this? */
-        *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
-        if (drive->pulse_ns >= 4000) {
-            drive->pulse_ns -= 4000;
-        }
-    } else if (drive->pulse_ns >= drive->data->bit_timing_ns) {
-        --drive->track_bit_shift;
-        if (drive->track_bit_shift == 0) {
-            ++drive->track_byte_index;
-            drive->track_bit_shift = 8;
-        }
-        /* read a pulse from the bitstream, following WOZ emulation suggestions
-            to emulate errors - this is effectively a copypasta from
-            https://applesaucefdc.com/woz/reference2/ */
-        drive->read_buffer <<= 1;
-        if (drive->real_track_index != 0xff) {
-            drive->read_buffer |= _clem_disk_read_bit_525(drive);
-            if ((drive->read_buffer & 0x0f) != 0) {
-                if (drive->read_buffer & 0x02) {
-                    *io_flags |= CLEM_IWM_FLAG_READ_DATA;
-                }
-            } else {
-                *io_flags |= _clem_disk_read_fake_bit_525(drive);
-            }
-        } else {
-            *io_flags |= _clem_disk_read_fake_bit_525(drive);
-        }
-        drive->pulse_ns -= drive->data->bit_timing_ns;
-    }
 
+    track_cur_pos = (drive->track_byte_index * 8) + (7 - drive->track_bit_shift);
+
+    /* clamp quarter track index to 5.25" limits */
+    int qtr_track_delta = (
+        s_disk2_phase_states[drive->q03_switch & 0xf][in_phase & 0xf]);
+    qtr_track_index += qtr_track_delta;
+    if (qtr_track_index < 0) qtr_track_index = 0;
+    else if (qtr_track_index >= 160) qtr_track_index = 160;
     if (in_phase != drive->q03_switch) {
-        /* clamp quarter track index to 5.25" limits */
-        int qtr_track_delta = (
-            s_disk2_phase_states[drive->q03_switch & 0xf][in_phase & 0xf]);
-        qtr_track_index += qtr_track_delta;
-        if (qtr_track_index < 0) qtr_track_index = 0;
-        else if (qtr_track_index >= 160) qtr_track_index = 160;
         CLEM_LOG("IWM: Disk525[%u]: Motor: %u; Head @ (%d,%d)",
             (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
             (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
             qtr_track_index / 4, qtr_track_index % 4);
         drive->q03_switch = in_phase;
     }
-
-    if (!drive->data) {
+    if (drive->data) {
+        if (qtr_track_index != drive->qtr_track_index || drive->real_track_index == 0xfe) {
+            unsigned track_prev_len = drive->track_bit_length;
+            drive->qtr_track_index = qtr_track_index;
+            drive->real_track_index = drive->data->meta_track_map[drive->qtr_track_index];
+            if (drive->real_track_index != 0xff) {
+                drive->track_bit_length = _clem_disk_get_track_bit_length_525(
+                    drive, drive->real_track_index);
+                if (track_prev_len) {
+                    track_cur_pos = track_cur_pos * drive->track_bit_length / track_prev_len;
+                }
+            } else {
+                /* WOZ recommended */
+                drive->track_bit_length = 51200;
+            }
+            drive->zero_count = 0;
+        }
+    } else {
+        /* also we need to fake it being write protected?  check this? */
+        *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
         return;
-    }
-    track_cur_pos = (drive->track_byte_index * 8) + (8 - drive->track_bit_shift);
-    if (drive->track_bit_length == 0) {
-        drive->track_bit_length = _clem_disk_get_track_bit_length_525(
-            drive, drive->qtr_track_index);
-    }
-    if (qtr_track_index != drive->qtr_track_index) {
-        unsigned track_next_len = _clem_disk_get_track_bit_length_525(
-            drive, qtr_track_index);
-        track_cur_pos = track_cur_pos * track_next_len / drive->track_bit_shift;
-        drive->track_byte_index = track_cur_pos / 8;
-        drive->track_bit_shift = 8 - (track_cur_pos % 8);
-        drive->track_bit_length = track_next_len;
-        drive->qtr_track_index = qtr_track_index;
-        drive->real_track_index = drive->data->meta_track_map[qtr_track_index];
     }
     if (track_cur_pos >= drive->track_bit_length) {
         /* wrap to beginning of track */
         track_cur_pos -= drive->track_bit_length;
-        drive->track_byte_index = track_cur_pos / 8;
-        drive->track_bit_shift = 8 - (track_cur_pos % 8);
+    }
+    drive->track_byte_index = track_cur_pos / 8;
+    drive->track_bit_shift = 7 - (track_cur_pos % 8);
+    drive->pulse_ns = clem_util_timer_increment(drive->pulse_ns, 1000000, dt_ns);
+    if (drive->pulse_ns >= drive->data->bit_timing_ns) {
+        /* read a pulse from the bitstream, following WOZ emulation suggestions
+            to emulate errors - this is effectively a copypasta from
+            https://applesaucefdc.com/woz/reference2/ */
+        if (drive->real_track_index != 0xff) {
+            if (_clem_disk_read_bit_525(drive)) {
+                *io_flags |= CLEM_IWM_FLAG_READ_DATA;
+                drive->zero_count = 0;
+            }
+        }
+        if (!(*io_flags & CLEM_IWM_FLAG_READ_DATA)) {
+            if (++drive->zero_count > 2) {
+                *io_flags |= _clem_disk_read_fake_bit_525(drive);
+            }
+        }
+        if (drive->track_bit_shift == 0) {
+            drive->track_bit_shift = 8;
+            ++drive->track_byte_index;
+        }
+        --drive->track_bit_shift;
+        drive->pulse_ns = 0;
     }
 
     if (drive->data->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) {

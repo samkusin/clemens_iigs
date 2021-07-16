@@ -239,7 +239,7 @@ static void _clem_mmio_speed_c036_set(
     uint8_t setflags = clem->mmio.speed_c036 ^ value;
 
     if (setflags & CLEM_MMIO_SPEED_FAST_ENABLED) {
-        if (value & CLEM_MMIO_SPEED_FAST_ENABLED) {
+        if (value & CLEM_MMIO_SPEED_FAST_ENABLED && !clem->mmio.disk_motor_on) {
             //CLEM_LOG("C036: Fast Mode");
             clem->clocks_step = clem->clocks_step_fast;
         } else {

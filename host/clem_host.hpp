@@ -56,6 +56,8 @@ private:
   bool parseCommandListBreak(const char* line);
   bool parseCommandRemoveBreak(const char* line);
   bool parseCommandRun(const char* line);
+  bool parseCommandLog(const char* line);
+  bool parseCommandUnlog(const char* line);
 
   void createMachine();
   void destroyMachine();

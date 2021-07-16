@@ -10,6 +10,14 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
+* EB F7 BF B9 ?? F7
+* Debug IWM (ff5636 -> 00c61e) logging
+  * we might be saving 1 extra nanosecond per glu frame - that will add up...
+    * is it a factor?
+    * are we really expected to persist lag over whole CPU cycles?
+    * should we use cycles instead of clocks for iwm
+    * to test, just don't persist lag between frames
+  *
 * First 5.25" disk boot (DOS 3.3)
 * Decimal Math sanity tests
 * Decimal math tests

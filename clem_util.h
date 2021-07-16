@@ -63,11 +63,8 @@ static inline unsigned clem_util_timer_increment(
 ) {
     if (timer_ns + dt_ns > timer_ns) {
         timer_ns += dt_ns;
-    }
-    if (timer_ns + dt_ns < timer_ns) {
-        timer_ns = UINT32_MAX;
     } else {
-        timer_ns += dt_ns;
+        timer_ns = UINT32_MAX;
     }
     if (timer_ns > timer_max_ns) {
         timer_ns = timer_max_ns;
