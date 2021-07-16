@@ -20,6 +20,7 @@ This is a running todo list.
 * CLEM_MMIO_REG_VGC_IRQ_BYTE
 * C07F? - AN3?
 * remaining //e softswitches
+  * Joystick, Paddle
 * VGC Pass 3 : Dblhires Graphics (not SHGR)
 * Some Apple II games testing
 * C041 INTEN - enable Mega II, VBL, quartersec interrupts

@@ -912,7 +912,7 @@ bool clemens_assign_disk(
         return false;
     }
     if (!disk) {
-        clem_iwm_eject_disk(&clem->mmio.dev_iwm, drive_type);
+        clem_iwm_eject_disk(&clem->mmio.dev_iwm, drive);
         return true;
     }
 
@@ -931,7 +931,7 @@ bool clemens_assign_disk(
         return false;
     }
 
-    clem_iwm_insert_disk(&clem->mmio.dev_iwm, drive_type);
+    clem_iwm_insert_disk(&clem->mmio.dev_iwm, drive, disk);
     return true;
 }
 

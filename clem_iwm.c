@@ -110,8 +110,10 @@ void clem_iwm_reset(struct ClemensDeviceIWM* iwm) {
 
 void clem_iwm_insert_disk(
    struct ClemensDeviceIWM* iwm,
-   enum ClemensDriveType drive_type
+   struct ClemensDrive* drive,
+   struct ClemensWOZDisk* disk
 ) {
+    drive->data = disk;
     // set disk
     // reset drive state
 
@@ -119,7 +121,7 @@ void clem_iwm_insert_disk(
 
 void clem_iwm_eject_disk(
     struct ClemensDeviceIWM* iwm,
-    enum ClemensDriveType drive_type
+   struct ClemensDrive* drive
 ) {
     // clear disk after timeout
     // after timeout, reset drive state
