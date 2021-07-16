@@ -133,11 +133,19 @@ struct ClemensDeviceAudio {
     uint8_t sound_ram[65536];
 
     unsigned address;           /**< 16-bit address into RAM or registers */
-    unsigned status;            /**< I/O status */
+    unsigned ram_read_cntr;     /**< RAM read counter, reset on address change */
+
+    uint8_t doc_reg[256];       /**< DOC register values */
+
+    bool addr_auto_inc;         /**< Address auto incremented on access */
+    bool is_access_ram;         /**< If true, sound RAM, if false, registers */
+    bool is_busy;               /**< DOC busy */
+
 
     /* settings */
     uint8_t volume;             /**< 0 - 15 */
 
+    uint32_t irq_line;
 };
 
 /** Really, this is part of the RTC/VGC, but for separation of concerns,

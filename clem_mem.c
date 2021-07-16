@@ -292,11 +292,11 @@ static void _clem_mmio_mega2_clear_irq(
     if (data & 0x9f) {
         CLEM_WARN("clem_mmio: invalid clear flags for SCANINT %02X", data);
     }
-    if (data & 0x40) {
+    if (!(data & 0x40)) {
         _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_RTC_1SEC);
     }
-    if (data & 0x20) {
-        CLEM_UNIMPLEMENTED("clem_mmio: scan-line interrupt");
+    if (!(data & 0x20)) {
+        //  TODO
     }
 }
 
@@ -338,6 +338,7 @@ static void _clem_mmio_vgc_irq_c023_set(
         mmio->dev_timer.flags |= CLEM_MMIO_TIMER_1SEC_ENABLED;
     } else {
         mmio->dev_timer.flags &= ~CLEM_MMIO_TIMER_1SEC_ENABLED;
+        _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_RTC_1SEC);
     }
     if (data & 0x2) {
         CLEM_UNIMPLEMENTED("VGC Scanline IRQ set");
@@ -700,6 +701,9 @@ static uint8_t _clem_mmio_read(
             result = _clem_mmio_inttype_c046(mmio);
             break;
         case CLEM_MMIO_REG_CLRVBLINT:
+            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+                _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_QSEC | CLEM_IRQ_VGC_BLANK);
+            }
             break;
         case CLEM_MMIO_REG_TXTCLR:
             if (!(flags & CLEM_MMIO_READ_NO_OP)) {
@@ -963,7 +967,7 @@ static void _clem_mmio_write(
             _clem_mmio_mega2_inten_set(mmio, data);
             break;
         case CLEM_MMIO_REG_CLRVBLINT:
-            _clem_mmio_mega2_clear_irq(mmio, data);
+            _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_QSEC | CLEM_IRQ_VGC_BLANK);
             break;
         case CLEM_MMIO_REG_TXTCLR:
             clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_GRAPHICS_MODE);

@@ -1017,3 +1017,60 @@ static inline void _clem_branch(
     _clem_cycle(clem, 1);
     *pc = tmp_addr;
 }
+
+static inline void _clem_irq_brk_setup(
+    ClemensMachine* clem,
+    uint16_t pc,
+    bool is_brk
+) {
+    /*
+        pass PC into function since instructions modify may modify the current
+            PC register.
+
+        if native push PBR
+        push PCH, PCL
+        push P
+        irq disable, decimal mode cleared
+        clear PBR
+        3 cycles in emulation
+        4 cycles in native (+PBR)
+    */
+    struct Clemens65C816* cpu = &clem->cpu;
+    if (!cpu->pins.emulation) {
+        _cpu_sp_dec(cpu);
+        clem_write(clem, (uint8_t)cpu->regs.PBR, cpu->regs.S + 1, 0x00,
+                    CLEM_MEM_FLAG_DATA);
+    }
+    _cpu_sp_dec2(cpu);
+    _clem_write_16(clem, pc, cpu->regs.S + 1, 0x00);
+    _clem_opc_push_status(clem, is_brk);
+    //  65816 always disables decimal mode on interrupts, even in emulation
+    cpu->regs.P &= ~kClemensCPUStatus_Decimal;
+    cpu->regs.P |= kClemensCPUStatus_IRQDisable;
+    cpu->regs.PBR = 0x00;
+}
+
+static inline uint16_t _clem_irq_brk_return(
+    ClemensMachine* clem
+) {
+    /*  called from RTI
+        pop P
+        pop PCL, PCH
+        if native pull PBR
+        +3/4 cycles (emulation/native)
+    */
+    uint16_t tmp_addr;
+    uint8_t tmp_bnk0;
+
+    struct Clemens65C816* cpu = &clem->cpu;
+
+    _clem_opc_pull_status(clem);
+    _clem_read_16(clem, &tmp_addr, cpu->regs.S + 1, 0x00, CLEM_MEM_FLAG_DATA);
+    _cpu_sp_inc2(cpu);
+    if (!cpu->pins.emulation) {
+        clem_read(clem, &tmp_bnk0, cpu->regs.S + 1, 0x00, CLEM_MEM_FLAG_DATA);
+        _cpu_sp_inc(cpu);
+        cpu->regs.PBR = tmp_bnk0;
+    }
+    return tmp_addr;
+}
