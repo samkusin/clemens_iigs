@@ -611,6 +611,10 @@ bool ClemensHost::parseCommand(const char* buffer)
                  !strncasecmp(start, "c", end - start)) {
         // clear some UI states
         executedInstructions_.clear();
+      } else if (!strncasecmp(start, "log", end - start)) {
+        return parseCommandLog(end);
+      } else if (!strncasecmp(start, "unlog", end - start)) {
+        return parseCommandUnlog(end);
       }
       return false;
     });
@@ -774,6 +778,58 @@ bool ClemensHost::parseCommandRun(const char* line)
       strncpy(number, start, std::min(sizeof(number) - 1, size_t(end - start)));
       number[15] = '\0';
       return emulationRun(strtoul(number, nullptr, 16));
+    });
+}
+
+bool ClemensHost::parseCommandLog(const char* line)
+{
+  const char* start = trimCommand(line);
+  if (!clemens_is_initialized(&machine_)) {
+    FormatView fv(terminalOutput_);
+    fv.format("Machine not powered on.");
+    return false;
+  }
+  if (!start) {
+    FormatView fv(terminalOutput_);
+    fv.format("usage: log <type>");
+    return false;
+  }
+  return parseCommandToken(start,
+    [this](const char* start, const char* end) {
+      char name[16];
+      strncpy(name, start, std::min(sizeof(name) - 1, size_t(end - start)));
+      name[end - start] = '\0';
+      if (!strncasecmp(name, "iwm", sizeof(name))) {
+        machine_.mmio.dev_iwm.enable_debug = true;
+        return true;
+      }
+      return false;
+    });
+}
+
+bool ClemensHost::parseCommandUnlog(const char* line)
+{
+  const char* start = trimCommand(line);
+  if (!clemens_is_initialized(&machine_)) {
+    FormatView fv(terminalOutput_);
+    fv.format("Machine not powered on.");
+    return false;
+  }
+  if (!start) {
+    FormatView fv(terminalOutput_);
+    fv.format("usage: unlog <type>");
+    return false;
+  }
+  return parseCommandToken(start,
+    [this](const char* start, const char* end) {
+      char name[16];
+      strncpy(name, start, std::min(sizeof(name) - 1, size_t(end - start)));
+      name[end - start] = '\0';
+      if (!strncasecmp(name, "iwm", sizeof(name))) {
+        machine_.mmio.dev_iwm.enable_debug = false;
+        return true;
+      }
+      return false;
     });
 }
 

@@ -30,7 +30,6 @@ void clem_debug_rts(struct ClemensDeviceDebugger* dbg,
                     uint16_t next_pc,
                     uint8_t pbr);
 
-
 void clem_rtc_reset(struct ClemensDeviceRTC* rtc,
                     clem_clocks_duration_t latency);
 void clem_rtc_set_clock_time(struct ClemensDeviceRTC* rtc,

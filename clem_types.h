@@ -255,6 +255,7 @@ struct ClemensDeviceIWM {
     bool async_write_mode;      /**< If True, IWM delays writes until ready */
     bool latch_mode;            /**< If True, latch value lasts for full 8 xfer */
     bool clock_8mhz;            /**< If True, 8mhz clock - never used? */
+    bool enable_debug;          /**< If True, activates file logging */
 
     unsigned state;             /**< The current IWM register state */
     unsigned ns_latch_hold;     /**< The latch value expiration timer */
@@ -262,6 +263,9 @@ struct ClemensDeviceIWM {
     unsigned lss_state;         /**< State of our custom LSS */
     unsigned lss_write_counter; /**< Used for detecting write underruns */
     unsigned lss_update_dt_ns;  /**< Fast mode = 250ns, Slow = 500ns */
+
+    uint64_t debug_timer_ns;
+    uint32_t debug_value;       /**< option displayed during iwm_debug_event */
 };
 
 /**
@@ -328,6 +332,7 @@ struct ClemensDrive {
     unsigned track_bit_shift;   /**< bit offset into current byte */
     unsigned track_bit_length;  /**< current track bit length */
     unsigned pulse_ns;          /**< nanosecond timer for pulse input */
+    unsigned zero_count;        /**< number of non-pulses found in succession */
 
     /**
      * 4-bit Q0-3 entry 5.25" = stepper control
@@ -341,7 +346,6 @@ struct ClemensDrive {
 
     uint32_t random_bits[8];    /**< used for random pulse generation */
     uint8_t random_bit_index;   /**< bit index into 32-byte buffer */
-    uint8_t read_buffer;        /**< Incoming bits from stream shifted in */
     uint8_t real_track_index;   /**< the index into the raw woz track data */
 };
 

@@ -276,6 +276,125 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"IO_IWM_DRIVE_OFF":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_IWM_DRIVE_OFF",
+"Value":49288,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_IWM_DRIVE_ON":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_IWM_DRIVE_ON",
+"Value":49289,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_IWM_DRIVE_SEL":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_IWM_DRIVE_SEL",
+"Value":49386,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_IWM_PHASE0_HI":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_IWM_PHASE0_HI",
+"Value":49281,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_IWM_PHASE0_LO":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_IWM_PHASE0_LO",
+"Value":49280,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_IWM_Q6_LO":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_IWM_Q6_LO",
+"Value":49292,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_IWM_Q7_LO":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_IWM_Q7_LO",
+"Value":49294,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "IO_KEY_CAPPL_E1_C062":{
 "DataDescriptor":{
 "Length":1,
@@ -1485,7 +1604,15 @@
 
 "AddressMap":[{
 "Offset":0,
-"Addr":16515072}],
+"Addr":16515072},
+
+{
+"Offset":247296,
+"Addr":50688},
+
+{
+"Offset":247550,
+"Addr":16762622}],
 "TypeHints":[{
 "Low":0,
 "High":0,
@@ -1599,6 +1726,16 @@
 {
 "Low":214345,
 "High":214345,
+"Hint":"Code"},
+
+{
+"Low":218654,
+"High":218654,
+"Hint":"Code"},
+
+{
+"Low":218671,
+"High":218671,
 "Hint":"Code"},
 
 {
@@ -1859,6 +1996,11 @@
 {
 "Low":245883,
 "High":245883,
+"Hint":"Code"},
+
+{
+"Low":247296,
+"High":247296,
 "Hint":"Code"},
 
 {
@@ -2218,6 +2360,9 @@
 "214801":"Disabling the current drive",
 "214804":"Read the IWM status",
 "214810":"Wait for it to be disabled",
+"218640":"read data mode",
+"218652":"80 half tracks",
+"218687":"read data from disk",
 "218759":"Drive 0",
 "218762":"Motor On",
 "218765":"Motor Off",
@@ -2764,6 +2909,30 @@
 
 "245271":{
 "Text":"Handle the VBL interrupt\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"218654":{
+"Text":"This code moves the 5.25 drive head to zero",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"218633":{
+"Text":"Reset Slot 6 Drive head\r\nY = drive # (0, 1)\r\n\r\nreturn carry = 1 (error?)\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"247390":{
+"Text":"Look for D5 AA 96",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"247382":{
+"Text":"Find a sector header",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -5101,6 +5270,27 @@
 "Value":16760702,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"218687":{
+"Label":"poll_disk",
+"Value":16733759,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"218633":{
+"Label":"SUB_RESET_DRIVE_SLOT6",
+"Value":16733705,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"218654":{
+"Label":"next_phase",
+"Value":16733726,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -5784,4 +5974,12 @@
 
 "244853":{
 "FollowPbr":false,
-"Bank":225}}}
+"Bank":225},
+
+"247308":{
+"FollowPbr":false,
+"Bank":0},
+
+"218633":{
+"FollowPbr":false,
+"Bank":0}}}

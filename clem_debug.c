@@ -1,6 +1,8 @@
 #include "clem_debug.h"
 #include "clem_device.h"
 
+#include <stdio.h>
+
 static void _clem_print_io_reg_counters(struct ClemensDeviceDebugger* dbg) {
     for (unsigned i = 0; i < 256; ++i) {
         if (dbg->ioreg_read_ctr[i] || dbg->ioreg_write_ctr[i]) {
