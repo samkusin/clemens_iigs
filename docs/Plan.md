@@ -10,14 +10,13 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* EB F7 BF B9 ?? F7
-* Debug IWM (ff5636 -> 00c61e) logging
-  * we might be saving 1 extra nanosecond per glu frame - that will add up...
-    * is it a factor?
-    * are we really expected to persist lag over whole CPU cycles?
-    * should we use cycles instead of clocks for iwm
-    * to test, just don't persist lag between frames
-  *
+* DOS Boot
+  * Boot 0 - OK (loads sector 0 into $800)
+  * Boot 1 - Loads RWTS from sectors 1 - 9 to $3700, sector 0 to $3600
+  * Boot 2
+    * Track 2, sector 4 loaded intp $3500
+    * Read 26 sectors into memory 4 + 16 + 6 ... down to track 0 sector A
+    *
 * First 5.25" disk boot (DOS 3.3)
 * Decimal Math sanity tests
 * Decimal math tests
@@ -53,6 +52,9 @@ This is a running todo list.
 
 ## DONE
 
+* Fixed timing issues when disk motor turns on (slow mode)
+* Fix timing per IWM frame so that we dont persist lag, since LSS cycles should
+  consume all CPU cycles per frame
 * audio registers (interrupt) need implementation
 * Serial register read/write simple
 * Fix various unimplemented stuff

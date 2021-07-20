@@ -248,6 +248,7 @@ struct ClemensDeviceIWM {
     uint8_t data;               /**< IO switch data (D0-D7) */
     uint8_t latch;              /**< data latch (work register for IWM) */
     uint8_t write_out;          /**< TODO: Remove.. written byte out */
+    uint8_t disk_motor_on;      /**< bits 0-3 represent ports 4-7 */
 
     bool q6_switch;             /**< Q6 state switch */
     bool q7_switch;             /**< Q7 stage switch */
@@ -305,7 +306,6 @@ struct ClemensMMIO {
     uint32_t mmap_register;     // memory map flags- CLEM_MMIO_MMAP_
     uint8_t new_video_c029;     // see kClemensMMIONewVideo_xxx
     uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
-    uint8_t disk_motor_on;      // bits 0-3 represent ports 4-7
     uint8_t flags_c08x;         // used to detect double reads
 
     uint64_t mega2_cycles;      // number of mega2 pulses/ticks since startup
@@ -339,6 +339,7 @@ struct ClemensDrive {
      * Control/Status/Strobe bits for 3.5"
      */
     unsigned q03_switch;
+    unsigned cog_orient;        /**< emulated orientation of stepper cog */
     unsigned state_35;          /**< 3.5" state machine */
     unsigned query_35;          /**< 3.5" status query  */
     unsigned step_timer_35_ns;  /**< 3.5" track step timer */

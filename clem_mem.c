@@ -1,5 +1,6 @@
 #include "clem_mem.h"
 #include "clem_debug.h"
+#include "clem_drive.h"
 #include "clem_mmio_defs.h"
 
 #include "clem_util.h"
@@ -239,7 +240,9 @@ static void _clem_mmio_speed_c036_set(
     uint8_t setflags = clem->mmio.speed_c036 ^ value;
 
     if (setflags & CLEM_MMIO_SPEED_FAST_ENABLED) {
-        if (value & CLEM_MMIO_SPEED_FAST_ENABLED && !clem->mmio.disk_motor_on) {
+        if (value & CLEM_MMIO_SPEED_FAST_ENABLED &&
+            !clem->mmio.dev_iwm.disk_motor_on
+        ) {
             //CLEM_LOG("C036: Fast Mode");
             clem->clocks_step = clem->clocks_step_fast;
         } else {
@@ -521,36 +524,6 @@ static uint8_t _clem_mmio_read_bank_select(
     return 0;
 }
 
-void _clem_mmio_speed_disk_gate(ClemensMachine* clem, uint8_t ioreg) {
-    uint8_t slot_index = (ioreg >> 4) & 0x03;
-    uint8_t old_disk_flags = clem->mmio.disk_motor_on;
-    if ((clem->mmio.speed_c036 & 0x0f) & (1 << slot_index)) {
-        if ((ioreg & 0x0f) == 0x08) {
-            clem->mmio.disk_motor_on &= ~(1 << slot_index);
-        } else if ((ioreg & 0x0f) == 0x09) {
-            clem->mmio.disk_motor_on |= (1 << slot_index);
-        }
-        if (clem->mmio.disk_motor_on) {
-            clem->clocks_step = clem->clocks_step_mega2;
-            if (old_disk_flags == 0) {
-                CLEM_LOG("SPEED SLOW Disk: %02X", clem->mmio.disk_motor_on);
-            }
-        } else {
-            if (clem->mmio.speed_c036 & CLEM_MMIO_SPEED_FAST_ENABLED) {
-                clem->clocks_step = clem->clocks_step_fast;
-                if (old_disk_flags) {
-                    CLEM_LOG("SPEED FAST Disk: %02X", clem->mmio.disk_motor_on);
-                }
-            } else {
-                clem->clocks_step = clem->clocks_step_mega2;
-                if (old_disk_flags) {
-                    CLEM_LOG("SPEED SLOW Disk: %02X", clem->mmio.disk_motor_on);
-                }
-            }
-        }
-    }
-}
-
 static uint8_t _clem_mmio_read(
     ClemensMachine* clem,
     uint16_t addr,
@@ -569,9 +542,6 @@ static uint8_t _clem_mmio_read(
 
     if (!(flags & CLEM_MMIO_READ_NO_OP)) {
         /* disk motor speed registers */
-        if (ioreg & 0xc0) {
-            _clem_mmio_speed_disk_gate(clem, ioreg);
-        }
         *mega2_access = true;
     }
 
@@ -832,9 +802,6 @@ static void _clem_mmio_write(
         ++mmio->dev_debug.ioreg_write_ctr[ioreg];
     }
     if (mem_flags != CLEM_MEM_FLAG_NULL) {
-        if (ioreg & 0xc0) {
-            _clem_mmio_speed_disk_gate(clem, ioreg);
-        }
         *mega2_access = true;
     }
 
