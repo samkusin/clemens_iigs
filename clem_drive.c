@@ -18,32 +18,39 @@
 
 /*  Disk II stepper emulation
 
-    Applied rotation based on what phase the stepper motor is on currently, and
-    the next phase.  The rotor will advance or decline the current
-    quarter-track index accordingly.
+    Much of this is based on Understanding the Apple IIe Chapter 9
+        Specifically the section on the head arm mechanism (9-6 to 9-7)
 
-    Note that opposing states will cancel each other out.   For example, Phase
-    0 and 2 are on opposite sides of the rotor.  If both are on, no motion is
-    applied... UNLESS Phase 1 or 3 is also on (but not both as Phase 1 and 3
-    also are on opposite sides of the rotor.)
+    There are some assumptions made here based on experimentation:
+        - The Sector Zero Bootloader in internal ROM not only forces the arm
+          to track 0, but also the cog turned by the stepper magnets will
+          ensure that the cog is phase aligned to the last activated phase.
+        - This is 'proved' by some timings that analyze the sector 0
+          bootloader here: https://embeddedmicro.weebly.com/apple-2iie.html
+        - The waveform shows that PH0 is held high at the end of boot
+        - Also verified in the emulator that PH0 is held high while sector 0
+          is loaded into memory
 
-    This effectively means that rotations can occur only between effective
-    states of the phase magnets:
+    Our goal is to emulate how the phase magnets move the drive arm.  Stepper
+    motors by definition employ magnets to turn a cog that precisely moves the
+    arm inward towards the spindle, or outwards towards the outer edge of the
+    disk.  The teeth on the cog are polarized so that magnets can move the
+    arm in quarter or half track increments.
 
-    0<->1, 1<->2, 2<->3, 3<->0
+    Though not mechanically accurate, we can use scale down this cog to a
+    'single-tooth' cog, where the tooth is orientated like a compass needle
+    (8 cardinal directions.)  Phase magnets are positioned around this cog.
 
-    This also means that if adjacent phases are enabled, we can advance one
-    rotor step (or quarter-track).   This is a special case handled by the
-    following state transitions:
+    Given:
+    - The cog's orientation: N, NE, E, SE, S, SW, W, NW
+    - Magnets at N, E, S, W
 
-    Phase 0 ON, Phase 1 ON, rotates a quarter step.  But also if we transition
-    from Phase 0 ON, to Phase 0 OFF + Phase 1 ON + Phase 2 ON, which would
-    step the rotor 3 times (0->1 = half track, 2 steps, 1+2 = quarter track)
-
-    The easiest visual representation of this is a state table representing
-    rotation before and after PHASE magnet states.   The alternative is writing
-    special case code for quarter vs half-track steps, which is harder to
-    follow.
+    Logic:
+    - The cog will move if a phase magnet is active adjacent to it
+    - But the cog will not move if the phase magnet lies directly opposite to
+      the cog's orientation
+    - Special cases are if two *adjacent* phase magnets are on, which can
+      allow for 'quarter track' placement
 */
 
 /*  Phase magnet effective cardinal positions represented by values (4-bit)
@@ -61,24 +68,16 @@
                 works in practice
 
 */
-static int s_disk2_phase_states[16][16] = {
-        /* 00   N   E  NE   S  x0  SE  xE   W  NW  0x  Nx  SW  xW  Sx  xx */
-/* 00 */ {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 },
+static int s_disk2_phase_states[8][16] = {
+    /*     00  N0  0E  NE  S0  x0  SE  xE  0W  NW  0x  Nx  SW  xW  Sx  xx */
 /* N  */ {  0,  0,  2,  1,  0,  0,  3,  2, -2, -1,  0,  0, -3, -2,  0,  0 },
+/* NE */ {  0, -1,  1,  0,  3, -1,  2,  1, -3, -2,  1, -1,  0, -3,  3,  0 },
 /*  E */ {  0, -2,  0, -1,  2,  0,  1,  0,  0, -3,  0, -2,  3,  0,  2,  0 },
-/* NE */ {  0, -1,  1,  0,  3,  0,  2,  1, -3, -2,  0, -1,  0, -3,  3,  0 },
+/* SE */ {  0, -3, -1, -2,  1,  1,  0, -1,  3,  0,  1, -3,  2,  3,  1,  0 },
 /* S  */ {  0,  0, -2, -3,  0,  0, -1, -2,  2,  3,  0,  0,  1,  2,  0,  0 },
-/* x0 */ {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 },
-/* SE */ {  0, -3, -1, -2,  1,  0,  0, -1,  3,  0,  0, -3,  2,  3,  1,  0 },
-/* xE */ {  0, -2,  0, -1,  2,  0,  1,  0,  0, -3,  0, -2,  3,  0,  2,  0 },
+/* SW */ {  0,  3, -3,  0, -1, -1, -2, -3,  1,  2,  1,  3,  0,  1, -1,  0 },
 /*  W */ {  0,  2,  0,  3, -2,  0, -3,  0,  0,  1,  0,  2, -1,  0, -2,  0 },
-/* NW */ {  0,  1,  3,  2, -3,  0,  0,  3, -1,  0,  0,  1, -2, -1, -3,  0 },
-/* 0x */ {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 },
-/* Nx */ {  0,  0,  2,  1,  0,  0,  3,  2, -2, -1,  0,  0, -3, -2,  0,  0 },
-/* SW */ {  0,  3, -3,  0, -1,  0, -2, -3,  1,  2,  0,  3,  0,  1, -1,  0 },
-/* xW */ {  0,  2,  0,  3, -2,  0, -3,  0,  0,  1,  0,  2, -1,  0, -2,  0 },
-/* Sx */ {  0,  0, -2, -3,  0,  0, -1, -2,  2,  3,  0,  0,  1,  2,  0,  0 },
-/* xx */ {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 }
+/* NW */ {  0,  1,  3,  2, -3,  1,  0,  3, -1,  0, -1,  1, -2, -1, -3,  0 }
 };
 
 /*  Follows the status and control values from https://llx.com/Neil/a2/disk
@@ -130,6 +129,8 @@ static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
     drive->real_track_index = 0xfe;
     drive->random_bit_index = 0;
     drive->qtr_track_index = 0;
+    /* not going to change the cog orientation since this could be a soft
+       reset */
     /* crappy method to randomize 30-ish percent ON bits (30% per WOZ
        recommendation, subject to experimentation
     */
@@ -341,8 +342,8 @@ static uint8_t _clem_disk_read_bit_525(struct ClemensDrive* drive) {
 }
 
 static inline uint8_t _clem_disk_read_fake_bit_525(struct ClemensDrive* drive) {
-    uint8_t random_bit = (drive->random_bits[drive->random_bit_index / 32] & (
-        1 << (drive->random_bit_index % 8)));
+    uint32_t random_bit = (drive->random_bits[drive->random_bit_index / 32] & (
+        1 << (drive->random_bit_index % 32)));
     ++drive->random_bit_index;
     return random_bit ? CLEM_IWM_FLAG_READ_DATA : 0x00;
 }
@@ -372,6 +373,7 @@ void clem_disk_update_state_525(
 ) {
     int qtr_track_index = drive->qtr_track_index;
     unsigned track_cur_pos;
+    unsigned bit_timing_ns;
     bool track_phase_change = false;
     bool pulse;
 
@@ -385,22 +387,31 @@ void clem_disk_update_state_525(
     track_cur_pos = (drive->track_byte_index * 8) + (7 - drive->track_bit_shift);
 
     /* clamp quarter track index to 5.25" limits */
+    /* turning a cog that can be oriented in one of 8 directions */
     int qtr_track_delta = (
-        s_disk2_phase_states[drive->q03_switch & 0xf][in_phase & 0xf]);
+        s_disk2_phase_states[drive->cog_orient & 0x7][in_phase & 0xf]);
+    drive->cog_orient = (drive->cog_orient + qtr_track_delta) % 8;
     qtr_track_index += qtr_track_delta;
-    if (qtr_track_index < 0) qtr_track_index = 0;
+    if (qtr_track_index < 0) {
+        CLEM_LOG("IWM: Disk525[%u]: Motor: %u; CLACK",
+                 (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
+                 (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0);
+        qtr_track_index = 0;
+    }
     else if (qtr_track_index >= 160) qtr_track_index = 160;
-    if (in_phase != drive->q03_switch) {
+    if (qtr_track_index != drive->qtr_track_index) {
         CLEM_LOG("IWM: Disk525[%u]: Motor: %u; Head @ (%d,%d)",
             (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
             (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
             qtr_track_index / 4, qtr_track_index % 4);
-        drive->q03_switch = in_phase;
+        drive->qtr_track_index = qtr_track_index;
+        /* force lookup of the real track if the arm has changed */
+        drive->real_track_index = 0xfe;
     }
+    drive->q03_switch = in_phase;
     if (drive->data) {
-        if (qtr_track_index != drive->qtr_track_index || drive->real_track_index == 0xfe) {
+        if (drive->real_track_index == 0xfe) {
             unsigned track_prev_len = drive->track_bit_length;
-            drive->qtr_track_index = qtr_track_index;
             drive->real_track_index = drive->data->meta_track_map[drive->qtr_track_index];
             if (drive->real_track_index != 0xff) {
                 drive->track_bit_length = _clem_disk_get_track_bit_length_525(
@@ -414,10 +425,12 @@ void clem_disk_update_state_525(
             }
             drive->zero_count = 0;
         }
+        bit_timing_ns = drive->data->bit_timing_ns;
     } else {
         /* also we need to fake it being write protected?  check this? */
+        drive->qtr_track_index = qtr_track_index;
+        bit_timing_ns = 4000;
         *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
-        return;
     }
     if (track_cur_pos >= drive->track_bit_length) {
         /* wrap to beginning of track */

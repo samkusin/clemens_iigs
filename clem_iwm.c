@@ -785,3 +785,40 @@ uint8_t clem_iwm_read_switch(
 
     return result;
 }
+
+
+void clem_iwm_speed_disk_gate(ClemensMachine* clem) {
+    struct ClemensDeviceIWM* iwm = &clem->mmio.dev_iwm;
+    uint8_t slot_index = 2;         // TODO: see note below
+    uint8_t old_disk_flags = iwm->disk_motor_on;
+    // TODO: this is sloppy - right now we're hardcoding slot 6
+    // as the only slot the IWM manages (which is not the case.)
+    // until we get there though, let's get the mechanism (timing)
+    // right before cleaning up for all slots.
+    if ((clem->mmio.speed_c036 & 0x0f) & (1 << slot_index)) {
+        if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
+            iwm->disk_motor_on |= (1 << slot_index);
+        } else {
+            iwm->disk_motor_on &= ~(1 << slot_index);
+        }
+    }
+    if (iwm->disk_motor_on) {
+        if (!old_disk_flags) {
+            CLEM_LOG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
+        }
+        clem->clocks_step = clem->clocks_step_mega2;
+        return;
+    }
+    if (clem->mmio.speed_c036 & CLEM_MMIO_SPEED_FAST_ENABLED) {
+        clem->clocks_step = clem->clocks_step_fast;
+
+        if (old_disk_flags) {
+            CLEM_LOG("SPEED FAST Disk: %02X", iwm->disk_motor_on);
+        }
+    } else {
+        clem->clocks_step = clem->clocks_step_mega2;
+        if (old_disk_flags) {
+            CLEM_LOG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
+        }
+    }
+}

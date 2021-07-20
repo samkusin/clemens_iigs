@@ -214,6 +214,8 @@ uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM* iwm,
                              uint8_t ioreg,
                              uint8_t flags);
 
+void clem_iwm_speed_disk_gate(ClemensMachine* clem);
+
 /**
  * @brief
  *

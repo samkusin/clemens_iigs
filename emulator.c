@@ -3196,6 +3196,8 @@ void clemens_emulate(ClemensMachine* clem) {
     }
     cpu_execute(cpu, clem);
 
+    clem_iwm_speed_disk_gate(clem);
+
     //  1 mega2 cycle = 1023 nanoseconds
     //  1 fast cycle = 1023 / (2864/1023) nanoseconds
 
@@ -3211,6 +3213,7 @@ void clemens_emulate(ClemensMachine* clem) {
 
     clock.ts = clem->clocks_spent;
     clock.ref_step = clem->clocks_step_mega2;
+
     clem_vgc_sync(&mmio->vgc, &clock);
     clem_iwm_glu_sync(&mmio->dev_iwm, &clem->active_drives, &clock);
     clem_scc_glu_sync(&mmio->dev_scc, &clock);
@@ -3242,6 +3245,7 @@ void clemens_emulate(ClemensMachine* clem) {
             cpu->state_type = kClemensCPUStateType_IRQ;
         }
     }
+    clem_iwm_speed_disk_gate(clem);
 }
 
 ClemensMonitor* clemens_get_monitor(
