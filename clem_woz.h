@@ -49,6 +49,12 @@
 #define CLEM_WOZ_LIMIT_QTR_TRACKS   160
 #define CLEM_WOZ_OFFSET_TRACK_DATA  1536
 
+/* value from woz spec - evaluate if this can be used for blank disks */
+#define CLEM_WOZ_DEFAULT_TRACK_BIT_LENGTH_525       51200
+/* value from dsk2woz2 */
+#define CLEM_WOZ_BLANK_DISK_TRACK_BIT_LENGTH_525    50624
+
+
 
 struct ClemensWOZChunkHeader {
     size_t data_size;
@@ -63,6 +69,7 @@ struct ClemensWOZDisk {
     unsigned max_track_size_bytes;
     unsigned bit_timing_ns;             /* time to read (and write?) */
     unsigned track_count;
+    unsigned default_track_bit_length;  /* used for on-demand WOZ files */
 
     /* maps quarter tracks (for 5.25) and 80 tracks per side (for 3.25).  the
        drive head mechanism should track current head position by the meta

@@ -9,15 +9,12 @@ with ROM1 if possible compatibility.)
 ## TODO
 
 This is a running todo list.
-
-* DOS Boot
-  * Boot 0 - OK (loads sector 0 into $800)
-  * Boot 1 - Loads RWTS from sectors 1 - 9 to $3700, sector 0 to $3600
-  * Boot 2
-    * Track 2, sector 4 loaded intp $3500
-    * Read 26 sectors into memory 4 + 16 + 6 ... down to track 0 sector A
-    *
-* First 5.25" disk boot (DOS 3.3)
+* WOZ-like blank disks
+  * Cannot be saved as WOZ disks until 'formatted'
+  * Disks have a preset track bit size based on 'type'
+  * This prevents creating blank disks with any format other than DOS or ProDOS
+  * For DOS disks - bit size per track = 0xC5C0
+  *
 * Decimal Math sanity tests
 * Decimal math tests
 * Writable disk data
@@ -52,6 +49,8 @@ This is a running todo list.
 
 ## DONE
 
+* First 5.25" disk boot (DOS 3.3)
+* Fixed stepper motor logic for 5.25" drive
 * Fixed timing issues when disk motor turns on (slow mode)
 * Fix timing per IWM frame so that we dont persist lag, since LSS cycles should
   consume all CPU cycles per frame
