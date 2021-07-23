@@ -44,6 +44,7 @@ private:
   void emulate(float deltaTime);
 
   bool parseWOZDisk(struct ClemensWOZDisk* woz, uint8_t* data, size_t dataSize);
+  bool initWOZDisk(struct ClemensWOZDisk* woz);
 
 private:
 

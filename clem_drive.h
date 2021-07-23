@@ -36,18 +36,28 @@ extern "C" {
 
 void clem_disk_reset_drives(struct ClemensDriveBay* drives);
 
-void clem_disk_update_state_35(
+void clem_disk_read_and_position_head_35(
     struct ClemensDrive* drive,
     unsigned *io_flags,
-    unsigned in_phase,
-    unsigned dt_ns
+    unsigned in_phase
 );
 
-void clem_disk_update_state_525(
+void clem_disk_update_head_35(
     struct ClemensDrive* drive,
     unsigned *io_flags,
-    unsigned in_phase,
-    unsigned dt_ns
+    unsigned delta_ns
+);
+
+void clem_disk_read_and_position_head_525(
+    struct ClemensDrive* drive,
+    unsigned *io_flags,
+    unsigned in_phase
+);
+
+void clem_disk_update_head_525(
+    struct ClemensDrive* drive,
+    unsigned *io_flags,
+    unsigned delta_ns
 );
 
 #ifdef __cplusplus

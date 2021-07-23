@@ -84,6 +84,9 @@ ClemensHost::ClemensHost() :
     free(tmp);
   }
 
+  disks525_[1].disk_type = CLEM_WOZ_DISK_5_25;
+  initWOZDisk(&disks525_[1]);
+
   displayProvider_ = std::make_unique<ClemensDisplayProvider>();
   display_ = std::make_unique<ClemensDisplay>(*displayProvider_);
 }
@@ -869,6 +872,7 @@ void ClemensHost::createMachine()
   clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
 
   clemens_assign_disk(&machine_, kClemensDrive_5_25_D1, &disks525_[0]);
+  clemens_assign_disk(&machine_, kClemensDrive_5_25_D2, &disks525_[1]);
 
   memoryViewBank_[0] = 0x00;
   memoryViewBank_[1] = 0x00;
@@ -987,6 +991,7 @@ bool ClemensHost::parseWOZDisk(
           }
           woz->bits_data = (uint8_t*)malloc(trackDataSize);
           woz->bits_data_end = woz->bits_data + trackDataSize;
+          woz->default_track_bit_length = CLEM_WOZ_DEFAULT_TRACK_BIT_LENGTH_525;
         }
         current = clem_woz_parse_trks_chunk(
           woz, &chunkHeader, current, chunkHeader.data_size);
@@ -1001,6 +1006,52 @@ bool ClemensHost::parseWOZDisk(
       default:
         break;
     }
+  }
+
+  return true;
+}
+
+bool ClemensHost::initWOZDisk(struct ClemensWOZDisk* woz) {
+  //  This method creates a very basic WOZ disk with many assumptions.  Use
+  //  real hardware if you want to experiment with copy protection, etc (and
+  //  generate a WOZ image from that.)
+  //
+  //  exoected inputs :
+  //    disk_type
+
+  switch (woz->disk_type) {
+    case CLEM_WOZ_DISK_5_25:
+      woz->boot_type = CLEM_WOZ_BOOT_5_25_16;
+      woz->max_track_size_bytes = 0x0d * 512;
+      woz->bit_timing_ns = 4000;
+      woz->track_count = 35;
+      break;
+    default:
+      return false;
+  }
+
+  unsigned trackDataSize = woz->track_count * woz->max_track_size_bytes;
+  if (woz->flags & CLEM_WOZ_IMAGE_DOUBLE_SIDED) {
+      trackDataSize <<= 1;
+  }
+  woz->bits_data = (uint8_t*)malloc(trackDataSize);
+  woz->bits_data_end = woz->bits_data + trackDataSize;
+  woz->default_track_bit_length = CLEM_WOZ_BLANK_DISK_TRACK_BIT_LENGTH_525;
+  memset(woz->bits_data, 0, trackDataSize);
+
+  unsigned track_index = 0;
+  for (unsigned i = 0; i < CLEM_WOZ_LIMIT_QTR_TRACKS; ++i) {
+    if ((i % 4) == 0 || (i % 4) == 1) {
+      woz->meta_track_map[i] = (i % 4);
+    } else {
+      woz->meta_track_map[i] = 0xff;
+    }
+  }
+
+  for (unsigned i = 0; i < woz->track_count; ++i) {
+    woz->track_byte_offset[i] = i * woz->max_track_size_bytes;
+    woz->track_byte_count[i] = woz->max_track_size_bytes;
+    woz->track_bits_count[i] = woz->default_track_bit_length;
   }
 
   return true;
