@@ -85,6 +85,8 @@ struct ClemensWOZDisk {
     uint32_t track_byte_offset[CLEM_WOZ_LIMIT_QTR_TRACKS];
     uint32_t track_byte_count[CLEM_WOZ_LIMIT_QTR_TRACKS];
     uint32_t track_bits_count[CLEM_WOZ_LIMIT_QTR_TRACKS];
+    uint8_t track_initialized[CLEM_WOZ_LIMIT_QTR_TRACKS];
+
     /* This buffer is supplied by the application that can be allocated from
        values within the INFO chunk (written out to max_track_size_bytes), and
        can be released upon eject

@@ -344,6 +344,7 @@ struct ClemensDrive {
     unsigned query_35;          /**< 3.5" status query  */
     unsigned step_timer_35_ns;  /**< 3.5" track step timer */
     bool select_35;             /**< 3.5" select state */
+    bool write_pulse;           /**< Changes in the write field translate as pulses */
 
     uint32_t random_bits[8];    /**< used for random pulse generation */
     uint8_t random_bit_index;   /**< bit index into 32-byte buffer */

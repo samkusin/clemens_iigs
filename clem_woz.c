@@ -331,9 +331,12 @@ const uint8_t* clem_woz_parse_trks_chunk(
                 CLEM_ASSERT(false);
                 return NULL;
             }
-            _clem_woz_read_bytes(
-                &woz_iter, out_bits, disk->track_byte_count[idx]);
-            out_bits += disk->track_byte_count[idx];
+            if (disk->track_byte_count[idx]) {
+                disk->track_initialized[idx] = 1;
+                _clem_woz_read_bytes(
+                    &woz_iter, out_bits, disk->track_byte_count[idx]);
+                out_bits += disk->track_byte_count[idx];
+            }
         }
     } else {
         /* skip the raw data since the user didn't specify a bits buffer */
