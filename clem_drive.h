@@ -29,6 +29,11 @@
 #define CLEM_IWM_FLAG_READ_DATA             0x00000100
 /*  Write pulse input to drive */
 #define CLEM_IWM_FLAG_WRITE_DATA            0x00000200
+/*  For debugging only */
+#define CLEM_IWM_FLAG_PULSE_HIGH            0x00008000
+
+#define CLEM_IWM_FLAG_WRITE_HEAD_ON \
+    (CLEM_IWM_FLAG_WRITE_DATA + CLEM_IWM_FLAG_WRITE_REQUEST)
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,7 +44,8 @@ void clem_disk_reset_drives(struct ClemensDriveBay* drives);
 void clem_disk_read_and_position_head_35(
     struct ClemensDrive* drive,
     unsigned *io_flags,
-    unsigned in_phase
+    unsigned in_phase,
+    unsigned delta_ns
 );
 
 void clem_disk_update_head_35(
@@ -51,7 +57,8 @@ void clem_disk_update_head_35(
 void clem_disk_read_and_position_head_525(
     struct ClemensDrive* drive,
     unsigned *io_flags,
-    unsigned in_phase
+    unsigned in_phase,
+    unsigned delta_ns
 );
 
 void clem_disk_update_head_525(
