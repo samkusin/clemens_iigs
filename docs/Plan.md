@@ -9,6 +9,12 @@ with ROM1 if possible compatibility.)
 ## TODO
 
 This is a running todo list.
+
+* Timing Issues
+  * STA a,X  4(5)
+  * PLA, PLX, etc 3(4)
+  * RTS 5(6)
+  *
 * WOZ-like blank disks
   * Cannot be saved as WOZ disks until 'formatted'
   * Disks have a preset track bit size based on 'type'

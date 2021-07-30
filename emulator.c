@@ -302,7 +302,13 @@ static void _opcode_print(
     }
     if (clem->debug_flags & kClemensDebugFlag_DebugLogOpcode) {
         char* debug_text = clem_debug_acquire_log(32);
-        int debug_len = snprintf(debug_text, 32, "%02X:%04X %s %s",
+        int debug_len = snprintf(debug_text, 32, "%02X:%04X %s %u",
+            inst->pbr, inst->addr, inst->desc->name, inst->cycles_spent);
+        memset(debug_text + debug_len, 0x20, 32 - debug_len);
+        debug_text[31] = '\n';
+
+        debug_text = clem_debug_acquire_log(32);
+        debug_len = snprintf(debug_text, 32, "%02X:%04X %s %s",
             inst->pbr, inst->addr, inst->desc->name, operand);
         memset(debug_text + debug_len, 0x20, 32 - debug_len);
         debug_text[31] = '\n';
@@ -988,6 +994,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
     tmp_pc = cpu->regs.PC;
     opc_pbr = cpu->regs.PBR;
     opc_addr = tmp_pc;
+    opc_inst.cycles_spent = cpu->cycles_spent;
 
     //  TODO: Okay, we enter native mode but PBR is still 0x00 though we are
     //        reading code from ROM.  research what to do during the switch to
@@ -3099,6 +3106,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
     if (clem->debug_flags) {
         opc_inst.pbr = opc_pbr;
         opc_inst.addr = opc_addr;
+        opc_inst.cycles_spent = cpu->cycles_spent - opc_inst.cycles_spent;
         _opcode_print(clem, &opc_inst);
     }
 }

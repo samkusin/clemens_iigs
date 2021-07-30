@@ -160,7 +160,7 @@ static inline void _clem_cycle(
     uint32_t cycle_count
 ) {
     clem->clocks_spent += clem->clocks_step * cycle_count;
-    ++clem->cpu.cycles_spent;
+    clem->cpu.cycles_spent += cycle_count;
 }
 
 static inline void _clem_next_dbr(
