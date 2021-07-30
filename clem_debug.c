@@ -3,6 +3,34 @@
 
 #include <stdio.h>
 
+static FILE* g_fp_debug_out = NULL;
+static char s_clem_debug_buffer[65536 * 102];
+static unsigned s_clem_debug_cnt = 0;
+
+
+char* clem_debug_acquire_log(unsigned amt) {
+    char* next;
+    unsigned next_debug_cnt = s_clem_debug_cnt + amt;
+    if (next_debug_cnt >= sizeof(s_clem_debug_buffer)) {
+        clem_debug_log_flush();
+    }
+    next = &s_clem_debug_buffer[s_clem_debug_cnt];
+    s_clem_debug_cnt = next_debug_cnt;
+    return next;
+}
+
+void clem_debug_log_flush() {
+    if (!g_fp_debug_out && s_clem_debug_cnt > 0) {
+        g_fp_debug_out = fopen("debug.out", "wb");
+    }
+    if (g_fp_debug_out) {
+        fwrite(s_clem_debug_buffer, 1, s_clem_debug_cnt, g_fp_debug_out);
+        fflush(g_fp_debug_out);
+    }
+    s_clem_debug_cnt = 0;
+}
+
+
 static void _clem_print_io_reg_counters(struct ClemensDeviceDebugger* dbg) {
     for (unsigned i = 0; i < 256; ++i) {
         if (dbg->ioreg_read_ctr[i] || dbg->ioreg_write_ctr[i]) {

@@ -25,4 +25,16 @@
 } while (0)
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+char* clem_debug_acquire_log(unsigned amt);
+
+void clem_debug_log_flush();
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

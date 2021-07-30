@@ -95,22 +95,16 @@ static uint8_t s_lss_rom[256] = {
     0xDD, 0x4D, 0xE0, 0xE0, 0x0A, 0x0A, 0x0A, 0x0A, 0x88, 0x88, 0x08, 0x08, 0x88, 0x88, 0x08, 0x08
 };
 
+
 #define CLEM_IWM_DEBUG_DIAGNOSTIC
 #ifdef CLEM_IWM_DEBUG_DIAGNOSTIC
 
-static FILE* g_fp_debug_out = NULL;
-
 #define CLEM_IWM_DEBUG_RECORD_SIZE 28
-static char s_iwm_debug[CLEM_IWM_DEBUG_RECORD_SIZE * 1024];
-static unsigned s_iwm_debug_cnt = 0;
 
 static char* s_lss_cmds[16] = {
     "CLR", "CLR", "CLR", "CLR", "CLR", "CLR", "CLR", "CLR",
     "NOP", "SL0", "SR.", "LD.", "NOP", "SL1", "SR.", "LD."
 };
-
-
-static const char* s_log_header = "type state op latch data\n";
 
 #define CLEM_IWM_DEBUG_HEX(_out_, _digit_) do { \
         if (_digit_ >= 10) { \
@@ -140,31 +134,7 @@ static const char* s_log_header = "type state op latch data\n";
         char endl
     }
 */
-static char* _iwm_debug_begin(
-    struct ClemensDeviceIWM* iwm
-) {
-    CLEM_ASSERT(s_iwm_debug_cnt <= sizeof(s_iwm_debug));
-    if (s_iwm_debug_cnt >= sizeof(s_iwm_debug) || !iwm->enable_debug) {
-        if (!g_fp_debug_out && s_iwm_debug_cnt > 0) {
-            g_fp_debug_out = fopen("debug.out", "wb");
-            fwrite(s_log_header, 1, strlen(s_log_header), g_fp_debug_out);
-        }
-        if (g_fp_debug_out) {
-            fwrite(s_iwm_debug, 1, s_iwm_debug_cnt, g_fp_debug_out);
-            fflush(g_fp_debug_out);
-            if (!iwm->enable_debug) {
-                fclose(g_fp_debug_out);
-                g_fp_debug_out = NULL;
-            }
-        }
-        s_iwm_debug_cnt = 0;
-    }
-    return iwm->enable_debug ? &s_iwm_debug[s_iwm_debug_cnt] : NULL;
-}
 
-static void _iwm_debug_end(struct ClemensDeviceIWM* iwm) {
-    s_iwm_debug_cnt += CLEM_IWM_DEBUG_RECORD_SIZE;
-}
 
 static void _iwm_debug_event(
     struct ClemensDeviceIWM* iwm,
@@ -174,11 +144,13 @@ static void _iwm_debug_event(
     uint8_t alt1,
     uint8_t alt2
 ) {
-    char* cur = _iwm_debug_begin(iwm);
+    char* cur;
     uint8_t state;
     int cnt;
 
-    if (!cur) return;
+    if (!iwm->enable_debug) return;
+
+    cur = clem_debug_acquire_log(CLEM_IWM_DEBUG_RECORD_SIZE);
     memset(cur, 0x20, 12);
     cnt = snprintf(cur, 11, "%llu", iwm->debug_timer_ns / 1000);
     if (cnt < 11) cur[cnt] = 0x20;
@@ -254,19 +226,18 @@ static void _iwm_debug_event(
             CLEM_IWM_DEBUG_HEX(&cur[14], (alt2 & 0x0f));
         }
     }
-    cur[15] = '\n';
-    _iwm_debug_end(iwm);
+    cur[15] = '\n';;
 }
 
 static void _iwm_debug_print(struct ClemensDeviceIWM* iwm, const char* txt) {
-    char* cur = _iwm_debug_begin(iwm);
-    if (!cur) return;
+    char* cur;
 
+    if (!iwm->enable_debug) return;
+
+    cur = clem_debug_acquire_log(CLEM_IWM_DEBUG_RECORD_SIZE);
     memset(cur, 0x20, CLEM_IWM_DEBUG_RECORD_SIZE);
     memcpy(cur, txt, CLEM_IWM_DEBUG_RECORD_SIZE);
     cur[CLEM_IWM_DEBUG_RECORD_SIZE - 1] = '\n';
-
-    _iwm_debug_end(iwm);
 }
 
 #else

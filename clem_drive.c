@@ -540,7 +540,7 @@ void clem_disk_update_head_525(
             ++drive->track_byte_index;
         }
         --drive->track_bit_shift;
-        drive->pulse_ns = drive->pulse_ns - drive->data->bit_timing_ns;
+        drive->pulse_ns = 0; // drive->pulse_ns - drive->data->bit_timing_ns;
     } else {
         *io_flags &= ~CLEM_IWM_FLAG_PULSE_HIGH;
     }

@@ -1,5 +1,6 @@
 #include "clem_host.hpp"
 #include "clem_display.hpp"
+#include "clem_debug.h"
 #include "clem_mem.h"
 #include "clem_vgc.h"
 
@@ -806,6 +807,11 @@ bool ClemensHost::parseCommandLog(const char* line)
         machine_.mmio.dev_iwm.enable_debug = true;
         return true;
       }
+      if (!strncasecmp(name, "opcode", sizeof(name))) {
+        machine_.debug_flags |= (
+          kClemensDebugFlag_StdoutOpcode | kClemensDebugFlag_DebugLogOpcode);
+        return true;
+      }
       return false;
     });
 }
@@ -820,7 +826,10 @@ bool ClemensHost::parseCommandUnlog(const char* line)
   }
   if (!start) {
     FormatView fv(terminalOutput_);
-    fv.format("usage: unlog <type>");
+    machine_.mmio.dev_iwm.enable_debug = false;
+    machine_.debug_flags &= ~(
+       kClemensDebugFlag_StdoutOpcode | kClemensDebugFlag_DebugLogOpcode);
+    clem_debug_log_flush();
     return false;
   }
   return parseCommandToken(start,
@@ -830,6 +839,13 @@ bool ClemensHost::parseCommandUnlog(const char* line)
       name[end - start] = '\0';
       if (!strncasecmp(name, "iwm", sizeof(name))) {
         machine_.mmio.dev_iwm.enable_debug = false;
+        clem_debug_log_flush();
+        return true;
+      }
+      if (!strncasecmp(name, "opcode", sizeof(name))) {
+        machine_.debug_flags &= ~(
+          kClemensDebugFlag_StdoutOpcode | kClemensDebugFlag_DebugLogOpcode);
+        clem_debug_log_flush();
         return true;
       }
       return false;
