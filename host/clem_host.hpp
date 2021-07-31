@@ -118,6 +118,7 @@ private:
   bool cpu6502EmulationSaved_;
 
   struct ExecutedInstruction {
+    uint32_t cycles_spent;
     uint32_t pc;
     char opcode[4];
     char operand[24];

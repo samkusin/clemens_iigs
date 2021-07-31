@@ -225,7 +225,8 @@ void ClemensHost::frame(int width, int height, float deltaTime)
                                    ImGuiWindowFlags_NoBringToFrontOnFocus);
 
   for (auto& instruction : executedInstructions_) {
-    ImGui::TextColored(ImVec4(0.75f, 0.75f, 0.75f, 1.0f), "%02X/%04X",
+    ImGui::TextColored(ImVec4(0.75f, 0.75f, 0.75f, 1.0f), "(%u) %02X/%04X",
+                       instruction.cycles_spent,
                        instruction.pc >> 16, instruction.pc & 0xffff);
     ImGui::SameLine();
     ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "%s", instruction.opcode);
@@ -968,6 +969,7 @@ void ClemensHost::emulatorOpcodePrint(
   strncpy(instruction.opcode, inst->desc->name, sizeof(instruction.opcode));
   instruction.pc = (uint32_t(inst->pbr) << 16) | inst->addr;
   strncpy(instruction.operand, operand, sizeof(instruction.operand));
+  instruction.cycles_spent = inst->cycles_spent;
 }
 
 bool ClemensHost::parseWOZDisk(

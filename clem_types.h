@@ -434,6 +434,7 @@ struct ClemensInstruction {
     uint8_t pbr;
     uint8_t bank;
     bool opc_8;
+    uint32_t cycles_spent;
 };
 
 struct ClemensCPURegs {
