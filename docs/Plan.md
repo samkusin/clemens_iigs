@@ -12,11 +12,11 @@ This is a running todo list.
 
 * If disk is not write protected on boot, bootup doesn't work?  Debug
 * Clean up some IWM code, debugging
+* Audio Phase I (just get the system beeps working, speaker clicks too)
 * Decimal Math sanity tests
 * Decimal math tests
-* Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
-* Audio Phase I (just get the system beeps working, speaker clicks too)
 * Some Simple Apple II games testing
+* Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
 * CLEM_MMIO_REG_VGC_IRQ_BYTE
 * C07F? - AN3?
 * remaining //e softswitches
