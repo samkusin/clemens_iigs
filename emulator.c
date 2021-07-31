@@ -1631,6 +1631,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 cpu->regs.X = tmp_value;
                 _cpu_p_flags_n_z_data_16(cpu, tmp_value);
             }
+            _clem_cycle(clem, 1);
             break;
         case CLEM_OPC_DEY:
             tmp_value = cpu->regs.Y - 1;
@@ -1641,6 +1642,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 cpu->regs.Y = tmp_value;
                 _cpu_p_flags_n_z_data_16(cpu, tmp_value);
             }
+            _clem_cycle(clem, 1);
             break;
         //
         //  Start EOR
@@ -1803,6 +1805,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 cpu->regs.X = tmp_value;
                 _cpu_p_flags_n_z_data_16(cpu, tmp_value);
             }
+            _clem_cycle(clem, 1);
             break;
         case CLEM_OPC_INY:
             tmp_value = cpu->regs.Y + 1;
@@ -1813,6 +1816,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 cpu->regs.Y = tmp_value;
                 _cpu_p_flags_n_z_data_16(cpu, tmp_value);
             }
+            _clem_cycle(clem, 1);
             break;
         //
         //  Start JMP
@@ -2631,7 +2635,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_STA_ABS_IDX:
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
-            _clem_cycle(clem, 1);    // extra IO
+            _clem_cycle(clem, 1);
+            //_clem_read_indexed_null_io(clem, tmp_addr, cpu->regs.X, cpu->regs.DBR);
             _clem_write_indexed_816(clem, cpu->regs.A, tmp_addr, cpu->regs.X,
                 cpu->regs.DBR, m_status, x_status);
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
@@ -2803,6 +2808,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 cpu->regs.X = CLEM_UTIL_set16_lo(cpu->regs.X, cpu->regs.S);
                 _cpu_p_flags_n_z_data(cpu, (uint8_t)cpu->regs.X);
             }
+            _clem_cycle(clem, 1);
             break;
         case CLEM_OPC_TXA:
             if (m_status) {
@@ -2812,6 +2818,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 cpu->regs.A = x_status ? (uint8_t)cpu->regs.X : cpu->regs.X;
                 _cpu_p_flags_n_z_data_16(cpu, cpu->regs.A);
             }
+            _clem_cycle(clem, 1);
             break;
         case CLEM_OPC_TXS:
             //  no n,z flags set
@@ -2822,6 +2829,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             } else {
                 cpu->regs.S = cpu->regs.X;
             }
+            _clem_cycle(clem, 1);
             break;
         case CLEM_OPC_TXY:
             if (x_status) {
@@ -2831,6 +2839,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 cpu->regs.Y = cpu->regs.X;
                 _cpu_p_flags_n_z_data_16(cpu, cpu->regs.Y);
             }
+            _clem_cycle(clem, 1);
             break;
         case CLEM_OPC_TYA:
             if (m_status) {
@@ -2840,6 +2849,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 cpu->regs.A = x_status ? (uint8_t)cpu->regs.Y : cpu->regs.Y;
                 _cpu_p_flags_n_z_data_16(cpu, cpu->regs.A);
             }
+            _clem_cycle(clem, 1);
             break;
         case CLEM_OPC_TYX:
             if (x_status) {
@@ -2849,6 +2859,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 cpu->regs.X = cpu->regs.Y;
                 _cpu_p_flags_n_z_data_16(cpu, cpu->regs.X);
             }
+            _clem_cycle(clem, 1);
             break;
         //  End Transfer
         //

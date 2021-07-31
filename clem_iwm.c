@@ -309,7 +309,8 @@ static void _clem_iwm_reset_lss(
 
 static void _clem_iwm_lss(
     struct ClemensDeviceIWM* iwm,
-    struct ClemensDriveBay* drives
+    struct ClemensDriveBay* drives,
+    struct ClemensClock* clock
 ) {
     /* Uses the Disk II sequencer.
        Some assumptions taken from Understanding the Apple //e
@@ -363,7 +364,8 @@ static void _clem_iwm_lss(
                 iwm->latch = iwm->data;
                 if (iwm->state & 0x02) {
                     iwm->lss_write_counter = 0x81;
-                    CLEM_LOG("lss_ld:  %02X", iwm->latch);
+                    iwm->last_write_clocks_ts = clock->ts;
+                    //CLEM_LOG("lss_ld:  %02X", iwm->latch);
                 } else {
                     CLEM_WARN("IWM: state: %02X load byte %02X in read?",
                         iwm->state, iwm->data);
@@ -396,11 +398,13 @@ static void _clem_iwm_lss(
         } else {
             iwm->io_flags &= ~CLEM_IWM_FLAG_WRITE_DATA;
         }
+        /*
         if (iwm->io_flags & CLEM_IWM_FLAG_PULSE_HIGH) {
             CLEM_LOG("drv_wr: (%u ns) => %02X, %c",
                 drive->pulse_ns,
                 iwm->latch, (iwm->io_flags & CLEM_IWM_FLAG_WRITE_DATA) ? '1' : '0');
         }
+        */
     } else {
         /* read mode - data = latch except when holding the current read byte
            note, that the LSS ROM does this for us, but when IIgs latch mode is
@@ -446,6 +450,7 @@ void clem_iwm_glu_sync(
 ) {
     unsigned delta_ns, lss_budget_ns;
     int drive_index = (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 1 : 0;
+    struct ClemensClock next_clock;
 
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
         if (iwm->enable_debug) {
@@ -462,10 +467,14 @@ void clem_iwm_glu_sync(
         _iwm_debug_value(iwm, lss_budget_ns);
         _iwm_debug_event(iwm, 's', 'b', 0, 0, 0);
 
+        next_clock.ts = clock->ts;
+        next_clock.ref_step = clock->ref_step;
         while (lss_budget_ns >= iwm->lss_update_dt_ns) {
-            _clem_iwm_lss(iwm, drives);
+            _clem_iwm_lss(iwm, drives, &next_clock);
             lss_budget_ns -= iwm->lss_update_dt_ns;
             iwm->debug_timer_ns += iwm->lss_update_dt_ns;
+            next_clock.ts += _clem_calc_clocks_step_from_ns(
+                iwm->lss_update_dt_ns, next_clock.ref_step);
         }
         //iwm->lss_clocks_lag = _clem_calc_clocks_step_from_ns(
         //    lss_budget_ns, clock->ref_step);
@@ -582,7 +591,7 @@ void _clem_iwm_io_switch(
                 iwm->lss_write_counter = 0x00;
             }
 //        }
-        CLEM_LOG("IWM: state %02X => %02X", current_state, iwm->state);
+        //CLEM_LOG("IWM: state %02X => %02X", current_state, iwm->state);
     }
 }
 

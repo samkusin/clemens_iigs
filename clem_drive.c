@@ -519,6 +519,8 @@ void clem_disk_update_head_525(
     if (drive->pulse_ns >= drive->data->bit_timing_ns) {
         *io_flags |= CLEM_IWM_FLAG_PULSE_HIGH;
 
+
+        /*
         if (*io_flags & CLEM_IWM_FLAG_WRITE_REQUEST &&
             drive->data->track_initialized[drive->real_track_index]
         ) {
@@ -526,17 +528,20 @@ void clem_disk_update_head_525(
                         drive->real_track_index, drive->track_byte_index, drive->track_bit_shift,
                         write_transition ? '1': '0');
         }
+        */
 
         drive->write_pulse = write_pulse;
 
         if (drive->track_bit_shift == 0) {
             drive->track_bit_shift = 8;
+            /*
             if (*io_flags & CLEM_IWM_FLAG_WRITE_REQUEST) {
                 CLEM_LOG("diskwr(%u:%u): %02X",
                     drive->real_track_index, drive->track_byte_index,
                     *(drive->data->bits_data + (
                         drive->data->track_byte_offset[drive->real_track_index] + drive->track_byte_index)));
             }
+            */
             ++drive->track_byte_index;
         }
         --drive->track_bit_shift;
