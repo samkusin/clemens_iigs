@@ -330,7 +330,7 @@ static void _clem_iwm_lss(
     } else {
         drive = &drives->slot6[drive_index];
         clem_disk_read_and_position_head_525(
-            drive, &iwm->io_flags, iwm->out_phase, iwm->lss_update_dt_ns);
+            drive, &iwm->io_flags, iwm->out_phase, 500);
     }
 
     adr = (unsigned)(iwm->lss_state) << 4 |
@@ -420,7 +420,7 @@ static void _clem_iwm_lss(
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
         clem_disk_update_head_35(drive, &iwm->io_flags, iwm->lss_update_dt_ns);
     } else {
-        clem_disk_update_head_525(drive, &iwm->io_flags, iwm->lss_update_dt_ns);
+        clem_disk_update_head_525(drive, &iwm->io_flags, 500);
     }
 
 #ifdef CLEM_IWM_DEBUG_DIAGNOSTIC

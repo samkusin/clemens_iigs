@@ -10,11 +10,8 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Timing Issues
-  * STA a,X  4(5)
-  * PLA, PLX, etc 3(4)
-  * RTS 5(6)
-  *
+* 00BC57 - trace all IWM and OPCODE logs to see if they match Jim Sather's description to the letter.
+
 * WOZ-like blank disks
   * Cannot be saved as WOZ disks until 'formatted'
   * Disks have a preset track bit size based on 'type'
@@ -55,6 +52,11 @@ This is a running todo list.
 
 ## DONE
 
+
+* Timing Issues - fix clem_cycle bug!
+  * STA a,X  4(5)
+  * PLA, PLX, etc 3(4)
+  * RTS 5(6)
 * First 5.25" disk boot (DOS 3.3)
 * Fixed stepper motor logic for 5.25" drive
 * Fixed timing issues when disk motor turns on (slow mode)
