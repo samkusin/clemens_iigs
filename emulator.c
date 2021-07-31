@@ -302,14 +302,8 @@ static void _opcode_print(
     }
     if (clem->debug_flags & kClemensDebugFlag_DebugLogOpcode) {
         char* debug_text = clem_debug_acquire_log(32);
-        int debug_len = snprintf(debug_text, 32, "%02X:%04X %s %u",
-            inst->pbr, inst->addr, inst->desc->name, inst->cycles_spent);
-        memset(debug_text + debug_len, 0x20, 32 - debug_len);
-        debug_text[31] = '\n';
-
-        debug_text = clem_debug_acquire_log(32);
-        debug_len = snprintf(debug_text, 32, "%02X:%04X %s %s",
-            inst->pbr, inst->addr, inst->desc->name, operand);
+        int debug_len = snprintf(debug_text, 32, "%2u %02X:%04X %s %s",
+            inst->cycles_spent, inst->pbr, inst->addr, inst->desc->name, operand);
         memset(debug_text + debug_len, 0x20, 32 - debug_len);
         debug_text[31] = '\n';
     }
