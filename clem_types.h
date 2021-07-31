@@ -487,7 +487,8 @@ struct Clemens65C816 {
 enum {
     kClemensDebugFlag_None              = 0,
     kClemensDebugFlag_StdoutOpcode      = (1 << 0),
-    kClemensDebugFlag_OpcodeCallback    = (1 << 1)
+    kClemensDebugFlag_OpcodeCallback    = (1 << 1),
+    kClemensDebugFlag_DebugLogOpcode    = (1 << 2)
 };
 
 typedef void (*ClemensOpcodeCallback)(struct ClemensInstruction*,

@@ -213,7 +213,7 @@ static void _opcode_print(
     ClemensMachine* clem,
     struct ClemensInstruction* inst
 ) {
-    char operand[24];
+    char operand[16];
     operand[0] = '\0';
 
     switch (inst->desc->addr_mode) {
@@ -299,6 +299,13 @@ static void _opcode_print(
         printf(ANSI_COLOR_BLUE "%02X:%04X "
             ANSI_COLOR_CYAN "%s" ANSI_COLOR_YELLOW " %s" ANSI_COLOR_RESET "\n",
             inst->pbr, inst->addr, inst->desc->name, operand);
+    }
+    if (clem->debug_flags & kClemensDebugFlag_DebugLogOpcode) {
+        char* debug_text = clem_debug_acquire_log(32);
+        int debug_len = snprintf(debug_text, 32, "%02X:%04X %s %s",
+            inst->pbr, inst->addr, inst->desc->name, operand);
+        memset(debug_text + debug_len, 0x20, 32 - debug_len);
+        debug_text[31] = '\n';
     }
     if ((clem->debug_flags & kClemensDebugFlag_OpcodeCallback) && clem->opcode_post) {
         (*clem->opcode_post)(inst,  operand, clem->debug_user_ptr);
@@ -2623,6 +2630,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_STA_ABS_IDX:
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_cycle(clem, 1);    // extra IO
             _clem_write_indexed_816(clem, cpu->regs.A, tmp_addr, cpu->regs.X,
                 cpu->regs.DBR, m_status, x_status);
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
@@ -2635,6 +2643,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_STA_ABS_IDY:      // $addr + Y
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_cycle(clem, 1);       // extra IO
             _clem_write_indexed_816(clem, cpu->regs.A, tmp_addr, cpu->regs.Y,
                 cpu->regs.DBR, m_status, x_status);
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
@@ -2727,6 +2736,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_STZ_ABS_IDX:
             _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
+            _clem_cycle(clem, 1);
             _clem_write_indexed_816(clem, 0x0000, tmp_addr, cpu->regs.X,
                 cpu->regs.DBR, m_status, x_status);
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
