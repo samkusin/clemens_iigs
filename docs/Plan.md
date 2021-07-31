@@ -10,17 +10,10 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* 00BC57 - trace all IWM and OPCODE logs to see if they match Jim Sather's description to the letter.
-
-* WOZ-like blank disks
-  * Cannot be saved as WOZ disks until 'formatted'
-  * Disks have a preset track bit size based on 'type'
-  * This prevents creating blank disks with any format other than DOS or ProDOS
-  * For DOS disks - bit size per track = 0xC5C0
-  *
+* If disk is not write protected on boot, bootup doesn't work?  Debug
+* Clean up some IWM code, debugging
 * Decimal Math sanity tests
 * Decimal math tests
-* Writable disk data
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
 * Audio Phase I (just get the system beeps working, speaker clicks too)
 * Some Simple Apple II games testing
@@ -52,7 +45,10 @@ This is a running todo list.
 
 ## DONE
 
-
+* DOS newly formatted disk via INIT working (haven't tried booting yet..., but
+  catalog, save/load, work...)
+* Many simple instructions we're clocked at 1 cycle (incorrect - 2 cycles!)
+  * INY/DEY, INX,DEX, TXA, etc.
 * Timing Issues - fix clem_cycle bug!
   * STA a,X  4(5)
   * PLA, PLX, etc 3(4)

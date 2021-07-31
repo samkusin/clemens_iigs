@@ -1026,6 +1026,7 @@ bool ClemensHost::parseWOZDisk(
     }
   }
 
+  //woz->flags &= ~CLEM_WOZ_IMAGE_WRITE_PROTECT;
   return true;
 }
 
@@ -1060,7 +1061,7 @@ bool ClemensHost::initWOZDisk(struct ClemensWOZDisk* woz) {
   unsigned track_index = 0;
   for (unsigned i = 0; i < CLEM_WOZ_LIMIT_QTR_TRACKS; ++i) {
     if ((i % 4) == 0 || (i % 4) == 1) {
-      woz->meta_track_map[i] = (i % 4);
+      woz->meta_track_map[i] = (i / 4);
     } else {
       woz->meta_track_map[i] = 0xff;
     }
