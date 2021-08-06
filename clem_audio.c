@@ -37,10 +37,21 @@
 #define CLEM_AUDIO_CTL_VOLUME_MASK  0x07
 
 void clem_sound_reset(struct ClemensDeviceAudio* glu) {
-    memset(glu, 0, sizeof(*glu));
+    /* some GLU reset */
+    glu->address = 0;
+    glu->ram_read_cntr = 0;
+
+    memset(glu->doc_reg, 0, sizeof(glu->doc_reg));
+    glu->addr_auto_inc = false;
+    glu->is_access_ram = false;
+    glu->is_busy = false;
 
     /* indicates IRQB line, so no interrupt */;
     glu->doc_reg[0xe0] = 0x80;
+
+    /* mix buffer reset */
+    glu->mix_frame_delta_us = 0;
+    glu->mix_frame_index = 0;
 }
 
 void clem_sound_glu_sync(struct ClemensDeviceAudio* glu, uint32_t delta_us) {
@@ -142,6 +153,8 @@ uint8_t clem_sound_read_switch(
             break;
         case CLEM_MMIO_REG_SPKR:
             if (!CLEM_IS_MMIO_READ_NO_OP(flags)) {
+                /* toggle the speaker wave form.   tense/relax = 1, 0
+                 */
             }
             result = 0x00;
             break;

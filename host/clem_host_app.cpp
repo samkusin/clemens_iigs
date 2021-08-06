@@ -32,6 +32,8 @@ static void onInit()
   clem_host_timepoint_init();
   clem_host_timepoint_now(&g_LastTimepoint);
 
+  CoInitializeEx(NULL, COINIT_MULTITHREADED);
+
   sg_desc desc = {};
   desc.context = sapp_sgcontext();
   sg_setup(desc);
@@ -213,6 +215,8 @@ static void onCleanup()
   delete g_Host;
 
   g_Host = nullptr;
+
+  CoUninitialize();
 
   simgui_shutdown();
   sg_shutdown();

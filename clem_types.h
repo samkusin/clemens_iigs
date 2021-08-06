@@ -128,6 +128,20 @@ struct ClemensDeviceSCC {
     uint32_t irq_line;          /**< IRQ flags passed to machine */
 };
 
+/**
+ * @brief This buffer is supplied by the host and represents a complete
+ * 16-bit stereo PCM buffer
+ *
+ * This buffer is written to by the clemens machine, and consumed by the host
+ * as input to the audio device's playback buffer.
+ *
+ */
+struct ClemensAudioMixBuffer {
+    uint8_t* data;
+    unsigned stride;
+    unsigned frame_count;
+    unsigned frames_per_second; /**< target audio frequency */
+};
 
 struct ClemensDeviceAudio {
     uint8_t sound_ram[65536];
@@ -141,10 +155,15 @@ struct ClemensDeviceAudio {
     bool is_access_ram;         /**< If true, sound RAM, if false, registers */
     bool is_busy;               /**< DOC busy */
 
-
     /* settings */
     uint8_t volume;             /**< 0 - 15 */
 
+    /* host supplied mix buffer */
+    struct ClemensAudioMixBuffer mix_buffer;
+    unsigned mix_frame_delta_us;
+    unsigned mix_frame_index;
+
+    /* the device's IRQ line */
     uint32_t irq_line;
 };
 
@@ -268,6 +287,8 @@ struct ClemensDeviceIWM {
     uint64_t debug_timer_ns;
     uint32_t debug_value;       /**< option displayed during iwm_debug_event */
 };
+
+
 
 /**
  * @brief FPI + MEGA2 MMIO Interface

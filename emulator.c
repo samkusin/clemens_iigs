@@ -782,6 +782,15 @@ void _clem_init_instruction_map() {
     _opcode_description(CLEM_OPC_XCE,     "XCE", kClemensCPUAddrMode_None);
 }
 
+void clemens_assign_audio_mix_buffer(
+    ClemensMachine* clem,
+    struct ClemensAudioMixBuffer* mix_buffer
+) {
+    memcpy(&clem->mmio.dev_audio.mix_buffer, mix_buffer,
+           sizeof(struct ClemensAudioMixBuffer));
+    clem_sound_reset(&clem->mmio.dev_audio);
+}
+
 bool clemens_is_initialized_simple(const ClemensMachine* machine) {
     return (machine->fpi_bank_map[0xff] != NULL);
 }

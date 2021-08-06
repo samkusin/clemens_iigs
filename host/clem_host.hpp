@@ -24,6 +24,7 @@ struct ClemensHostInputEvent
   };
 };
 
+class ClemensAudio;
 class ClemensDisplay;
 class ClemensDisplayProvider;
 
@@ -139,6 +140,9 @@ private:
 
   std::unique_ptr<ClemensDisplayProvider> displayProvider_;
   std::unique_ptr<ClemensDisplay> display_;
+  std::unique_ptr<ClemensAudio> audio_;
+
+  std::vector<uint8_t> audioMixBuffer;
 };
 
 
