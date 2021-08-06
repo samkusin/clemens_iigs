@@ -1,4 +1,11 @@
+
+// TODO: cross-platform support
+
+//  windows................grrrrr
+#define NOMINMAX
+
 #include "clem_host.hpp"
+#include "clem_audio.hpp"
 #include "clem_display.hpp"
 #include "clem_debug.h"
 #include "clem_mem.h"
@@ -90,6 +97,7 @@ ClemensHost::ClemensHost() :
 
   displayProvider_ = std::make_unique<ClemensDisplayProvider>();
   display_ = std::make_unique<ClemensDisplay>(*displayProvider_);
+  audio_ = std::make_unique<ClemensAudio>();
 }
 
 ClemensHost::~ClemensHost()
@@ -860,6 +868,8 @@ void ClemensHost::createMachine()
   }
   slab_.reset();
 
+  audio_->start();
+
   void* romMemory = NULL;
   unsigned romMemorySize = 0;
   FILE* fp = fopen("gs_rom_3.rom", "rb");
@@ -902,8 +912,10 @@ void ClemensHost::destroyMachine()
   if (!clemens_is_initialized(&machine_)) {
     return;
   }
+  audio_->stop();
   emulationBreak();
   memset(&machine_, 0, sizeof(ClemensMachine));
+
 }
 
 void ClemensHost::resetMachine()

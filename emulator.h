@@ -36,6 +36,16 @@ int clemens_init(
 );
 
 /**
+ * @brief Sets the audio buffer used by the clemens audio system for mixing
+ * Ensoniq and Apple II speaker output
+ *
+ * @param clem
+ * @param mix_buffer
+ */
+void clemens_assign_audio_mix_buffer(ClemensMachine* clem,
+                                     struct ClemensAudioMixBuffer* mix_buffer);
+
+/**
  * @brief Verify the machine is initialized/ready for emulation
  *
  * The emulator does not ever allocate memory.  This method checks if the
