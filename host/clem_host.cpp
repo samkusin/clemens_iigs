@@ -97,7 +97,7 @@ ClemensHost::ClemensHost() :
 
   displayProvider_ = std::make_unique<ClemensDisplayProvider>();
   display_ = std::make_unique<ClemensDisplay>(*displayProvider_);
-  audio_ = std::make_unique<ClemensAudio>();
+  audio_ = std::make_unique<ClemensAudioDevice>();
 }
 
 ClemensHost::~ClemensHost()
@@ -186,6 +186,11 @@ void ClemensHost::frame(int width, int height, float deltaTime)
       }
     }
     display_->finish(screenUVs);
+
+    ClemensAudio audio;
+    if (emulationRan && clemens_get_audio(&audio, &machine_)) {
+      audio_->queue(audio);
+    }
   }
 
   ImGui::SetNextWindowPos(ImVec2(512, 32), ImGuiCond_FirstUseEver);
@@ -895,6 +900,14 @@ void ClemensHost::createMachine()
                slab_.allocate(256 * 7), // TODO make this a little less magic-numberish
                slab_.allocate(2048 * 7),
                fpiBankCount);
+
+  ClemensAudioMixBuffer mix_buffer;
+  mix_buffer.frames_per_second = audio_->getAudioFrequency();
+  mix_buffer.frame_count = mix_buffer.frames_per_second / 20;
+  mix_buffer.stride = 8;    //   2 channels, 16-bits per channel
+  mix_buffer.data = (uint8_t*)(
+    slab_.allocate(mix_buffer.frame_count * mix_buffer.stride));
+  clemens_assign_audio_mix_buffer(&machine_, &mix_buffer);
 
   clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
 

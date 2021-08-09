@@ -791,6 +791,16 @@ void clemens_assign_audio_mix_buffer(
     clem_sound_reset(&clem->mmio.dev_audio);
 }
 
+ClemensAudio* clemens_get_audio(ClemensAudio* audio, ClemensMachine* clem) {
+    audio->data = clem->mmio.dev_audio.mix_buffer.data;
+    audio->frame_start = 0;
+    audio->frame_count = 800; // clem->mmio.dev_audio.mix_buffer.frame_count-1;
+    audio->frame_stride = clem->mmio.dev_audio.mix_buffer.stride;
+    audio->frame_total = clem->mmio.dev_audio.mix_buffer.frame_count;
+
+    return audio;
+}
+
 bool clemens_is_initialized_simple(const ClemensMachine* machine) {
     return (machine->fpi_bank_map[0xff] != NULL);
 }

@@ -46,6 +46,16 @@ void clemens_assign_audio_mix_buffer(ClemensMachine* clem,
                                      struct ClemensAudioMixBuffer* mix_buffer);
 
 /**
+ * @brief Return the current audio buffer, and advances the read head to the
+ * current write head
+ *
+ * @param audio
+ * @param clem
+ * @return ClemensAudio*
+ */
+ClemensAudio* clemens_get_audio(ClemensAudio* audio, ClemensMachine* clem);
+
+/**
  * @brief Verify the machine is initialized/ready for emulation
  *
  * The emulator does not ever allocate memory.  This method checks if the
