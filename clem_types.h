@@ -551,6 +551,14 @@ typedef struct {
     unsigned text_color;        /**< bits 0-3 = foreground, 4-7 = background */
 } ClemensMonitor;
 
+typedef struct {
+    uint8_t* data;              /** format will always by 16-bit pcm stereo */
+    unsigned frame_total;       /** total number of frames in the buffer */
+    unsigned frame_start;       /** --frame-- index into the data buffer */
+    unsigned frame_count;       /** --frame-- count (this can wrap around) */
+    unsigned frame_stride;      /** each frame is this size */
+} ClemensAudio;
+
 /**
  * @brief
  *

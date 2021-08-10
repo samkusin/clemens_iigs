@@ -6,6 +6,8 @@
 #include <MMDeviceAPI.h>
 #include <AudioClient.h>
 
+#include <atomic>
+
 namespace ckaudio {
 
   enum class BufferFormat {
@@ -23,11 +25,11 @@ namespace ckaudio {
 
 }
 
-class ClemensAudio
+class ClemensAudioDevice
 {
 public:
-  ClemensAudio();
-  ~ClemensAudio();
+  ClemensAudioDevice();
+  ~ClemensAudioDevice();
 
   unsigned getAudioFrequency() const;
 
@@ -49,16 +51,29 @@ public:
   //  (perhaps at 60hz)
   //
   //
-  void render(const ClemensAudioMixBuffer& mixBuffer);
+  void queue(const ClemensAudio& mixBuffer);
 
 private:
+  friend DWORD __stdcall ckAudioRenderWorker(LPVOID context);
+
+  void render();
+
   IMMDevice* audioDevice_;
   IAudioClient* audioClient_;
   IAudioRenderClient* audioRenderClient_;
+  HANDLE audioThread_;
+  HANDLE shutdownEvent_;
+  HANDLE readyEvent_;
   ckaudio::DataFormat dataFormat_;
 
   uint32_t desiredLatencyMS_;
   uint32_t audioEngineFrameCount_;
+
+  // atomic-driven ring buffer
+  uint8_t* audioBuffer_;
+  std::atomic_uint32_t audioReadHead_;
+  std::atomic_uint32_t audioWriteHead_;
+  uint32_t audioFrameLimit_;
 };
 
 
