@@ -12,7 +12,8 @@
 #define CLEM_CLOCKS_FAST_CYCLE              1023
 #define CLEM_CLOCKS_MEGA2_CYCLE             2864
 
-#define CLEM_MEGA2_CYCLES_PER_60TH          16667
+#define CLEM_MEGA2_CYCLES_PER_SECOND        1023000
+#define CLEM_MEGA2_CYCLES_PER_60TH          (CLEM_MEGA2_CYCLES_PER_SECOND / 60)
 #define CLEM_MEGA2_TIMER_1SEC_US            1000000
 #define CLEM_MEGA2_TIMER_QSEC_US            266667
 #define CLEM_MEGA2_CYCLE_NS                 1023
@@ -519,5 +520,9 @@
 #define CLEM_SCC_PORT_RX_DATA_LO            0x10
 #define CLEM_SCC_PORT_RX_DATA_HI            0x20
 #define CLEM_SCC_PORT_GPI                   0x40
+
+#define CLEM_PI                             (3.14159265f)
+#define CLEM_PI_2                           (6.28318531f)
+#define CLEM_HALF_PI                        (1.570796325)
 
 #endif

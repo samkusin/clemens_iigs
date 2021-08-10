@@ -112,9 +112,10 @@ void clem_sound_reset(struct ClemensDeviceAudio* glu);
  * @brief Executed frequently enough to emulate the GLU Microcontroller
  *
  * @param glu device data (1 ms worth of cycles?)
- * @param delta_us Microsecond increment since last sync
+ * @param clocks Reference clock
  */
-void clem_sound_glu_sync(struct ClemensDeviceAudio* glu, uint32_t delta_us);
+void clem_sound_glu_sync(struct ClemensDeviceAudio* glu,
+                         struct ClemensClock* clocks);
 
 /**
  * @brief Executed from the memory subsystem for MMIO

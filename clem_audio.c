@@ -1,8 +1,10 @@
 #include "clem_device.h"
 #include "clem_debug.h"
 #include "clem_mmio_defs.h"
+#include "clem_util.h"
 
 #include <string.h>
+#include <math.h>
 
 /**
  * @brief Sound GLU emulation
@@ -50,12 +52,44 @@ void clem_sound_reset(struct ClemensDeviceAudio* glu) {
     glu->doc_reg[0xe0] = 0x80;
 
     /* mix buffer reset */
-    glu->mix_frame_delta_us = 0;
-    glu->mix_frame_index = 0;
+    glu->dt_mix_frame = 0;
+    if (glu->mix_buffer.frames_per_second > 0) {
+        glu->dt_mix_sample = (CLEM_CLOCKS_MEGA2_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND) / (
+            glu->mix_buffer.frames_per_second);
+        glu->tone_frame_delta = (440 * CLEM_PI_2) / glu->mix_buffer.frames_per_second;
+    } else {
+        glu->dt_mix_sample = 0;
+        glu->tone_frame_delta = 0;
+    }
+    glu->tone_theta = 0.0f;
 }
 
-void clem_sound_glu_sync(struct ClemensDeviceAudio* glu, uint32_t delta_us) {
-
+void clem_sound_glu_sync(
+    struct ClemensDeviceAudio* glu,
+    struct ClemensClock* clocks
+) {
+    if (glu->dt_mix_sample > 0) {
+        unsigned delta_frames = (glu->dt_mix_frame / glu->dt_mix_sample);
+        if (delta_frames > 0) {
+            uint8_t* mix_out = glu->mix_buffer.data;
+            for (unsigned i = 0; i < delta_frames; ++i) {
+                unsigned frame_index = (glu->mix_frame_index + i) % glu->mix_buffer.frame_count;
+                uint16_t* samples = (uint16_t*)(&mix_out[frame_index * glu->mix_buffer.stride]);
+                float mag = sinf(glu->tone_theta);
+                samples[0] = (uint16_t)((mag + 1.0f) * 32767);
+                samples[1] = (uint16_t)((mag + 1.0f) * 32767);
+                glu->tone_theta += glu->tone_frame_delta;
+                if (glu->tone_theta >= CLEM_PI_2) {
+                    glu->tone_theta -= CLEM_PI_2;
+                }
+            }
+            glu->mix_frame_index = (glu->mix_frame_index + delta_frames) % (
+                glu->mix_buffer.frame_count);
+            glu->dt_mix_frame = glu->dt_mix_frame % glu->dt_mix_sample;
+        }
+    }
+    glu->dt_mix_frame += (clocks->ts - glu->ts_last_frame);
+    glu->ts_last_frame = clocks->ts;
 }
 
 void clem_sound_write_switch(

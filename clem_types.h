@@ -160,8 +160,14 @@ struct ClemensDeviceAudio {
 
     /* host supplied mix buffer */
     struct ClemensAudioMixBuffer mix_buffer;
-    unsigned mix_frame_delta_us;
+    clem_clocks_time_t ts_last_frame;
+    clem_clocks_duration_t dt_mix_frame;
+    clem_clocks_duration_t dt_mix_sample;
     unsigned mix_frame_index;
+
+    /* test code */
+    float tone_frame_delta;
+    float tone_theta;
 
     /* the device's IRQ line */
     uint32_t irq_line;

@@ -190,6 +190,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     ClemensAudio audio;
     if (emulationRan && clemens_get_audio(&audio, &machine_)) {
       audio_->queue(audio);
+      clemens_audio_next_frame(&machine_);
     }
   }
 

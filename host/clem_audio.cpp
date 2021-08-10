@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cmath>
+#include <cassert>
 
 #include <Mmreg.h>
 
@@ -123,8 +124,8 @@ namespace {
     const EncodeBuffer& input
   ) {
     unsigned inFrameIdx = input.frameStart;
-    void* inptr = input.ptr;
-    void* outptr = output.ptr;
+    void* inptr = (void *)(uintptr_t(input.ptr) + input.frameStart * input.frameSize);
+    void* outptr = (void *)(uintptr_t(output.ptr) + output.frameStart * output.frameSize);
     for (unsigned outFrameIdx = output.frameStart;
          outFrameIdx <= output.frameEnd && inFrameIdx <= input.frameEnd;
          ++outFrameIdx, ++inFrameIdx
@@ -138,7 +139,7 @@ namespace {
       inptr = ((uint8_t*)inptr) + input.frameSize;
       outptr = ((uint8_t*)outptr) + output.frameSize;
     }
-    return inFrameIdx;
+    return inFrameIdx - input.frameStart;
   }
 
 } // namespace anon
@@ -158,15 +159,17 @@ DWORD __stdcall ckAudioRenderWorker(LPVOID context)
   //
   CoInitializeEx(NULL, COINIT_MULTITHREADED);
 
+  HANDLE waitHandles[2] = {audio->shutdownEvent_, audio->readyEvent_};
+
   bool isActive = true;
+
   while (isActive) {
-      DWORD waitResult = WaitForSingleObject(
-        audio->shutdownEvent_, audio->desiredLatencyMS_ / 2);
+      DWORD waitResult = WaitForMultipleObjects(2, waitHandles, FALSE, INFINITE);
       switch (waitResult) {
         case WAIT_OBJECT_0:
           isActive = false;
           break;
-        case WAIT_TIMEOUT:
+        case WAIT_OBJECT_0 + 1:
            /* populate the already played frames in the audio buffer with new
              data from the shared controller/worker buffer
           */
@@ -344,8 +347,11 @@ void ClemensAudioDevice::queue(const ClemensAudio& source)
   uint32_t inputTail = (source.frame_start + source.frame_count) % source.frame_total;
   uint32_t inputRemaining = source.frame_count;
 
+  //printf("SKS: W0: %u\n", currentWriteHead);
+
   while (inputHead != inputTail) {
     input.frameStart = inputHead;
+    assert(inputRemaining > 0 && inputRemaining <= source.frame_count);
     if (input.frameStart + inputRemaining >= source.frame_total) {
       input.frameEnd = source.frame_total - 1;
     } else {
@@ -360,7 +366,9 @@ void ClemensAudioDevice::queue(const ClemensAudio& source)
 
     uint32_t writtenFrames = encode_pcm_16_to_float_stereo(output, input);
 
+    assert(inputRemaining >= writtenFrames);
     inputHead += writtenFrames;
+    inputRemaining -= writtenFrames;
     if (inputHead >= source.frame_total) {
       inputHead = 0;
     }
@@ -369,7 +377,7 @@ void ClemensAudioDevice::queue(const ClemensAudio& source)
       currentWriteHead = 0;
     }
   }
-
+  //printf("SKS: W1: %u\n", currentWriteHead);
   audioWriteHead_.store(currentWriteHead);
 }
 
@@ -385,6 +393,7 @@ void ClemensAudioDevice::render()
   uint32_t currentReadHead = audioReadHead_.load();
   uint32_t currentWriteHead = audioWriteHead_.load();
   BYTE* data = NULL;
+  //printf("SKS: R0: %u\n", currentReadHead);
   while (availableFrames > 0 && currentReadHead != currentWriteHead) {
     //  This operation is much simpler than the queue() method, since
     //  data formats are guaranteed to be the same - so a direct copy to the
@@ -445,5 +454,6 @@ void ClemensAudioDevice::render()
     }
   } // end while
 
+  //printf("SKS: R1: %u\n", currentReadHead);
   audioReadHead_.store(currentReadHead);
 }
