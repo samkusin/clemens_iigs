@@ -782,25 +782,6 @@ void _clem_init_instruction_map() {
     _opcode_description(CLEM_OPC_XCE,     "XCE", kClemensCPUAddrMode_None);
 }
 
-void clemens_assign_audio_mix_buffer(
-    ClemensMachine* clem,
-    struct ClemensAudioMixBuffer* mix_buffer
-) {
-    memcpy(&clem->mmio.dev_audio.mix_buffer, mix_buffer,
-           sizeof(struct ClemensAudioMixBuffer));
-    clem_sound_reset(&clem->mmio.dev_audio);
-}
-
-ClemensAudio* clemens_get_audio(ClemensAudio* audio, ClemensMachine* clem) {
-    audio->data = clem->mmio.dev_audio.mix_buffer.data;
-    audio->frame_start = 0;
-    audio->frame_count = 800; // clem->mmio.dev_audio.mix_buffer.frame_count-1;
-    audio->frame_stride = clem->mmio.dev_audio.mix_buffer.stride;
-    audio->frame_total = clem->mmio.dev_audio.mix_buffer.frame_count;
-
-    return audio;
-}
-
 bool clemens_is_initialized_simple(const ClemensMachine* machine) {
     return (machine->fpi_bank_map[0xff] != NULL);
 }
@@ -969,6 +950,131 @@ bool clemens_has_disk(
     return drive != NULL ? (drive->data != NULL) : false;
 }
 
+ClemensMonitor* clemens_get_monitor(
+    ClemensMonitor* monitor,
+    ClemensMachine* clem
+) {
+    //  TODO: use vgc flags to detect NTSC vs PAL, Mono vs RGB
+    monitor->signal = CLEM_MONITOR_SIGNAL_NTSC;
+    monitor->signal = CLEM_MONITOR_COLOR_RGB;
+    monitor->width = 560;
+    monitor->height = 384;
+    monitor->border_color = clem->mmio.dev_rtc.ctl_c034 & 0x0f;
+    monitor->text_color = ((clem->mmio.vgc.text_bg_color & 0xf) << 4) |
+                          (clem->mmio.vgc.text_fg_color & 0xf);
+    return monitor;
+}
+
+ClemensVideo* clemens_get_text_video(
+    ClemensVideo* video,
+    ClemensMachine* clem
+) {
+    struct ClemensVGC* vgc = &clem->mmio.vgc;
+    if (!(vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE)) {
+        video->scanline_count = 24;
+        video->scanline_start = 0;
+    } else if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
+        video->scanline_count = 4;
+        video->scanline_start = 20;
+    } else {
+        return NULL;
+    }
+    video->format = kClemensVideoFormat_Text;
+    video->scanline_byte_cnt = 40;
+    if ((clem->mmio.mmap_register & CLEM_MMIO_MMAP_TXTPAGE2) &&
+        !(clem->mmio.mmap_register & CLEM_MMIO_MMAP_80COLSTORE)
+    ) {
+        video->scanlines = vgc->text_2_scanlines;
+    } else {
+        video->scanlines = vgc->text_1_scanlines;
+    }
+    return video;
+}
+
+ClemensVideo* clemens_get_graphics_video(
+    ClemensVideo* video,
+    ClemensMachine* clem
+) {
+    struct ClemensVGC* vgc = &clem->mmio.vgc;
+    bool use_page_2 = (clem->mmio.mmap_register & CLEM_MMIO_MMAP_TXTPAGE2) &&
+                      !(clem->mmio.mmap_register & CLEM_MMIO_MMAP_80COLSTORE);
+    if (vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE) {
+        video->scanline_start = 0;
+        if (vgc->mode_flags & CLEM_VGC_HIRES) {
+            video->format = kClemensVideoFormat_Hires;
+            if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
+                video->scanline_count = 160;
+            } else {
+                video->scanline_count = 192;
+            }
+        } else {
+            video->format = kClemensVideoFormat_Lores;
+            if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
+                video->scanline_count = 20;
+            } else {
+                video->scanline_count = 24;
+            }
+        }
+    } else {
+        return NULL;
+    }
+    if (video->format == kClemensVideoFormat_Hires) {
+        if (use_page_2) {
+            video->scanlines = vgc->hgr_2_scanlines;
+        } else {
+            video->scanlines = vgc->hgr_1_scanlines;
+        }
+    } else {
+        if (use_page_2) {
+            video->scanlines = vgc->text_2_scanlines;
+        } else {
+            video->scanlines = vgc->text_1_scanlines;
+        }
+    }
+    return video;
+}
+
+void clemens_assign_audio_mix_buffer(
+    ClemensMachine* clem,
+    struct ClemensAudioMixBuffer* mix_buffer
+) {
+    memcpy(&clem->mmio.dev_audio.mix_buffer, mix_buffer,
+           sizeof(struct ClemensAudioMixBuffer));
+    clem_sound_reset(&clem->mmio.dev_audio);
+}
+
+ClemensAudio* clemens_get_audio(ClemensAudio* audio, ClemensMachine* clem) {
+    audio->data = clem->mmio.dev_audio.mix_buffer.data;
+    audio->frame_start = 0;
+    audio->frame_count = clem->mmio.dev_audio.mix_frame_index;
+    audio->frame_stride = clem->mmio.dev_audio.mix_buffer.stride;
+    audio->frame_total = clem->mmio.dev_audio.mix_buffer.frame_count;
+
+    return audio;
+}
+
+void clemens_audio_next_frame(ClemensMachine* clem) {
+    clem->mmio.dev_audio.mix_frame_index = 0;
+}
+
+void clemens_input(
+    ClemensMachine* machine,
+    const struct ClemensInputEvent* input
+) {
+    clem_adb_device_input(&machine->mmio.dev_adb, input);
+}
+
+void clemens_rtc_set(
+    ClemensMachine* machine,
+    uint32_t seconds_since_1904
+) {
+    clem_rtc_set_clock_time(&machine->mmio.dev_rtc, seconds_since_1904);
+}
+
+void clemens_debug_status(ClemensMachine* clem) {
+    clem_debug_call_stack(&clem->mmio.dev_debug);
+    clem_debug_counters(&clem->mmio.dev_debug);
+}
 
 uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed) {
     if (clem->mmio.speed_c036 & CLEM_MMIO_SPEED_FAST_ENABLED) {
@@ -3259,13 +3365,12 @@ void clemens_emulate(ClemensMachine* clem) {
     clem_vgc_sync(&mmio->vgc, &clock);
     clem_iwm_glu_sync(&mmio->dev_iwm, &clem->active_drives, &clock);
     clem_scc_glu_sync(&mmio->dev_scc, &clock);
+    clem_sound_glu_sync(&mmio->dev_audio, &clock);
 
     /* background execution of some async devices on the 60 hz timer */
     while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {
         clem_timer_sync(&mmio->dev_timer, CLEM_MEGA2_CYCLES_PER_60TH);
         clem_adb_glu_sync(&mmio->dev_adb, CLEM_MEGA2_CYCLES_PER_60TH);
-        /* TODO: move sound into the frequent update loop 16khz? */
-        clem_sound_glu_sync(&mmio->dev_audio, CLEM_MEGA2_CYCLES_PER_60TH);
         if (clem->resb_counter <= 0 && mmio->dev_adb.keyb.reset_key) {
             /* TODO: move into its own utility */
             clem->resb_counter = 2;
@@ -3288,107 +3393,4 @@ void clemens_emulate(ClemensMachine* clem) {
         }
     }
     clem_iwm_speed_disk_gate(clem);
-}
-
-ClemensMonitor* clemens_get_monitor(
-    ClemensMonitor* monitor,
-    ClemensMachine* clem
-) {
-    //  TODO: use vgc flags to detect NTSC vs PAL, Mono vs RGB
-    monitor->signal = CLEM_MONITOR_SIGNAL_NTSC;
-    monitor->signal = CLEM_MONITOR_COLOR_RGB;
-    monitor->width = 560;
-    monitor->height = 384;
-    monitor->border_color = clem->mmio.dev_rtc.ctl_c034 & 0x0f;
-    monitor->text_color = ((clem->mmio.vgc.text_bg_color & 0xf) << 4) |
-                          (clem->mmio.vgc.text_fg_color & 0xf);
-    return monitor;
-}
-
-ClemensVideo* clemens_get_text_video(
-    ClemensVideo* video,
-    ClemensMachine* clem
-) {
-    struct ClemensVGC* vgc = &clem->mmio.vgc;
-    if (!(vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE)) {
-        video->scanline_count = 24;
-        video->scanline_start = 0;
-    } else if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
-        video->scanline_count = 4;
-        video->scanline_start = 20;
-    } else {
-        return NULL;
-    }
-    video->format = kClemensVideoFormat_Text;
-    video->scanline_byte_cnt = 40;
-    if ((clem->mmio.mmap_register & CLEM_MMIO_MMAP_TXTPAGE2) &&
-        !(clem->mmio.mmap_register & CLEM_MMIO_MMAP_80COLSTORE)
-    ) {
-        video->scanlines = vgc->text_2_scanlines;
-    } else {
-        video->scanlines = vgc->text_1_scanlines;
-    }
-    return video;
-}
-
-ClemensVideo* clemens_get_graphics_video(
-    ClemensVideo* video,
-    ClemensMachine* clem
-) {
-    struct ClemensVGC* vgc = &clem->mmio.vgc;
-    bool use_page_2 = (clem->mmio.mmap_register & CLEM_MMIO_MMAP_TXTPAGE2) &&
-                      !(clem->mmio.mmap_register & CLEM_MMIO_MMAP_80COLSTORE);
-    if (vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE) {
-        video->scanline_start = 0;
-        if (vgc->mode_flags & CLEM_VGC_HIRES) {
-            video->format = kClemensVideoFormat_Hires;
-            if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
-                video->scanline_count = 160;
-            } else {
-                video->scanline_count = 192;
-            }
-        } else {
-            video->format = kClemensVideoFormat_Lores;
-            if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
-                video->scanline_count = 20;
-            } else {
-                video->scanline_count = 24;
-            }
-        }
-    } else {
-        return NULL;
-    }
-    if (video->format == kClemensVideoFormat_Hires) {
-        if (use_page_2) {
-            video->scanlines = vgc->hgr_2_scanlines;
-        } else {
-            video->scanlines = vgc->hgr_1_scanlines;
-        }
-    } else {
-        if (use_page_2) {
-            video->scanlines = vgc->text_2_scanlines;
-        } else {
-            video->scanlines = vgc->text_1_scanlines;
-        }
-    }
-    return video;
-}
-
-void clemens_input(
-    ClemensMachine* machine,
-    const struct ClemensInputEvent* input
-) {
-    clem_adb_device_input(&machine->mmio.dev_adb, input);
-}
-
-void clemens_rtc_set(
-    ClemensMachine* machine,
-    uint32_t seconds_since_1904
-) {
-    clem_rtc_set_clock_time(&machine->mmio.dev_rtc, seconds_since_1904);
-}
-
-void clemens_debug_status(ClemensMachine* clem) {
-    clem_debug_call_stack(&clem->mmio.dev_debug);
-    clem_debug_counters(&clem->mmio.dev_debug);
 }

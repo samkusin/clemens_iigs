@@ -56,6 +56,13 @@ void clemens_assign_audio_mix_buffer(ClemensMachine* clem,
 ClemensAudio* clemens_get_audio(ClemensAudio* audio, ClemensMachine* clem);
 
 /**
+ * @brief After the host is done with the audio frame, call this.
+ *
+ * @param clem
+ */
+void clemens_audio_next_frame(ClemensMachine* clem);
+
+/**
  * @brief Verify the machine is initialized/ready for emulation
  *
  * The emulator does not ever allocate memory.  This method checks if the
