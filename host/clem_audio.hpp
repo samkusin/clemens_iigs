@@ -51,7 +51,7 @@ public:
   //  (perhaps at 60hz)
   //
   //
-  void queue(const ClemensAudio& mixBuffer);
+  unsigned queue(const ClemensAudio& mixBuffer);
 
 private:
   friend DWORD __stdcall ckAudioRenderWorker(LPVOID context);
@@ -61,19 +61,26 @@ private:
   IMMDevice* audioDevice_;
   IAudioClient* audioClient_;
   IAudioRenderClient* audioRenderClient_;
+  ckaudio::DataFormat dataFormat_;
+
   HANDLE audioThread_;
   HANDLE shutdownEvent_;
   HANDLE readyEvent_;
-  ckaudio::DataFormat dataFormat_;
+
+  CRITICAL_SECTION audioCritSection_;
 
   uint32_t desiredLatencyMS_;
   uint32_t audioEngineFrameCount_;
 
-  // atomic-driven ring buffer
   uint8_t* audioBuffer_;
-  std::atomic_uint32_t audioReadHead_;
-  std::atomic_uint32_t audioWriteHead_;
   uint32_t audioFrameLimit_;
+  uint32_t audioReadHead_;
+  uint32_t audioWriteHead_;
+  uint32_t audioFrameCount_;
+
+  bool prerolledFrames_;
+
+
 };
 
 

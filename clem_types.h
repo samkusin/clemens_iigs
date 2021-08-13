@@ -171,6 +171,12 @@ struct ClemensDeviceAudio {
 
     /* the device's IRQ line */
     uint32_t irq_line;
+
+#if CLEM_AUDIO_DIAGNOSTICS
+    unsigned diag_dt_ns;
+    unsigned diag_delta_frames;
+    clem_clocks_duration_t diag_dt;
+#endif
 };
 
 /** Really, this is part of the RTC/VGC, but for separation of concerns,

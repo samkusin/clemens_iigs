@@ -523,7 +523,7 @@ void _clem_iwm_io_switch(
                     iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
                     iwm->debug_timer_ns = 0;
                 } else if (iwm->ns_drive_hold == 0) {
-                    CLEM_LOG("IWM: turning drive off in 1 second");
+                    //CLEM_LOG("IWM: turning drive off in 1 second");
                     iwm->ns_drive_hold = CLEM_1SEC_NS;
                 }
             }
@@ -729,7 +729,7 @@ static uint8_t _clem_iwm_read_handshake(
         result &= ~0x80;
     } else {
         if (!is_noop) {
-            CLEM_LOG("IWM: write_rdy dt = %.3f us", ns_write * 0.001f);
+            //CLEM_LOG("IWM: write_rdy dt = %.3f us", ns_write * 0.001f);
         }
     }
     return result;

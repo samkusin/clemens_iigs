@@ -59,8 +59,9 @@ ClemensAudio* clemens_get_audio(ClemensAudio* audio, ClemensMachine* clem);
  * @brief After the host is done with the audio frame, call this.
  *
  * @param clem
+ * @param consumed
  */
-void clemens_audio_next_frame(ClemensMachine* clem);
+void clemens_audio_next_frame(ClemensMachine* clem, unsigned consumed);
 
 /**
  * @brief Verify the machine is initialized/ready for emulation
