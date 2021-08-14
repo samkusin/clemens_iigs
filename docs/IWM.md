@@ -187,7 +187,6 @@ FF/59C9 sets some odd valies for the phase when in 5.25" drive... phases that
 - Seems the code then checks the handshake register to check if a byte ($ff)
   was written to the disk (or at least checking the handshake register until
   no write overrun was detected)
-- KEGS seems to special case this section with 'enable2' - but what IS IT?
 
 
 

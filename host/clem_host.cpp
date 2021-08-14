@@ -76,6 +76,7 @@ ClemensHost::ClemensHost() :
   cpuPinsSaved_ {},
   cpu6502EmulationSaved_(true),
   widgetInputContext_(InputContext::None),
+  widgetDebugContext_(DebugContext::IWM),
   display_(nullptr)
 {
   void* slabMemory = malloc(kSlabMemorySize);
@@ -89,7 +90,8 @@ ClemensHost::ClemensHost() :
   memoryViewStatic_[1].WriteFn = &ClemensHost::emulatorImguiMemoryWrite;
 
   //  TODO: move into UI
-  FILE* fp = fopen("dos_3_3_master.woz", "rb");
+  //FILE* fp = fopen("dos_3_3_master.woz", "rb");
+  FILE* fp = fopen("hard_hat_mack.woz", "rb");
   if (fp) {
     fseek(fp, 0, SEEK_END);
     long sz = ftell(fp);
@@ -452,17 +454,21 @@ void ClemensHost::frame(int width, int height, float deltaTime)
                                    ImGuiWindowFlags_NoCollapse |
                                    ImGuiWindowFlags_NoBringToFrontOnFocus);
   if (clemens_is_mmio_initialized(&machine_)) {
-    memoryViewStatic_[0].ReadOnly = true;
-    if (emulationRan) {
-      memoryViewStatic_[0].GotoAddrAndHighlight(cpuPinsNext.adr, cpuPinsNext.adr + 1);
-      memoryViewBank_[0] = cpuPinsNext.bank;
-    }
-    ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[0],
-                       nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
-    uint8_t viewBank = memoryViewBank_[0];
-    if (!isRunningEmulation() || isRunningEmulationStep()) {
-      memoryViewStatic_[0].DrawContents((void*)
-        (void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
+    if (widgetDebugContext_ == DebugContext::RWMemory) {
+      memoryViewStatic_[0].ReadOnly = true;
+      if (emulationRan) {
+        memoryViewStatic_[0].GotoAddrAndHighlight(cpuPinsNext.adr, cpuPinsNext.adr + 1);
+        memoryViewBank_[0] = cpuPinsNext.bank;
+      }
+      ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[0],
+                        nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
+      uint8_t viewBank = memoryViewBank_[0];
+      if (!isRunningEmulation() || isRunningEmulationStep()) {
+        memoryViewStatic_[0].DrawContents((void*)
+          (void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
+      }
+    } else if (widgetDebugContext_ == DebugContext::IWM) {
+      doIWMContextWindow();
     }
   }
   ImGui::End();
@@ -491,6 +497,31 @@ void ClemensHost::frame(int width, int height, float deltaTime)
            diagnostics_.clocksSpent * scalar);
     diagnostics_.reset();
   }
+}
+
+void ClemensHost::doIWMContextWindow()
+{
+  ImGui::BeginTable("Drives", 3, 0);
+  ImGui::TableNextColumn(); ImGui::Text("Property");
+  ImGui::TableNextColumn(); ImGui::Text("5.25 D1");
+  ImGui::TableNextColumn(); ImGui::Text("5.25 D2");
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::Text("Track");
+  ImGui::TableNextColumn();
+  ImGui::Text("%.2f", machine_.active_drives.slot6[0].qtr_track_index / 4.0f);
+  ImGui::TableNextColumn();
+  ImGui::Text("%.2f", machine_.active_drives.slot6[1].qtr_track_index / 4.0f);
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::Text("Pos");
+  ImGui::TableNextColumn();
+  ImGui::Text("%u : %04X", machine_.active_drives.slot6[0].track_bit_shift,
+                         machine_.active_drives.slot6[0].track_byte_index);
+  ImGui::TableNextColumn();
+  ImGui::Text("%u : %04X", machine_.active_drives.slot6[1].track_bit_shift,
+                           machine_.active_drives.slot6[1].track_byte_index);
+  ImGui::EndTable();
 }
 
 void ClemensHost::emulate(float deltaTime)

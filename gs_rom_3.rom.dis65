@@ -2453,6 +2453,11 @@
 "245186":"check oscillator interrupt status",
 "245471":"1 second interrupt",
 "245490":"VGC external interrupt (N/A for the IIgs?)",
+"247416":"address prologue?",
+"247421":"data prologue?",
+"247484":"Read nibbles from sector and convert them to bytes",
+"247494":"Writes to $800,Y",
+"247542":"branch taken = not the one.",
 "249249":"in 80 column mode?",
 "249759":"checks if EventManager is active",
 "249767":"if active, then do something else?",
@@ -2933,6 +2938,30 @@
 
 "247382":{
 "Text":"Find a sector header",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"247427":{
+"Text":"Read six bytes from the WOZ (6 nibbles, 3  bytes?)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"247482":{
+"Text":"I think this reads a 256 byte sector from disk to $800 - i.e. sector 0?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"247514":{
+"Text":"I think this performs more decoding of the bytes read into $800\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"247531":{
+"Text":"I think this is validating the read-in sector is the one we want?",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -5289,6 +5318,90 @@
 "218654":{
 "Label":"next_phase",
 "Value":16733726,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247342":{
+"Label":"slot6_error",
+"Value":50734,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247382":{
+"Label":"drive_find_sector_zero",
+"Value":50774,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247482":{
+"Label":"sector_nibble_next",
+"Value":50874,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247484":{
+"Label":"wait_for_nibble",
+"Value":50876,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247462":{
+"Label":"read_data_bytes",
+"Value":50854,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247427":{
+"Label":"read_address_bytes",
+"Value":50819,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247409":{
+"Label":"bretry96",
+"Value":50801,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247399":{
+"Label":"bretryaa",
+"Value":50791,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247395":{
+"Label":"bretryd5",
+"Value":50787,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247390":{
+"Label":"test_sector_seq",
+"Value":50782,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247383":{
+"Label":"next_sector_seq",
+"Value":50775,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247333":{
+"Label":"start_or_retry_prologue",
+"Value":50725,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},

@@ -49,15 +49,21 @@ void clem_sound_reset(struct ClemensDeviceAudio* glu) {
     glu->is_access_ram = false;
     glu->is_busy = false;
 
+    glu->a2_speaker = false;
+    glu->a2_speaker_tense = false;
+
     /* indicates IRQB line, so no interrupt */;
     glu->doc_reg[0xe0] = 0x80;
+
+    /* other config - i.e. test tone */
+    glu->tone_frequency = 0;
 
     /* mix buffer reset */
     glu->dt_mix_frame = 0;
     if (glu->mix_buffer.frames_per_second > 0) {
         glu->dt_mix_sample = (CLEM_CLOCKS_MEGA2_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND) / (
             glu->mix_buffer.frames_per_second);
-        glu->tone_frame_delta = (440 * CLEM_PI_2) / glu->mix_buffer.frames_per_second;
+        glu->tone_frame_delta = (glu->tone_frequency * CLEM_PI_2) / glu->mix_buffer.frames_per_second;
     } else {
         glu->dt_mix_sample = 0;
         glu->tone_frame_delta = 0;
@@ -85,6 +91,19 @@ void clem_sound_consume_frames(
     glu->mix_frame_index -= consumed;
 }
 
+void _clem_sound_do_tone(
+    struct ClemensDeviceAudio* glu,
+    uint16_t* samples
+) {
+    float mag = sinf(glu->tone_theta);
+    samples[0] = (uint16_t)((mag + 1.0f) * 32767);
+    samples[1] = (uint16_t)((mag + 1.0f) * 32767);
+    glu->tone_theta += glu->tone_frame_delta;
+    if (glu->tone_theta >= CLEM_PI_2) {
+        glu->tone_theta -= CLEM_PI_2;
+    }
+}
+
 void clem_sound_glu_sync(
     struct ClemensDeviceAudio* glu,
     struct ClemensClock* clocks
@@ -97,12 +116,24 @@ void clem_sound_glu_sync(
             for (unsigned i = 0; i < delta_frames; ++i) {
                 unsigned frame_index = (glu->mix_frame_index + i) % glu->mix_buffer.frame_count;
                 uint16_t* samples = (uint16_t*)(&mix_out[frame_index * glu->mix_buffer.stride]);
-                float mag = sinf(glu->tone_theta);
-                samples[0] = (uint16_t)((mag + 1.0f) * 32767);
-                samples[1] = (uint16_t)((mag + 1.0f) * 32767);
-                glu->tone_theta += glu->tone_frame_delta;
-                if (glu->tone_theta >= CLEM_PI_2) {
-                    glu->tone_theta -= CLEM_PI_2;
+                /* test tone support */
+                samples[0] = 32767;
+                samples[1] = 32767;
+
+                if (glu->tone_frame_delta > 0) {
+                    _clem_sound_do_tone(glu, samples);
+                }
+                if (glu->a2_speaker) {
+                    /* click! - two speaker pulses = 1 complete wave */
+                    if (!glu->a2_speaker_tense) {
+                        samples[0] = 32767 + (uint16_t)(24576 * glu->volume/15);
+                        samples[1] = 32767 + (uint16_t)(24576 * glu->volume/15);
+                    } else {
+                        samples[0] = 32767 - (uint16_t)(24576 * glu->volume/15);
+                        samples[1] = 32767 - (uint16_t)(24576 * glu->volume/15);
+                    }
+                    glu->a2_speaker_tense = !glu->a2_speaker_tense;
+                    glu->a2_speaker = false;
                 }
             }
             glu->mix_frame_index = (glu->mix_frame_index + delta_frames) % (
@@ -169,6 +200,9 @@ void clem_sound_write_switch(
             glu->address |= ((unsigned)(value) << 8);
             glu->ram_read_cntr = 0;
             break;
+        case CLEM_MMIO_REG_SPKR:
+            glu->a2_speaker = !glu->a2_speaker;
+            break;
     }
 }
 
@@ -228,8 +262,7 @@ uint8_t clem_sound_read_switch(
             break;
         case CLEM_MMIO_REG_SPKR:
             if (!CLEM_IS_MMIO_READ_NO_OP(flags)) {
-                /* toggle the speaker wave form.   tense/relax = 1, 0
-                 */
+                glu->a2_speaker = !glu->a2_speaker;
             }
             result = 0x00;
             break;
