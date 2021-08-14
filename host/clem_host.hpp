@@ -49,6 +49,8 @@ private:
 
 private:
 
+  void doIWMContextWindow();
+
   bool parseCommand(const char* buffer);
   bool parseCommandPower(const char* line);
   bool parseCommandReset(const char* line);
@@ -131,7 +133,13 @@ private:
     TerminalKeyboardFocus
   };
 
+  enum class DebugContext {
+    RWMemory,
+    IWM
+  };
+
   InputContext widgetInputContext_;
+  DebugContext widgetDebugContext_;
 
   std::vector<ExecutedInstruction> executedInstructions_;
   MemoryEditor memoryViewStatic_[2];

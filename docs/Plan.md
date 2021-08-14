@@ -10,9 +10,13 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* If disk is not write protected on boot, bootup doesn't work?  Debug
 * Clean up some IWM code, debugging
-* Audio Phase I (just get the system beeps working, speaker clicks too)
+  * Why hard hat mack is not booting - diagnose sector zero failure
+  * https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PROCESS.txt
+* If disk is not write protected on boot, bootup doesn't work?  Debug
+
+* Speaker audio feels 'tinny' but pitch accurate- likely because we are using
+  square wave pcm on a naturally curved waveform playback mechanism
 * Decimal Math sanity tests
 * Decimal math tests
 * Some Simple Apple II games testing
@@ -45,6 +49,7 @@ This is a running todo list.
 
 ## DONE
 
+* Audio Phase I (just get the system beeps working, speaker clicks too)
 * DOS newly formatted disk via INIT working (haven't tried booting yet..., but
   catalog, save/load, work...)
 * Many simple instructions we're clocked at 1 cycle (incorrect - 2 cycles!)

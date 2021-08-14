@@ -157,6 +157,8 @@ struct ClemensDeviceAudio {
 
     /* settings */
     uint8_t volume;             /**< 0 - 15 */
+    bool a2_speaker;            /**< the c030 switch */
+    bool a2_speaker_tense;      /**< the a2 speaker state tense, relax */
 
     /* host supplied mix buffer */
     struct ClemensAudioMixBuffer mix_buffer;
@@ -168,6 +170,7 @@ struct ClemensDeviceAudio {
     /* test code */
     float tone_frame_delta;
     float tone_theta;
+    unsigned tone_frequency;
 
     /* the device's IRQ line */
     uint32_t irq_line;

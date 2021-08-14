@@ -78,9 +78,8 @@ private:
   uint32_t audioWriteHead_;
   uint32_t audioFrameCount_;
 
+  // TODO: is this still necessary after fixing all of the timing issues?
   bool prerolledFrames_;
-
-
 };
 
 

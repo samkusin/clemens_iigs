@@ -414,17 +414,17 @@ void clem_disk_read_and_position_head_525(
     drive->cog_orient = (drive->cog_orient + qtr_track_delta) % 8;
     qtr_track_index += qtr_track_delta;
     if (qtr_track_index < 0) {
-        //CLEM_LOG("IWM: Disk525[%u]: Motor: %u; CLACK",
-        //         (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
-        //         (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0);
+        CLEM_LOG("IWM: Disk525[%u]: Motor: %u; CLACK",
+                 (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
+                 (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0);
         qtr_track_index = 0;
     }
     else if (qtr_track_index >= 160) qtr_track_index = 160;
     if (qtr_track_index != drive->qtr_track_index) {
-        //CLEM_LOG("IWM: Disk525[%u]: Motor: %u; Head @ (%d,%d)",
-        //    (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
-        //    (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
-        //    qtr_track_index / 4, qtr_track_index % 4);
+        CLEM_LOG("IWM: Disk525[%u]: Motor: %u; Head @ (%d,%d)",
+            (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
+            (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
+            qtr_track_index / 4, qtr_track_index % 4);
         drive->qtr_track_index = qtr_track_index;
         /* force lookup of the real track if the arm has changed */
         drive->real_track_index = 0xfe;
