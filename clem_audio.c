@@ -38,6 +38,7 @@
 #define CLEM_AUDIO_CTL_AUTO_ADDRESS 0x20
 #define CLEM_AUDIO_CTL_VOLUME_MASK  0x07
 
+
 void clem_sound_reset(struct ClemensDeviceAudio* glu) {
     /* some GLU reset */
     glu->address = 0;
@@ -62,12 +63,33 @@ void clem_sound_reset(struct ClemensDeviceAudio* glu) {
         glu->tone_frame_delta = 0;
     }
     glu->tone_theta = 0.0f;
+
+#if CLEM_AUDIO_DIAGNOSTICS
+    glu->diag_dt_ns = 0;
+    glu->diag_delta_frames = 0;
+#endif
+}
+
+void clem_sound_consume_frames(
+    struct ClemensDeviceAudio* glu,
+    unsigned consumed
+) {
+    if (consumed > glu->mix_frame_index) {
+        consumed = glu->mix_frame_index;
+    }
+    if (consumed < glu->mix_frame_index) {
+        memmove(glu->mix_buffer.data,
+                glu->mix_buffer.data + consumed * glu->mix_buffer.stride,
+                consumed * glu->mix_buffer.stride);
+    }
+    glu->mix_frame_index -= consumed;
 }
 
 void clem_sound_glu_sync(
     struct ClemensDeviceAudio* glu,
     struct ClemensClock* clocks
 ) {
+    clem_clocks_duration_t dt_clocks = clocks->ts - glu->ts_last_frame;
     if (glu->dt_mix_sample > 0) {
         unsigned delta_frames = (glu->dt_mix_frame / glu->dt_mix_sample);
         if (delta_frames > 0) {
@@ -86,9 +108,28 @@ void clem_sound_glu_sync(
             glu->mix_frame_index = (glu->mix_frame_index + delta_frames) % (
                 glu->mix_buffer.frame_count);
             glu->dt_mix_frame = glu->dt_mix_frame % glu->dt_mix_sample;
+
+        #if CLEM_AUDIO_DIAGNOSTICS
+            glu->diag_delta_frames += delta_frames;
+        #endif
         }
     }
-    glu->dt_mix_frame += (clocks->ts - glu->ts_last_frame);
+    glu->dt_mix_frame += dt_clocks;
+
+#if CLEM_AUDIO_DIAGNOSTICS
+    glu->diag_dt_ns += _clem_calc_ns_step_from_clocks(dt_clocks, clocks->ref_step);
+    glu->diag_dt += dt_clocks;
+    if (glu->diag_dt_ns >= CLEM_1SEC_NS) {
+        float scalar = ((float)CLEM_1SEC_NS) / glu->diag_dt_ns;
+        printf("clem_audio: %.01f frames/sec (dt = %u clocks)\n",
+            scalar * glu->diag_delta_frames,
+            glu->diag_dt);
+        glu->diag_delta_frames = 0;
+        glu->diag_dt = 0;
+        glu->diag_dt_ns = 0;
+    }
+#endif
+
     glu->ts_last_frame = clocks->ts;
 }
 

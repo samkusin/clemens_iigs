@@ -67,6 +67,7 @@ private:
   void stepMachine(int stepCount);
   bool emulationRun(unsigned target);
   void emulationBreak();
+  void resetDiagnostics();
 
   bool isRunningEmulation() const;
   bool isRunningEmulationStep() const;
@@ -143,6 +144,17 @@ private:
 
   std::unique_ptr<ClemensAudioDevice> audio_;
   std::vector<uint8_t> audioMixBuffer;
+
+  struct Diagnostics {
+    uint32_t audioFrames;
+    clem_clocks_time_t clocksSpent;
+
+    float deltaTime;        //  diagnostics current delta time from frame start
+    float frameTime;        //  display diagnostics every frameTime seconds
+
+    void reset();
+  };
+  Diagnostics diagnostics_;
 };
 
 

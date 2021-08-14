@@ -127,7 +127,7 @@ namespace {
     void* inptr = (void *)(uintptr_t(input.ptr) + input.frameStart * input.frameSize);
     void* outptr = (void *)(uintptr_t(output.ptr) + output.frameStart * output.frameSize);
     for (unsigned outFrameIdx = output.frameStart;
-         outFrameIdx <= output.frameEnd && inFrameIdx <= input.frameEnd;
+         outFrameIdx < output.frameEnd && inFrameIdx < input.frameEnd;
          ++outFrameIdx, ++inFrameIdx
     ) {
       uint16_t* in16 = (uint16_t*)inptr;
@@ -144,7 +144,6 @@ namespace {
 
 } // namespace anon
 
-//static unsigned sks_frame = 0;
 
 DWORD __stdcall ckAudioRenderWorker(LPVOID context)
 {
@@ -173,7 +172,9 @@ DWORD __stdcall ckAudioRenderWorker(LPVOID context)
            /* populate the already played frames in the audio buffer with new
              data from the shared controller/worker buffer
           */
+          EnterCriticalSection(&audio->audioCritSection_);
           audio->render();
+          LeaveCriticalSection(&audio->audioCritSection_);
           break;
       }
   }
@@ -182,6 +183,7 @@ DWORD __stdcall ckAudioRenderWorker(LPVOID context)
 
   return 0;
 }
+
 
 static void* allocateLocal(unsigned sz)
 {
@@ -198,10 +200,8 @@ ClemensAudioDevice::ClemensAudioDevice() :
   audioDevice_(NULL),
   audioClient_(NULL),
   audioRenderClient_(NULL),
-  audioThread_(INVALID_HANDLE_VALUE),
-  shutdownEvent_(INVALID_HANDLE_VALUE),
-  readyEvent_(INVALID_HANDLE_VALUE),
-  audioEngineFrameCount_(0)
+  audioEngineFrameCount_(0),
+  prerolledFrames_(false)
 {
   IMMDeviceEnumerator *deviceEnumerator = NULL;
   HRESULT hr =  CoCreateInstance(__uuidof(MMDeviceEnumerator),
@@ -226,11 +226,14 @@ ClemensAudioDevice::ClemensAudioDevice() :
   readyEvent_ = CreateEvent(NULL, FALSE, FALSE, "ckaudio_data");
   audioClient_->SetEventHandle(readyEvent_);
 
+  InitializeCriticalSection(&audioCritSection_);
+
   //  TODO: reevaluate, one second seems a bit long...
-  audioFrameLimit_ = dataFormat_.frequency;
+  audioFrameLimit_ = audioEngineFrameCount_ * 2;
   audioBuffer_ = (uint8_t*)allocateLocal(audioFrameLimit_ *dataFormat_.frameSize);
-  audioReadHead_.store(0);
-  audioWriteHead_.store(0);
+  audioReadHead_ = 0;
+  audioWriteHead_ = 0;
+  audioFrameCount_ = 0;
 }
 
 ClemensAudioDevice::~ClemensAudioDevice()
@@ -240,6 +243,7 @@ ClemensAudioDevice::~ClemensAudioDevice()
   if (audioClient_) {
     audioClient_->Release();
 
+    DeleteCriticalSection(&audioCritSection_);
     CloseHandle(shutdownEvent_);
     CloseHandle(readyEvent_);
 
@@ -273,13 +277,16 @@ void ClemensAudioDevice::start()
     }
 
     audioThread_ = CreateThread(NULL, 0, ckAudioRenderWorker, this, 0, NULL);
+    SetThreadPriority(audioThread_, THREAD_PRIORITY_HIGHEST);
+
     audioClient_->Start();
+    prerolledFrames_ = false;
   }
 }
 
 void ClemensAudioDevice::stop()
 {
-  if (audioClient_) {
+  if (audioRenderClient_) {
     audioClient_->Stop();
 
     SetEvent(shutdownEvent_);
@@ -289,171 +296,129 @@ void ClemensAudioDevice::stop()
     audioRenderClient_->Release();
     audioRenderClient_ = NULL;
   }
-
 }
-
 
 unsigned ClemensAudioDevice::getAudioFrequency() const {
   return dataFormat_.frequency;
 }
 
-void ClemensAudioDevice::queue(const ClemensAudio& source)
+unsigned ClemensAudioDevice::queue(const ClemensAudio& source)
 {
-  if (!audioClient_) return;
+  unsigned sourceFramesConsumed = 0;
 
-  if (source.frame_count == 0) return;
+  if (source.frame_count > 0) {
+    EncodeBuffer input, output;
+    input.ptr = source.data;
+    input.frameSize = source.frame_stride;
+    output.ptr = audioBuffer_;
+    output.frameSize = dataFormat_.frameSize;
 
-  //  TODO: populate buffer
+    EnterCriticalSection(&audioCritSection_);
 
-  //  The input buffer is a simple data, data_size buffer to copy data from
-  //  The input buffer data format is 16-bit PCM stereo
-  //  The input buffer is consumed immediately - if the buffer cannot fit in
-  //    the available write space to the audio buffer, the remainder will be
-  //    dropped (input clipped)
-
-  //  The audio system has two points of data entry and exit:
-  //    Data is added via the queue()
-  //    Data is played via the thread()
-  //    Leverages a shared ring buffer
-
-  //  The shared ring buffer has two heads
-  //    read head
-  //    write head
-  //    an empty buffer is read = write
-  //    a full buffer is read = write + 1 sample
-  //    frames in the shared buffer are the same format as the hardware
-  //      playback format
-
-  //  encodeAudio(output, input, format)
-  //    output available
-  //    input available
-  //
-  //
-
-  //  check if there's space to write - we only modify write in this block and
-  //  do not mind that read can advance at any time
-  uint32_t currentReadHead = audioReadHead_.load();
-  uint32_t currentWriteHead = audioWriteHead_.load();
-
-  EncodeBuffer input;
-  input.ptr = source.data;
-  input.frameSize = source.frame_stride;
-
-  EncodeBuffer output;
-  output.ptr = audioBuffer_;
-  output.frameSize = dataFormat_.frameSize;
-
-  uint32_t inputHead = source.frame_start;
-  uint32_t inputTail = (source.frame_start + source.frame_count) % source.frame_total;
-  uint32_t inputRemaining = source.frame_count;
-
-  //printf("SKS: W0: %u\n", currentWriteHead);
-
-  while (inputHead != inputTail) {
-    input.frameStart = inputHead;
-    assert(inputRemaining > 0 && inputRemaining <= source.frame_count);
-    if (input.frameStart + inputRemaining >= source.frame_total) {
-      input.frameEnd = source.frame_total - 1;
-    } else {
-      input.frameEnd = (input.frameStart + inputRemaining) - 1;
+    uint32_t inputHead = source.frame_start;
+    uint32_t inputTail = (source.frame_start + source.frame_count) % source.frame_total;
+    uint32_t inputRemaining = source.frame_count;
+    uint32_t outputRemaining = audioFrameLimit_ - audioFrameCount_;
+    if (inputRemaining > outputRemaining) {
+      inputRemaining = outputRemaining;
     }
-    output.frameStart = currentWriteHead;
-    if (currentReadHead > currentWriteHead) {
-      output.frameEnd = currentReadHead - 1;
-    } else {
-      output.frameEnd = audioFrameLimit_ - 1;
+    while (inputRemaining > 0 && inputRemaining <= source.frame_count) {
+      input.frameStart = inputHead;
+      if (input.frameStart + inputRemaining > source.frame_total) {
+        input.frameEnd = source.frame_total;
+      } else {
+        input.frameEnd = input.frameStart + inputRemaining;
+      }
+      output.frameStart = audioWriteHead_;
+      if (audioReadHead_ > audioWriteHead_) {
+        output.frameEnd = audioReadHead_;
+      } else {
+        output.frameEnd = audioFrameLimit_;
+      }
+
+      uint32_t writtenFrames = encode_pcm_16_to_float_stereo(output, input);
+      assert(inputRemaining >= writtenFrames);
+
+      sourceFramesConsumed += writtenFrames;
+      inputHead += writtenFrames;
+      inputRemaining -= writtenFrames;
+      if (inputHead >= source.frame_total) {
+        inputHead = 0;
+      }
+      audioWriteHead_ += writtenFrames;
+      if (audioWriteHead_ >= audioFrameLimit_) {
+        audioWriteHead_ = 0;
+      }
+      audioFrameCount_ += writtenFrames;
     }
 
-    uint32_t writtenFrames = encode_pcm_16_to_float_stereo(output, input);
+    if (!prerolledFrames_ && audioFrameCount_ >= audioEngineFrameCount_) {
+      prerolledFrames_ = true;
+    }
 
-    assert(inputRemaining >= writtenFrames);
-    inputHead += writtenFrames;
-    inputRemaining -= writtenFrames;
-    if (inputHead >= source.frame_total) {
-      inputHead = 0;
-    }
-    currentWriteHead += writtenFrames;
-    if (currentWriteHead >= audioFrameLimit_) {
-      currentWriteHead = 0;
-    }
+    LeaveCriticalSection(&audioCritSection_);
   }
-  //printf("SKS: W1: %u\n", currentWriteHead);
-  audioWriteHead_.store(currentWriteHead);
+
+  //render();
+
+  return sourceFramesConsumed;
 }
 
 void ClemensAudioDevice::render()
 {
   UINT32 queuedFrameCount;
   HRESULT hr = audioClient_->GetCurrentPadding(&queuedFrameCount);
-  if (FAILED(hr)) {
-    return;
-  }
-  UINT32 availableFrames = audioEngineFrameCount_ - queuedFrameCount;
-  UINT32 framesWritten = 0;
-  uint32_t currentReadHead = audioReadHead_.load();
-  uint32_t currentWriteHead = audioWriteHead_.load();
-  BYTE* data = NULL;
-  //printf("SKS: R0: %u\n", currentReadHead);
-  while (availableFrames > 0 && currentReadHead != currentWriteHead) {
-    //  This operation is much simpler than the queue() method, since
-    //  data formats are guaranteed to be the same - so a direct copy to the
-    //  target buffer.  Also we know how many frames can copy over, and we
-    //  poll the number of frames we are able to write.
-    //
-    uint32_t readFrames;
-    if (currentReadHead <= currentWriteHead) {
-      readFrames = currentWriteHead - currentReadHead;
-    } else {
-      readFrames = audioFrameLimit_ - currentReadHead;
-    }
+  if (SUCCEEDED(hr) && prerolledFrames_) {
+    UINT32 availableFrames = audioEngineFrameCount_ - queuedFrameCount;
+    BYTE* data = NULL;
 
-    if (data == NULL) {
-      //printf("sks A: %u (%u)\n", sks_frame, availableFrames);
+  /*
+    if (audioFrameCount_ == 0) {
+      audioAvailCounter_ = 0;
+      if (audioStarvedCounter_ == 0) {
+        printf("audio: starved!\n");
+      }
+      ++audioStarvedCounter_;
+    } else {
+      audioStarvedCounter_ = 0;
+      if (audioAvailCounter_ == 0) {
+        printf("audio: buffered\n");
+      }
+      ++audioAvailCounter_;
+    }
+  */
+
+    while (availableFrames > 0 && audioFrameCount_ > 0) {
+      uint32_t readFrames;
+      if (audioReadHead_ < audioWriteHead_) {
+        readFrames = audioWriteHead_ - audioReadHead_;
+      } else {
+        readFrames = audioFrameLimit_ - audioReadHead_;
+      }
+
       hr = audioRenderClient_->GetBuffer(availableFrames, &data);
       if (FAILED(hr)) {
-          printf("FAILED! (%08x)\n", hr);
-    break;
+        printf("FAILED! (%08x)\n", hr);
+        break;
       }
-    }
 
-    //  TODO availableFrames needs to be decremented if this loop has already
-    //  copied data, since available frame count has one down after the copy
-    //  but we need to fix the termination logic below...
-    unsigned framesToCopy;
-    if (readFrames < availableFrames) {
-      framesToCopy = readFrames;
-    } else {
-      framesToCopy = availableFrames;
-    }
-    //memset(data, 0, framesToCopy * dataFormat_.frameSize);
-
-    memcpy(data, audioBuffer_ + currentReadHead * dataFormat_.frameSize,
+      unsigned framesToCopy;
+      if (readFrames < availableFrames) {
+        framesToCopy = readFrames;
+      } else {
+        framesToCopy = availableFrames;
+      }
+      //memset(data, 0, framesToCopy * dataFormat_.frameSize);
+      memcpy(data, audioBuffer_ + audioReadHead_ * dataFormat_.frameSize,
             framesToCopy * dataFormat_.frameSize);
-
-    //printf("sks B: %u (%u), %u\n", sks_frame, framesToCopy, currentReadHead <= currentWriteHead ? 0 : 1);
-
-    currentReadHead += framesToCopy;
-    if (currentReadHead >= audioFrameLimit_) {
-      currentReadHead = 0;
-    }
-    framesWritten += framesToCopy;
-    data += framesToCopy * dataFormat_.frameSize;
-    availableFrames -= framesToCopy;
-    if (availableFrames == 0 || currentReadHead == currentWriteHead) {
-      audioRenderClient_->ReleaseBuffer(framesWritten, 0);
-      data = NULL;
-      //printf("sks C: %u (%u)\n", sks_frame, framesWritten);
-      //++sks_frame;
-
-      framesWritten = 0;
-      hr = audioClient_->GetCurrentPadding(&queuedFrameCount);
-      if (FAILED(hr)) {
-          printf("FAILED2!\n");
+      audioFrameCount_ -= framesToCopy;
+      audioReadHead_ += framesToCopy;
+      if (audioReadHead_ >= audioFrameLimit_) {
+        audioReadHead_ = 0;
       }
+      audioRenderClient_->ReleaseBuffer(framesToCopy, 0);
+      audioClient_->GetCurrentPadding(&queuedFrameCount);
       availableFrames = audioEngineFrameCount_ - queuedFrameCount;
     }
   } // end while
-
-  //printf("SKS: R1: %u\n", currentReadHead);
-  audioReadHead_.store(currentReadHead);
 }

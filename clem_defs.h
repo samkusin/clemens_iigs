@@ -16,7 +16,7 @@
 #define CLEM_MEGA2_CYCLES_PER_60TH          (CLEM_MEGA2_CYCLES_PER_SECOND / 60)
 #define CLEM_MEGA2_TIMER_1SEC_US            1000000
 #define CLEM_MEGA2_TIMER_QSEC_US            266667
-#define CLEM_MEGA2_CYCLE_NS                 1023
+#define CLEM_MEGA2_CYCLE_NS                 978
 
 #define CLEM_1SEC_NS                        1000000000
 #define CLEM_1MS_NS                         1000000
@@ -524,5 +524,9 @@
 #define CLEM_PI                             (3.14159265f)
 #define CLEM_PI_2                           (6.28318531f)
 #define CLEM_HALF_PI                        (1.570796325)
+
+/* enable/disable certain compile time diagnostics */
+
+#define CLEM_AUDIO_DIAGNOSTICS              0
 
 #endif

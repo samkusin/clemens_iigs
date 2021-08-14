@@ -109,6 +109,16 @@ uint8_t clem_adb_read_switch(struct ClemensDeviceADB* adb, uint8_t ioreg,
 void clem_sound_reset(struct ClemensDeviceAudio* glu);
 
 /**
+ * @brief Invoked by the host to update the internal audio mixer read pointer
+ *
+ * @param glu
+ * @param consumed
+ */
+void clem_sound_consume_frames(struct ClemensDeviceAudio* glu,
+                               unsigned consumed);
+
+
+/**
  * @brief Executed frequently enough to emulate the GLU Microcontroller
  *
  * @param glu device data (1 ms worth of cycles?)

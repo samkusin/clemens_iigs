@@ -1044,17 +1044,18 @@ void clemens_assign_audio_mix_buffer(
 }
 
 ClemensAudio* clemens_get_audio(ClemensAudio* audio, ClemensMachine* clem) {
-    audio->data = clem->mmio.dev_audio.mix_buffer.data;
+    struct ClemensDeviceAudio* device = &clem->mmio.dev_audio;
+    audio->data = device->mix_buffer.data;
     audio->frame_start = 0;
-    audio->frame_count = clem->mmio.dev_audio.mix_frame_index;
-    audio->frame_stride = clem->mmio.dev_audio.mix_buffer.stride;
-    audio->frame_total = clem->mmio.dev_audio.mix_buffer.frame_count;
+    audio->frame_count = device->mix_frame_index;
+    audio->frame_stride = device->mix_buffer.stride;
+    audio->frame_total = device->mix_buffer.frame_count;
 
     return audio;
 }
 
-void clemens_audio_next_frame(ClemensMachine* clem) {
-    clem->mmio.dev_audio.mix_frame_index = 0;
+void clemens_audio_next_frame(ClemensMachine* clem, unsigned consumed) {
+    clem_sound_consume_frames(&clem->mmio.dev_audio, consumed);
 }
 
 void clemens_input(
@@ -1082,7 +1083,7 @@ uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed) {
     } else {
         *is_slow_speed = true;
     }
-    return clem->clocks_step_mega2 * 1000000;
+    return clem->clocks_step_mega2 * CLEM_MEGA2_CYCLES_PER_SECOND;
 }
 
 void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {

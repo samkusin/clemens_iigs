@@ -49,6 +49,15 @@ namespace {
   };
 } // namespace anon
 
+void ClemensHost::Diagnostics::reset()
+{
+  audioFrames = 0;
+  clocksSpent = 0;
+  deltaTime = 0.0f;
+  frameTime = 5.0f;
+}
+
+
 ClemensHost::ClemensHost() :
   machine_(),
   disks35_{},
@@ -155,6 +164,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   bool emulationRan = false;
   if (isRunningEmulation()) {
     emulate(deltaTime);
+    diagnostics_.deltaTime += deltaTime;
     emulationRan = true;
   }
   ClemensMonitor monitor = {};
@@ -189,8 +199,9 @@ void ClemensHost::frame(int width, int height, float deltaTime)
 
     ClemensAudio audio;
     if (emulationRan && clemens_get_audio(&audio, &machine_)) {
-      audio_->queue(audio);
-      clemens_audio_next_frame(&machine_);
+      unsigned consumedFrames = audio_->queue(audio);
+      clemens_audio_next_frame(&machine_, consumedFrames);
+      diagnostics_.audioFrames += consumedFrames;
     }
   }
 
@@ -471,6 +482,15 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     }
   }
   ImGui::End();
+
+  if (diagnostics_.deltaTime >= diagnostics_.frameTime) {
+    float scalar = 1.0f / diagnostics_.deltaTime;
+    printf("diag_host: audio (%.01f/sec)\n"
+           "diag_host: clocks (%.01f/sec)\n",
+           diagnostics_.audioFrames * scalar,
+           diagnostics_.clocksSpent * scalar);
+    diagnostics_.reset();
+  }
 }
 
 void ClemensHost::emulate(float deltaTime)
@@ -491,7 +511,7 @@ void ClemensHost::emulate(float deltaTime)
     &machine_, &is_machine_slow);
   const float kAdjustedDeltaTime = std::min(deltaTime, 0.1f);
   const uint64_t kClocksPerFrameDesired = kAdjustedDeltaTime * kClocksPerSecond;
-  uint64_t clocksSpentInitial = machine_.clocks_spent;
+  const uint64_t kClocksSpentInitial = machine_.clocks_spent;
 
   const time_t kEpoch1904To1970Seconds = 2082844800;
   auto epoch_time_1904 = (
@@ -500,10 +520,9 @@ void ClemensHost::emulate(float deltaTime)
 
   clemens_rtc_set(&machine_, (unsigned)epoch_time_1904);
 
-
   machine_.cpu.cycles_spent = 0;
   while (emulationStepCount_ > 0 || emulationRunTarget_ != 0xffffffff) {
-    if (machine_.clocks_spent - clocksSpentInitial >= kClocksPerFrameDesired) {
+    if (machine_.clocks_spent - kClocksSpentInitial >= kClocksPerFrameDesired) {
       // TODO: if we overflow, deduct from the budget for the next frame
       break;
     }
@@ -531,6 +550,7 @@ void ClemensHost::emulate(float deltaTime)
     --emulationStepCount_;
     ++emulationStepCountSinceReset_;
   }
+  diagnostics_.clocksSpent += (machine_.clocks_spent - kClocksSpentInitial);
   //printf("start==\n%u cycles executed\n", machine_.cpu.cycles_spent);
   machineCyclesSpentDuringSample_ += machine_.cpu.cycles_spent;
   sampleDuration_ += deltaTime;
@@ -939,6 +959,7 @@ void ClemensHost::resetMachine()
   //  step 2: reset end, issue interrupt
   machine_.cpu.pins.resbIn = false;   // low signal indicates reset
   emulationStepCountSinceReset_ = 0;
+  diagnostics_.reset();
   stepMachine(2);
 }
 
@@ -975,7 +996,8 @@ bool ClemensHost::isRunningEmulation() const
   return (emulationStepCount_ > 0 || emulationRunTarget_ != 0xffffffff);
 }
 
-bool ClemensHost::isRunningEmulationStep() const {
+bool ClemensHost::isRunningEmulationStep() const
+{
   return isRunningEmulation() && emulationStepCount_ > 0;
 }
 
