@@ -10,11 +10,15 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
+* After decoding sector zero...  016A
 * Clean up some IWM code, debugging
   * Why hard hat mack is not booting - diagnose sector zero failure
   * https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PROCESS.txt
+  * More timing issues.  Always timing...
+    * STA (DP), Y and likely other direct-indirect indexed ops are missing a
+      IO cycle (likely just writes, but evaluate rules in wd65c816 docs...)
+      * ADC, AND, CMP, EOR, LDA, ORA, SBC, STA
 * If disk is not write protected on boot, bootup doesn't work?  Debug
-
 * Speaker audio feels 'tinny' but pitch accurate- likely because we are using
   square wave pcm on a naturally curved waveform playback mechanism
 * Decimal Math sanity tests

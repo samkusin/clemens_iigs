@@ -163,6 +163,14 @@ static inline void _clem_cycle(
     clem->cpu.cycles_spent += cycle_count;
 }
 
+static inline void _clem_io_write_cycle(ClemensMachine* clem) {
+    /* special rules for IO cycles called out here but decision to call
+       determined by the caller (to minimize conditional logic)
+       x = 0, crossing page boundaries on index, or write
+    */
+   _clem_cycle(clem, 1);
+}
+
 static inline void _clem_next_dbr(
     ClemensMachine* clem,
     uint8_t* next_dbr,

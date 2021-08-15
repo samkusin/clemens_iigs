@@ -91,7 +91,7 @@ ClemensHost::ClemensHost() :
 
   //  TODO: move into UI
   //FILE* fp = fopen("dos_3_3_master.woz", "rb");
-  FILE* fp = fopen("hard_hat_mack.woz", "rb");
+  FILE* fp = fopen("sammy_lightfoot.woz", "rb");
   if (fp) {
     fseek(fp, 0, SEEK_END);
     long sz = ftell(fp);
