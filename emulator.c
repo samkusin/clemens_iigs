@@ -2319,6 +2319,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_ORA_DP_INDIRECT_IDY:
             _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            /* TODO: timing check for io cycle? */
             _clem_read_data_indexed_816(
                 clem, &tmp_value, tmp_addr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
             _cpu_ora(cpu, tmp_value, m_status);
@@ -2660,6 +2661,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_SBC_DP_INDIRECT_IDY:
             _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
+            /* TODO: timing io cycle check? */
             _clem_read_data_indexed_816(
                 clem, &tmp_value, tmp_addr, cpu->regs.Y, cpu->regs.DBR, m_status, x_status);
              if (!(cpu->regs.P & kClemensCPUStatus_Decimal)) {
@@ -2797,6 +2799,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
         case CLEM_OPC_STA_DP_INDIRECT_IDY:
             _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data,
                 0, false);
+            _clem_io_write_cycle(clem);
             _clem_write_indexed_816(clem, cpu->regs.A, tmp_addr, cpu->regs.Y,
                 cpu->regs.DBR, m_status, x_status);
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
