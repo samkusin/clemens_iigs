@@ -574,6 +574,15 @@ void _clem_iwm_io_switch(
                     iwm->out_phase &= ~(
                         1 << ((ioreg - CLEM_MMIO_REG_IWM_PHASE0_LO) >> 1));
                 }
+
+                if ((iwm->out_phase & 1) && (iwm->out_phase & 3)) {
+                    /* this sets the ENBL2 line (for hard-drives and other
+                       smartport devices)
+                    */
+                    iwm->enbl2 = true;
+                } else {
+                    iwm->enbl2 = false;
+                }
             }
             break;
     }
@@ -690,6 +699,11 @@ static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM* iwm) {
     if (iwm->io_flags & CLEM_IWM_FLAG_WRPROTECT_SENSE) {
         result |= 0x80;
     }
+    if (iwm->enbl2) {
+        /* TODO: justify this if we can, but ROM code seems to assume this for
+           a proper boot up sequence */
+        result |= 0x80;
+    }
     /* mode flags reflected here */
     if (iwm->clock_8mhz) {
         result |= 0x10;
@@ -706,6 +720,7 @@ static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM* iwm) {
     if (iwm->latch_mode) {
         result |= 0x01;
     }
+
 
     return result;
 }

@@ -1999,6 +1999,11 @@
 "Hint":"Code"},
 
 {
+"Low":247040,
+"High":247040,
+"Hint":"Code"},
+
+{
 "Low":247296,
 "High":247296,
 "Hint":"Code"},
@@ -2363,9 +2368,11 @@
 "218640":"read data mode",
 "218652":"80 half tracks",
 "218687":"read data from disk",
+"218746":"What the heck is this?",
 "218759":"Drive 0",
 "218762":"Motor On",
 "218765":"Motor Off",
+"218768":"Drive PH1,PH3 HI",
 "218774":"Drive 0 motor on",
 "218787":"slow speed",
 "218793":"q7 off",
@@ -2980,6 +2987,18 @@
 
 "247509":{
 "Text":"Decode 6-2 data into actual bytes (in chunks of 86 bytes)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"221095":{
+"Text":"If Write Protect/Sense is 1 on startup, C = 1, else C = 0",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"221102":{
+"Text":"This block seems crucial for handling the sense input from the IWM on startup",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -5492,6 +5511,13 @@
 "Value":50899,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"219588":{
+"Label":"SUB_DISK_PH1_3_HI_DRIVE_OFF",
+"Value":16734660,
+"Source":"User",
+"Type":"GlobalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -6297,4 +6323,24 @@
 
 "218633":{
 "FollowPbr":false,
-"Bank":0}}}
+"Bank":0},
+
+"219161":{
+"FollowPbr":false,
+"Bank":225},
+
+"219593":{
+"FollowPbr":false,
+"Bank":225},
+
+"221112":{
+"FollowPbr":false,
+"Bank":225},
+
+"219515":{
+"FollowPbr":false,
+"Bank":225},
+
+"219133":{
+"FollowPbr":false,
+"Bank":225}}}

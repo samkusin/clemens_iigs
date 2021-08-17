@@ -277,6 +277,7 @@ struct ClemensDeviceIWM {
     /** Drive I/O */
     unsigned io_flags;          /**< Disk port I/O flags */
     unsigned out_phase;         /**< PH0-PH3 bits sent to drive */
+    bool enbl2;                 /**< ENBL2 line */
 
     /** Internal Registers */
     uint8_t data;               /**< IO switch data (D0-D7) */
@@ -301,6 +302,10 @@ struct ClemensDeviceIWM {
 
     uint64_t debug_timer_ns;
     uint32_t debug_value;       /**< option displayed during iwm_debug_event */
+};
+
+struct ClemensDeviceGame {
+    unsigned i;
 };
 
 
@@ -337,6 +342,7 @@ struct ClemensMMIO {
     struct ClemensDeviceAudio dev_audio;
     struct ClemensDeviceIWM dev_iwm;
     struct ClemensDeviceSCC dev_scc;
+    struct ClemensDeviceGame dev_game;
 
     /* Registers that do not fall easily within a device struct */
     uint32_t mmap_register;     // memory map flags- CLEM_MMIO_MMAP_

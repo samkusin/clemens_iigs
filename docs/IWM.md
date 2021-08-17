@@ -208,3 +208,7 @@ First IWM writes:  FF/56bb
   At this point, once we continue run, 5.25 boot sequence seems to start
     Analyze debug spew during 5.25 boot sequence to see if everything looks ok
   An I/O at C019 causes an assert (unimpl?)
+
+
+Disk pre-startup?
+

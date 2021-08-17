@@ -91,7 +91,7 @@ ClemensHost::ClemensHost() :
 
   //  TODO: move into UI
   //FILE* fp = fopen("dos_3_3_master.woz", "rb");
-  FILE* fp = fopen("commando.woz", "rb");
+  FILE* fp = fopen("sammy_lightfoot.woz", "rb");
   if (fp) {
     fseek(fp, 0, SEEK_END);
     long sz = ftell(fp);
@@ -1103,6 +1103,12 @@ bool ClemensHost::parseWOZDisk(
       default:
         break;
     }
+  }
+
+  if (woz->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) {
+    printf("WOZ Image is write protected");
+  } else {
+    printf("WOZ Image is NOT write protected");
   }
 
   //woz->flags &= ~CLEM_WOZ_IMAGE_WRITE_PROTECT;
