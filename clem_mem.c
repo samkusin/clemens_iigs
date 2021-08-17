@@ -550,7 +550,21 @@ static uint8_t _clem_mmio_read(
 
     switch (ioreg) {
         case CLEM_MMIO_REG_KEYB_READ:
-        /* 01-0F are no-ops */
+        case CLEM_MMIO_REG_KEYB_READ + 1:
+        case CLEM_MMIO_REG_KEYB_READ + 2:
+        case CLEM_MMIO_REG_KEYB_READ + 3:
+        case CLEM_MMIO_REG_KEYB_READ + 4:
+        case CLEM_MMIO_REG_KEYB_READ + 5:
+        case CLEM_MMIO_REG_KEYB_READ + 6:
+        case CLEM_MMIO_REG_KEYB_READ + 7:
+        case CLEM_MMIO_REG_KEYB_READ + 8:
+        case CLEM_MMIO_REG_KEYB_READ + 9:
+        case CLEM_MMIO_REG_KEYB_READ + 10:
+        case CLEM_MMIO_REG_KEYB_READ + 11:
+        case CLEM_MMIO_REG_KEYB_READ + 12:
+        case CLEM_MMIO_REG_KEYB_READ + 13:
+        case CLEM_MMIO_REG_KEYB_READ + 14:
+        case CLEM_MMIO_REG_KEYB_READ + 15:
         case CLEM_MMIO_REG_ANYKEY_STROBE:
         case CLEM_MMIO_REG_ADB_MOUSE_DATA:
         case CLEM_MMIO_REG_ADB_MODKEY:

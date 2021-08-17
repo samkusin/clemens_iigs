@@ -1184,7 +1184,9 @@ uint8_t clem_adb_read_switch(
 ) {
     bool is_noop = (flags & CLEM_MMIO_READ_NO_OP) != 0;
     uint8_t tmp;
-
+    if (ioreg > CLEM_MMIO_REG_KEYB_READ && ioreg <  CLEM_MMIO_REG_ANYKEY_STROBE) {
+        ioreg = CLEM_MMIO_REG_KEYB_READ;
+    }
     switch (ioreg) {
         case CLEM_MMIO_REG_KEYB_READ:
             /* FIXME: HWRef says this is cleared when reading here */
