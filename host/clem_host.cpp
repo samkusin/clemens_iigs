@@ -8,6 +8,7 @@
 #include "clem_audio.hpp"
 #include "clem_display.hpp"
 #include "clem_debug.h"
+#include "clem_drive.h"
 #include "clem_mem.h"
 #include "clem_vgc.h"
 
@@ -454,26 +455,51 @@ void ClemensHost::frame(int width, int height, float deltaTime)
                                    ImGuiWindowFlags_NoCollapse |
                                    ImGuiWindowFlags_NoBringToFrontOnFocus);
   if (clemens_is_mmio_initialized(&machine_)) {
-    if (widgetDebugContext_ == DebugContext::RWMemory) {
+    ImGui::BeginChild("context_memory", ImVec2(memoryViewSize.x, memoryViewSize.y/2));
+    {
       memoryViewStatic_[0].ReadOnly = true;
       if (emulationRan) {
         memoryViewStatic_[0].GotoAddrAndHighlight(cpuPinsNext.adr, cpuPinsNext.adr + 1);
         memoryViewBank_[0] = cpuPinsNext.bank;
       }
+      ImGui::BeginTable("context_memory", 1, 0,
+                        ImVec2(memoryViewSize.x, memoryViewSize.y));
+      ImGui::TableNextColumn();
       ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[0],
                         nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn();
       uint8_t viewBank = memoryViewBank_[0];
       if (!isRunningEmulation() || isRunningEmulationStep()) {
         memoryViewStatic_[0].DrawContents((void*)
           (void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
       }
-    } else if (widgetDebugContext_ == DebugContext::IWM) {
+      ImGui::EndTable();
+    }
+    ImGui::EndChild();
+    ImGui::Separator();
+    if (widgetDebugContext_ == DebugContext::IWM) {
       doIWMContextWindow();
     }
   }
   ImGui::End();
   memoryViewCursor.x += memoryViewSize.x;
   ImGui::SetNextWindowPos(memoryViewCursor);
+  ImGui::SetNextWindowSize(memoryViewSize);
+  ImGui::Begin("Memory 1", nullptr, ImGuiWindowFlags_NoResize |
+                                    ImGuiWindowFlags_NoCollapse |
+                                    ImGuiWindowFlags_NoBringToFrontOnFocus);
+  if (clemens_is_mmio_initialized(&machine_)) {
+    ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[1],
+                       nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
+    uint8_t viewBank = memoryViewBank_[1];
+    if (!isRunningEmulation() || isRunningEmulationStep()) {
+      memoryViewStatic_[1].DrawContents((void*)
+        (void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
+    }
+  }
+  ImGui::End();
+
   ImGui::SetNextWindowSize(memoryViewSize);
   ImGui::Begin("Memory 1", nullptr, ImGuiWindowFlags_NoResize |
                                     ImGuiWindowFlags_NoCollapse |
@@ -501,68 +527,130 @@ void ClemensHost::frame(int width, int height, float deltaTime)
 
 void ClemensHost::doIWMContextWindow()
 {
-  ImGui::BeginTable("Drives", 3, 0);
-  ImGui::TableNextColumn(); ImGui::Text("Property");
-  ImGui::TableNextColumn(); ImGui::Text("5.25 D1");
-  ImGui::TableNextColumn(); ImGui::Text("5.25 D2");
-  ImGui::TableNextRow();
-  ImGui::TableNextColumn();
-  ImGui::Text("Track");
-  ImGui::TableNextColumn();
-  ImGui::Text("%.2f", machine_.active_drives.slot6[0].qtr_track_index / 4.0f);
-  ImGui::TableNextColumn();
-  ImGui::Text("%.2f", machine_.active_drives.slot6[1].qtr_track_index / 4.0f);
-  {
-    const ClemensDrive* drive0 = &machine_.active_drives.slot6[0];
-    const ClemensDrive* drive1 = &machine_.active_drives.slot6[1];
-    unsigned byteidx[2] = {
-      drive0->track_byte_index,
-      drive1->track_byte_index
-    };
-    unsigned bitshift[2] = {
-      drive0->track_bit_shift,
-      drive1->track_bit_shift
-    };
-    unsigned trackpos[2] = {
-      (drive0->track_byte_index * 8) + (7 - drive0->track_bit_shift),
-      (drive1->track_byte_index * 8) + (7 - drive1->track_bit_shift),
-    };
+  const ClemensDeviceIWM& iwm = machine_.mmio.dev_iwm;
 
-    ImGui::TableNextRow();
-    ImGui::TableNextColumn();
-    ImGui::Text("Bits");
-    ImGui::TableNextColumn();
-    ImGui::Text("%x", drive0->data->track_bits_count[drive0->real_track_index]);
-    ImGui::TableNextColumn();
-    ImGui::Text("%x", drive1->data->track_bits_count[drive1->real_track_index]);
-    ImGui::TableNextRow();
-    ImGui::TableNextColumn();
-    ImGui::Text("Pos");
-    ImGui::TableNextColumn();
-    ImGui::Text("%X (%u: %X)", trackpos[0], bitshift[0], byteidx[0]);
-    ImGui::TableNextColumn();
-    ImGui::Text("%X (%u: %X)", trackpos[1], bitshift[1], byteidx[1]);
-    ImGui::TableNextRow();
-    ImGui::TableNextColumn();
-    ImGui::Text("Byte");
-    ImGui::TableNextColumn();
-    if (drive0->data) {
-      const uint8_t* data = drive0->data->bits_data + (
-        drive0->data->track_byte_offset[drive0->real_track_index]) + byteidx[0];
-      ImGui::Text("%02X", *data);
+  ImGui::BeginGroup();
+  ImGui::BeginTable("IWM", 3, ImGuiTableFlags_Resizable);
+  ImGui::TableSetupColumn("Drive", ImGuiTableColumnFlags_WidthStretch);
+  ImGui::TableSetupColumn("IWM LSS     ", ImGuiTableColumnFlags_WidthFixed);
+  ImGui::TableSetupColumn("IWM Pins    ", ImGuiTableColumnFlags_WidthFixed);
+  ImGui::TableHeadersRow();
+  ImGui::TableNextColumn();
+  {
+    const ClemensDrive* drive = NULL;
+    int driveIdx = (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 1 :
+                   (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_1) ? 0 :
+                   -1;
+    if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+      drive = &machine_.active_drives.slot5[driveIdx];
     } else {
-      ImGui::Text("n/a");
+      drive = &machine_.active_drives.slot6[driveIdx];
     }
-    ImGui::TableNextColumn();
-    if (drive1->data) {
-      const uint8_t* data = drive1->data->bits_data + (
-        drive1->data->track_byte_offset[drive1->real_track_index]) + byteidx[1];
-      ImGui::Text("%02X", *data);
-    } else {
-      ImGui::Text("n/a");
+    ImGui::BeginTable("IWM_Drive", 2, 0);
+    {
+      ImGui::TableNextColumn(); ImGui::Text("Disk");
+      ImGui::TableNextColumn();
+      if (drive && driveIdx >= 0) {
+        ImGui::Text("%s D%d %s", (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_35) ? "3.5" : "5.25",
+                    driveIdx,
+                    (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? "on": "off");
+      } else {
+        ImGui::Text("N/A");
+      }
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("Track");
+      ImGui::TableNextColumn(); ImGui::Text("%.2f", drive->qtr_track_index / 4.0f);
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("Bits");
+      ImGui::TableNextColumn();
+      if (drive->data) {
+        ImGui::Text("%x", drive->data->track_bits_count[drive->real_track_index]);
+      }
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("Pos");
+      ImGui::TableNextColumn();
+      if (drive->data) {
+        ImGui::Text("%X (%u: %X)",
+                    (drive->track_byte_index * 8) + (7 - drive->track_bit_shift),
+                    drive->track_bit_shift, drive->track_byte_index);
+      }
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("Byte");
+      ImGui::TableNextColumn();
+      if (drive->data) {
+        const uint8_t* data = drive->data->bits_data + (
+          drive->data->track_byte_offset[drive->real_track_index]) + (
+            drive->track_byte_index);
+        ImGui::Text("%02X", *data);
+      }
     }
+    ImGui::EndTable();
+  }
+  ImGui::TableNextColumn();
+  {
+    ImGui::BeginTable("IWM_LSS", 2, 0);
+    {
+      ImGui::TableNextColumn(); ImGui::Text("Latch");
+      ImGui::TableNextColumn();
+      ImGui::Text("%02X", iwm.latch);
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("State");
+      ImGui::TableNextColumn();
+      ImGui::Text("%02X", iwm.lss_state);
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("Q6,Q7");
+      ImGui::TableNextColumn();
+      ImGui::Text("%u,%u ", iwm.q6_switch, iwm.q7_switch);
+    }
+    ImGui::EndTable();
+  }
+  ImGui::TableNextColumn();
+  {
+    ImGui::BeginTable("IWM_Pins", 2, 0);
+    {
+      ImGui::TableNextColumn(); ImGui::Text("PH0_3");
+      ImGui::TableNextColumn();
+      ImGui::Text("%u%u%u%u", (iwm.out_phase & 1) ? 1 : 0,
+                              (iwm.out_phase & 2) ? 1 : 0,
+                              (iwm.out_phase & 4) ? 1 : 0,
+                              (iwm.out_phase & 8) ? 1 : 0);
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("SENSE");
+      ImGui::TableNextColumn();
+      if (iwm.io_flags & CLEM_IWM_FLAG_WRPROTECT_SENSE) {
+        ImGui::Text("1");
+      } else {
+        ImGui::Text("0");
+      }
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("RDDATA");
+      ImGui::TableNextColumn();
+      if (iwm.io_flags & CLEM_IWM_FLAG_READ_DATA) {
+        ImGui::Text("1");
+      } else {
+        ImGui::Text("0");
+      }
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("WRREQ");
+      ImGui::TableNextColumn();
+      if (iwm.io_flags & CLEM_IWM_FLAG_WRITE_REQUEST) {
+        ImGui::Text("1");
+      } else {
+        ImGui::Text("0");
+      }
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("ENBL2");
+      ImGui::TableNextColumn();
+      if (iwm.enbl2) {
+        ImGui::Text("1");
+      } else {
+        ImGui::Text("0");
+      }
+    }
+    ImGui::EndTable();
   }
   ImGui::EndTable();
+  ImGui::EndGroup();
 }
 
 void ClemensHost::emulate(float deltaTime)
