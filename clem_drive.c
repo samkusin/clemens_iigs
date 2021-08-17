@@ -436,12 +436,12 @@ void clem_disk_read_and_position_head_525(
             drive->real_track_index = drive->data->meta_track_map[drive->qtr_track_index];
             if (drive->real_track_index != 0xff) {
                 drive->track_bit_length = _clem_disk_get_track_bit_length_525(
-                    drive, drive->real_track_index);
-                if (track_prev_len) {
-                    track_cur_pos = track_cur_pos * drive->track_bit_length / track_prev_len;
-                }
+                    drive, drive->qtr_track_index);
             } else {
                 drive->track_bit_length = drive->data->default_track_bit_length;
+            }
+            if (track_prev_len) {
+                track_cur_pos = track_cur_pos * drive->track_bit_length / track_prev_len;
             }
             drive->zero_count = 0;
         }

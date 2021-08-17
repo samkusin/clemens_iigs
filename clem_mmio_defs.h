@@ -270,6 +270,21 @@
  */
 #define CLEM_MMIO_REG_STATEREG          0x68
 
+/**
+ * Resets the paddle timers (note that //e docs state that reset occurs on
+ * "addressing C07X will cause a reset. - //e tech ref manual- p190)
+ *
+ * Also note that different cards used various C07x memory addresses as IO
+ * registers for things like bank select.  Determine need as it comes, and
+ * always reset the paddles with accessing C07X?
+ *
+ * For example, the Transwarp card used c074, and some titles will write to it
+ * to disable Transwarp (not IIgs fast mode).
+ * - http://www.faqs.org/faqs/apple2/faq/part3/
+ */
+#define CLEM_MMIO_REG_PADDL_RESET       0x70
+/** Write 1 to disable transwarp, 0 to enable (no-op on Clemens) */
+#define CLEM_MMIO_REG_C074_TRANSWARP    0x74
 /** R1 - LC Bank 2, Read RAM, Write Protect */
 #define CLEM_MMIO_REG_LC2_RAM_WP        0x80
 /** R2 - LC Bank 2, Read ROM, Write Enable */
