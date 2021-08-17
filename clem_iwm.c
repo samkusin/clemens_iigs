@@ -575,9 +575,9 @@ void _clem_iwm_io_switch(
                         1 << ((ioreg - CLEM_MMIO_REG_IWM_PHASE0_LO) >> 1));
                 }
 
-                if ((iwm->out_phase & 1) && (iwm->out_phase & 3)) {
-                    /* this sets the ENBL2 line (for hard-drives and other
-                       smartport devices)
+                if ((iwm->out_phase & 2) && (iwm->out_phase & 8)) {
+                    /* PH1 and PH3 ON this sets the ENBL2 line (for hard-drives
+                       and other smartport devices)
                     */
                     iwm->enbl2 = true;
                 } else {
