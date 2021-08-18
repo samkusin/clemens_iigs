@@ -10,6 +10,7 @@
 #include "clem_debug.h"
 #include "clem_drive.h"
 #include "clem_mem.h"
+#include "clem_mmio_defs.h"
 #include "clem_vgc.h"
 
 #include "fmt/format.h"
@@ -48,6 +49,17 @@ namespace {
       fmt::format_to_n(buffer_.data() + start, sz + 1, formatStr, args...);
     }
   };
+
+  char clemens_is_mmio_card_rom(const ClemensMMIO& mmio, unsigned slot) {
+    assert(slot > 0);
+    if ((mmio.mmap_register & CLEM_MMIO_MMAP_CXROM) ||
+        (mmio.mmap_register & (CLEM_MMIO_MMAP_C1ROM << (slot - 1)))
+    ) {
+      return 'C';
+    } else {
+      return 'I';
+    }
+  }
 } // namespace anon
 
 void ClemensHost::Diagnostics::reset()
@@ -93,7 +105,7 @@ ClemensHost::ClemensHost() :
   //  TODO: move into UI
   //FILE* fp = fopen("dos_3_3_master.woz", "rb");
   //FILE* fp = fopen("stargate.woz", "rb");
-  FILE* fp = fopen("oregon_trail.woz", "rb");
+  FILE* fp = fopen("oregon_trail_disk_1.woz", "rb");
   if (fp) {
     fseek(fp, 0, SEEK_END);
     long sz = ftell(fp);
@@ -481,6 +493,8 @@ void ClemensHost::frame(int width, int height, float deltaTime)
     ImGui::Separator();
     if (widgetDebugContext_ == DebugContext::IWM) {
       doIWMContextWindow();
+    } else if (widgetDebugContext_ == DebugContext::MemoryMaps) {
+      doMemoryMapWindow();
     }
   }
   ImGui::End();
@@ -653,6 +667,108 @@ void ClemensHost::doIWMContextWindow()
   ImGui::EndGroup();
 }
 
+void ClemensHost::doMemoryMapWindow()
+{
+  const ClemensMMIO& mmio = machine_.mmio;
+
+  ImGui::BeginGroup();
+  ImGui::BeginTable("MMIO_MemoryMaps", 3);
+  ImGui::TableSetupColumn("64K");
+  ImGui::TableSetupColumn("128K");
+  ImGui::TableSetupColumn("Video");
+  ImGui::TableHeadersRow();
+  ImGui::TableNextColumn();
+  {
+    ImGui::BeginTable("MMIO_MEMORY", 2, 0);
+    {
+      ImGui::TableNextColumn(); ImGui::Text("MMAPR");
+      ImGui::TableNextColumn();
+      ImGui::Text("%08X", mmio.mmap_register);
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("SLOTS");
+      ImGui::TableNextColumn();
+      ImGui::Text("%c%c%c%c%c%c%c", clemens_is_mmio_card_rom(mmio, 1),
+                                    clemens_is_mmio_card_rom(mmio, 2),
+                                    clemens_is_mmio_card_rom(mmio, 3),
+                                    clemens_is_mmio_card_rom(mmio, 4),
+                                    clemens_is_mmio_card_rom(mmio, 5),
+                                    clemens_is_mmio_card_rom(mmio, 6),
+                                    clemens_is_mmio_card_rom(mmio, 7));
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("LCRDR");
+      ImGui::TableNextColumn();
+      if (mmio.mmap_register & CLEM_MMIO_MMAP_RDLCRAM) {
+        ImGui::Text("RAM");
+      } else {
+        ImGui::Text("ROM");
+      }
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("LCWRI");
+      ImGui::TableNextColumn();
+      if (mmio.mmap_register & CLEM_MMIO_MMAP_WRLCRAM) {
+        ImGui::Text("WRITE");
+      } else {
+        ImGui::Text("WPROT");
+      }
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("LCBNK");
+      ImGui::TableNextColumn();
+      if (mmio.mmap_register & CLEM_MMIO_MMAP_LCBANK2) {
+        ImGui::Text("LC2");
+      } else {
+        ImGui::Text("LC1");
+      }
+    }
+    ImGui::EndTable();
+  }
+  ImGui::TableNextColumn();
+  {
+    ImGui::BeginTable("MMIO_128K", 2, 0);
+    {
+      ImGui::TableNextColumn(); ImGui::Text("ALTZP");
+      ImGui::TableNextColumn();
+      if (mmio.mmap_register & CLEM_MMIO_MMAP_ALTZPLC) {
+        ImGui::Text("AUX");
+      } else {
+        ImGui::Text("MAIN");
+      }
+      ImGui::TableNextColumn(); ImGui::Text("RAMRD");
+      ImGui::TableNextColumn();
+      if (mmio.mmap_register & CLEM_MMIO_MMAP_RAMRD) {
+        ImGui::Text("AUX");
+      } else {
+        ImGui::Text("MAIN");
+      }
+      ImGui::TableNextColumn(); ImGui::Text("RAMWRT");
+      ImGui::TableNextColumn();
+      if (mmio.mmap_register & CLEM_MMIO_MMAP_RAMWRT) {
+        ImGui::Text("AUX");
+      } else {
+        ImGui::Text("MAIN");
+      }
+    }
+    ImGui::EndTable();
+  }
+  ImGui::TableNextColumn();
+  {
+    ImGui::BeginTable("MMIO_SHADOW", 2, 0);
+    {
+      ImGui::TableNextColumn(); ImGui::Text("A");
+      ImGui::TableNextColumn();
+      ImGui::Text("N/A");
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn(); ImGui::Text("N");
+      ImGui::TableNextColumn();
+      ImGui::Text("N/A");
+      ImGui::TableNextRow();
+    }
+    ImGui::EndTable();
+  }
+  ImGui::EndTable();
+  ImGui::EndGroup();
+
+}
+
 void ClemensHost::emulate(float deltaTime)
 {
   //  execution loop for clemens 65816
@@ -814,6 +930,8 @@ bool ClemensHost::parseCommand(const char* buffer)
         return parseCommandLog(end);
       } else if (!strncasecmp(start, "unlog", end - start)) {
         return parseCommandUnlog(end);
+      } else if (!strncasecmp(start, "context", end - start)) {
+        return parseCommandDebugContext(end);
       }
       return false;
     });
@@ -1025,7 +1143,7 @@ bool ClemensHost::parseCommandUnlog(const char* line)
     machine_.debug_flags &= ~(
        kClemensDebugFlag_StdoutOpcode | kClemensDebugFlag_DebugLogOpcode);
     clem_debug_log_flush();
-    return false;
+    return true;
   }
   return parseCommandToken(start,
     [this](const char* start, const char* end) {
@@ -1041,6 +1159,31 @@ bool ClemensHost::parseCommandUnlog(const char* line)
         machine_.debug_flags &= ~(
           kClemensDebugFlag_StdoutOpcode | kClemensDebugFlag_DebugLogOpcode);
         clem_debug_log_flush();
+        return true;
+      }
+      return false;
+    });
+}
+
+bool ClemensHost::parseCommandDebugContext(const char* line)
+{
+  const char* start = trimCommand(line);
+  if (!start) {
+    FormatView fv(terminalOutput_);
+    fv.format("usage: context <iwm|mmap>");
+    return false;
+  }
+  return parseCommandToken(start,
+    [this](const char* start, const char* end) {
+      char name[16];
+      strncpy(name, start, std::min(sizeof(name) - 1, size_t(end - start)));
+      name[end - start] = '\0';
+      if (!strncasecmp(name, "iwm", sizeof(name))) {
+        widgetDebugContext_ = DebugContext::IWM;
+        return true;
+      }
+      if (!strncasecmp(name, "mmap", sizeof(name))) {
+        widgetDebugContext_ = DebugContext::MemoryMaps;
         return true;
       }
       return false;
