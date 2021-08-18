@@ -28,8 +28,8 @@
 #define CLEM_MONITOR_COLOR_MONO             1
 
 /** Emulated duration of every 'step' iwm_glu_sync runs. 1.023 / 2 ~ 0.511 */
-#define CLEM_IWM_SYNC_FRAME_NS              511
-#define CLEM_IWM_SYNC_FRAME_NS_FAST         256
+#define CLEM_IWM_SYNC_FRAME_NS              (CLEM_MEGA2_CYCLE_NS / 2)
+#define CLEM_IWM_SYNC_FRAME_NS_FAST         (CLEM_MEGA2_CYCLE_NS / 4)
 
 #define CLEM_VGC_HORIZ_SCAN_TIME_NS         63700
 #define CLEM_VGC_NTSC_SCANLINE_COUNT        262

@@ -2009,6 +2009,11 @@
 "Hint":"Code"},
 
 {
+"Low":247388,
+"High":247388,
+"Hint":"Code"},
+
+{
 "Low":248219,
 "High":248219,
 "Hint":"Code"},
@@ -5518,6 +5523,13 @@
 "Value":16734660,
 "Source":"User",
 "Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"247330":{
+"Label":"ext_find_sector",
+"Value":50722,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{

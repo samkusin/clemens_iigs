@@ -375,6 +375,7 @@ struct ClemensDrive {
     unsigned track_bit_length;  /**< current track bit length */
     unsigned pulse_ns;          /**< nanosecond timer for pulse input */
     unsigned zero_count;        /**< number of non-pulses found in succession */
+    unsigned read_buffer;       /**< Used for MC3470 emulation */
 
     /**
      * 4-bit Q0-3 entry 5.25" = stepper control
@@ -388,9 +389,10 @@ struct ClemensDrive {
     bool select_35;             /**< 3.5" select state */
     bool write_pulse;           /**< Changes in the write field translate as pulses */
 
-    uint32_t random_bits[8];    /**< used for random pulse generation */
-    uint8_t random_bit_index;   /**< bit index into 32-byte buffer */
     uint8_t real_track_index;   /**< the index into the raw woz track data */
+
+    uint8_t random_bits[64];    /**< used for random pulse generation */
+    unsigned random_bit_index;   /**< bit index into 32-byte buffer */
 };
 
 struct ClemensDriveBay {

@@ -122,6 +122,7 @@ static int s_disk2_phase_states[8][16] = {
 */
 
 static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
+    unsigned max_random_bits = sizeof(uint8_t) * sizeof(drive->random_bits);
     drive->q03_switch = 0;
     drive->pulse_ns = 0;
     drive->track_byte_index = 0;
@@ -129,22 +130,24 @@ static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
     drive->real_track_index = 0xfe;
     drive->random_bit_index = 0;
     drive->qtr_track_index = 0;
+    drive->zero_count = 0;
+    drive->read_buffer = 0;
+
     /* not going to change the cog orientation since this could be a soft
        reset */
     /* crappy method to randomize 30-ish percent ON bits (30% per WOZ
        recommendation, subject to experimentation
     */
     do {
-        if (rand() < RAND_MAX/3) {
-            drive->random_bits[drive->random_bit_index / 32] |= (
-                1 << (drive->random_bit_index % 8));
+        unsigned random_byte_index = (drive->random_bit_index / 8);
+        unsigned random_bit_shift = (drive->random_bit_index % 8);
+        if (rand() < (RAND_MAX * 0.30f)) {
+            drive->random_bits[random_byte_index] |= (1 << random_bit_shift);
         } else {
-            drive->random_bits[drive->random_bit_index / 32] &= ~(
-                1 << (drive->random_bit_index % 8));
+            drive->random_bits[random_byte_index] &= ~(1 << random_bit_shift);
         }
         ++drive->random_bit_index;
-    } while (drive->random_bit_index != 0);
-    drive->random_bits[0] = 0xf00f003;
+    } while (drive->random_bit_index < max_random_bits);
 }
 
 void clem_disk_reset_drives(struct ClemensDriveBay* drives) {
@@ -402,6 +405,7 @@ void clem_disk_read_and_position_head_525(
     *io_flags &= ~CLEM_IWM_FLAG_PULSE_HIGH;
 
     if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
+        drive->read_buffer = 0;
         return;
     }
 
@@ -425,9 +429,15 @@ void clem_disk_read_and_position_head_525(
             (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
             (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
             qtr_track_index / 4, qtr_track_index % 4);
+        if (drive->data->meta_track_map[drive->qtr_track_index] !=
+            drive->data->meta_track_map[qtr_track_index]
+        ) {
+            /* force lookup of the real track if the arm has changed */
+            drive->real_track_index = 0xfe;
+            drive->zero_count = 0;
+        }
+
         drive->qtr_track_index = qtr_track_index;
-        /* force lookup of the real track if the arm has changed */
-        drive->real_track_index = 0xfe;
     }
     drive->q03_switch = in_phase;
     if (drive->data) {
@@ -443,7 +453,6 @@ void clem_disk_read_and_position_head_525(
             if (track_prev_len) {
                 track_cur_pos = track_cur_pos * drive->track_bit_length / track_prev_len;
             }
-            drive->zero_count = 0;
         }
         bit_timing_ns = drive->data->bit_timing_ns;
     } else {
@@ -464,18 +473,21 @@ void clem_disk_read_and_position_head_525(
         /* read a pulse from the bitstream, following WOZ emulation suggestions
             to emulate errors - this is effectively a copypasta from
             https://applesaucefdc.com/woz/reference2/ */
+        drive->read_buffer <<= 1;
         if (drive->real_track_index != 0xff &&
             drive->data->track_initialized[drive->real_track_index]
         ) {
             if (_clem_disk_read_bit_525(drive)) {
-                *io_flags |= CLEM_IWM_FLAG_READ_DATA;
+                drive->read_buffer |= 0x1;
                 drive->zero_count = 0;
             }
         }
-        if (!(*io_flags & CLEM_IWM_FLAG_READ_DATA)) {
-            if (++drive->zero_count > 2) {
-                *io_flags |= _clem_disk_read_fake_bit_525(drive);
+        if ((drive->read_buffer & 0xf) && drive->real_track_index != 0xff) {
+            if (drive->read_buffer & 0x2) {
+                *io_flags |= CLEM_IWM_FLAG_READ_DATA;
             }
+        } else {
+            *io_flags |= _clem_disk_read_fake_bit_525(drive);
         }
     }
 
