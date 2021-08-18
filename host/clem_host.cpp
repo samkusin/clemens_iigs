@@ -512,15 +512,56 @@ void ClemensHost::doIWMContextWindow()
   ImGui::Text("%.2f", machine_.active_drives.slot6[0].qtr_track_index / 4.0f);
   ImGui::TableNextColumn();
   ImGui::Text("%.2f", machine_.active_drives.slot6[1].qtr_track_index / 4.0f);
-  ImGui::TableNextRow();
-  ImGui::TableNextColumn();
-  ImGui::Text("Pos");
-  ImGui::TableNextColumn();
-  ImGui::Text("%u : %04X", machine_.active_drives.slot6[0].track_bit_shift,
-                         machine_.active_drives.slot6[0].track_byte_index);
-  ImGui::TableNextColumn();
-  ImGui::Text("%u : %04X", machine_.active_drives.slot6[1].track_bit_shift,
-                           machine_.active_drives.slot6[1].track_byte_index);
+  {
+    const ClemensDrive* drive0 = &machine_.active_drives.slot6[0];
+    const ClemensDrive* drive1 = &machine_.active_drives.slot6[1];
+    unsigned byteidx[2] = {
+      drive0->track_byte_index,
+      drive1->track_byte_index
+    };
+    unsigned bitshift[2] = {
+      drive0->track_bit_shift,
+      drive1->track_bit_shift
+    };
+    unsigned trackpos[2] = {
+      (drive0->track_byte_index * 8) + (7 - drive0->track_bit_shift),
+      (drive1->track_byte_index * 8) + (7 - drive1->track_bit_shift),
+    };
+
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    ImGui::Text("Bits");
+    ImGui::TableNextColumn();
+    ImGui::Text("%x", drive0->data->track_bits_count[drive0->real_track_index]);
+    ImGui::TableNextColumn();
+    ImGui::Text("%x", drive1->data->track_bits_count[drive1->real_track_index]);
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    ImGui::Text("Pos");
+    ImGui::TableNextColumn();
+    ImGui::Text("%X (%u: %X)", trackpos[0], bitshift[0], byteidx[0]);
+    ImGui::TableNextColumn();
+    ImGui::Text("%X (%u: %X)", trackpos[1], bitshift[1], byteidx[1]);
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    ImGui::Text("Byte");
+    ImGui::TableNextColumn();
+    if (drive0->data) {
+      const uint8_t* data = drive0->data->bits_data + (
+        drive0->data->track_byte_offset[drive0->real_track_index]) + byteidx[0];
+      ImGui::Text("%02X", *data);
+    } else {
+      ImGui::Text("n/a");
+    }
+    ImGui::TableNextColumn();
+    if (drive1->data) {
+      const uint8_t* data = drive1->data->bits_data + (
+        drive1->data->track_byte_offset[drive1->real_track_index]) + byteidx[1];
+      ImGui::Text("%02X", *data);
+    } else {
+      ImGui::Text("n/a");
+    }
+  }
   ImGui::EndTable();
 }
 
@@ -1106,9 +1147,12 @@ bool ClemensHost::parseWOZDisk(
   }
 
   if (woz->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) {
-    printf("WOZ Image is write protected");
+    printf("WOZ is write protected\n");
   } else {
-    printf("WOZ Image is NOT write protected");
+    printf("WOZ is NOT write protected\n");
+  }
+  for (unsigned i = 0; i < woz->track_count; ++i) {
+    printf("WOZ Track %u: %u bits\n", i, woz->track_bits_count[i]);
   }
 
   //woz->flags &= ~CLEM_WOZ_IMAGE_WRITE_PROTECT;
