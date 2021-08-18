@@ -577,11 +577,10 @@ void ClemensHost::doIWMContextWindow()
       ImGui::TableNextRow();
       ImGui::TableNextColumn(); ImGui::Text("Byte");
       ImGui::TableNextColumn();
-      if (drive->data) {
+      if (drive->data && drive->real_track_index < 0xfe) {
         const uint8_t* data = drive->data->bits_data + (
-          drive->data->track_byte_offset[drive->real_track_index]) + (
-            drive->track_byte_index);
-        ImGui::Text("%02X", *data);
+          drive->data->track_byte_offset[drive->real_track_index]);
+        ImGui::Text("%02X", data[drive->track_byte_index]);
       }
     }
     ImGui::EndTable();
