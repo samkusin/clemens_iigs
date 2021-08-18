@@ -756,21 +756,8 @@ static uint8_t _clem_mmio_read(
             result = _clem_mmio_statereg_c068(mmio);
             break;
         case CLEM_MMIO_REG_PADDL_RESET:
-        case CLEM_MMIO_REG_PADDL_RESET + 0x1:
-        case CLEM_MMIO_REG_PADDL_RESET + 0x2:
-        case CLEM_MMIO_REG_PADDL_RESET + 0x3:
-        case CLEM_MMIO_REG_C074_TRANSWARP:
-        case CLEM_MMIO_REG_PADDL_RESET + 0x5:
-        case CLEM_MMIO_REG_PADDL_RESET + 0x6:
-        case CLEM_MMIO_REG_PADDL_RESET + 0x7:
-        case CLEM_MMIO_REG_PADDL_RESET + 0x8:
-        case CLEM_MMIO_REG_PADDL_RESET + 0x9:
-        case CLEM_MMIO_REG_PADDL_RESET + 0xa:
-        case CLEM_MMIO_REG_PADDL_RESET + 0xb:
-        case CLEM_MMIO_REG_PADDL_RESET + 0xc:
-        case CLEM_MMIO_REG_PADDL_RESET + 0xd:
-        case CLEM_MMIO_REG_PADDL_RESET + 0xe:
-        case CLEM_MMIO_REG_PADDL_RESET + 0xf:
+            /* note c071 - 7f are reserved for ROM access - used for the
+               BRK interrupt */
             result = clem_game_read_switch(&mmio->dev_game, &ref_clock, ioreg, flags);
             break;
         case CLEM_MMIO_REG_LC2_RAM_WP:
