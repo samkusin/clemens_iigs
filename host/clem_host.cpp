@@ -92,7 +92,8 @@ ClemensHost::ClemensHost() :
 
   //  TODO: move into UI
   //FILE* fp = fopen("dos_3_3_master.woz", "rb");
-  FILE* fp = fopen("sammy_lightfoot.woz", "rb");
+  //FILE* fp = fopen("stargate.woz", "rb");
+  FILE* fp = fopen("oregon_trail.woz", "rb");
   if (fp) {
     fseek(fp, 0, SEEK_END);
     long sz = ftell(fp);
@@ -563,13 +564,13 @@ void ClemensHost::doIWMContextWindow()
       ImGui::TableNextRow();
       ImGui::TableNextColumn(); ImGui::Text("Bits");
       ImGui::TableNextColumn();
-      if (drive->data) {
+      if (drive && driveIdx >=0 && drive->data) {
         ImGui::Text("%x", drive->data->track_bits_count[drive->real_track_index]);
       }
       ImGui::TableNextRow();
       ImGui::TableNextColumn(); ImGui::Text("Pos");
       ImGui::TableNextColumn();
-      if (drive->data) {
+      if (drive && driveIdx >= 0 && drive->data) {
         ImGui::Text("%X (%u: %X)",
                     (drive->track_byte_index * 8) + (7 - drive->track_bit_shift),
                     drive->track_bit_shift, drive->track_byte_index);
@@ -577,7 +578,7 @@ void ClemensHost::doIWMContextWindow()
       ImGui::TableNextRow();
       ImGui::TableNextColumn(); ImGui::Text("Byte");
       ImGui::TableNextColumn();
-      if (drive->data && drive->real_track_index < 0xfe) {
+      if (drive && driveIdx >= 0 && drive->data && drive->real_track_index < 0xfe) {
         const uint8_t* data = drive->data->bits_data + (
           drive->data->track_byte_offset[drive->real_track_index]);
         ImGui::Text("%02X", data[drive->track_byte_index]);

@@ -16,9 +16,6 @@ This is a running todo list.
 
 * Many WOZ disks are booting...
   * Hard Hat Mack so far may require Disk II boot
-  * Commando gets to the QuickDOS loading screen but spins indefinitely at
-    Track 34 after that
-  * Sammy Lightfoot stays on track 0
   * Others?
 * Timing checks on native mode versions of:
   * STA (DP), Y and likely other direct-indirect indexed ops are missing a
@@ -61,6 +58,10 @@ This is a running todo list.
 
 
 ## DONE
+
+* Commando gets to the QuickDOS loading screen but spins indefinitely at
+  Track 34 after that
+* Sammy Lightfoot sta
 
 * Diagnosed Hard Hat Mack WOZ issue - likely it's the IIgs internal boot rom
   for slot 6 (ROM 03, maybe 1)
