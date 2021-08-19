@@ -50,6 +50,7 @@ private:
 private:
 
   void doIWMContextWindow();
+  void doMemoryMapWindow();
 
   bool parseCommand(const char* buffer);
   bool parseCommandPower(const char* line);
@@ -62,6 +63,7 @@ private:
   bool parseCommandRun(const char* line);
   bool parseCommandLog(const char* line);
   bool parseCommandUnlog(const char* line);
+  bool parseCommandDebugContext(const char* line);
 
   void createMachine();
   void destroyMachine();
@@ -134,7 +136,8 @@ private:
   };
 
   enum class DebugContext {
-    IWM
+    IWM,
+    MemoryMaps
   };
 
   InputContext widgetInputContext_;

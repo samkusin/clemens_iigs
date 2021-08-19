@@ -14,14 +14,10 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
-* Many WOZ disks are booting...
-  * Hard Hat Mack so far may require Disk II boot
-  * Others?
 * Timing checks on native mode versions of:
   * STA (DP), Y and likely other direct-indirect indexed ops are missing a
     IO cycle (likely just writes, but evaluate rules in wd65c816 docs...)
   * ADC, AND, CMP, EOR, LDA, ORA, SBC, STA
-* If disk is not write protected on boot, bootup doesn't work?  Debug
 * Check if system beep is supposed to call Ensoniq DOC
   * Assuming that the system thunks down to speaker beeps (which may be the
     reason for the tinny beep sound
@@ -59,10 +55,10 @@ This is a running todo list.
 
 ## DONE
 
+* Fixed boot on write-protect disabled (enbl2 minimal support)
 * Commando gets to the QuickDOS loading screen but spins indefinitely at
   Track 34 after that
-* Sammy Lightfoot sta
-
+* Sammy Lightfoot starts
 * Diagnosed Hard Hat Mack WOZ issue - likely it's the IIgs internal boot rom
   for slot 6 (ROM 03, maybe 1)
   * The 16 sector read from track 0 on boot is too long and the internal rom
