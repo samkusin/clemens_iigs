@@ -108,6 +108,9 @@ static int s_disk2_phase_states[8][16] = {
 #define CLEM_IWM_DISK35_STATE_STEP_IN       0x02
 #define CLEM_IWM_DISK35_STATE_STEP_ONE      0x04
 
+#define CLEM_IWM_DRIVE_MAX_RANDOM_BITS \
+    (sizeof(uint8_t) * CLEM_IWM_DRIVE_RANDOM_BYTES)
+
 /*
     Emulation of disk drives and the IWM Controller.
 
@@ -122,7 +125,6 @@ static int s_disk2_phase_states[8][16] = {
 */
 
 static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
-    unsigned max_random_bits = sizeof(uint8_t) * sizeof(drive->random_bits);
     drive->q03_switch = 0;
     drive->pulse_ns = 0;
     drive->track_byte_index = 0;
@@ -130,7 +132,6 @@ static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
     drive->real_track_index = 0xfe;
     drive->random_bit_index = 0;
     drive->qtr_track_index = 0;
-    drive->zero_count = 0;
     drive->read_buffer = 0;
 
     /* not going to change the cog orientation since this could be a soft
@@ -147,7 +148,7 @@ static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
             drive->random_bits[random_byte_index] &= ~(1 << random_bit_shift);
         }
         ++drive->random_bit_index;
-    } while (drive->random_bit_index < max_random_bits);
+    } while (drive->random_bit_index < CLEM_IWM_DRIVE_MAX_RANDOM_BITS);
 }
 
 void clem_disk_reset_drives(struct ClemensDriveBay* drives) {
@@ -366,8 +367,10 @@ static uint8_t _clem_disk_read_bit_525(struct ClemensDrive* drive) {
 }
 
 static inline uint8_t _clem_disk_read_fake_bit_525(struct ClemensDrive* drive) {
-    uint32_t random_bit = (drive->random_bits[drive->random_bit_index / 32] & (
-        1 << (drive->random_bit_index % 32)));
+    uint8_t random_byte = (
+        drive->random_bits[drive->random_bit_index / CLEM_IWM_DRIVE_RANDOM_BYTES]);
+    bool random_bit = random_byte & (
+        1 << (drive->random_bit_index % CLEM_IWM_DRIVE_RANDOM_BYTES));
     ++drive->random_bit_index;
     return random_bit ? CLEM_IWM_FLAG_READ_DATA : 0x00;
 }
@@ -396,6 +399,7 @@ void clem_disk_read_and_position_head_525(
     unsigned dt_ns
 ) {
     int qtr_track_index = drive->qtr_track_index;
+    int qtr_track_delta;
     unsigned track_cur_pos;
     unsigned bit_timing_ns;
     bool track_phase_change = false;
@@ -413,7 +417,7 @@ void clem_disk_read_and_position_head_525(
 
     /* clamp quarter track index to 5.25" limits */
     /* turning a cog that can be oriented in one of 8 directions */
-    int qtr_track_delta = (
+    qtr_track_delta = (
         s_disk2_phase_states[drive->cog_orient & 0x7][in_phase & 0xf]);
     drive->cog_orient = (drive->cog_orient + qtr_track_delta) % 8;
     qtr_track_index += qtr_track_delta;
@@ -434,10 +438,10 @@ void clem_disk_read_and_position_head_525(
         ) {
             /* force lookup of the real track if the arm has changed */
             drive->real_track_index = 0xfe;
-            drive->zero_count = 0;
         }
 
         drive->qtr_track_index = qtr_track_index;
+        track_phase_change = true;
     }
     drive->q03_switch = in_phase;
     if (drive->data) {
@@ -469,20 +473,19 @@ void clem_disk_read_and_position_head_525(
     drive->track_bit_shift = 7 - (track_cur_pos % 8);
     drive->pulse_ns = clem_util_timer_increment(drive->pulse_ns, 1000000, dt_ns);
     if (drive->pulse_ns >= drive->data->bit_timing_ns) {
+        bool valid_disk_data = drive->real_track_index != 0xff &&
+            drive->data->track_initialized[drive->real_track_index];
         *io_flags |= CLEM_IWM_FLAG_PULSE_HIGH;
         /* read a pulse from the bitstream, following WOZ emulation suggestions
             to emulate errors - this is effectively a copypasta from
             https://applesaucefdc.com/woz/reference2/ */
         drive->read_buffer <<= 1;
-        if (drive->real_track_index != 0xff &&
-            drive->data->track_initialized[drive->real_track_index]
-        ) {
+        if (valid_disk_data) {
             if (_clem_disk_read_bit_525(drive)) {
                 drive->read_buffer |= 0x1;
-                drive->zero_count = 0;
             }
         }
-        if ((drive->read_buffer & 0xf) && drive->real_track_index != 0xff) {
+        if ((drive->read_buffer & 0xf) && valid_disk_data) {
             if (drive->read_buffer & 0x2) {
                 *io_flags |= CLEM_IWM_FLAG_READ_DATA;
             }
