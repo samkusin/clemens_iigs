@@ -324,14 +324,19 @@ static void _clem_iwm_lss(
     int drive_index = (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 1 : 0;
     struct ClemensDrive* drive;
 
-    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-        drive = &drives->slot5[drive_index];
-        clem_disk_read_and_position_head_35(
-            drive, &iwm->io_flags, iwm->out_phase, 250);
+    if (!iwm->enbl2) {
+        if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+            drive = &drives->slot5[drive_index];
+            clem_disk_read_and_position_head_35(
+                drive, &iwm->io_flags, iwm->out_phase, 250);
+        } else {
+            drive = &drives->slot6[drive_index];
+            clem_disk_read_and_position_head_525(
+                drive, &iwm->io_flags, iwm->out_phase, 500);
+        }
     } else {
-        drive = &drives->slot6[drive_index];
-        clem_disk_read_and_position_head_525(
-            drive, &iwm->io_flags, iwm->out_phase, 500);
+        /* TODO: enbl2 drives? */
+        drive = NULL;
     }
 
     adr = (unsigned)(iwm->lss_state) << 4 |
@@ -391,7 +396,9 @@ static void _clem_iwm_lss(
         /* write mode */
         if (!(iwm->io_flags & CLEM_IWM_FLAG_WRITE_REQUEST)) {
             iwm->io_flags |= CLEM_IWM_FLAG_WRITE_REQUEST;
-            drive->write_pulse = false;
+            if (drive) {
+                drive->write_pulse = false;
+            }
         }
         if (iwm->lss_state & 0x8) {
             iwm->io_flags |= CLEM_IWM_FLAG_WRITE_DATA;
@@ -421,17 +428,22 @@ static void _clem_iwm_lss(
         iwm->data = iwm->latch;
     }
 
-    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-        clem_disk_update_head_35(drive, &iwm->io_flags, 250);
+    if (!iwm->enbl2) {
+        if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+            clem_disk_update_head_35(drive, &iwm->io_flags, 250);
+        } else {
+            clem_disk_update_head_525(drive, &iwm->io_flags, 500);
+        }
     } else {
-        clem_disk_update_head_525(drive, &iwm->io_flags, 500);
+        /* TODO: enbl2 drives? */
     }
+
 
 #ifdef CLEM_IWM_DEBUG_DIAGNOSTIC
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
         _iwm_debug_event(iwm, 'l', cmd, 0, 0, 0);
     }
-    if (drive->real_track_index != 0xff) {
+    if (drive && drive->real_track_index != 0xff) {
         _iwm_debug_event(iwm,
             (iwm->io_flags & CLEM_IWM_FLAG_PULSE_HIGH) ? 'D' : 'd',
             drive->track_bit_shift,
