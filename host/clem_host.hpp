@@ -8,7 +8,7 @@
 
 #include "cinek/fixedstack.hpp"
 
-#include "clem_program_trace.hpp"
+#include "clem_host_utils.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -29,6 +29,7 @@ struct ClemensHostInputEvent
 class ClemensAudioDevice;
 class ClemensDisplay;
 class ClemensDisplayProvider;
+class ClemensProgramTrace;
 
 
 class ClemensHost
@@ -77,6 +78,7 @@ private:
 
   bool isRunningEmulation() const;
   bool isRunningEmulationStep() const;
+  bool isRunningEmulationUntilBreak() const;
   bool hitBreakpoint();
 
   static void emulatorOpcodePrint(struct ClemensInstruction* inst,
@@ -137,6 +139,8 @@ private:
 
   InputContext widgetInputContext_;
   DebugContext widgetDebugContext_;
+
+  std::unique_ptr<ClemensProgramTrace> programTrace_;
 
   std::vector<ClemensTraceExecutedInstruction> executedInstructions_;
   MemoryEditor memoryViewStatic_[2];
