@@ -464,18 +464,22 @@ static uint8_t _clem_mmio_read_bank_select(
     uint8_t flags
 ) {
     uint32_t memory_flags = mmio->mmap_register;
+    /* odd address access will enable ram writes first before their other ops
+       which handles applications that perform single reads on the odd
+       addressed softswitches after a prior write-enable double read switch.
+       this seems to jive with the documentation on these softswitches, which
+       assumes that the dual write is to perform */
     switch (ioreg) {
         case CLEM_MMIO_REG_LC2_RAM_WP:
             memory_flags |= (CLEM_MMIO_MMAP_RDLCRAM + CLEM_MMIO_MMAP_LCBANK2);
             memory_flags &= ~CLEM_MMIO_MMAP_WRLCRAM;
             break;
         case CLEM_MMIO_REG_LC2_ROM_WE:
-            if (mmio->flags_c08x & 0x1) {
-                memory_flags |= (CLEM_MMIO_MMAP_WRLCRAM + CLEM_MMIO_MMAP_LCBANK2);
+            if (memory_flags & CLEM_MMIO_MMAP_WRLCRAM) {
+                memory_flags |= CLEM_MMIO_MMAP_LCBANK2;
                 memory_flags &= ~CLEM_MMIO_MMAP_RDLCRAM;
-                mmio->flags_c08x &= ~0x1;
             } else {
-                mmio->flags_c08x |= 0x1;
+                memory_flags |= CLEM_MMIO_MMAP_WRLCRAM;
             }
             break;
         case CLEM_MMIO_REG_LC2_ROM_WP:
@@ -483,13 +487,11 @@ static uint8_t _clem_mmio_read_bank_select(
             memory_flags |= CLEM_MMIO_MMAP_LCBANK2;
             break;
         case CLEM_MMIO_REG_LC2_RAM_WE:
-            if (mmio->flags_c08x & 0x2) {
+            if (memory_flags & CLEM_MMIO_MMAP_WRLCRAM) {
                 memory_flags |= (CLEM_MMIO_MMAP_RDLCRAM +
-                                 CLEM_MMIO_MMAP_WRLCRAM +
                                  CLEM_MMIO_MMAP_LCBANK2);
-                mmio->flags_c08x &= ~0x2;
             } else {
-                mmio->flags_c08x |= 0x2;
+                memory_flags |= CLEM_MMIO_MMAP_WRLCRAM;
             }
             break;
         case CLEM_MMIO_REG_LC1_RAM_WP:
@@ -497,12 +499,10 @@ static uint8_t _clem_mmio_read_bank_select(
             memory_flags |= CLEM_MMIO_MMAP_RDLCRAM;
             break;
         case CLEM_MMIO_REG_LC1_ROM_WE:
-            if (mmio->flags_c08x & 0x4) {
+            if (memory_flags & CLEM_MMIO_MMAP_WRLCRAM) {
                 memory_flags &= ~(CLEM_MMIO_MMAP_RDLCRAM + CLEM_MMIO_MMAP_LCBANK2);
-                memory_flags |= CLEM_MMIO_MMAP_WRLCRAM;
-                mmio->flags_c08x &= ~0x4;
             } else {
-                mmio->flags_c08x |= 0x4;
+                memory_flags |= CLEM_MMIO_MMAP_WRLCRAM;
             }
             break;
         case CLEM_MMIO_REG_LC1_ROM_WP:
@@ -510,12 +510,11 @@ static uint8_t _clem_mmio_read_bank_select(
                               CLEM_MMIO_MMAP_RDLCRAM);
             break;
         case CLEM_MMIO_REG_LC1_RAM_WE:
-            if (mmio->flags_c08x & 0x8) {
-                memory_flags |= (CLEM_MMIO_MMAP_RDLCRAM + CLEM_MMIO_MMAP_WRLCRAM);
+            if (memory_flags & CLEM_MMIO_MMAP_WRLCRAM) {
+                memory_flags |= CLEM_MMIO_MMAP_RDLCRAM;
                 memory_flags &= ~CLEM_MMIO_MMAP_LCBANK2;
-                mmio->flags_c08x &= ~0x8;
             } else {
-                mmio->flags_c08x |= 0x8;
+                memory_flags |= CLEM_MMIO_MMAP_WRLCRAM;
             }
             break;
     }
@@ -768,7 +767,9 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_LC1_ROM_WE:
         case CLEM_MMIO_REG_LC1_ROM_WP:
         case CLEM_MMIO_REG_LC1_RAM_WE:
-            result = _clem_mmio_read_bank_select(mmio, ioreg, flags);
+            if (!(flags & CLEM_MMIO_READ_NO_OP)) {
+                result = _clem_mmio_read_bank_select(mmio, ioreg, flags);
+            }
             break;
         case CLEM_MMIO_REG_IWM_PHASE0_LO:
         case CLEM_MMIO_REG_IWM_PHASE0_HI:
@@ -1609,7 +1610,6 @@ void _clem_mmio_init(
     //  TODO: ROM 01 will not use bit 6 and expect it to be cleared
     mmio->speed_c036 = CLEM_MMIO_SPEED_FAST_ENABLED |
                        CLEM_MMIO_SPEED_POWERED_ON;
-    mmio->flags_c08x = 0;
     mmio->mega2_cycles = 0;
     mmio->card_expansion_rom_index = -1;
 

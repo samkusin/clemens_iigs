@@ -838,8 +838,8 @@ bool ClemensHost::hitBreakpoint() {
   for (auto it = breakpoints_.begin(); it != breakpoints_.end(); ++it) {
     uint16_t b_adr = (uint16_t)(it->addr & 0xffff);
     uint8_t b_bank = (uint8_t)(it->addr >> 16);
-    bool b_adr_hit = (machine_.cpu.pins.bank == b_bank &&
-                      machine_.cpu.pins.adr == b_adr);
+    bool b_adr_hit = (machine_.cpu.regs.PBR == b_bank &&
+                      machine_.cpu.regs.PC == b_adr);
     if (b_adr_hit) {
       switch (it->op) {
         case Breakpoint::Read:
