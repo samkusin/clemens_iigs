@@ -8,6 +8,8 @@
 
 #include "cinek/fixedstack.hpp"
 
+#include "clem_program_trace.hpp"
+
 #include <cstdint>
 #include <vector>
 #include <array>
@@ -123,13 +125,6 @@ private:
   struct ClemensCPUPins cpuPinsSaved_;
   bool cpu6502EmulationSaved_;
 
-  struct ExecutedInstruction {
-    uint32_t cycles_spent;
-    uint32_t pc;
-    char opcode[4];
-    char operand[24];
-  };
-
   enum class InputContext {
     None,
     TerminalKeyboardFocus
@@ -143,7 +138,7 @@ private:
   InputContext widgetInputContext_;
   DebugContext widgetDebugContext_;
 
-  std::vector<ExecutedInstruction> executedInstructions_;
+  std::vector<ClemensTraceExecutedInstruction> executedInstructions_;
   MemoryEditor memoryViewStatic_[2];
   uint8_t memoryViewBank_[2];
 

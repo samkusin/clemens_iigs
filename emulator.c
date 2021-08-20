@@ -3237,6 +3237,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
     }
 
     cpu->regs.PC = tmp_pc;
+
     if (clem->debug_flags) {
         opc_inst.pbr = opc_pbr;
         opc_inst.addr = opc_addr;

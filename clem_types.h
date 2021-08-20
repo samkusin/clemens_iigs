@@ -348,7 +348,6 @@ struct ClemensMMIO {
     uint32_t mmap_register;     // memory map flags- CLEM_MMIO_MMAP_
     uint8_t new_video_c029;     // see kClemensMMIONewVideo_xxx
     uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
-    uint8_t flags_c08x;         // used to detect double reads
 
     uint64_t mega2_cycles;      // number of mega2 pulses/ticks since startup
     uint32_t timer_60hz_us;     // used for executing logic per 1/60th second
