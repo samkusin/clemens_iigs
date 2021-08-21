@@ -7,23 +7,16 @@
 #include <array>
 #include <vector>
 
-#include "clem_types.h"
-
-struct ClemensTraceExecutedInstruction {
-  uint32_t cycles_spent;
-  uint32_t pc;
-  uint32_t size;
-  char opcode[4];
-  char operand[24];
-};
-
-
+#include "clem_host_utils.hpp"
 
 class ClemensProgramTrace
 {
 public:
+  ClemensProgramTrace();
+
   ClemensTraceExecutedInstruction& addExecutedInstruction(
     const ClemensInstruction& instruction,
+    const char* operand,
     const ClemensMachine& machineState);
 
   void reset();
@@ -31,16 +24,20 @@ public:
   void exportTrace(const char* filename);
 
 private:
-  uint64_t nextSeqNo_ = 0;
+  uint64_t nextSeq_ = 0;
 
   //  <Execution Order> | <Bank>::<PC> | Opcode Operand
   struct Action {
-    uint64_t seqno;
+    uint32_t prev;
+    uint32_t next;
+    uint64_t seq;
     ClemensTraceExecutedInstruction inst;
   };
 
-  using ActionBank = std::array<Action, 65536>;
-  std::vector<std::pair<unsigned, ActionBank>> actionBanks_;
+  uint32_t actionAnchor_;
+  uint32_t actionCurrent_;
+  std::vector<Action> actions_;
+  std::vector<uint32_t> freeActionIndices_;
 };
 
 #endif

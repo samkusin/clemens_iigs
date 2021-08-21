@@ -39,6 +39,7 @@ add_executable(clemens_iigs
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_display.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_app.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_program_trace.cpp"
     ${FMT_SOURCES}
     ${SOKOL_SOURCES}

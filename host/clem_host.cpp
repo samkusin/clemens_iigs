@@ -7,6 +7,8 @@
 #include "clem_host.hpp"
 #include "clem_audio.hpp"
 #include "clem_display.hpp"
+#include "clem_program_trace.hpp"
+
 #include "clem_debug.h"
 #include "clem_drive.h"
 #include "clem_mem.h"
@@ -38,6 +40,9 @@ namespace {
                                       kMinDebugStatusHeight +
                                       kMinDebugTerminalHeight;
   constexpr float kConsoleWidthScalar = 0.333f;
+
+  constexpr unsigned kEmulationRunForever = 0x00ffffff;
+  constexpr unsigned kEmulationRunTargetNone = 0xffffffff;
 
   struct FormatView {
     std::vector<char>& buffer_;
@@ -83,7 +88,7 @@ ClemensHost::ClemensHost() :
   machineCyclesSpentDuringSample_(0),
   sampleDuration_(0.0f),
   emulationSpeedSampled_(0.0f),
-  emulationRunTarget_(0xffffffff),
+  emulationRunTarget_(kEmulationRunTargetNone),
   emulatorHasKeyboardFocus_(false),
   cpuRegsSaved_ {},
   cpuPinsSaved_ {},
@@ -92,6 +97,8 @@ ClemensHost::ClemensHost() :
   widgetDebugContext_(DebugContext::IWM),
   display_(nullptr)
 {
+  ClemensTraceExecutedInstruction::initialize();
+
   void* slabMemory = malloc(kSlabMemorySize);
   slab_ = cinek::FixedStack(kSlabMemorySize, slabMemory);
   executedInstructions_.reserve(1024);
@@ -797,7 +804,7 @@ void ClemensHost::emulate(float deltaTime)
   clemens_rtc_set(&machine_, (unsigned)epoch_time_1904);
 
   machine_.cpu.cycles_spent = 0;
-  while (emulationStepCount_ > 0 || emulationRunTarget_ != 0xffffffff) {
+  while (emulationStepCount_ > 0 || isRunningEmulationUntilBreak()) {
     if (machine_.clocks_spent - kClocksSpentInitial >= kClocksPerFrameDesired) {
       // TODO: if we overflow, deduct from the budget for the next frame
       break;
@@ -1086,7 +1093,7 @@ bool ClemensHost::parseCommandRun(const char* line)
   }
   if (!start) {
     emulationStepCount_ = 0;
-    emulationRun(0x00ffffff);
+    emulationRun(kEmulationRunForever);
     return true;
   }
   return parseCommandToken(start,
@@ -1125,6 +1132,16 @@ bool ClemensHost::parseCommandLog(const char* line)
           kClemensDebugFlag_StdoutOpcode | kClemensDebugFlag_DebugLogOpcode);
         return true;
       }
+      if (!strncasecmp(name, "trace", sizeof(name))) {
+        if (programTrace_) {
+          FormatView fv(terminalOutput_);
+          fv.format("trace already active");
+          return false;
+        }
+        programTrace_ = std::make_unique<ClemensProgramTrace>();
+        clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
+        return true;
+      }
       return false;
     });
 }
@@ -1159,6 +1176,20 @@ bool ClemensHost::parseCommandUnlog(const char* line)
         machine_.debug_flags &= ~(
           kClemensDebugFlag_StdoutOpcode | kClemensDebugFlag_DebugLogOpcode);
         clem_debug_log_flush();
+        return true;
+      }
+      if (!strncasecmp(name, "trace", sizeof(name))) {
+        if (!programTrace_) {
+          FormatView fv(terminalOutput_);
+          fv.format("trace not active");
+          return false;
+        }
+        programTrace_->exportTrace("trace.out");
+        if (isRunningEmulationUntilBreak()) {
+          // don't log
+          clemens_opcode_callback(&machine_, NULL, NULL);
+        }
+        programTrace_ = nullptr;
         return true;
       }
       return false;
@@ -1275,6 +1306,7 @@ void ClemensHost::stepMachine(int stepCount)
   emulationSpeedSampled_ = 0.0f;
   machineCyclesSpentDuringSample_ = 0;
   sampleDuration_ = 0.0f;
+  clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
 }
 
 bool ClemensHost::emulationRun(unsigned target) {
@@ -1283,25 +1315,30 @@ bool ClemensHost::emulationRun(unsigned target) {
   if (emulationRunTarget_ > 0x00ffffff) {
     return false;
   }
-  clemens_opcode_callback(&machine_, NULL, NULL);
+  if (!programTrace_) {
+    clemens_opcode_callback(&machine_, NULL, NULL);
+  }
   return true;
 }
 
 void ClemensHost::emulationBreak()
 {
-  emulationRunTarget_ = 0xffffffff;
+  emulationRunTarget_ = kEmulationRunTargetNone;
   emulationStepCount_ = 0;
-  clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
 }
 
 bool ClemensHost::isRunningEmulation() const
 {
-  return (emulationStepCount_ > 0 || emulationRunTarget_ != 0xffffffff);
+  return (emulationStepCount_ > 0 || isRunningEmulationUntilBreak());
 }
 
 bool ClemensHost::isRunningEmulationStep() const
 {
   return isRunningEmulation() && emulationStepCount_ > 0;
+}
+
+bool ClemensHost::isRunningEmulationUntilBreak() const {
+  return emulationRunTarget_ != kEmulationRunTargetNone;
 }
 
 void ClemensHost::emulatorOpcodePrint(
@@ -1310,17 +1347,21 @@ void ClemensHost::emulatorOpcodePrint(
   void* this_ptr
 ) {
   auto* host = reinterpret_cast<ClemensHost*>(this_ptr);
-  constexpr size_t kInstructionEdgeSize = 64;
-  if (host->executedInstructions_.size() > 128 + kInstructionEdgeSize) {
-    auto it = host->executedInstructions_.begin();
-    host->executedInstructions_.erase(it, it + kInstructionEdgeSize);
+
+  if (!host->isRunningEmulationUntilBreak()) {
+    //  don't display run history while running continously
+    constexpr size_t kInstructionEdgeSize = 64;
+    if (host->executedInstructions_.size() > 128 + kInstructionEdgeSize) {
+      auto it = host->executedInstructions_.begin();
+      host->executedInstructions_.erase(it, it + kInstructionEdgeSize);
+    }
+    host->executedInstructions_.emplace_back();
+    auto& instruction = host->executedInstructions_.back();
+    instruction.fromInstruction(*inst, operand);
   }
-  host->executedInstructions_.emplace_back();
-  auto& instruction = host->executedInstructions_.back();
-  strncpy(instruction.opcode, inst->desc->name, sizeof(instruction.opcode));
-  instruction.pc = (uint32_t(inst->pbr) << 16) | inst->addr;
-  strncpy(instruction.operand, operand, sizeof(instruction.operand));
-  instruction.cycles_spent = inst->cycles_spent;
+  if (host->programTrace_) {
+    host->programTrace_->addExecutedInstruction(*inst, operand, host->machine_);
+  }
 }
 
 bool ClemensHost::parseWOZDisk(

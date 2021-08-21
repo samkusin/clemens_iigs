@@ -460,7 +460,8 @@ enum ClemensCPUAddrMode {
     kClemensCPUAddrMode_PCIndirect_X,
     kClemensCPUAddrMode_PCLong,
     kClemensCPUAddrMode_PCLongIndirect,
-    kClemensCPUAddrMode_Operand
+    kClemensCPUAddrMode_Operand,
+    kClemensCPUAddrMode_Count
 };
 
 struct ClemensOpcodeDesc {
