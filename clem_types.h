@@ -23,7 +23,7 @@ struct ClemensClock {
 #define CLEM_IO_WRITE               0x01
 
 
-struct ClemensMMIOPageInfo {
+struct ClemensMemoryPageInfo {
     uint8_t read;
     uint8_t write;
     uint8_t bank_read;
@@ -31,13 +31,13 @@ struct ClemensMMIOPageInfo {
     uint32_t flags;
 };
 
-struct ClemensMMIOShadowMap {
+struct ClemensMemoryShadowMap {
     uint8_t pages[256];
 };
 
-struct ClemensMMIOPageMap {
-  struct ClemensMMIOPageInfo pages[256];
-  struct ClemensMMIOShadowMap* shadow_map;
+struct ClemensMemoryPageMap {
+  struct ClemensMemoryPageInfo pages[256];
+  struct ClemensMemoryShadowMap* shadow_map;
 };
 
 /**
@@ -315,23 +315,22 @@ struct ClemensDeviceGame {
  *
  */
 struct ClemensMMIO {
-    /* Provides remapping of memory read/write access per bank.  For the IIgs,
-       this map covers shadowed memory as well as language card and main/aux
-       bank access.
+    /* pointer to the array of bank page map pointers initialized by the
+       parent machine
     */
-    struct ClemensMMIOPageMap* bank_page_map[256];
+    struct ClemensMemoryPageMap** bank_page_map;
     /* The different page mapping types */
-    struct ClemensMMIOPageMap fpi_direct_page_map;
-    struct ClemensMMIOPageMap fpi_main_page_map;
-    struct ClemensMMIOPageMap fpi_aux_page_map;
-    struct ClemensMMIOPageMap fpi_rom_page_map;
-    struct ClemensMMIOPageMap mega2_main_page_map;
-    struct ClemensMMIOPageMap mega2_aux_page_map;
-    struct ClemensMMIOPageMap empty_page_map;
+    struct ClemensMemoryPageMap fpi_direct_page_map;
+    struct ClemensMemoryPageMap fpi_main_page_map;
+    struct ClemensMemoryPageMap fpi_aux_page_map;
+    struct ClemensMemoryPageMap fpi_rom_page_map;
+    struct ClemensMemoryPageMap mega2_main_page_map;
+    struct ClemensMemoryPageMap mega2_aux_page_map;
+    struct ClemensMemoryPageMap empty_page_map;
 
     /* Shadow maps for bank 00, 01 */
-    struct ClemensMMIOShadowMap fpi_mega2_main_shadow_map;
-    struct ClemensMMIOShadowMap fpi_mega2_aux_shadow_map;
+    struct ClemensMemoryShadowMap fpi_mega2_main_shadow_map;
+    struct ClemensMemoryShadowMap fpi_mega2_aux_shadow_map;
 
     /* All devices */
     struct ClemensVGC vgc;
@@ -345,7 +344,8 @@ struct ClemensMMIO {
     struct ClemensDeviceGame dev_game;
 
     /* Registers that do not fall easily within a device struct */
-    uint32_t mmap_register;     // memory map flags- CLEM_MMIO_MMAP_
+    uint32_t mmap_register;     // memory map flags- CLEM_MEM_IO_MMAP_
+    uint32_t last_data_address; // used for c08x switches
     uint8_t new_video_c029;     // see kClemensMMIONewVideo_xxx
     uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
 
@@ -598,6 +598,15 @@ typedef struct {
     clem_clocks_time_t clocks_spent;
 
     uint8_t* fpi_bank_map[256];     // $00 - $ff
+
+    /* Provides remapping of memory read/write access per bank.  For the IIgs,
+       this map covers shadowed memory as well as language card and main/aux
+       bank access.
+    */
+    struct ClemensMemoryPageMap* bank_page_map[256];
+
+    /* THe above can be moved to a 'simple' struct */
+
     uint8_t* mega2_bank_map[2];     // $e0 - $e1
     /** ROM memory for individual card slots.  Only slots 1,2,4,5,6,7 are used
      *  and each slot should have 256 bytes allocated for it */
@@ -607,11 +616,6 @@ typedef struct {
      *  size.  As with card slot memory, slot 3 is ignored */
     uint8_t* card_slot_expansion_memory[7];
 
-    /** Internal, tracks cycle count for holding down the reset key */
-    int resb_counter;
-
-    struct ClemensMMIO mmio;
-    struct ClemensDriveBay active_drives;
 
     /* Optional callback for debugging purposes.
        When issued, it's guaranteed that all registers/CPU state has been
@@ -621,6 +625,14 @@ typedef struct {
     uint32_t debug_flags;           // See enum kClemensDebugFlag_
     void* debug_user_ptr;
     ClemensOpcodeCallback opcode_post;
+
+    /** Internal, tracks cycle count for holding down the reset key */
+    int resb_counter;
+    /** Internal, skips mmio if in 'simple' mode */
+    bool mmio_bypass;
+
+    struct ClemensMMIO mmio;
+    struct ClemensDriveBay active_drives;
 } ClemensMachine;
 
 #endif

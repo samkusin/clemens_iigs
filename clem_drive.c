@@ -429,10 +429,12 @@ void clem_disk_read_and_position_head_525(
     }
     else if (qtr_track_index >= 160) qtr_track_index = 160;
     if (qtr_track_index != drive->qtr_track_index) {
+        /*
         CLEM_LOG("IWM: Disk525[%u]: Motor: %u; Head @ (%d,%d)",
             (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
             (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
             qtr_track_index / 4, qtr_track_index % 4);
+        */
         if (drive->data->meta_track_map[drive->qtr_track_index] !=
             drive->data->meta_track_map[qtr_track_index]
         ) {

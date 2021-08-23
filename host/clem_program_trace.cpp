@@ -35,6 +35,8 @@ ClemensTraceExecutedInstruction& ClemensProgramTrace::addExecutedInstruction(
   //  ok.
   Action* current = &actions_[newCurrentActionIdx];
   current->inst.fromInstruction(instruction, operand);
+  memcpy(&current->regs, &machineState.cpu.regs, sizeof(ClemensCPURegs));
+  current->emulation = machineState.cpu.pins.emulation;
 
   Action* prev = &actions_[actionCurrent_];
   Action* next = &actions_[prev->next];
@@ -108,17 +110,74 @@ void ClemensProgramTrace::exportTrace(const char* filename)
   char line[256];
 
   FILE* fp = fopen(filename, "w");
-
-  while (actionIndex != actionAnchor_) {
-    const Action& action = actions_[actionIndex];
-
-    snprintf(line, sizeof(line),
-             "%-14" PRIu64 " | %02X:%04X (%02u) %4s %s\n",
-             action.seq, action.inst.cycles_spent,
-             action.inst.pc >> 16, action.inst.pc & 0xffff,
-             action.inst.opcode, action.inst.operand);
-
-    fputs(line, fp);
-    actionIndex = action.next;
+  if (fp) {
+    while (actionIndex != actionAnchor_) {
+      const Action& action = actions_[actionIndex];
+      char* out = &line[0];
+      size_t outLeft = sizeof(line);
+      int amt = snprintf(
+              out, outLeft,
+              "%16" PRIu64 " | %02X | %04X | (%2u) %4s %-10s | ",
+              action.seq,
+              action.inst.pc >> 16, action.inst.pc & 0xffff,
+              action.inst.cycles_spent,
+              action.inst.opcode, action.inst.operand);
+      outLeft -= amt;
+      out += amt;
+      amt = snprintf(
+              out, outLeft, "PC=%04X, PBR=%02X, DBR=%02X, S=%04X, D=%04X, e=%u, ",
+              action.regs.PC, action.regs.PBR, action.regs.DBR,
+              action.regs.S, action.regs.D, action.emulation ? 1 : 0);
+      out += amt;
+      outLeft -= amt;
+      if (action.emulation) {
+        amt = snprintf(
+                out, outLeft, "A=%02X, X=%02X, Y=%02X, %c%c*%c%c%c%c%c",
+                action.regs.A & 0xff, action.regs.X & 0xff, action.regs.Y & 0xff,
+                (action.regs.P & kClemensCPUStatus_Negative) ? '1' : '0',
+                (action.regs.P & kClemensCPUStatus_Overflow) ? '1' : '0',
+                (action.regs.P & kClemensCPUStatus_EmulatedBrk) ? '1' : '0',
+                (action.regs.P  & kClemensCPUStatus_Decimal) ? '1' : '0',
+                (action.regs.P  & kClemensCPUStatus_IRQDisable) ? '1' : '0',
+                (action.regs.P  & kClemensCPUStatus_Zero) ? '1' : '0',
+                (action.regs.P  & kClemensCPUStatus_Carry) ? '1' : '0');
+      } else {
+          if (action.regs.P & kClemensCPUStatus_MemoryAccumulator) {
+            amt = snprintf(
+                out, outLeft, "A=%02X, ", action.regs.A & 0xff);
+          } else {
+            amt = snprintf(
+                out, outLeft, "A=%04X, ", action.regs.A);
+          }
+          out += amt;
+          outLeft -= amt;
+          if (action.regs.P & kClemensCPUStatus_Index) {
+            amt = snprintf(
+                out, outLeft, "X=%02X, Y=%02X, ", action.regs.X & 0xff, action.regs.Y & 0xff);
+          } else {
+            amt = snprintf(
+                out, outLeft, "X=%04X, Y=%04X, ", action.regs.X, action.regs.Y);
+          }
+          out += amt;
+          outLeft -= amt;
+          amt = snprintf(
+                out, outLeft, "%c%c%c%c%c%c%c%c",
+                (action.regs.P & kClemensCPUStatus_Negative) ? '1' : '0',
+                (action.regs.P & kClemensCPUStatus_Overflow) ? '1' : '0',
+                (action.regs.P & kClemensCPUStatus_MemoryAccumulator) ? '1' : '0',
+                (action.regs.P & kClemensCPUStatus_Index) ? '1' : '0',
+                (action.regs.P  & kClemensCPUStatus_Decimal) ? '1' : '0',
+                (action.regs.P  & kClemensCPUStatus_IRQDisable) ? '1' : '0',
+                (action.regs.P  & kClemensCPUStatus_Zero) ? '1' : '0',
+                (action.regs.P  & kClemensCPUStatus_Carry) ? '1' : '0');
+      }
+      out += amt;
+      outLeft -= amt;
+      out[0] = '\n';
+      out[1] = '\0';
+      fputs(line, fp);
+      actionIndex = action.next;
+    }
+    fclose(fp);
   }
 }

@@ -226,7 +226,7 @@ uint8_t clem_sound_read_switch(
             result |= glu->volume;
             break;
         case CLEM_MMIO_REG_AUDIO_DATA:
-            if (!CLEM_IS_MMIO_READ_NO_OP(flags)) {
+            if (!CLEM_IS_IO_READ_NO_OP(flags)) {
                 /* refer to HW Ref Chapter 5 - p 107, Read operation,
                    first time read operations upon changing the address
                    require double reads - likely for some kind of switch
@@ -261,7 +261,7 @@ uint8_t clem_sound_read_switch(
             result = (uint8_t)((glu->address >> 8) & 0x00ff);
             break;
         case CLEM_MMIO_REG_SPKR:
-            if (!CLEM_IS_MMIO_READ_NO_OP(flags)) {
+            if (!CLEM_IS_IO_READ_NO_OP(flags)) {
                 glu->a2_speaker = !glu->a2_speaker;
             }
             result = 0x00;

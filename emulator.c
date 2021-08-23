@@ -783,21 +783,18 @@ void _clem_init_instruction_map() {
 }
 
 bool clemens_is_initialized_simple(const ClemensMachine* machine) {
-    return (machine->fpi_bank_map[0xff] != NULL);
+    return (machine->fpi_bank_map[0] != NULL);
 }
 
 bool clemens_is_mmio_initialized(const ClemensMachine* machine) {
-    return machine->mmio.bank_page_map[0] && machine->mmio.bank_page_map[1];
+    return clemens_is_initialized_simple(machine) && !machine->mmio_bypass;
 }
 
 bool clemens_is_initialized(const ClemensMachine* machine) {
     if (!clemens_is_initialized_simple(machine)) {
         return false;
     }
-    if (!machine->fpi_bank_map[0] || !machine->fpi_bank_map[1]) {
-        return false;
-    }
-    if (!machine->mega2_bank_map[0] || !machine->mega2_bank_map[1]) {
+    if (!machine->fpi_bank_map[1]) {
         return false;
     }
     if (!machine->clocks_step ||
@@ -821,6 +818,15 @@ void clemens_opcode_callback(
     clem->debug_user_ptr = callback_ptr;
 }
 
+void clemens_create_page_mapping(
+    struct ClemensMemoryPageInfo* page,
+    uint8_t page_idx,
+    uint8_t bank_read_idx,
+    uint8_t bank_write_idx
+) {
+    clem_mem_create_page_mapping(page, page_idx, bank_read_idx, bank_write_idx);
+}
+
 int clemens_init(
     ClemensMachine* machine,
     uint32_t speed_factor,
@@ -834,11 +840,11 @@ int clemens_init(
     void* slotExpansionROM,
     unsigned int fpiRAMBankCount
 ) {
-    machine->cpu.pins.resbIn = true;
-    machine->clocks_step = clocks_step;
-    machine->clocks_step_fast = clocks_step;
-    machine->clocks_step_mega2 = speed_factor;
-    machine->clocks_spent = 0;
+    clemens_simple_init(machine,
+                        speed_factor,
+                        clocks_step,
+                        fpiRAM,
+                        fpiRAMBankCount);
 
     if (romSize != CLEM_IIGS_ROM3_SIZE || rom == NULL) {
         return -1;
@@ -850,22 +856,11 @@ int clemens_init(
     }
     /* memory organization for the FPI */
     /* TODO: Support ROM 01 */
-    memset(s_empty_ram, 0, CLEM_IIGS_BANK_SIZE);
-    for (unsigned i = 0xf0; i < 0xfc; ++i) {
-        machine->fpi_bank_map[i] = s_empty_ram;
-    }
     machine->fpi_bank_map[0xfc] = (uint8_t*)rom;
     machine->fpi_bank_map[0xfd] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE;
     machine->fpi_bank_map[0xfe] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE * 2;
     machine->fpi_bank_map[0xff] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE * 3;
 
-    /* TODO: clear memory according to spec 0x00, 0xff, etc (look it up) */
-    if (fpiRAMBankCount > 128) fpiRAMBankCount = 128;
-
-    for (unsigned i  = 0; i < fpiRAMBankCount; ++i) {
-        machine->fpi_bank_map[i] = ((uint8_t*)fpiRAM) + (i * CLEM_IIGS_BANK_SIZE);
-        memset(machine->fpi_bank_map[i], 0, CLEM_IIGS_BANK_SIZE);
-    }
     /* TODO: remap non used banks to used banks per the wrapping mechanism on
        the IIgs
     */
@@ -880,14 +875,47 @@ int clemens_init(
         machine->card_slot_expansion_memory[i] = ((uint8_t*)slotExpansionROM) + (i * 256);
     }
 
+    machine->mmio_bypass = false;
+    _clem_mmio_init(&machine->mmio, machine->bank_page_map, machine->clocks_step_mega2);
+
+    return 0;
+}
+
+void clemens_simple_init(
+    ClemensMachine* machine,
+    uint32_t speed_factor,
+    uint32_t clocks_step,
+    void* fpiRAM,
+    unsigned int fpiRAMBankCount
+) {
+    machine->cpu.pins.resbIn = true;
+    machine->clocks_step = clocks_step;
+    machine->clocks_step_fast = clocks_step;
+    machine->clocks_step_mega2 = speed_factor;
+    machine->clocks_spent = 0;
+    machine->mmio_bypass = true;
+
+    if (fpiRAMBankCount > 256) fpiRAMBankCount = 256;
+    for (unsigned i  = 0; i < fpiRAMBankCount; ++i) {
+        machine->fpi_bank_map[i] = ((uint8_t*)fpiRAM) + (i * CLEM_IIGS_BANK_SIZE);
+        memset(machine->fpi_bank_map[i], 0, CLEM_IIGS_BANK_SIZE);
+    }
+    /* all non mapped FPI banks will map to empty memory until overridden by
+       application or the full IIgs emulator initializtion function
+       (clemens_init)
+    */
+    memset(s_empty_ram, 0, CLEM_IIGS_BANK_SIZE);
+    for (unsigned i = fpiRAMBankCount; i < 0xff; ++i) {
+        machine->fpi_bank_map[i] = s_empty_ram;
+    }
+
+    memset(&machine->bank_page_map, 0, sizeof(machine->bank_page_map));
+
+    /* internal tables used to define opcode attributes */
     for (unsigned i = 0; i < 256; ++i) {
         _opcode_description((uint8_t)i, "...", kClemensCPUAddrMode_None);
     }
-
     _clem_init_instruction_map();
-    _clem_mmio_init(&machine->mmio, machine->clocks_step_mega2);
-
-    return 0;
 }
 
 static inline struct ClemensDrive* _clem_drive_get(
@@ -981,8 +1009,8 @@ ClemensVideo* clemens_get_text_video(
     }
     video->format = kClemensVideoFormat_Text;
     video->scanline_byte_cnt = 40;
-    if ((clem->mmio.mmap_register & CLEM_MMIO_MMAP_TXTPAGE2) &&
-        !(clem->mmio.mmap_register & CLEM_MMIO_MMAP_80COLSTORE)
+    if ((clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
+        !(clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE)
     ) {
         video->scanlines = vgc->text_2_scanlines;
     } else {
@@ -996,8 +1024,8 @@ ClemensVideo* clemens_get_graphics_video(
     ClemensMachine* clem
 ) {
     struct ClemensVGC* vgc = &clem->mmio.vgc;
-    bool use_page_2 = (clem->mmio.mmap_register & CLEM_MMIO_MMAP_TXTPAGE2) &&
-                      !(clem->mmio.mmap_register & CLEM_MMIO_MMAP_80COLSTORE);
+    bool use_page_2 = (clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
+                      !(clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE);
     if (vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE) {
         video->scanline_start = 0;
         if (vgc->mode_flags & CLEM_VGC_HIRES) {
@@ -3279,9 +3307,10 @@ void clemens_emulate(ClemensMachine* clem) {
             cpu->pins.emulation = true;
             cpu->pins.readyOut = true;
             cpu->enabled = true;
-
-            clem_disk_reset_drives(&clem->active_drives);
-            _clem_mmio_reset(mmio, clem->clocks_step_mega2);
+            if (!clem->mmio_bypass) {
+                clem_disk_reset_drives(&clem->active_drives);
+                _clem_mmio_reset(mmio, clem->clocks_step_mega2);
+            }
             _clem_cycle(clem, 1);
         }
         _clem_cycle(clem, 1);
@@ -3349,53 +3378,56 @@ void clemens_emulate(ClemensMachine* clem) {
     }
     cpu_execute(cpu, clem);
 
-    clem_iwm_speed_disk_gate(clem);
+    if (!clem->mmio_bypass) {
+        clem_iwm_speed_disk_gate(clem);
 
-    //  1 mega2 cycle = 1023 nanoseconds
-    //  1 fast cycle = 1023 / (2864/1023) nanoseconds
+        //  1 mega2 cycle = 1023 nanoseconds
+        //  1 fast cycle = 1023 / (2864/1023) nanoseconds
 
-    //  1 fast cycle = 1 mega2 cycle (ns) / (clocks_step_mega2 / clocks_step) =
-    //      (1 mega2 cycle (ns) * clocks_step) / clocks_step_mega2
+        //  1 fast cycle = 1 mega2 cycle (ns) / (clocks_step_mega2 / clocks_step) =
+        //      (1 mega2 cycle (ns) * clocks_step) / clocks_step_mega2
 
-    // TODO: calculate delta_ns per emulate call to call 'real-time' systems
-    //      like VGC
-    delta_mega2_cycles = (uint32_t)(
-        (clem->clocks_spent / clem->clocks_step_mega2) - mmio->mega2_cycles);
-    mmio->mega2_cycles += delta_mega2_cycles;
-    mmio->timer_60hz_us += delta_mega2_cycles;
+        // TODO: calculate delta_ns per emulate call to call 'real-time' systems
+        //      like VGC
+        delta_mega2_cycles = (uint32_t)(
+            (clem->clocks_spent / clem->clocks_step_mega2) - mmio->mega2_cycles);
+        mmio->mega2_cycles += delta_mega2_cycles;
+        mmio->timer_60hz_us += delta_mega2_cycles;
 
-    clock.ts = clem->clocks_spent;
-    clock.ref_step = clem->clocks_step_mega2;
+        clock.ts = clem->clocks_spent;
+        clock.ref_step = clem->clocks_step_mega2;
 
-    clem_vgc_sync(&mmio->vgc, &clock);
-    clem_iwm_glu_sync(&mmio->dev_iwm, &clem->active_drives, &clock);
-    clem_scc_glu_sync(&mmio->dev_scc, &clock);
-    clem_sound_glu_sync(&mmio->dev_audio, &clock);
+        clem_vgc_sync(&mmio->vgc, &clock);
+        clem_iwm_glu_sync(&mmio->dev_iwm, &clem->active_drives, &clock);
+        clem_scc_glu_sync(&mmio->dev_scc, &clock);
+        clem_sound_glu_sync(&mmio->dev_audio, &clock);
 
-    /* background execution of some async devices on the 60 hz timer */
-    while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {
-        clem_timer_sync(&mmio->dev_timer, CLEM_MEGA2_CYCLES_PER_60TH);
-        clem_adb_glu_sync(&mmio->dev_adb, CLEM_MEGA2_CYCLES_PER_60TH);
-        if (clem->resb_counter <= 0 && mmio->dev_adb.keyb.reset_key) {
-            /* TODO: move into its own utility */
-            clem->resb_counter = 2;
-            clem->cpu.pins.resbIn = false;
+        /* background execution of some async devices on the 60 hz timer */
+        while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {
+            clem_timer_sync(&mmio->dev_timer, CLEM_MEGA2_CYCLES_PER_60TH);
+            clem_adb_glu_sync(&mmio->dev_adb, CLEM_MEGA2_CYCLES_PER_60TH);
+            if (clem->resb_counter <= 0 && mmio->dev_adb.keyb.reset_key) {
+                /* TODO: move into its own utility */
+                clem->resb_counter = 2;
+                clem->cpu.pins.resbIn = false;
+            }
+            mmio->timer_60hz_us -= CLEM_MEGA2_CYCLES_PER_60TH;
         }
-        mmio->timer_60hz_us -= CLEM_MEGA2_CYCLES_PER_60TH;
+
+        mmio->irq_line = (
+            mmio->dev_adb.irq_line |
+            mmio->dev_timer.irq_line |
+            mmio->dev_audio.irq_line |
+            mmio->vgc.irq_line);
+        clem_iwm_speed_disk_gate(clem);
+
+        cpu->pins.irqbIn = mmio->irq_line == 0;
     }
 
-    mmio->irq_line = (
-        mmio->dev_adb.irq_line |
-        mmio->dev_timer.irq_line |
-        mmio->dev_audio.irq_line |
-        mmio->vgc.irq_line);
-
     /* IRQB low triggers an interrupt next frame */
-    cpu->pins.irqbIn = mmio->irq_line == 0;
     if (!cpu->pins.irqbIn && cpu->state_type == kClemensCPUStateType_Execute) {
         if (!(cpu->regs.P & kClemensCPUStatus_IRQDisable)) {
             cpu->state_type = kClemensCPUStateType_IRQ;
         }
     }
-    clem_iwm_speed_disk_gate(clem);
 }

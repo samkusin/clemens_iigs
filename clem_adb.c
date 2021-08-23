@@ -1119,7 +1119,7 @@ static uint8_t _clem_adb_read_cmd(struct ClemensDeviceADB* adb, uint8_t flags) {
     switch (adb->state) {
         case CLEM_ADB_STATE_READY:
             /* TODO: cmd_flags returned? */
-            if (!CLEM_IS_MMIO_READ_NO_OP(flags)) {
+            if (!CLEM_IS_IO_READ_NO_OP(flags)) {
                 adb->cmd_status &= ~CLEM_ADB_C027_CMD_FULL;
             }
             break;
@@ -1128,7 +1128,7 @@ static uint8_t _clem_adb_read_cmd(struct ClemensDeviceADB* adb, uint8_t flags) {
             break;
         case CLEM_ADB_STATE_RESULT_DATA:
             result = adb->cmd_data[adb->cmd_data_recv];
-            if (!CLEM_IS_MMIO_READ_NO_OP(flags)) {
+            if (!CLEM_IS_IO_READ_NO_OP(flags)) {
                 if (adb->cmd_data_sent > adb->cmd_data_recv) {
                     ++adb->cmd_data_recv;
                 }
@@ -1182,7 +1182,7 @@ uint8_t clem_adb_read_switch(
     uint8_t ioreg,
     uint8_t flags
 ) {
-    bool is_noop = (flags & CLEM_MMIO_READ_NO_OP) != 0;
+    bool is_noop = (flags & CLEM_MEM_IO_READ_NO_OP) != 0;
     uint8_t tmp;
     if (ioreg > CLEM_MMIO_REG_KEYB_READ && ioreg <  CLEM_MMIO_REG_ANYKEY_STROBE) {
         ioreg = CLEM_MMIO_REG_KEYB_READ;
@@ -1252,7 +1252,7 @@ uint8_t clem_adb_read_switch(
             adb->gameport.ann_mask |= 0x8;
             break;
         default:
-            if (!CLEM_IS_MMIO_READ_NO_OP(flags)) {
+            if (!CLEM_IS_IO_READ_NO_OP(flags)) {
                 CLEM_WARN("ADB: Unimplemented read %02X", ioreg);
             }
             break;

@@ -1,82 +1,82 @@
 //  support read or write operations
-#define CLEM_MMIO_PAGE_WRITE_OK     0x00000001
+#define CLEM_MEM_PAGE_WRITEOK_FLAG      0x00000001
+//  use the original bank register
+#define CLEM_MEM_PAGE_DIRECT_FLAG       0x10000000
 //  use a mask of the requested bank and the 17th address bit of the read/write
 //  bank
-#define CLEM_MMIO_PAGE_MAINAUX      0x10000000
-//  use the original bank register
-#define CLEM_MMIO_PAGE_DIRECT       0x20000000
+#define CLEM_MEM_PAGE_MAINAUX_FLAG      0x20000000
 //  use card memory vs internal
-#define CLEM_MMIO_PAGE_CARDMEM      0x40000000
+#define CLEM_MEM_PAGE_CARDMEM_FLAG      0x40000000
 //  redirects to Mega2 I/O registers
-#define CLEM_MMIO_PAGE_IOADDR       0x80000000
+#define CLEM_MEM_PAGE_IOADDR_FLAG       0x80000000
 
 //  convenience flags to identify source of memory
-#define CLEM_MMIO_BANK_MEMORY       0x30000000
-#define CLEM_MMIO_IO_MEMORY         0xC0000000
-#define CLEM_MMIO_PAGE_TYPE_MASK    0xF0000000
+#define CLEM_MEM_PAGE_BANK_MASK         0x30000000
+#define CLEM_MEM_IO_MEMORY_MASK         0xC0000000
+#define CLEM_MEM_PAGE_TYPE_MASK         0xF0000000
 
 //  These flags refer to bank 0 memory switches for address bit 17
 //  0 = Main Bank, 1 = Aux Bank ZP, Stack and Language Card
-#define CLEM_MMIO_MMAP_ALTZPLC      0x00000001
+#define CLEM_MEM_IO_MMAP_ALTZPLC      0x00000001
 
 // consolidated mask for all Apple //e video areas influenced by 80COLSTORE
-#define CLEM_MMIO_MMAP_OLDVIDEO     0x000000fe
+#define CLEM_MEM_IO_MMAP_OLDVIDEO     0x000000fe
 //  0 = Main Bank RAM Read Enabled, 1 = Aux Bank RAM Read Enabled
-#define CLEM_MMIO_MMAP_RAMRD        0x00000002
+#define CLEM_MEM_IO_MMAP_RAMRD        0x00000002
 //  0 = Main Bank RAM Write Enabled, 1 = Aux Bank RAM Write Enabled
-#define CLEM_MMIO_MMAP_RAMWRT       0x00000004
+#define CLEM_MEM_IO_MMAP_RAMWRT       0x00000004
 //  0 = Disabled 80 column storage (treats TXTPAGE2 as page 2 memory reliant on
 //      RAMRD/RAMWRT)
 //  1 = Enabled 80 column storage (treats TXTPAGE2 as page 1 aux memory)
 //  80 column store flags should take precendence in this case
-#define CLEM_MMIO_MMAP_80COLSTORE   0x00000008
+#define CLEM_MEM_IO_MMAP_80COLSTORE   0x00000008
 //  Depends on 80COLSTORE.  Select Page 1/2 memory or main/aux page1 display
 //  This switch must take precedence over RAMRD/RAMWRT for the selected regions
 //  if 80COLSTORE is switched on
-#define CLEM_MMIO_MMAP_TXTPAGE2     0x00000010
+#define CLEM_MEM_IO_MMAP_TXTPAGE2     0x00000010
 //  p89 of the //e reference indicates that to enable the 80COLSTORE/TXTPAGE2
 //  switch for the HIRES region, you need to have HIRES mode active (text modes
 //  always account for the 80COLSTORE, whether the current graphics mode is
 //  full screen without text or not.)
-#define CLEM_MMIO_MMAP_HIRES        0x00000020
+#define CLEM_MEM_IO_MMAP_HIRES        0x00000020
 
 //  Bits 4-7 These flags refer to the language card banks
-#define CLEM_MMIO_MMAP_LC           0x00000f00
+#define CLEM_MEM_IO_MMAP_LC           0x00000f00
 //  0 = Read LC ROM, 1 = Read LC RAM
-#define CLEM_MMIO_MMAP_RDLCRAM      0x00000100
+#define CLEM_MEM_IO_MMAP_RDLCRAM      0x00000100
 //  0 = Write protect LC RAM, 1 = Write enable LC RAM
-#define CLEM_MMIO_MMAP_WRLCRAM      0x00000200
+#define CLEM_MEM_IO_MMAP_WRLCRAM      0x00000200
 //  0 = LC Bank 1, 1 = LC Bank 2
-#define CLEM_MMIO_MMAP_LCBANK2      0x00000400
+#define CLEM_MEM_IO_MMAP_LCBANK2      0x00000400
 //  0 = Internal ROM, 1 = Peripheral ROM
-#define CLEM_MMIO_MMAP_CROM         0x000ff000
-#define CLEM_MMIO_MMAP_C1ROM        0x00001000
-#define CLEM_MMIO_MMAP_C2ROM        0x00002000
-#define CLEM_MMIO_MMAP_C3ROM        0x00004000
-#define CLEM_MMIO_MMAP_C4ROM        0x00008000
-#define CLEM_MMIO_MMAP_C5ROM        0x00010000
-#define CLEM_MMIO_MMAP_C6ROM        0x00020000
-#define CLEM_MMIO_MMAP_C7ROM        0x00040000
-#define CLEM_MMIO_MMAP_CXROM        0x00080000
+#define CLEM_MEM_IO_MMAP_CROM         0x000ff000
+#define CLEM_MEM_IO_MMAP_C1ROM        0x00001000
+#define CLEM_MEM_IO_MMAP_C2ROM        0x00002000
+#define CLEM_MEM_IO_MMAP_C3ROM        0x00004000
+#define CLEM_MEM_IO_MMAP_C4ROM        0x00008000
+#define CLEM_MEM_IO_MMAP_C5ROM        0x00010000
+#define CLEM_MEM_IO_MMAP_C6ROM        0x00020000
+#define CLEM_MEM_IO_MMAP_C7ROM        0x00040000
+#define CLEM_MEM_IO_MMAP_CXROM        0x00080000
 
 // Bits 16-23 These flags refer to shadow register controls
-#define CLEM_MMIO_MMAP_NSHADOW      0x0ff00000
-#define CLEM_MMIO_MMAP_NSHADOW_TXT1 0x00100000
-#define CLEM_MMIO_MMAP_NSHADOW_TXT2 0x00200000
-#define CLEM_MMIO_MMAP_NSHADOW_HGR1 0x00400000
-#define CLEM_MMIO_MMAP_NSHADOW_HGR2 0x00800000
-#define CLEM_MMIO_MMAP_NSHADOW_SHGR 0x01000000
-#define CLEM_MMIO_MMAP_NSHADOW_AUX  0x02000000
+#define CLEM_MEM_IO_MMAP_NSHADOW      0x0ff00000
+#define CLEM_MEM_IO_MMAP_NSHADOW_TXT1 0x00100000
+#define CLEM_MEM_IO_MMAP_NSHADOW_TXT2 0x00200000
+#define CLEM_MEM_IO_MMAP_NSHADOW_HGR1 0x00400000
+#define CLEM_MEM_IO_MMAP_NSHADOW_HGR2 0x00800000
+#define CLEM_MEM_IO_MMAP_NSHADOW_SHGR 0x01000000
+#define CLEM_MEM_IO_MMAP_NSHADOW_AUX  0x02000000
 //  0 = Bank 00: I/O enabled + LC enabled,  1 = I/O disabled + LC disabled
-#define CLEM_MMIO_MMAP_NIOLC        0x04000000
+#define CLEM_MEM_IO_MMAP_NIOLC        0x04000000
 
 //  Bits 24-31 deal with memory mapped features not covered above
 
 
 /** Flags for _clem_mmio_read */
-#define CLEM_MMIO_READ_NO_OP        0x01
+#define CLEM_MEM_IO_READ_NO_OP        0x01
 
-#define CLEM_IS_MMIO_READ_NO_OP(_flags_) (((_flags_) & CLEM_MMIO_READ_NO_OP) != 0)
+#define CLEM_IS_IO_READ_NO_OP(_flags_) (((_flags_) & CLEM_MEM_IO_READ_NO_OP) != 0)
 
 /**
  * IO Registers
