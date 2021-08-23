@@ -770,7 +770,7 @@ uint8_t clem_iwm_read_switch(
     uint8_t flags
 ) {
     uint8_t result = 0x00;
-    bool is_noop = (flags & CLEM_MMIO_READ_NO_OP) != 0;
+    bool is_noop = (flags & CLEM_MEM_IO_READ_NO_OP) != 0;
 
     switch (ioreg) {
         case CLEM_MMIO_REG_DISK_INTERFACE:

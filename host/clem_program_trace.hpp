@@ -32,6 +32,8 @@ private:
     uint32_t next;
     uint64_t seq;
     ClemensTraceExecutedInstruction inst;
+    ClemensCPURegs regs;
+    bool emulation;
   };
 
   uint32_t actionAnchor_;

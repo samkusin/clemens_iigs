@@ -68,7 +68,12 @@ private:
   bool parseCommandUnlog(const char* line);
   bool parseCommandDebugContext(const char* line);
 
-  void createMachine();
+  enum class MachineType {
+    Apple2GS,
+    Simple128K
+  };
+
+  void createMachine(const char* filename, MachineType machineType);
   void destroyMachine();
   void resetMachine();
   void stepMachine(int stepCount);
@@ -91,6 +96,8 @@ private:
 private:
   ClemensMachine machine_;
   cinek::FixedStack slab_;
+
+  ClemensMemoryPageMap simpleDirectPageMap_;
 
   std::array<struct ClemensWOZDisk, 2> disks35_;
   std::array<struct ClemensWOZDisk, 2> disks525_;

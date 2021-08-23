@@ -57,8 +57,8 @@ namespace {
 
   char clemens_is_mmio_card_rom(const ClemensMMIO& mmio, unsigned slot) {
     assert(slot > 0);
-    if ((mmio.mmap_register & CLEM_MMIO_MMAP_CXROM) ||
-        (mmio.mmap_register & (CLEM_MMIO_MMAP_C1ROM << (slot - 1)))
+    if ((mmio.mmap_register & CLEM_MEM_IO_MMAP_CXROM) ||
+        (mmio.mmap_register & (CLEM_MEM_IO_MMAP_C1ROM << (slot - 1)))
     ) {
       return 'C';
     } else {
@@ -195,7 +195,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   constexpr int kClemensScreenHeight = 480;
   float screenUVs[2];
 
-  if (clemens_is_initialized(&machine_)) {
+  if (clemens_is_mmio_initialized(&machine_)) {
     ClemensVideo video;
     clemens_get_monitor(&monitor, &machine_);
 
@@ -474,7 +474,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   ImGui::Begin("Context", nullptr, ImGuiWindowFlags_NoResize |
                                    ImGuiWindowFlags_NoCollapse |
                                    ImGuiWindowFlags_NoBringToFrontOnFocus);
-  if (clemens_is_mmio_initialized(&machine_)) {
+  if (clemens_is_initialized_simple(&machine_)) {
     ImGui::BeginChild("context_memory", ImVec2(memoryViewSize.x, memoryViewSize.y/2));
     {
       memoryViewStatic_[0].ReadOnly = true;
@@ -511,7 +511,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   ImGui::Begin("Memory 1", nullptr, ImGuiWindowFlags_NoResize |
                                     ImGuiWindowFlags_NoCollapse |
                                     ImGuiWindowFlags_NoBringToFrontOnFocus);
-  if (clemens_is_mmio_initialized(&machine_)) {
+  if (clemens_is_initialized_simple(&machine_)) {
     ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[1],
                        nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
     uint8_t viewBank = memoryViewBank_[1];
@@ -526,7 +526,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   ImGui::Begin("Memory 1", nullptr, ImGuiWindowFlags_NoResize |
                                     ImGuiWindowFlags_NoCollapse |
                                     ImGuiWindowFlags_NoBringToFrontOnFocus);
-  if (clemens_is_mmio_initialized(&machine_)) {
+  if (clemens_is_initialized_simple(&machine_)) {
     ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[1],
                        nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
     uint8_t viewBank = memoryViewBank_[1];
@@ -704,7 +704,7 @@ void ClemensHost::doMemoryMapWindow()
       ImGui::TableNextRow();
       ImGui::TableNextColumn(); ImGui::Text("LCRDR");
       ImGui::TableNextColumn();
-      if (mmio.mmap_register & CLEM_MMIO_MMAP_RDLCRAM) {
+      if (mmio.mmap_register & CLEM_MEM_IO_MMAP_RDLCRAM) {
         ImGui::Text("RAM");
       } else {
         ImGui::Text("ROM");
@@ -712,7 +712,7 @@ void ClemensHost::doMemoryMapWindow()
       ImGui::TableNextRow();
       ImGui::TableNextColumn(); ImGui::Text("LCWRI");
       ImGui::TableNextColumn();
-      if (mmio.mmap_register & CLEM_MMIO_MMAP_WRLCRAM) {
+      if (mmio.mmap_register & CLEM_MEM_IO_MMAP_WRLCRAM) {
         ImGui::Text("WRITE");
       } else {
         ImGui::Text("WPROT");
@@ -720,7 +720,7 @@ void ClemensHost::doMemoryMapWindow()
       ImGui::TableNextRow();
       ImGui::TableNextColumn(); ImGui::Text("LCBNK");
       ImGui::TableNextColumn();
-      if (mmio.mmap_register & CLEM_MMIO_MMAP_LCBANK2) {
+      if (mmio.mmap_register & CLEM_MEM_IO_MMAP_LCBANK2) {
         ImGui::Text("LC2");
       } else {
         ImGui::Text("LC1");
@@ -734,21 +734,21 @@ void ClemensHost::doMemoryMapWindow()
     {
       ImGui::TableNextColumn(); ImGui::Text("ALTZP");
       ImGui::TableNextColumn();
-      if (mmio.mmap_register & CLEM_MMIO_MMAP_ALTZPLC) {
+      if (mmio.mmap_register & CLEM_MEM_IO_MMAP_ALTZPLC) {
         ImGui::Text("AUX");
       } else {
         ImGui::Text("MAIN");
       }
       ImGui::TableNextColumn(); ImGui::Text("RAMRD");
       ImGui::TableNextColumn();
-      if (mmio.mmap_register & CLEM_MMIO_MMAP_RAMRD) {
+      if (mmio.mmap_register & CLEM_MEM_IO_MMAP_RAMRD) {
         ImGui::Text("AUX");
       } else {
         ImGui::Text("MAIN");
       }
       ImGui::TableNextColumn(); ImGui::Text("RAMWRT");
       ImGui::TableNextColumn();
-      if (mmio.mmap_register & CLEM_MMIO_MMAP_RAMWRT) {
+      if (mmio.mmap_register & CLEM_MEM_IO_MMAP_RAMWRT) {
         ImGui::Text("AUX");
       } else {
         ImGui::Text("MAIN");
@@ -947,15 +947,26 @@ bool ClemensHost::parseCommand(const char* buffer)
 bool ClemensHost::parseCommandPower(const char* line)
 {
   const char* start = trimCommand(line);
-  if (!start) {
-    //  assume toggle power
-    if (!clemens_is_initialized(&machine_)) {
-      createMachine();
-    } else {
-      destroyMachine();
-    }
+  if (clemens_is_initialized_simple(&machine_)) {
+    destroyMachine();
     return true;
   }
+
+  if (!start) {
+    //  assume toggle power
+    createMachine("gs_rom_3.rom", MachineType::Apple2GS);
+    return true;
+  }
+
+ return parseCommandToken(start,
+    [this](const char* start, const char* end) {
+      char machineName[16];
+      strncpy(machineName, start, std::min(sizeof(machineName) - 1, size_t(end - start)));
+      machineName[15] = '\0';
+      createMachine("6502_test.hex", MachineType::Simple128K);
+      return true;
+    });
+
   return false;
 }
 
@@ -963,7 +974,7 @@ bool ClemensHost::parseCommandReset(const char* line)
 {
   const char* start = trimCommand(line);
   if (!start) {
-    if (!clemens_is_initialized(&machine_)) {
+    if (!clemens_is_initialized_simple(&machine_)) {
       FormatView fv(terminalOutput_);
       fv.format("Machine not powered on.");
       return false;
@@ -1221,53 +1232,74 @@ bool ClemensHost::parseCommandDebugContext(const char* line)
     });
 }
 
-void ClemensHost::createMachine()
+void ClemensHost::createMachine(const char* filename, MachineType machineType)
 {
-  if (clemens_is_initialized(&machine_)) {
+  if (clemens_is_initialized_simple(&machine_)) {
     return;
   }
   slab_.reset();
 
-  audio_->start();
-
-  void* romMemory = NULL;
-  unsigned romMemorySize = 0;
-  FILE* fp = fopen("gs_rom_3.rom", "rb");
-  if (fp) {
-    fseek(fp, 0, SEEK_END);
-    romMemorySize = (unsigned)ftell(fp);
-    romMemory = slab_.allocate(romMemorySize);
-    fseek(fp, 0, SEEK_SET);
-    fread(romMemory, 1, romMemorySize, fp);
-    fclose(fp);
-  }
-  unsigned fpiBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT;
-  // Apple II line (including Mega2) was 1.023mhz
+ // Apple II line (including Mega2) was 1.023mhz
   // A Mega2 cycle is equivalent to 1 full cycle of the 2.8mhz clock
   // TODO: allows 1.023, 2.8, 8mhz without any loss due to integer div
   const uint32_t kClocksPerFastCycle = CLEM_CLOCKS_FAST_CYCLE;
   const uint32_t kClocksPerSlowCycle = CLEM_CLOCKS_MEGA2_CYCLE;
-  clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle,
-               romMemory, romMemorySize,
-               slab_.allocate(CLEM_IIGS_BANK_SIZE),
-               slab_.allocate(CLEM_IIGS_BANK_SIZE),
-               slab_.allocate(CLEM_IIGS_BANK_SIZE * fpiBankCount),
-               slab_.allocate(256 * 7), // TODO make this a little less magic-numberish
-               slab_.allocate(2048 * 7),
-               fpiBankCount);
 
-  ClemensAudioMixBuffer mix_buffer;
-  mix_buffer.frames_per_second = audio_->getAudioFrequency();
-  mix_buffer.frame_count = mix_buffer.frames_per_second / 20;
-  mix_buffer.stride = 8;    //   2 channels, 16-bits per channel
-  mix_buffer.data = (uint8_t*)(
-    slab_.allocate(mix_buffer.frame_count * mix_buffer.stride));
-  clemens_assign_audio_mix_buffer(&machine_, &mix_buffer);
+  switch (machineType) {
+    case MachineType::Apple2GS: {
+      audio_->start();
+
+      void* romMemory = NULL;
+      unsigned romMemorySize = 0;
+      FILE* fp = fopen(filename, "rb");
+      if (fp) {
+        fseek(fp, 0, SEEK_END);
+        romMemorySize = (unsigned)ftell(fp);
+        romMemory = slab_.allocate(romMemorySize);
+        fseek(fp, 0, SEEK_SET);
+        fread(romMemory, 1, romMemorySize, fp);
+        fclose(fp);
+      }
+      const unsigned fpiBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT;
+      clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle,
+                  romMemory, romMemorySize,
+                  slab_.allocate(CLEM_IIGS_BANK_SIZE),
+                  slab_.allocate(CLEM_IIGS_BANK_SIZE),
+                  slab_.allocate(CLEM_IIGS_BANK_SIZE * fpiBankCount),
+                  slab_.allocate(256 * 7), // TODO make this a little less magic-numberish
+                  slab_.allocate(2048 * 7),
+                  fpiBankCount);
+
+      ClemensAudioMixBuffer mix_buffer;
+      mix_buffer.frames_per_second = audio_->getAudioFrequency();
+      mix_buffer.frame_count = mix_buffer.frames_per_second / 20;
+      mix_buffer.stride = 8;    //   2 channels, 16-bits per channel
+      mix_buffer.data = (uint8_t*)(
+        slab_.allocate(mix_buffer.frame_count * mix_buffer.stride));
+      clemens_assign_audio_mix_buffer(&machine_, &mix_buffer);
+
+      clemens_assign_disk(&machine_, kClemensDrive_5_25_D1, &disks525_[0]);
+      clemens_assign_disk(&machine_, kClemensDrive_5_25_D2, &disks525_[1]);
+    } break;
+    case MachineType::Simple128K: {
+      const unsigned fpiBankCount = 2;
+      clemens_simple_init(&machine_,  kClocksPerSlowCycle, kClocksPerFastCycle,
+                          slab_.allocate(CLEM_IIGS_BANK_SIZE * fpiBankCount),
+                          fpiBankCount);
+
+      auto* page_map = &simpleDirectPageMap_;
+      page_map->shadow_map = NULL;
+      for (unsigned pageIdx = 0x00; pageIdx < 0x100; ++pageIdx) {
+        clemens_create_page_mapping(&page_map->pages[pageIdx], pageIdx, 0x00, 0x00);
+        page_map->pages[pageIdx].flags |= CLEM_MEM_PAGE_DIRECT_FLAG;
+      }
+      for (unsigned bankIdx = 0; bankIdx < fpiBankCount; ++bankIdx) {
+        machine_.bank_page_map[bankIdx] = page_map;
+      }
+    } break;
+  }
 
   clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
-
-  clemens_assign_disk(&machine_, kClemensDrive_5_25_D1, &disks525_[0]);
-  clemens_assign_disk(&machine_, kClemensDrive_5_25_D2, &disks525_[1]);
 
   memoryViewBank_[0] = 0x00;
   memoryViewBank_[1] = 0x00;
@@ -1277,13 +1309,13 @@ void ClemensHost::createMachine()
 
 void ClemensHost::destroyMachine()
 {
-  if (!clemens_is_initialized(&machine_)) {
+  if (clemens_is_mmio_initialized(&machine_)) {
+    audio_->stop();
+  } else if (!clemens_is_mmio_initialized(&machine_)) {
     return;
   }
-  audio_->stop();
   emulationBreak();
   memset(&machine_, 0, sizeof(ClemensMachine));
-
 }
 
 void ClemensHost::resetMachine()

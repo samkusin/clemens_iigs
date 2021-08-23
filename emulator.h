@@ -36,6 +36,105 @@ int clemens_init(
 );
 
 /**
+ * @brief initializes an empty machine that acts as a 65816 with just RAM
+ *
+ * Useful for test purposes (i.e. Klaus2m5's test suite, etc).  It is up to
+ * the host to implement memory mapped I/O and supply a memory map of the first
+ * 64K so that the 65816 can boot/reset in emulation mode.  As such, calling
+ * any audio/video/disk functions here will not work as those functions rely on
+ * a full Apple IIgs ROM and I/O implementation.
+ *
+ * @param machine
+ * @param speed_factor
+ * @param clocks_step
+ * @param fpiRAM
+ * @param fpiRAMBankCount
+ */
+void clemens_simple_init(
+    ClemensMachine* machine,
+    uint32_t speed_factor,
+    uint32_t clocks_step,
+    void* fpiRAM,
+    unsigned int fpiRAMBankCount
+);
+
+/**
+ * @brief Verify the machine is initialized/ready for emulation
+ *
+ * The emulator does not ever allocate memory.  This method checks if the
+ * machine was initialized via clemens_init with valid parameters.
+ *
+ * @param clem The machine
+ * @return true The machine has ROM/RAM and clock settings
+ * @return false
+ */
+bool clemens_is_initialized(const ClemensMachine* clem);
+
+/**
+ * @brief Trivial validation function (one conditional)
+ *
+ * Better used for polling every frame vs a more comprehensive check via
+ * clemens_is_initialized
+ *
+ * @param clem The machine
+ * @return true Passes a trivial check
+ * @return false Fails a trivial check
+ */
+bool clemens_is_initialized_simple(const ClemensMachine* clem);
+
+/**
+ * @brief
+ *
+ * @param clem
+ */
+void clemens_emulate(ClemensMachine* clem);
+
+/**
+ * @brief
+ *
+ * @param clem
+ * @param callback
+ * @param callback_ptr
+ */
+void clemens_opcode_callback(ClemensMachine* clem,
+                             ClemensOpcodeCallback callback,
+                             void* callback_ptr);
+
+/**
+ * @brief
+ *
+ * @param page
+ * @param page_idx
+ * @param bank_read_idx
+ * @param bank_write_idx
+ */
+void clemens_create_page_mapping(
+    struct ClemensMemoryPageInfo* page,
+    uint8_t page_idx,
+    uint8_t bank_read_idx,
+    uint8_t bank_write_idx
+);
+
+/**
+ * @brief
+ *
+ * @param clem
+ * @param is_slow_speed
+ * @return uint64_t
+ */
+uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed);
+
+/**
+ * @brief Trivial validation that the emulator memory interface has been
+ *        initialized following a reset.
+ *
+ * @param machine The machine
+ * @return true  MMIO is initialized (requires a reset)
+ * @return false MMIO not initialized
+ */
+bool clemens_is_mmio_initialized(const ClemensMachine* machine);
+
+/**
  * @brief Sets the audio buffer used by the clemens audio system for mixing
  * Ensoniq and Apple II speaker output
  *
@@ -64,18 +163,6 @@ ClemensAudio* clemens_get_audio(ClemensAudio* audio, ClemensMachine* clem);
 void clemens_audio_next_frame(ClemensMachine* clem, unsigned consumed);
 
 /**
- * @brief Verify the machine is initialized/ready for emulation
- *
- * The emulator does not ever allocate memory.  This method checks if the
- * machine was initialized via clemens_init with valid parameters.
- *
- * @param clem The machine
- * @return true The machine has ROM/RAM and clock settings
- * @return false
- */
-bool clemens_is_initialized(const ClemensMachine* clem);
-
-/**
  * @brief
  *
  * @param clem
@@ -99,48 +186,6 @@ bool clemens_assign_disk(ClemensMachine* clem,
 bool clemens_has_disk(ClemensMachine* clem, enum ClemensDriveType drive_type);
 
 /**
- * @brief Trivial validation function (one conditional)
- *
- * Better used for polling every frame vs a more comprehensive check via
- * clemens_is_initialized
- *
- * @param clem The machine
- * @return true Passes a trivial check
- * @return false Fails a trivial check
- */
-bool clemens_is_initialized_simple(const ClemensMachine* clem);
-
-/**
- * @brief Trivial validation that the emulator memory interface has been
- *        initialized following a reset.
- *
- * @param machine The machine
- * @return true  MMIO is initialized (requires a reset)
- * @return false MMIO not initialized
- */
-bool clemens_is_mmio_initialized(const ClemensMachine* machine);
-
-/**
- * @brief
- *
- * @param clem
- * @param callback
- * @param callback_ptr
- */
-void clemens_opcode_callback(ClemensMachine* clem,
-                             ClemensOpcodeCallback callback,
-                             void* callback_ptr);
-
-/**
- * @brief
- *
- * @param clem
- * @param is_slow_speed
- * @return uint64_t
- */
-uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed);
-
-/**
  * @brief Forwards input from ths host machine to the ADB
  *
  * @param clem
@@ -162,26 +207,7 @@ void clemens_rtc_set(ClemensMachine* clem, uint32_t seconds_since_1904);
  *
  * @param clem
  */
-void clemens_emulate(ClemensMachine* clem);
-
-/**
- * @brief
- *
- * @param clem
- */
 void clemens_debug_status(ClemensMachine* clem);
-
-
-/**
- * @brief Returns the current video data to be displayed by the host
- *
- * The data here is in the form of scanlines and a description of how to
- * interpret the data.  The host must convert this information to visuals.
- *
- * @param clem
- * @return ClemensVideo*
- */
-
 
 /**
  * @brief Returns the current monitor settings.
