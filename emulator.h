@@ -116,6 +116,21 @@ void clemens_create_page_mapping(
 );
 
 /**
+ * @brief Upload hex data directly into machine memory
+ *
+ * Data is uploaded directly by bank and address, bypassing any memory maps
+ * defined.
+ *
+ * @param clem
+ * @param hex
+ * @param hex_end
+ * @param bank  This is ignored if the incoming hex points to a 32-bit address
+ * @return bool
+ */
+bool clemens_load_hex(ClemensMachine* clem, const char* hex, const char* hex_end,
+                      unsigned bank);
+
+/**
  * @brief
  *
  * @param clem
@@ -193,6 +208,14 @@ bool clemens_has_disk(ClemensMachine* clem, enum ClemensDriveType drive_type);
  */
 void clemens_input(ClemensMachine* clem,
                    const struct ClemensInputEvent* input);
+
+/**
+ * @brief
+ *
+ * @param input
+ * @return const uint8_t*
+ */
+const uint8_t* clemens_get_ascii_from_a2code(unsigned input);
 
 /**
  * @brief
