@@ -178,7 +178,20 @@ void ClemensHost::emulatorImguiMemoryWrite(
 void ClemensHost::input(const ClemensInputEvent& input)
 {
   if (isRunningEmulation() && emulatorHasKeyboardFocus_) {
-    clemens_input(&machine_, &input);
+    if (clemens_is_mmio_initialized(&machine_)) {
+      clemens_input(&machine_, &input);
+    } else if (machine_.mmio_bypass) {
+      if (input.type == kClemensInputType_KeyDown) {
+        simpleMachineIO_.eventKeybA2 = input.value;
+        if (input.value == CLEM_ADB_KEY_LSHIFT || input.value == CLEM_ADB_KEY_RSHIFT) {
+          simpleMachineIO_.modShift = true;
+        }
+      } else if (input.type == kClemensInputType_KeyUp) {
+          if (input.value == CLEM_ADB_KEY_LSHIFT || input.value == CLEM_ADB_KEY_RSHIFT) {
+            simpleMachineIO_.modShift = false;
+          }
+      }
+    }
   }
 }
 
@@ -226,6 +239,9 @@ void ClemensHost::frame(int width, int height, float deltaTime)
       clemens_audio_next_frame(&machine_, consumedFrames);
       diagnostics_.audioFrames += consumedFrames;
     }
+  } else if (clemens_is_initialized_simple(&machine_)) {
+    /* simple machine video and input */
+
   }
 
   ImGui::SetNextWindowPos(ImVec2(512, 32), ImGuiCond_FirstUseEver);
@@ -545,6 +561,13 @@ void ClemensHost::frame(int width, int height, float deltaTime)
            diagnostics_.clocksSpent * scalar);
     diagnostics_.reset();
   }
+
+  if (machine_.mmio_bypass) {
+    if (simpleMachineIO_.terminalOutIndex > 0) {
+      printf(simpleMachineIO_.terminalOut);
+      simpleMachineIO_.terminalOutIndex = 0;
+    }
+  }
 }
 
 void ClemensHost::doIWMContextWindow()
@@ -823,6 +846,23 @@ void ClemensHost::emulate(float deltaTime)
       }
     }
     clemens_emulate(&machine_);
+    if (machine_.mmio_bypass) {
+      //  execute simple machine I/O
+      uint8_t* mainBank =  machine_.fpi_bank_map[0];
+      if (simpleMachineIO_.eventKeybA2) {
+        const uint8_t* keybToAscii = clemens_get_ascii_from_a2code(
+          simpleMachineIO_.eventKeybA2);
+        mainBank[0xff00] = keybToAscii[simpleMachineIO_.modShift ? 2 : 0];
+        simpleMachineIO_.eventKeybA2 = 0;
+      }
+      if (mainBank[0xff01]) {
+        if (simpleMachineIO_.terminalOutIndex < sizeof(simpleMachineIO_.terminalOut)) {
+          simpleMachineIO_.terminalOut[simpleMachineIO_.terminalOutIndex++] = (
+            mainBank[0xff01]);
+          mainBank[0xff01] = 0;
+        }
+      }
+    }
     if (!breakpoints_.empty()) {
       if (hitBreakpoint()) {
         emulationBreak();
@@ -939,6 +979,8 @@ bool ClemensHost::parseCommand(const char* buffer)
         return parseCommandUnlog(end);
       } else if (!strncasecmp(start, "context", end - start)) {
         return parseCommandDebugContext(end);
+      } else if (!strncasecmp(start, "set", end - start)) {
+        return parseCommandSetValue(end);
       }
       return false;
     });
@@ -954,17 +996,15 @@ bool ClemensHost::parseCommandPower(const char* line)
 
   if (!start) {
     //  assume toggle power
-    createMachine("gs_rom_3.rom", MachineType::Apple2GS);
-    return true;
+    return createMachine("gs_rom_3.rom", MachineType::Apple2GS);
   }
 
  return parseCommandToken(start,
     [this](const char* start, const char* end) {
-      char machineName[16];
+      char machineName[256];
+      memset(machineName, 0, sizeof(machineName));
       strncpy(machineName, start, std::min(sizeof(machineName) - 1, size_t(end - start)));
-      machineName[15] = '\0';
-      createMachine("6502_test.hex", MachineType::Simple128K);
-      return true;
+      return createMachine(machineName, MachineType::Simple128K);
     });
 
   return false;
@@ -1232,10 +1272,68 @@ bool ClemensHost::parseCommandDebugContext(const char* line)
     });
 }
 
-void ClemensHost::createMachine(const char* filename, MachineType machineType)
+bool ClemensHost::parseCommandSetValue(const char* line)
 {
+  const char* start = trimCommand(line);
+  if (!start) {
+    FormatView fv(terminalOutput_);
+    fv.format("usage: set <a|x|y|pc> <value>");
+    return false;
+  }
+  return parseCommandToken(start,
+    [this](const char* start, const char* end) {
+      unsigned value;
+      if (!parseImmediateValue(&value, end)) {
+        return false;
+      }
+
+      char name[16];
+      strncpy(name, start, std::min(sizeof(name) - 1, size_t(end - start)));
+      name[end - start] = '\0';
+      if (!strncasecmp(name, "a", sizeof(name))) {
+        machine_.cpu.regs.A = (uint16_t)(value & 0xffff);
+        return true;
+      } else if (!strncasecmp(name, "x", sizeof(name))) {
+        machine_.cpu.regs.X = (uint16_t)(value & 0xffff);
+        return true;
+      } else if (!strncasecmp(name, "y", sizeof(name))) {
+        machine_.cpu.regs.Y = (uint16_t)(value & 0xffff);
+        return true;
+      } else if (!strncasecmp(name, "pc", sizeof(name))) {
+        machine_.cpu.regs.PC = (uint16_t)(value & 0xffff);
+        return true;
+      }
+      return false;
+    });
+}
+
+bool ClemensHost::parseImmediateValue(unsigned* value, const char* line)
+{
+  const char* start = trimCommand(line);
+  if (!start) {
+    FormatView fv(terminalOutput_);
+    fv.format("requires an immediate value");
+    return false;
+  }
+  return parseCommandToken(start,
+    [this, value](const char* start, const char* end) {
+      char name[16];
+      strncpy(name, start, std::min(sizeof(name) - 1, size_t(end - start)));
+      name[end - start] = '\0';
+      if (name[0] == '$') {
+        *value = (unsigned)(strtoul(name + 1, NULL, 16));
+      } else {
+        *value = (unsigned)(strtoul(name, NULL, 10));
+      }
+      return true;
+    });
+}
+
+bool ClemensHost::createMachine(const char* filename, MachineType machineType)
+{
+  bool success = false;
   if (clemens_is_initialized_simple(&machine_)) {
-    return;
+    return success;
   }
   slab_.reset();
 
@@ -1280,6 +1378,8 @@ void ClemensHost::createMachine(const char* filename, MachineType machineType)
 
       clemens_assign_disk(&machine_, kClemensDrive_5_25_D1, &disks525_[0]);
       clemens_assign_disk(&machine_, kClemensDrive_5_25_D2, &disks525_[1]);
+
+      success = true;
     } break;
     case MachineType::Simple128K: {
       const unsigned fpiBankCount = 2;
@@ -1296,6 +1396,30 @@ void ClemensHost::createMachine(const char* filename, MachineType machineType)
       for (unsigned bankIdx = 0; bankIdx < fpiBankCount; ++bankIdx) {
         machine_.bank_page_map[bankIdx] = page_map;
       }
+
+      //  load in the hex image for our machine
+      char* hexMemory = NULL;
+      unsigned hexMemorySize = 0;
+      FILE* fp = fopen(filename, "rb");
+      if (fp) {
+        fseek(fp, 0, SEEK_END);
+        hexMemorySize = (unsigned)ftell(fp);
+        hexMemory = (char *)malloc(hexMemorySize);
+        fseek(fp, 0, SEEK_SET);
+        fread(hexMemory, 1, hexMemorySize, fp);
+        //  TODO: allow load into multiple banks as needed
+        //
+        success = clemens_load_hex(
+          &machine_, hexMemory, hexMemory + hexMemorySize, 0x00);
+        if (!success) {
+          FormatView fv(terminalOutput_);
+          fv.format("Failed to ingest {}", filename);
+        }
+        free(hexMemory);
+        fclose(fp);
+      }
+
+      simpleMachineIO_ = SimpleMachineIO {};
     } break;
   }
 
@@ -1305,6 +1429,7 @@ void ClemensHost::createMachine(const char* filename, MachineType machineType)
   memoryViewBank_[1] = 0x00;
 
   resetMachine();
+  return success;
 }
 
 void ClemensHost::destroyMachine()

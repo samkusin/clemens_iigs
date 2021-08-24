@@ -408,7 +408,7 @@ static uint8_t _clem_adb_glu_keyb_parse(
     bool is_key_down = (key_event & 0x80) == 0;     /* up = b7 at this point */
     uint8_t ascii_key;
 
-    uint8_t* ascii_table = &g_a2_to_ascii[key_index][0];
+    uint8_t* ascii_table =  clem_adb_ascii_from_a2code(key_index);
     uint16_t modifiers = adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_MODKEY_MASK;
     uint16_t old_modifiers = modifiers;
 
@@ -949,6 +949,10 @@ void clem_adb_device_input(
             }
             break;
     }
+}
+
+uint8_t* clem_adb_ascii_from_a2code(unsigned input) {
+    return &g_a2_to_ascii[input & 0x7f][0];
 }
 
 

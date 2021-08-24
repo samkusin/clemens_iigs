@@ -605,18 +605,6 @@ typedef struct {
     */
     struct ClemensMemoryPageMap* bank_page_map[256];
 
-    /* THe above can be moved to a 'simple' struct */
-
-    uint8_t* mega2_bank_map[2];     // $e0 - $e1
-    /** ROM memory for individual card slots.  Only slots 1,2,4,5,6,7 are used
-     *  and each slot should have 256 bytes allocated for it */
-    uint8_t* card_slot_memory[7];
-    /** Expansion ROM area for each card.  This area is paged into addressable
-     *  memory with the correct IO instructions.  Each area should be 2K in
-     *  size.  As with card slot memory, slot 3 is ignored */
-    uint8_t* card_slot_expansion_memory[7];
-
-
     /* Optional callback for debugging purposes.
        When issued, it's guaranteed that all registers/CPU state has been
        updated (and can be viewed as an accurate state of the machine after
@@ -630,6 +618,18 @@ typedef struct {
     int resb_counter;
     /** Internal, skips mmio if in 'simple' mode */
     bool mmio_bypass;
+
+    /* The above can be moved to a 'simple' struct, and the below is specizlied
+       for the IIgs
+    */
+    uint8_t* mega2_bank_map[2];     // $e0 - $e1
+    /** ROM memory for individual card slots.  Only slots 1,2,4,5,6,7 are used
+     *  and each slot should have 256 bytes allocated for it */
+    uint8_t* card_slot_memory[7];
+    /** Expansion ROM area for each card.  This area is paged into addressable
+     *  memory with the correct IO instructions.  Each area should be 2K in
+     *  size.  As with card slot memory, slot 3 is ignored */
+    uint8_t* card_slot_expansion_memory[7];
 
     struct ClemensMMIO mmio;
     struct ClemensDriveBay active_drives;

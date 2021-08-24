@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -918,6 +919,170 @@ void clemens_simple_init(
     _clem_init_instruction_map();
 }
 
+#define CLEM_LOAD_HEX_STATE_BEGIN   '\0'
+#define CLEM_LOAD_HEX_STATE_ERROR   -1
+#define CLEM_LOAD_HEX_STATE_CR      '\r'
+#define CLEM_LOAD_HEX_STATE_LENGTH  ':'
+#define CLEM_LOAD_HEX_STATE_ADR16   'a'
+#define CLEM_LOAD_HEX_STATE_RECORD  'R'
+#define CLEM_LOAD_HEX_STATE_DATA    'd'
+#define CLEM_LOAD_HEX_STATE_CHKSUM  '+'
+#define CLEM_LOAD_HEX_STATE_EOL     '.'
+#define CLEM_LOAD_HEX_STATE_EOF     '!'
+
+#define CLEM_LOAD_HEX_RECORD_DATA   0x00
+#define CLEM_LOAD_HEX_RECORD_EOF    0x01
+#define CLEM_LOAD_HEX_RECORD_NONE   0xFF
+
+
+bool clemens_load_hex(
+    ClemensMachine* clem,
+    const char* hex,
+    const char* hex_end,
+    unsigned bank
+) {
+    const char* line = hex;
+    const char* next = line;
+    unsigned token_len = 0;
+    char state = CLEM_LOAD_HEX_STATE_BEGIN;
+
+    uint8_t* clem_memory = NULL;
+    unsigned hex_byte_length = 0;
+    unsigned hex_address16 = 0;
+    unsigned hex_recordtype = CLEM_LOAD_HEX_RECORD_NONE;
+    unsigned tmp;
+    unsigned data;
+    uint8_t chksum = 0;
+
+    while ((hex_end && line < hex_end) || *line) {
+        char cur_state = state;
+        if (state == CLEM_LOAD_HEX_STATE_EOF) {
+            break;
+        }
+
+        token_len = (unsigned)(next - line);
+        switch (cur_state) {
+            case CLEM_LOAD_HEX_STATE_ERROR:
+                return false;
+            case CLEM_LOAD_HEX_STATE_CR:
+                if (*next == '\n') state = CLEM_LOAD_HEX_STATE_BEGIN;
+                else state = CLEM_LOAD_HEX_STATE_ERROR;
+                break;
+            case CLEM_LOAD_HEX_STATE_BEGIN:
+                if (*next == ':') state = CLEM_LOAD_HEX_STATE_LENGTH;
+                else if (isspace(*next)) state = CLEM_LOAD_HEX_STATE_BEGIN;
+                else state = CLEM_LOAD_HEX_STATE_ERROR;
+                break;
+            case CLEM_LOAD_HEX_STATE_LENGTH:
+                if (token_len == 2) {
+                    hex_byte_length = 0;
+                    if (!_clem_util_hex_value(&hex_byte_length, line, next)) {
+                        state = CLEM_LOAD_HEX_STATE_ERROR;
+                    } else {
+                        chksum = (uint8_t)(hex_byte_length & 0xff);
+                        clem_memory = clem->fpi_bank_map[bank];
+                        if (clem_memory) {
+                            state = CLEM_LOAD_HEX_STATE_ADR16;
+                            --next; /* backtrack since there's no delim */
+                        } else {
+                            state = CLEM_LOAD_HEX_STATE_ERROR;
+                        }
+                    }
+                }
+                break;
+            case CLEM_LOAD_HEX_STATE_ADR16:
+                if (token_len == 4) {
+                    if (_clem_util_hex_value(&tmp, line, next)) {
+                        hex_address16 = (tmp & 0xffff);
+                        chksum += (uint8_t)((hex_address16 >> 8) & 0xff);
+                        chksum += (uint8_t)(hex_address16 & 0xff);
+                        state = CLEM_LOAD_HEX_STATE_RECORD;
+                        --next; /* backtrack since there's no delim */
+                    } else {
+                        state = CLEM_LOAD_HEX_STATE_ERROR;
+                    }
+                }
+                break;
+            case CLEM_LOAD_HEX_STATE_RECORD:
+                if (token_len == 2) {
+                    if (!_clem_util_hex_value(&hex_recordtype, line, next)) {
+                        state = CLEM_LOAD_HEX_STATE_ERROR;
+                    } else {
+                        hex_recordtype &= 0xff;
+                        chksum += (uint8_t)(hex_recordtype);
+                        if (hex_recordtype == CLEM_LOAD_HEX_RECORD_DATA) {
+                            state = CLEM_LOAD_HEX_STATE_DATA;
+                            --next; /* backtrack since there's no delim */
+                        } else if (hex_recordtype == CLEM_LOAD_HEX_RECORD_EOF) {
+                            state = CLEM_LOAD_HEX_STATE_CHKSUM;
+                            --next; /* backtrack since there's no delim */
+                        } else {
+                            /* TODO: support more record types */
+                            state = CLEM_LOAD_HEX_STATE_ERROR;
+                        }
+                    }
+                }
+                break;
+            case CLEM_LOAD_HEX_STATE_DATA:
+                /* hex data */
+                tmp = token_len / 2;
+                if (!(token_len % 2) && tmp > 0) {
+                    --tmp;
+                    if (_clem_util_hex_value(
+                        &data,
+                        line + tmp * 2,
+                        next)
+                    ) {
+                        chksum += (uint8_t)(data & 0xff);
+                        clem_memory[(hex_address16 + tmp) & 0xffff] = (
+                            (uint8_t)(data & 0xff));
+                    } else {
+                        state = CLEM_LOAD_HEX_STATE_ERROR;
+                    }
+                    if (tmp + 1 >= hex_byte_length) {
+                        state = CLEM_LOAD_HEX_STATE_CHKSUM;
+                        --next; /* backtrack since there's no delim */
+                    }
+                }
+                break;
+            case CLEM_LOAD_HEX_STATE_CHKSUM:
+                if (token_len == 2) {
+                    chksum = 0x01 + (~chksum);
+                    if (_clem_util_hex_value(&tmp, line, next) &&
+                        chksum == (tmp & 0xff)
+                    ) {
+                        if (hex_recordtype == CLEM_LOAD_HEX_RECORD_EOF) {
+                            state = CLEM_LOAD_HEX_STATE_EOF;
+                        } else {
+                            state = CLEM_LOAD_HEX_STATE_EOL;
+                        }
+                    } else {
+                        state = CLEM_LOAD_HEX_STATE_ERROR;
+                    }
+                }
+                break;
+            case CLEM_LOAD_HEX_STATE_EOL:
+                /* ignores the remainder until we hit a newline, which is
+                    handled at the start of this loop
+                */
+                if (*next == '\r') state = CLEM_LOAD_HEX_STATE_CR;
+                else if (*next == '\n') state = CLEM_LOAD_HEX_STATE_BEGIN;
+                break;
+        }
+        if (!(*next)) {
+            line = next;
+        } else {
+            ++next;
+            if (state != cur_state) {
+                line = next;
+            }
+        }
+    }
+
+    return true;
+}
+
+
 static inline struct ClemensDrive* _clem_drive_get(
     ClemensMachine* clem,
     enum ClemensDriveType drive_type
@@ -1091,6 +1256,10 @@ void clemens_input(
     const struct ClemensInputEvent* input
 ) {
     clem_adb_device_input(&machine->mmio.dev_adb, input);
+}
+
+const uint8_t* clemens_get_ascii_from_a2code(unsigned input) {
+    return clem_adb_ascii_from_a2code(input);
 }
 
 void clemens_rtc_set(

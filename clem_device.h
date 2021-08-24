@@ -72,6 +72,15 @@ void clem_adb_reset(struct ClemensDeviceADB* adb);
  */
 void clem_adb_device_input(struct ClemensDeviceADB* adb,
                            const struct ClemensInputEvent* input);
+
+/**
+ * @brief
+ *
+ * @param input
+ * @return uint8_t*
+ */
+uint8_t* clem_adb_ascii_from_a2code(unsigned input);
+
 /**
  * @brief Executed frequently enough to emulate the GLU Microcontroller
  *

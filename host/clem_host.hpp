@@ -67,13 +67,15 @@ private:
   bool parseCommandLog(const char* line);
   bool parseCommandUnlog(const char* line);
   bool parseCommandDebugContext(const char* line);
+  bool parseCommandSetValue(const char* line);
+  bool parseImmediateValue(unsigned* value, const char* line);
 
   enum class MachineType {
     Apple2GS,
     Simple128K
   };
 
-  void createMachine(const char* filename, MachineType machineType);
+  bool createMachine(const char* filename, MachineType machineType);
   void destroyMachine();
   void resetMachine();
   void stepMachine(int stepCount);
@@ -171,6 +173,14 @@ private:
     void reset();
   };
   Diagnostics diagnostics_;
+
+  struct SimpleMachineIO {
+    unsigned eventKeybA2 = 0;
+    bool modShift = false;
+    unsigned terminalOutIndex = 0;
+    char terminalOut[256];
+  };
+  SimpleMachineIO simpleMachineIO_;
 };
 
 
