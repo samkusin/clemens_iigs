@@ -895,6 +895,7 @@ void clemens_simple_init(
     machine->clocks_step_mega2 = speed_factor;
     machine->clocks_spent = 0;
     machine->mmio_bypass = true;
+    machine->cpu.pins.irqbIn = true;
 
     if (fpiRAMBankCount > 256) fpiRAMBankCount = 256;
     for (unsigned i  = 0; i < fpiRAMBankCount; ++i) {
@@ -2206,6 +2207,9 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
             _cpu_lda(cpu, tmp_value, m_status);
+            if (cpu->regs.PC == 0x3482) {
+                printf("SKS: LDA A=$%02X\n", cpu->regs.A & 0xff);
+            }
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_LDA_DP_INDIRECT:
@@ -2595,7 +2599,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_PHP:
             _clem_cycle(clem, 1);
-            _clem_opc_push_status(clem, false);
+            _clem_opc_push_status(clem);
             break;
         case CLEM_OPC_PHX:
             _clem_opc_push_reg_816(clem, cpu->regs.X, x_status);
@@ -2605,6 +2609,9 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_PLA:
             _clem_opc_pull_reg_816(clem, &cpu->regs.A, m_status);
+            if (cpu->regs.PC == 0x348b) {
+                printf("SKS: PLA A=$%02X\n", cpu->regs.A & 0xff);
+            }
             _cpu_p_flags_n_z_data_816(cpu, cpu->regs.A, m_status);
             break;
         case CLEM_OPC_PLB:
@@ -2770,11 +2777,17 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
         case CLEM_OPC_SBC_DP:
             _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
-             if (!(cpu->regs.P & kClemensCPUStatus_Decimal)) {
+            if (cpu->regs.PC == 0x3484 && (cpu->regs.A & 0xff) == 0x79) {
+                printf("SKS: STOP HERE!");
+            }
+            if (!(cpu->regs.P & kClemensCPUStatus_Decimal)) {
                 _cpu_sbc(cpu, tmp_value, m_status);
-             } else {
+            } else {
                 _cpu_sbc_bcd(cpu, tmp_value, m_status);
-             }
+            }
+            if (cpu->regs.PC == 0x3484) {
+                printf("SKS: SBC $=%02X A=$%02X\n", tmp_value & 0xff, cpu->regs.A & 0xff);
+            }
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_SBC_DP_INDIRECT:

@@ -1436,7 +1436,7 @@ void ClemensHost::destroyMachine()
 {
   if (clemens_is_mmio_initialized(&machine_)) {
     audio_->stop();
-  } else if (!clemens_is_mmio_initialized(&machine_)) {
+  } else if (!clemens_is_initialized_simple(&machine_)) {
     return;
   }
   emulationBreak();
