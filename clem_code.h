@@ -337,18 +337,9 @@ static inline void _clem_opc_pull_reg_8(
 }
 
 static inline void _clem_opc_push_status(
-    ClemensMachine* clem,
-    bool is_brk
+    ClemensMachine* clem
 ) {
-    uint8_t tmp_data = clem->cpu.regs.P;
-    if (clem->cpu.pins.emulation) {
-        if (is_brk) {
-            tmp_data |= kClemensCPUStatus_EmulatedBrk;
-        } else {
-            tmp_data &= ~kClemensCPUStatus_EmulatedBrk;
-        }
-    }
-    clem_write(clem, tmp_data, clem->cpu.regs.S, 0x00, CLEM_MEM_FLAG_DATA);
+    clem_write(clem, clem->cpu.regs.P, clem->cpu.regs.S, 0x00, CLEM_MEM_FLAG_DATA);
     _cpu_sp_dec(&clem->cpu);
 }
 
@@ -616,7 +607,7 @@ static inline void _cpu_sbc_bcd(
     /* note, invalid BCD should still function according to specific rules. see
        https://math.stackexchange.com/questions/945320/why-do-we-add-6-in-bcd-addition
     */
-    uint32_t sbc;
+    uint32_t sbc, sbc_tmp;
     uint32_t sbc_2comp;
     uint8_t p;
     bool carry = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
@@ -626,21 +617,24 @@ static inline void _cpu_sbc_bcd(
         if (sbc & 0x10) {
             /* borrow */
             sbc = (sbc - 0x06) & 0x0f;
-            sbc |= ((cpu->regs.A & 0xf0) - (value & 0xf0) - 0x10);
+            sbc_tmp = sbc;
+            sbc = (cpu->regs.A & 0xf0) - (value & 0xf0) - (sbc & 0x10);
         } else {
             sbc = (sbc & 0x0f);
-            sbc |= ((cpu->regs.A & 0xf0) - (value & 0xf0));
+            sbc_tmp = sbc;
+            sbc = (cpu->regs.A & 0xf0) - (value & 0xf0);
         }
         if (sbc & 0x100) sbc -= 0x60;
-        sbc_2comp = (cpu->regs.A & 0x80) - value  - !carry;
-        carry = (sbc_2comp < 0x100);
+        sbc_2comp = (cpu->regs.A & 0xff) - value - !carry;
+        carry = ((int32_t)(sbc_2comp) >= 0) && (sbc_2comp < 0x100);
         _cpu_p_flags_n_z_data(cpu, (uint8_t)sbc_2comp);
         p = cpu->regs.P;
 	    if (((cpu->regs.A & 0xff) ^ sbc) & (value ^ sbc) & 0x80) p |= kClemensCPUStatus_Overflow;
         else p &= ~kClemensCPUStatus_Overflow;
         if (carry) p |= kClemensCPUStatus_Carry;
         else p &= ~kClemensCPUStatus_Carry;
-        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, sbc);
+        sbc_tmp = (sbc_tmp & 0xf) | sbc;
+        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, sbc_tmp);
     } else {
         sbc = (cpu->regs.A & 0x0f) - (value & 0x0f) - !carry;
         if (sbc & 0x10) {
@@ -1051,7 +1045,12 @@ static inline void _clem_irq_brk_setup(
     }
     _cpu_sp_dec2(cpu);
     _clem_write_16(clem, pc, cpu->regs.S + 1, 0x00);
-    _clem_opc_push_status(clem, is_brk);
+
+    if (clem->cpu.pins.emulation && is_brk) {
+        clem->cpu.regs.P |= kClemensCPUStatus_EmulatedBrk;
+    }
+
+    _clem_opc_push_status(clem);
     //  65816 always disables decimal mode on interrupts, even in emulation
     cpu->regs.P &= ~kClemensCPUStatus_Decimal;
     cpu->regs.P |= kClemensCPUStatus_IRQDisable;
