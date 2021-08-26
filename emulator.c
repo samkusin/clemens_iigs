@@ -1083,6 +1083,35 @@ bool clemens_load_hex(
     return true;
 }
 
+unsigned clemens_out_hex_data_body(
+    ClemensMachine* clem, char* hex,
+    unsigned out_hex_byte_limit,
+    unsigned bank, unsigned adr
+) {
+    unsigned byte_amt = out_hex_byte_limit >> 1;    /* 2 digits per byte */
+    unsigned byte_idx;
+    const uint8_t* memory = clem->fpi_bank_map[bank & 0xff];
+    unsigned chksum = 0;
+
+    if (!memory) return UINT_MAX;
+    if (!byte_amt) return UINT_MAX;
+
+    /* intel hex has a limit of 255 per line - and callers should be aware of
+       this.
+    */
+    if (byte_amt > 256) return UINT_MAX;
+
+    for (byte_idx = 0; byte_idx < byte_amt; ++byte_idx) {
+        uint8_t byte = memory[(adr + byte_idx) & 0xffff];
+        hex[byte_idx*2] = g_decimal_to_hex[(byte & 0xf0) >> 4];
+        hex[byte_idx*2 + 1] = g_decimal_to_hex[(byte & 0x0f)];
+        chksum += byte;
+    }
+    hex[byte_idx] = '\0';
+    return chksum;
+}
+
+
 
 static inline struct ClemensDrive* _clem_drive_get(
     ClemensMachine* clem,
@@ -2207,9 +2236,6 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
             _cpu_lda(cpu, tmp_value, m_status);
-            if (cpu->regs.PC == 0x3482) {
-                printf("SKS: LDA A=$%02X\n", cpu->regs.A & 0xff);
-            }
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;
         case CLEM_OPC_LDA_DP_INDIRECT:
@@ -2609,9 +2635,6 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_PLA:
             _clem_opc_pull_reg_816(clem, &cpu->regs.A, m_status);
-            if (cpu->regs.PC == 0x348b) {
-                printf("SKS: PLA A=$%02X\n", cpu->regs.A & 0xff);
-            }
             _cpu_p_flags_n_z_data_816(cpu, cpu->regs.A, m_status);
             break;
         case CLEM_OPC_PLB:
@@ -2777,16 +2800,10 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
         case CLEM_OPC_SBC_DP:
             _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
             _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
-            if (cpu->regs.PC == 0x3484 && (cpu->regs.A & 0xff) == 0x79) {
-                printf("SKS: STOP HERE!");
-            }
             if (!(cpu->regs.P & kClemensCPUStatus_Decimal)) {
                 _cpu_sbc(cpu, tmp_value, m_status);
             } else {
                 _cpu_sbc_bcd(cpu, tmp_value, m_status);
-            }
-            if (cpu->regs.PC == 0x3484) {
-                printf("SKS: SBC $=%02X A=$%02X\n", tmp_value & 0xff, cpu->regs.A & 0xff);
             }
             _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
             break;

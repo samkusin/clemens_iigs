@@ -133,6 +133,24 @@ bool clemens_load_hex(ClemensMachine* clem, const char* hex, const char* hex_end
 /**
  * @brief
  *
+ * If writing to an intel hex file, the maximum out_byte_limit is 255 * 2
+ *
+ * Absolute limit is 256 bytes of output otherwise.
+ *
+ * @param clem
+ * @param hex
+ * @param out_byte_limit The number of hex digits that can be written out with
+ *  with room for a null terminator
+ * @param bank
+ * @param adr
+ */
+unsigned clemens_out_hex_data_body(ClemensMachine* clem, char* hex,
+                                   unsigned out_hex_byte_limit,
+                                   unsigned bank, unsigned adr);
+
+/**
+ * @brief
+ *
  * @param clem
  * @param is_slow_speed
  * @return uint64_t

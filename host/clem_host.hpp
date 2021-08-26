@@ -14,6 +14,7 @@
 #include <vector>
 #include <array>
 #include <memory>
+#include <string>
 
 struct ClemensHostInputEvent
 {
@@ -68,7 +69,10 @@ private:
   bool parseCommandUnlog(const char* line);
   bool parseCommandDebugContext(const char* line);
   bool parseCommandSetValue(const char* line);
-  bool parseImmediateValue(unsigned* value, const char* line);
+  bool parseCommandDump(const char* line);
+
+  bool parseImmediateValue(unsigned& value, const char* line);
+  bool parseImmediateString(std::string& value, const char* line);
 
   enum class MachineType {
     Apple2GS,
@@ -82,6 +86,8 @@ private:
   bool emulationRun(unsigned target);
   void emulationBreak();
   void resetDiagnostics();
+
+  void dumpMemory(unsigned bank, const char* filename);
 
   bool isRunningEmulation() const;
   bool isRunningEmulationStep() const;
