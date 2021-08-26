@@ -607,60 +607,72 @@ static inline void _cpu_sbc_bcd(
     /* note, invalid BCD should still function according to specific rules. see
        https://math.stackexchange.com/questions/945320/why-do-we-add-6-in-bcd-addition
     */
-    uint32_t sbc, sbc_tmp;
+    uint32_t a_tmp;
+    uint32_t sbc;
     uint32_t sbc_2comp;
     uint8_t p;
     bool carry = (cpu->regs.P & kClemensCPUStatus_Carry) != 0;
     if (is8) {
+        a_tmp = (cpu->regs.A & 0x00ff);
         value = value & 0xff;
-        sbc = (cpu->regs.A & 0x0f) - (value & 0x0f) - !carry;
+        sbc = (a_tmp & 0x0f) - (value & 0x0f) - !carry;
         if (sbc & 0x10) {
             /* borrow */
             sbc = (sbc - 0x06) & 0x0f;
-            sbc_tmp = sbc;
-            sbc = (cpu->regs.A & 0xf0) - (value & 0xf0) - (sbc & 0x10);
+            sbc |= ((a_tmp & 0xf0) - (value & 0xf0) - 0x10);
         } else {
             sbc = (sbc & 0x0f);
-            sbc_tmp = sbc;
-            sbc = (cpu->regs.A & 0xf0) - (value & 0xf0);
+            sbc |= ((a_tmp & 0xf0) - (value & 0xf0));
         }
         if (sbc & 0x100) sbc -= 0x60;
-        sbc_2comp = (cpu->regs.A & 0xff) - value - !carry;
-        carry = ((int32_t)(sbc_2comp) >= 0) && (sbc_2comp < 0x100);
-        _cpu_p_flags_n_z_data(cpu, (uint8_t)sbc_2comp);
+        sbc_2comp = a_tmp - value - !carry;
+        carry = (sbc_2comp < 0x100);
+        _cpu_p_flags_n_z_data(cpu, (uint8_t)(sbc_2comp & 0xff));
         p = cpu->regs.P;
-	    if (((cpu->regs.A & 0xff) ^ sbc) & (value ^ sbc) & 0x80) p |= kClemensCPUStatus_Overflow;
-        else p &= ~kClemensCPUStatus_Overflow;
-        if (carry) p |= kClemensCPUStatus_Carry;
-        else p &= ~kClemensCPUStatus_Carry;
-        sbc_tmp = (sbc_tmp & 0xf) | sbc;
-        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, sbc_tmp);
+	    if (((a_tmp ^ sbc_2comp) & 0x80) && ((a_tmp ^ value) & 0x80)) {
+            p |= kClemensCPUStatus_Overflow;
+        } else {
+            p &= ~kClemensCPUStatus_Overflow;
+        }
+        if (carry) {
+            p |= kClemensCPUStatus_Carry;
+        } else {
+            p &= ~kClemensCPUStatus_Carry;
+        }
+        cpu->regs.A = CLEM_UTIL_set16_lo(cpu->regs.A, (uint16_t)(sbc & 0xff));
     } else {
-        sbc = (cpu->regs.A & 0x0f) - (value & 0x0f) - !carry;
+        a_tmp = cpu->regs.A;
+        sbc = (a_tmp & 0x0f) - (value & 0x0f) - !carry;
         if (sbc & 0x10) {
             /* borrow */
             sbc = (sbc - 0x06) & 0x0f;
-            sbc |= ((cpu->regs.A & 0xf0) - (value & 0xf0) - 0x10);
+            sbc |= ((a_tmp & 0xf0) - (value & 0xf0) - 0x10);
         } else {
             sbc = (sbc & 0x0f);
-            sbc |= ((cpu->regs.A & 0xf0) - (value & 0xf0));
+            sbc |= ((a_tmp & 0xf0) - (value & 0xf0));
         }
         if (sbc & 0x100) {
             sbc = (sbc - 0x60) & 0xff;
-            sbc |= ((cpu->regs.A & 0xf00) - (value & 0xf00) - 0x100);
+            sbc |= ((a_tmp & 0xf00) - (value & 0xf00) - 0x100);
         } else {
             sbc = (sbc & 0xff);
-            sbc |= ((cpu->regs.A & 0xf00) - (value & 0xf00));
+            sbc |= ((a_tmp & 0xf00) - (value & 0xf00));
         }
         if (sbc & 0x1000) sbc -= 0x600;
-        sbc_2comp = (cpu->regs.A & 0x8000) - value  - !carry;
+        sbc_2comp = a_tmp - value - !carry;
         carry = (sbc_2comp < 0x10000);
         _cpu_p_flags_n_z_data_16(cpu, (uint16_t)sbc_2comp);
         p = cpu->regs.P;
-        if ((cpu->regs.A ^ sbc) & (value ^ sbc) & 0x8000) p |= kClemensCPUStatus_Overflow;
-        else p &= ~kClemensCPUStatus_Overflow;
-        if (carry) p |= kClemensCPUStatus_Carry;
-        else p &= ~kClemensCPUStatus_Carry;
+        if (((a_tmp ^ sbc) & 0x8000) && ((a_tmp ^ value) & 0x8000)) {
+            p |= kClemensCPUStatus_Overflow;
+        }  else {
+            p &= ~kClemensCPUStatus_Overflow;
+        }
+        if (carry) {
+            p |= kClemensCPUStatus_Carry;
+        } else {
+            p &= ~kClemensCPUStatus_Carry;
+        }
         cpu->regs.A = (uint16_t)sbc;
     }
     cpu->regs.P = p;

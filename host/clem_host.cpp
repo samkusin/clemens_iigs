@@ -981,6 +981,8 @@ bool ClemensHost::parseCommand(const char* buffer)
         return parseCommandDebugContext(end);
       } else if (!strncasecmp(start, "set", end - start)) {
         return parseCommandSetValue(end);
+      } else if (!strncasecmp(start, "dump", end - start)) {
+        return parseCommandDump(end);
       }
       return false;
     });
@@ -1283,7 +1285,7 @@ bool ClemensHost::parseCommandSetValue(const char* line)
   return parseCommandToken(start,
     [this](const char* start, const char* end) {
       unsigned value;
-      if (!parseImmediateValue(&value, end)) {
+      if (!parseImmediateValue(value, end)) {
         return false;
       }
 
@@ -1307,7 +1309,28 @@ bool ClemensHost::parseCommandSetValue(const char* line)
     });
 }
 
-bool ClemensHost::parseImmediateValue(unsigned* value, const char* line)
+bool ClemensHost::parseCommandDump(const char* line)
+{
+  const char* start = trimCommand(line);
+  if (!start) {
+    FormatView fv(terminalOutput_);
+    fv.format("usage: dump <bank> <name>");
+    return false;
+  }
+  return parseCommandToken(start,
+    [this](const char* start, const char* end) {
+      char name[16];
+      strncpy(name, start, std::min(sizeof(name) - 1, size_t(end - start)));
+      name[end - start] = '\0';
+      unsigned bank = (unsigned)strtoul(name, NULL, 16);
+      if (bank >= 256) return false;
+
+      dumpMemory(bank, "");
+      return true;
+    });
+}
+
+bool ClemensHost::parseImmediateValue(unsigned& value, const char* line)
 {
   const char* start = trimCommand(line);
   if (!start) {
@@ -1316,15 +1339,33 @@ bool ClemensHost::parseImmediateValue(unsigned* value, const char* line)
     return false;
   }
   return parseCommandToken(start,
-    [this, value](const char* start, const char* end) {
+    [this, &value](const char* start, const char* end) {
       char name[16];
       strncpy(name, start, std::min(sizeof(name) - 1, size_t(end - start)));
       name[end - start] = '\0';
       if (name[0] == '$') {
-        *value = (unsigned)(strtoul(name + 1, NULL, 16));
+        value = (unsigned)(strtoul(name + 1, NULL, 16));
       } else {
-        *value = (unsigned)(strtoul(name, NULL, 10));
+        value = (unsigned)(strtoul(name, NULL, 10));
       }
+      return true;
+    });
+}
+
+bool ClemensHost::parseImmediateString(std::string& value, const char* line)
+{
+  const char* start = trimCommand(line);
+  if (!start) {
+    FormatView fv(terminalOutput_);
+    fv.format("requires an immediate value");
+    return false;
+  }
+  return parseCommandToken(start,
+    [this, &value](const char* start, const char* end) {
+      char name[256];
+      strncpy(name, start, std::min(sizeof(name) - 1, size_t(end - start)));
+      name[end - start] = '\0';
+      value.assign(name);
       return true;
     });
 }
@@ -1633,4 +1674,10 @@ bool ClemensHost::initWOZDisk(struct ClemensWOZDisk* woz) {
   }
 
   return true;
+}
+
+
+void ClemensHost::dumpMemory(unsigned bank, const char* filename)
+{
+
 }
