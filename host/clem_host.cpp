@@ -24,6 +24,9 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include <filesystem>
+#include <fstream>
+
 #include <inttypes.h>
 
 namespace {
@@ -45,8 +48,9 @@ namespace {
   constexpr unsigned kEmulationRunTargetNone = 0xffffffff;
 
   struct FormatView {
-    std::vector<char>& buffer_;
-    FormatView(std::vector<char>& buffer): buffer_(buffer) {}
+    using BufferType = std::vector<char>;
+    BufferType& buffer_;
+    FormatView(BufferType& buffer): buffer_(buffer) {}
     template<typename... Args> void format(const char* formatStr, const Args&... args) {
       size_t sz = fmt::formatted_size(formatStr, args...);
       size_t start = buffer_.size();
@@ -65,7 +69,10 @@ namespace {
       return 'I';
     }
   }
+
 } // namespace anon
+
+#define CLEM_HOST_COUT FormatView(terminalOutput_)
 
 void ClemensHost::Diagnostics::reset()
 {
@@ -112,15 +119,14 @@ ClemensHost::ClemensHost() :
   //  TODO: move into UI
   //FILE* fp = fopen("dos_3_3_master.woz", "rb");
   //FILE* fp = fopen("stargate.woz", "rb");
-  FILE* fp = fopen("oregon_trail_disk_1.woz", "rb");
-  if (fp) {
-    fseek(fp, 0, SEEK_END);
-    long sz = ftell(fp);
-    uint8_t* tmp = (uint8_t*)malloc(sz);
-    fseek(fp, 0, SEEK_SET);
-    fread(tmp, 1, sz, fp);
-    fclose(fp);
-    parseWOZDisk(&disks525_[0], tmp, sz);
+  std::ifstream wozFile("oregon_trail_disk_1.woz", std::ios::binary | std::ios::ate);
+  if (wozFile.is_open()) {
+    unsigned sz = unsigned(wozFile.tellg());
+    char* tmp = new char[sz];
+    wozFile.seekg(0, std::ios::beg);
+    wozFile.read(tmp, sz);
+    wozFile.close();
+    parseWOZDisk(&disks525_[0], (uint8_t*)tmp, sz);
     free(tmp);
   }
 
@@ -461,12 +467,10 @@ void ClemensHost::frame(int width, int height, float deltaTime)
 
     if (ImGui::InputText("", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
       terminalOutput_.clear();
-
-      FormatView fv(terminalOutput_);
       if (parseCommand(buffer)) {
-        fv.format("Ok.");
+        CLEM_HOST_COUT.format("Ok");
       } else {
-        fv.format("Error.");
+        CLEM_HOST_COUT.format("Error");
       }
       widgetInputContext_ = InputContext::TerminalKeyboardFocus;
     }
@@ -1017,8 +1021,7 @@ bool ClemensHost::parseCommandReset(const char* line)
   const char* start = trimCommand(line);
   if (!start) {
     if (!clemens_is_initialized_simple(&machine_)) {
-      FormatView fv(terminalOutput_);
-      fv.format("Machine not powered on.");
+      CLEM_HOST_COUT.format("Machine not powered on.");
       return false;
     }
     resetMachine();
@@ -1032,8 +1035,7 @@ bool ClemensHost::parseCommandDebugStatus(const char* line)
   const char* start = trimCommand(line);
   if (!start) {
     if (!clemens_is_initialized(&machine_)) {
-      FormatView fv(terminalOutput_);
-      fv.format("Machine not powered on.");
+      CLEM_HOST_COUT.format("Machine not powered on.");
       return false;
     }
     clemens_debug_status(&machine_);
@@ -1047,8 +1049,7 @@ bool ClemensHost::parseCommandStep(const char* line)
 {
   const char* start = trimCommand(line);
   if (!clemens_is_initialized(&machine_)) {
-    FormatView fv(terminalOutput_);
-    fv.format("Machine not powered on.");
+    CLEM_HOST_COUT.format("Machine not powered on.");
     return false;
   }
   emulationBreak();
@@ -1069,8 +1070,7 @@ bool ClemensHost::parseCommandStep(const char* line)
 bool ClemensHost::parseCommandBreak(const char* line) {
   const char* start = trimCommand(line);
   if (!clemens_is_initialized(&machine_)) {
-    FormatView fv(terminalOutput_);
-    fv.format("Machine not powered on.");
+    CLEM_HOST_COUT.format("Machine not powered on.");
     return false;
   }
   if (!start) {
@@ -1120,10 +1120,9 @@ bool ClemensHost::parseCommandListBreak(const char* line) {
 
 bool ClemensHost::parseCommandRemoveBreak(const char* line) {
   const char* start = trimCommand(line);
-  FormatView fv(terminalOutput_);
   if (!start) {
     breakpoints_.clear();
-    fv.format("Breakpoints cleared");
+    CLEM_HOST_COUT.format("Breakpoints cleared");
     return true;
   }
   return parseCommandToken(start,
@@ -1140,8 +1139,7 @@ bool ClemensHost::parseCommandRun(const char* line)
 {
   const char* start = trimCommand(line);
   if (!clemens_is_initialized(&machine_)) {
-    FormatView fv(terminalOutput_);
-    fv.format("Machine not powered on.");
+    CLEM_HOST_COUT.format("Machine not powered on.");
     return false;
   }
   if (!start) {
@@ -1162,13 +1160,11 @@ bool ClemensHost::parseCommandLog(const char* line)
 {
   const char* start = trimCommand(line);
   if (!clemens_is_initialized(&machine_)) {
-    FormatView fv(terminalOutput_);
-    fv.format("Machine not powered on.");
+    CLEM_HOST_COUT.format("Machine not powered on.");
     return false;
   }
   if (!start) {
-    FormatView fv(terminalOutput_);
-    fv.format("usage: log <type>");
+    CLEM_HOST_COUT.format("usage: log <type>");
     return false;
   }
   return parseCommandToken(start,
@@ -1187,8 +1183,7 @@ bool ClemensHost::parseCommandLog(const char* line)
       }
       if (!strncasecmp(name, "trace", sizeof(name))) {
         if (programTrace_) {
-          FormatView fv(terminalOutput_);
-          fv.format("trace already active");
+          CLEM_HOST_COUT.format("trace already active");
           return false;
         }
         programTrace_ = std::make_unique<ClemensProgramTrace>();
@@ -1203,12 +1198,10 @@ bool ClemensHost::parseCommandUnlog(const char* line)
 {
   const char* start = trimCommand(line);
   if (!clemens_is_initialized(&machine_)) {
-    FormatView fv(terminalOutput_);
-    fv.format("Machine not powered on.");
+    CLEM_HOST_COUT.format("Machine not powered on.");
     return false;
   }
   if (!start) {
-    FormatView fv(terminalOutput_);
     machine_.mmio.dev_iwm.enable_debug = false;
     machine_.debug_flags &= ~(
        kClemensDebugFlag_StdoutOpcode | kClemensDebugFlag_DebugLogOpcode);
@@ -1233,8 +1226,7 @@ bool ClemensHost::parseCommandUnlog(const char* line)
       }
       if (!strncasecmp(name, "trace", sizeof(name))) {
         if (!programTrace_) {
-          FormatView fv(terminalOutput_);
-          fv.format("trace not active");
+          CLEM_HOST_COUT.format("trace not active");
           return false;
         }
         programTrace_->exportTrace("trace.out");
@@ -1253,8 +1245,7 @@ bool ClemensHost::parseCommandDebugContext(const char* line)
 {
   const char* start = trimCommand(line);
   if (!start) {
-    FormatView fv(terminalOutput_);
-    fv.format("usage: context <iwm|mmap>");
+    CLEM_HOST_COUT.format("usage: context <iwm|mmap>");
     return false;
   }
   return parseCommandToken(start,
@@ -1278,8 +1269,7 @@ bool ClemensHost::parseCommandSetValue(const char* line)
 {
   const char* start = trimCommand(line);
   if (!start) {
-    FormatView fv(terminalOutput_);
-    fv.format("usage: set <a|x|y|pc> <value>");
+    CLEM_HOST_COUT.format("usage: set <a|x|y|pc> <value>");
     return false;
   }
   return parseCommandToken(start,
@@ -1313,8 +1303,7 @@ bool ClemensHost::parseCommandDump(const char* line)
 {
   const char* start = trimCommand(line);
   if (!start) {
-    FormatView fv(terminalOutput_);
-    fv.format("usage: dump <bank> <name>");
+    CLEM_HOST_COUT.format("usage: dump <bank> <name>");
     return false;
   }
   return parseCommandToken(start,
@@ -1334,8 +1323,7 @@ bool ClemensHost::parseImmediateValue(unsigned& value, const char* line)
 {
   const char* start = trimCommand(line);
   if (!start) {
-    FormatView fv(terminalOutput_);
-    fv.format("requires an immediate value");
+    CLEM_HOST_COUT.format("requires an immediate value");
     return false;
   }
   return parseCommandToken(start,
@@ -1356,8 +1344,7 @@ bool ClemensHost::parseImmediateString(std::string& value, const char* line)
 {
   const char* start = trimCommand(line);
   if (!start) {
-    FormatView fv(terminalOutput_);
-    fv.format("requires an immediate value");
+    CLEM_HOST_COUT.format("requires an immediate value");
     return false;
   }
   return parseCommandToken(start,
@@ -1384,21 +1371,26 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
   const uint32_t kClocksPerFastCycle = CLEM_CLOCKS_FAST_CYCLE;
   const uint32_t kClocksPerSlowCycle = CLEM_CLOCKS_MEGA2_CYCLE;
 
+  std::ifstream romFileStream(filename, std::ios::binary | std::ios::ate);
+  void* romMemory = NULL;
+  unsigned romMemorySize = 0;
+
+  if (romFileStream.is_open()) {
+    romMemorySize = unsigned(romFileStream.tellg());
+    romMemory = slab_.allocate(romMemorySize);
+    romFileStream.seekg(0, std::ios::beg);
+    romFileStream.read((char*)romMemory, romMemorySize);
+    romFileStream.close();
+  }
+  if (!romMemory) {
+    CLEM_HOST_COUT.format("{} not found", filename);
+    return false;
+  }
+
   switch (machineType) {
     case MachineType::Apple2GS: {
       audio_->start();
 
-      void* romMemory = NULL;
-      unsigned romMemorySize = 0;
-      FILE* fp = fopen(filename, "rb");
-      if (fp) {
-        fseek(fp, 0, SEEK_END);
-        romMemorySize = (unsigned)ftell(fp);
-        romMemory = slab_.allocate(romMemorySize);
-        fseek(fp, 0, SEEK_SET);
-        fread(romMemory, 1, romMemorySize, fp);
-        fclose(fp);
-      }
       const unsigned fpiBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT;
       clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle,
                   romMemory, romMemorySize,
@@ -1439,25 +1431,11 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
       }
 
       //  load in the hex image for our machine
-      char* hexMemory = NULL;
-      unsigned hexMemorySize = 0;
-      FILE* fp = fopen(filename, "rb");
-      if (fp) {
-        fseek(fp, 0, SEEK_END);
-        hexMemorySize = (unsigned)ftell(fp);
-        hexMemory = (char *)malloc(hexMemorySize);
-        fseek(fp, 0, SEEK_SET);
-        fread(hexMemory, 1, hexMemorySize, fp);
-        //  TODO: allow load into multiple banks as needed
-        //
-        success = clemens_load_hex(
-          &machine_, hexMemory, hexMemory + hexMemorySize, 0x00);
-        if (!success) {
-          FormatView fv(terminalOutput_);
-          fv.format("Failed to ingest {}", filename);
-        }
-        free(hexMemory);
-        fclose(fp);
+      auto* hexMemory = reinterpret_cast<char*>(romMemory);
+      success = clemens_load_hex(
+        &machine_, hexMemory, hexMemory + romMemorySize, 0x00);
+      if (!success) {
+        CLEM_HOST_COUT.format("Failed to ingest hex data from {}", filename);
       }
 
       simpleMachineIO_ = SimpleMachineIO {};
@@ -1679,5 +1657,29 @@ bool ClemensHost::initWOZDisk(struct ClemensWOZDisk* woz) {
 
 void ClemensHost::dumpMemory(unsigned bank, const char* filename)
 {
+  if (!clemens_is_initialized_simple(&machine_)) {
+    CLEM_HOST_COUT.format("Machine not powered on");
+    return;
+  }
 
+  std::string dumpFilePath;
+  if (!filename || !filename[0]) {
+    dumpFilePath = fmt::format("memory_{:02X}.txt", bank);
+  }
+
+  std::ofstream dumpFile(dumpFilePath, std::ios::binary);
+  constexpr unsigned kHexByteCountPerLine = 64;
+  constexpr unsigned kByteCountPerLine = 6 + kHexByteCountPerLine * 2;
+  char* hexDump = new char[kByteCountPerLine + 1];
+  unsigned adr = 0x0000;
+
+  while (adr < 0x10000) {
+    snprintf(hexDump, kByteCountPerLine + 1, "%04X: ", adr);
+    clemens_out_hex_data_body(
+      &machine_, hexDump + 6, kHexByteCountPerLine * 2, bank, adr);
+    hexDump[kByteCountPerLine] = '\n';
+    dumpFile.write(hexDump, kByteCountPerLine + 1);
+    adr += 0x40;
+  }
+  delete[] hexDump;
 }

@@ -1107,7 +1107,7 @@ unsigned clemens_out_hex_data_body(
         hex[byte_idx*2 + 1] = g_decimal_to_hex[(byte & 0x0f)];
         chksum += byte;
     }
-    hex[byte_idx] = '\0';
+    hex[byte_idx * 2] = '\0';
     return chksum;
 }
 
