@@ -287,20 +287,28 @@
 #define CLEM_MMIO_REG_C074_TRANSWARP    0x74
 /** R1 - LC Bank 2, Read RAM, Write Protect */
 #define CLEM_MMIO_REG_LC2_RAM_WP        0x80
+#define CLEM_MMIO_REG_LC2_RAM_WP2       0x84
 /** R2 - LC Bank 2, Read ROM, Write Enable */
 #define CLEM_MMIO_REG_LC2_ROM_WE        0x81
+#define CLEM_MMIO_REG_LC2_ROM_WE2       0x85
 /** R1 - LC Bank 2, Read ROM, Write Protect */
 #define CLEM_MMIO_REG_LC2_ROM_WP        0x82
+#define CLEM_MMIO_REG_LC2_ROM_WP2       0x86
 /** R2 - LC Bank 2, Read and Write Enable */
 #define CLEM_MMIO_REG_LC2_RAM_WE        0x83
+#define CLEM_MMIO_REG_LC2_RAM_WE2       0x87
 /** R1 - LC Bank 1, Read RAM, Write Protect */
 #define CLEM_MMIO_REG_LC1_RAM_WP        0x88
+#define CLEM_MMIO_REG_LC1_RAM_WP2       0x8C
 /** R2 - LC Bank 1, Read ROM, Write Enable */
 #define CLEM_MMIO_REG_LC1_ROM_WE        0x89
+#define CLEM_MMIO_REG_LC1_ROM_WE2       0x8D
 /** R1 - LC Bank 2, Read ROM, Write Protect */
 #define CLEM_MMIO_REG_LC1_ROM_WP        0x8A
+#define CLEM_MMIO_REG_LC1_ROM_WP2       0x8E
 /** R2 - LC Bank 1, Read and Write Enable */
 #define CLEM_MMIO_REG_LC1_RAM_WE        0x8B
+#define CLEM_MMIO_REG_LC1_RAM_WE2       0x8F
 
 /** IWM registers */
 #define CLEM_MMIO_REG_IWM_PHASE0_LO     0xE0
