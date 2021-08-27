@@ -24,7 +24,6 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include <filesystem>
 #include <fstream>
 
 #include <inttypes.h>
@@ -119,17 +118,8 @@ ClemensHost::ClemensHost() :
   //  TODO: move into UI
   //FILE* fp = fopen("dos_3_3_master.woz", "rb");
   //FILE* fp = fopen("stargate.woz", "rb");
-  std::ifstream wozFile("oregon_trail_disk_1.woz", std::ios::binary | std::ios::ate);
-  if (wozFile.is_open()) {
-    unsigned sz = unsigned(wozFile.tellg());
-    char* tmp = new char[sz];
-    wozFile.seekg(0, std::ios::beg);
-    wozFile.read(tmp, sz);
-    wozFile.close();
-    parseWOZDisk(&disks525_[0], (uint8_t*)tmp, sz);
-    free(tmp);
-  }
-
+  loadWOZDisk("oregon_trail_disk_1.woz", 0);
+  //loadWOZDisk("ultima_i_player.woz", 1);
   disks525_[1].disk_type = CLEM_WOZ_DISK_5_25;
   initWOZDisk(&disks525_[1]);
 
@@ -1538,6 +1528,22 @@ void ClemensHost::emulatorOpcodePrint(
   if (host->programTrace_) {
     host->programTrace_->addExecutedInstruction(*inst, operand, host->machine_);
   }
+}
+
+bool ClemensHost::loadWOZDisk(const char* filename, int drive_index)
+{
+  std::ifstream wozFile(filename, std::ios::binary | std::ios::ate);
+  if (wozFile.is_open()) {
+    unsigned sz = unsigned(wozFile.tellg());
+    char* tmp = new char[sz];
+    wozFile.seekg(0, std::ios::beg);
+    wozFile.read(tmp, sz);
+    wozFile.close();
+    parseWOZDisk(&disks525_[drive_index], (uint8_t*)tmp, sz);
+    free(tmp);
+    return true;
+  }
+  return false;
 }
 
 bool ClemensHost::parseWOZDisk(
