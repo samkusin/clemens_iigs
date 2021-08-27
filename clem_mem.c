@@ -465,6 +465,7 @@ static uint8_t _clem_mmio_rw_bank_select(
     uint32_t memory_flags = mmio->mmap_register;
     uint16_t last_data_address = mmio->last_data_address & 0xffff;
     uint8_t ioreg = (address & 0xff);
+
     /* odd address access will enable ram writes first before their other ops
        which handles applications that perform single reads on the odd
        addressed softswitches after a prior write-enable double read switch.
@@ -473,7 +474,9 @@ static uint8_t _clem_mmio_rw_bank_select(
     switch (ioreg) {
         case CLEM_MMIO_REG_LC2_RAM_WP:
             memory_flags |= (CLEM_MEM_IO_MMAP_RDLCRAM + CLEM_MEM_IO_MMAP_LCBANK2);
-            memory_flags &= ~CLEM_MEM_IO_MMAP_WRLCRAM;
+            if (last_data_address == address) {
+                memory_flags &= ~CLEM_MEM_IO_MMAP_WRLCRAM;
+            }
             break;
         case CLEM_MMIO_REG_LC2_ROM_WE:
             memory_flags |= CLEM_MEM_IO_MMAP_LCBANK2;
@@ -483,19 +486,24 @@ static uint8_t _clem_mmio_rw_bank_select(
             }
             break;
         case CLEM_MMIO_REG_LC2_ROM_WP:
-            memory_flags &= ~(CLEM_MEM_IO_MMAP_RDLCRAM + CLEM_MEM_IO_MMAP_WRLCRAM);
+            memory_flags &= ~(CLEM_MEM_IO_MMAP_RDLCRAM);
             memory_flags |= CLEM_MEM_IO_MMAP_LCBANK2;
+            if (last_data_address == address) {
+                memory_flags &= ~CLEM_MEM_IO_MMAP_WRLCRAM;
+            }
             break;
         case CLEM_MMIO_REG_LC2_RAM_WE:
-            memory_flags |= (CLEM_MEM_IO_MMAP_RDLCRAM +
-                                CLEM_MEM_IO_MMAP_LCBANK2);
+            memory_flags |= (CLEM_MEM_IO_MMAP_RDLCRAM + CLEM_MEM_IO_MMAP_LCBANK2);
             if (last_data_address == address) {
                 memory_flags |= CLEM_MEM_IO_MMAP_WRLCRAM;
             }
             break;
         case CLEM_MMIO_REG_LC1_RAM_WP:
-            memory_flags &= ~(CLEM_MEM_IO_MMAP_LCBANK2 + CLEM_MEM_IO_MMAP_WRLCRAM);
+            memory_flags &= ~(CLEM_MEM_IO_MMAP_LCBANK2);
             memory_flags |= CLEM_MEM_IO_MMAP_RDLCRAM;
+            if (last_data_address == address) {
+                memory_flags &= ~CLEM_MEM_IO_MMAP_WRLCRAM;
+            }
             break;
         case CLEM_MMIO_REG_LC1_ROM_WE:
             memory_flags &= ~(CLEM_MEM_IO_MMAP_RDLCRAM + CLEM_MEM_IO_MMAP_LCBANK2);
@@ -504,8 +512,11 @@ static uint8_t _clem_mmio_rw_bank_select(
             }
             break;
         case CLEM_MMIO_REG_LC1_ROM_WP:
-            memory_flags &= ~(CLEM_MEM_IO_MMAP_LCBANK2 + CLEM_MEM_IO_MMAP_WRLCRAM +
+            memory_flags &= ~(CLEM_MEM_IO_MMAP_LCBANK2 +
                               CLEM_MEM_IO_MMAP_RDLCRAM);
+            if (last_data_address == address) {
+                memory_flags &= ~CLEM_MEM_IO_MMAP_WRLCRAM;
+            }
             break;
         case CLEM_MMIO_REG_LC1_RAM_WE:
             memory_flags |= CLEM_MEM_IO_MMAP_RDLCRAM;
