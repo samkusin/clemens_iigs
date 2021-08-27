@@ -473,12 +473,14 @@ static uint8_t _clem_mmio_rw_bank_select(
        assumes that the dual write is to perform */
     switch (ioreg) {
         case CLEM_MMIO_REG_LC2_RAM_WP:
+        case CLEM_MMIO_REG_LC2_RAM_WP2:
             memory_flags |= (CLEM_MEM_IO_MMAP_RDLCRAM + CLEM_MEM_IO_MMAP_LCBANK2);
             if (last_data_address == address) {
                 memory_flags &= ~CLEM_MEM_IO_MMAP_WRLCRAM;
             }
             break;
         case CLEM_MMIO_REG_LC2_ROM_WE:
+        case CLEM_MMIO_REG_LC2_ROM_WE2:
             memory_flags |= CLEM_MEM_IO_MMAP_LCBANK2;
             memory_flags &= ~CLEM_MEM_IO_MMAP_RDLCRAM;
             if (last_data_address == address) {
@@ -486,6 +488,7 @@ static uint8_t _clem_mmio_rw_bank_select(
             }
             break;
         case CLEM_MMIO_REG_LC2_ROM_WP:
+        case CLEM_MMIO_REG_LC2_ROM_WP2:
             memory_flags &= ~(CLEM_MEM_IO_MMAP_RDLCRAM);
             memory_flags |= CLEM_MEM_IO_MMAP_LCBANK2;
             if (last_data_address == address) {
@@ -493,12 +496,14 @@ static uint8_t _clem_mmio_rw_bank_select(
             }
             break;
         case CLEM_MMIO_REG_LC2_RAM_WE:
+        case CLEM_MMIO_REG_LC2_RAM_WE2:
             memory_flags |= (CLEM_MEM_IO_MMAP_RDLCRAM + CLEM_MEM_IO_MMAP_LCBANK2);
             if (last_data_address == address) {
                 memory_flags |= CLEM_MEM_IO_MMAP_WRLCRAM;
             }
             break;
         case CLEM_MMIO_REG_LC1_RAM_WP:
+        case CLEM_MMIO_REG_LC1_RAM_WP2:
             memory_flags &= ~(CLEM_MEM_IO_MMAP_LCBANK2);
             memory_flags |= CLEM_MEM_IO_MMAP_RDLCRAM;
             if (last_data_address == address) {
@@ -506,12 +511,14 @@ static uint8_t _clem_mmio_rw_bank_select(
             }
             break;
         case CLEM_MMIO_REG_LC1_ROM_WE:
+        case CLEM_MMIO_REG_LC1_ROM_WE2:
             memory_flags &= ~(CLEM_MEM_IO_MMAP_RDLCRAM + CLEM_MEM_IO_MMAP_LCBANK2);
             if (last_data_address == address) {
                 memory_flags |= CLEM_MEM_IO_MMAP_WRLCRAM;
             }
             break;
         case CLEM_MMIO_REG_LC1_ROM_WP:
+        case CLEM_MMIO_REG_LC1_ROM_WP2:
             memory_flags &= ~(CLEM_MEM_IO_MMAP_LCBANK2 +
                               CLEM_MEM_IO_MMAP_RDLCRAM);
             if (last_data_address == address) {
@@ -519,6 +526,7 @@ static uint8_t _clem_mmio_rw_bank_select(
             }
             break;
         case CLEM_MMIO_REG_LC1_RAM_WE:
+        case CLEM_MMIO_REG_LC1_RAM_WE2:
             memory_flags |= CLEM_MEM_IO_MMAP_RDLCRAM;
             memory_flags &= ~CLEM_MEM_IO_MMAP_LCBANK2;
             if (last_data_address == address) {
@@ -768,13 +776,21 @@ static uint8_t _clem_mmio_read(
             result = clem_game_read_switch(&mmio->dev_game, &ref_clock, ioreg, flags);
             break;
         case CLEM_MMIO_REG_LC2_RAM_WP:
+        case CLEM_MMIO_REG_LC2_RAM_WP2:
         case CLEM_MMIO_REG_LC2_ROM_WE:
+        case CLEM_MMIO_REG_LC2_ROM_WE2:
         case CLEM_MMIO_REG_LC2_ROM_WP:
+        case CLEM_MMIO_REG_LC2_ROM_WP2:
         case CLEM_MMIO_REG_LC2_RAM_WE:
+        case CLEM_MMIO_REG_LC2_RAM_WE2:
         case CLEM_MMIO_REG_LC1_RAM_WP:
+        case CLEM_MMIO_REG_LC1_RAM_WP2:
         case CLEM_MMIO_REG_LC1_ROM_WE:
+        case CLEM_MMIO_REG_LC1_ROM_WE2:
         case CLEM_MMIO_REG_LC1_ROM_WP:
+        case CLEM_MMIO_REG_LC1_ROM_WP2:
         case CLEM_MMIO_REG_LC1_RAM_WE:
+        case CLEM_MMIO_REG_LC1_RAM_WE2:
             if (!(flags & CLEM_MEM_IO_READ_NO_OP)) {
                 result = _clem_mmio_rw_bank_select(mmio, addr);
             }
@@ -1030,13 +1046,21 @@ static void _clem_mmio_write(
             clem_game_write_switch(&mmio->dev_game, &ref_clock, ioreg, data);
             break;
         case CLEM_MMIO_REG_LC2_RAM_WP:
+        case CLEM_MMIO_REG_LC2_RAM_WP2:
         case CLEM_MMIO_REG_LC2_ROM_WE:
+        case CLEM_MMIO_REG_LC2_ROM_WE2:
         case CLEM_MMIO_REG_LC2_ROM_WP:
+        case CLEM_MMIO_REG_LC2_ROM_WP2:
         case CLEM_MMIO_REG_LC2_RAM_WE:
+        case CLEM_MMIO_REG_LC2_RAM_WE2:
         case CLEM_MMIO_REG_LC1_RAM_WP:
+        case CLEM_MMIO_REG_LC1_RAM_WP2:
         case CLEM_MMIO_REG_LC1_ROM_WE:
+        case CLEM_MMIO_REG_LC1_ROM_WE2:
         case CLEM_MMIO_REG_LC1_ROM_WP:
+        case CLEM_MMIO_REG_LC1_ROM_WP2:
         case CLEM_MMIO_REG_LC1_RAM_WE:
+        case CLEM_MMIO_REG_LC1_RAM_WE2:
             _clem_mmio_rw_bank_select(mmio, addr);
             break;
         case CLEM_MMIO_REG_STATEREG:
