@@ -17,7 +17,7 @@ This is a running todo list.
 * Save Battery RAM
 * Capslock
 * AN3 and Dblhires
-* Some Simple Apple II games testing
+* Save state
 * remaining //e softswitches
   * Joystick, Paddle
 * Timing checks on native mode versions of:
@@ -55,6 +55,10 @@ This is a running todo list.
 
 ## DONE
 
+* Some Simple Apple II games testing
+  * Oregon Trail Plays
+  * Sammy Lightfoot Plays
+  * Ultima I plays (two disks)
 * Fixed c08x write protect switches (and now Oregon Trail plays!)
 * Fixed BRK and Decimal mode according to test failures
 * Run 6502 test suite from Klaus

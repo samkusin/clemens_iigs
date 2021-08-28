@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(clements_65816 LANGUAGES C)
+project(clemens_65816 LANGUAGES C)
 
 function(project_create_assets_target ARG_TARGET_NAME)
     set(_TARGET_RUNTIME_OUTPUT_DIRECTORY
@@ -52,11 +52,26 @@ set(EMULATOR_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_mem.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/emulator.c")
 
+set(CONTRIB_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/contrib/mpack.c"
+    )
+
 add_library(clemens_65816 STATIC
+    ${CONTRIB_SOURCES}
     ${EMULATOR_SOURCES})
 
 target_include_directories(clemens_65816
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+
+add_library(clemens_65816_serializer STATIC
+    ${CONTRIB_SOURCES}
+    "${CMAKE_CURRENT_SOURCE_DIR}/serializer.c")
+
+target_link_libraries(clemens_65816_serializer PUBLIC clemens_65816)
+
+target_include_directories(clemens_65816_serializer
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+
 
 add_subdirectory(tests)
 
