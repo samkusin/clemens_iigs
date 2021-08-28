@@ -48,7 +48,9 @@ add_executable(clemens_iigs
 target_include_directories(clemens_iigs
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(clemens_iigs
-    PRIVATE clemens_65816)
+    PRIVATE
+        clemens_65816
+        clemens_65816_serializer)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(clemens_iigs PRIVATE -Wall -Wextra -pedantic)
