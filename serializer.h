@@ -4,9 +4,40 @@
 #include "clem_types.h"
 #include "contrib/mpack.h"
 
+#define CLEM_SERIALIZER_INVALID_RECORD      (UINT_MAX)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+enum ClemensSerializerType {
+    kClemensSerializerTypeEmpty,
+    kClemensSerializerTypeRoot,
+    kClemensSerializerTypeBool,
+    kClemensSerializerTypeUInt8,
+    kClemensSerializerTypeUInt16,
+    kClemensSerializerTypeUInt32,
+    kClemensSerializerTypeInt32,
+    kClemensSerializerTypeFloat,
+    kClemensSerializerTypeDuration,
+    kClemensSerializerTypeClocks,
+    kClemensSerializerTypeBlob,
+    kClemensSerializerTypeArray,
+    kClemensSerializerTypeObject
+};
+
+struct ClemensSerializerRecord {
+    const char* name;
+    enum ClemensSerializerType type;
+    enum ClemensSerializerType array_type;
+    unsigned offset;
+    unsigned size;
+    unsigned param;
+
+    struct ClemensSerializerRecord* records;
+};
+
+typedef uint8_t*(*ClemensSerializerAllocateCb)(unsigned);
 
 /**
  * @brief
@@ -28,79 +59,45 @@ mpack_writer_t* clemens_serialize_machine(
  */
 mpack_reader_t* clemens_unserialize_machine(
     mpack_reader_t* writer,
-    ClemensMachine* machine);
+    ClemensMachine* machine,
+    ClemensSerializerAllocateCb alloc_cb);
 
 /* The following APIs are provided for completeness, but they are typically
    not called directly by the application (called instead by the main machine
    APIs above.)
 */
-
-/**
- * @brief
- *
- * @param writer
- * @param machine
- * @return mpack_writer_t*
- */
-mpack_writer_t* clemens_serialize_cpu(
+unsigned clemens_serialize_object(
     mpack_writer_t* writer,
-    struct Clemens65C816* cpu);
+    uintptr_t data_adr,
+    const struct ClemensSerializerRecord* record);
 
-/**
- * @brief
- *
- * @param writer
- * @param mmio
- * @return mpack_writer_t*
- */
-mpack_writer_t* clemens_serialize_mmio(
+unsigned clemens_serialize_array(
     mpack_writer_t* writer,
-    struct ClemensMMIO* mmio);
+    uintptr_t data_adr,
+    const struct ClemensSerializerRecord* record);
 
-/**
- * @brief
- *
- * @param writer
- * @param drives
- * @return mpack_writer_t*
- */
-mpack_writer_t* clemens_serialize_drives(
+unsigned clemens_serialize_record(
     mpack_writer_t* writer,
-    struct ClemensDriveBay* drives);
+    uintptr_t data_adr,
+    const struct ClemensSerializerRecord* record);
 
-/**
- * @brief
- *
- * @param writer
- * @param cpu
- * @return mpack_writer_t*
- */
-mpack_reader_t* clemens_unserialize_cpu(
-    mpack_reader_t* writer,
-    struct Clemens65C816* cpu);
+unsigned clemens_unserialize_object(
+    mpack_reader_t* reader,
+    uintptr_t data_adr,
+    const struct ClemensSerializerRecord* record,
+    ClemensSerializerAllocateCb alloc_cb);
 
-/**
- * @brief
- *
- * @param writer
- * @param mmio
- * @return mpack_reader_t*
- */
-mpack_reader_t* clemens_unserialize_mmio(
-    mpack_reader_t* writer,
-    struct ClemensMMIO* mmio);
+unsigned clemens_unserialize_array(
+    mpack_reader_t* reader,
+    uintptr_t data_adr,
+    const struct ClemensSerializerRecord* record,
+    ClemensSerializerAllocateCb alloc_cb);
 
-/**
- * @brief
- *
- * @param writer
- * @param drives
- * @return mpack_reader_t*
- */
-mpack_reader_t* clemens_unserialize_drives(
-    mpack_reader_t* writer,
-    struct ClemensDriveBay* drives);
-
+unsigned clemens_unserialize_record(
+    mpack_reader_t* reader,
+    uintptr_t data_adr,
+    const struct ClemensSerializerRecord* record,
+    ClemensSerializerAllocateCb alloc_cb);
 
 #ifdef __cplusplus
 }

@@ -597,6 +597,7 @@ typedef struct {
     /* clock timer - never change once system has been started */
     clem_clocks_time_t clocks_spent;
 
+    /* each used bank MUST be 64K (65536) bytes */
     uint8_t* fpi_bank_map[256];     // $00 - $ff
 
     /* Provides remapping of memory read/write access per bank.  For the IIgs,

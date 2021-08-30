@@ -61,6 +61,8 @@ private:
   bool parseCommand(const char* buffer);
   bool parseCommandPower(const char* line);
   bool parseCommandReset(const char* line);
+  bool parseCommandLoad(const char* line);
+  bool parseCommandSave(const char* line);
   bool parseCommandDebugStatus(const char* line);
   bool parseCommandStep(const char* line);
   bool parseCommandBreak(const char* line);
@@ -84,10 +86,12 @@ private:
   bool createMachine(const char* filename, MachineType machineType);
   void destroyMachine();
   void resetMachine();
+  bool saveState(const char* filename);
   void stepMachine(int stepCount);
   bool emulationRun(unsigned target);
   void emulationBreak();
   void resetDiagnostics();
+
 
   void dumpMemory(unsigned bank, const char* filename);
 
