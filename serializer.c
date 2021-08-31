@@ -1,4 +1,5 @@
 #include "serializer.h"
+#include "clem_woz.h"
 
 /* Serializing the Machine */
 
@@ -16,6 +17,10 @@ union ClemensSerializerVariant {
     bool b;
 };
 
+#define CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER      0x00000001
+#define CLEM_SERIALIZER_CUSTOM_RECORD_WOZ_DISK              0x00000002
+
+
 #define CLEM_SERIALIZER_RECORD_COUNT(_records_) \
     (sizeof(_records_) / sizeof(struct ClemensSerializerRecord))
 
@@ -27,6 +32,9 @@ union ClemensSerializerVariant {
 
 #define CLEM_SERIALIZER_RECORD_ARRAY(_struct_, _type_, _name_, _size_, _param_) \
     CLEM_SERIALIZER_RECORD_PARAM(_struct_, kClemensSerializerTypeArray, _type_, _name_, _size_, _param_, NULL)
+
+#define CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(_struct_, _name_, _size_, _object_type_, _records_) \
+    CLEM_SERIALIZER_RECORD_PARAM(_struct_, kClemensSerializerTypeArray, kClemensSerializerTypeObject, _name_, _size_, sizeof(_object_type_), _records_)
 
 #define CLEM_SERIALIZER_RECORD_BOOL(_struct_, _name_) \
     CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeBool, _name_)
@@ -63,6 +71,10 @@ union ClemensSerializerVariant {
     _struct_, _name_, _object_type_, _records_) \
     CLEM_SERIALIZER_RECORD_PARAM( \
         _struct_, kClemensSerializerTypeObject, kClemensSerializerTypeEmpty, _name_, sizeof(_object_type_), 0, _records_)
+
+#define CLEM_SERIALIZER_RECORD_CUSTOM(_struct_, _name_, _object_type_, _record_id_) \
+    CLEM_SERIALIZER_RECORD_PARAM(_struct_, kClemensSerializerTypeCustom, kClemensSerializerTypeEmpty, \
+        _name_, sizeof(_object_type_), _record_id_, NULL)
 
 #define CLEM_SERIALIZER_RECORD_EMPTY() \
     { NULL, kClemensSerializerTypeEmpty, kClemensSerializerTypeEmpty, 0, 0, 0, NULL}
@@ -173,19 +185,80 @@ struct ClemensSerializerRecord kTimer[] = {
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 
+struct ClemensSerializerRecord kJSRContext[] = {
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDebugJSRContext, adr),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDebugJSRContext, jmp),
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensDebugJSRContext, sp),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
 struct ClemensSerializerRecord kDebugger[] = {
+    CLEM_SERIALIZER_RECORD_ARRAY(
+        struct ClemensDeviceDebugger, kClemensSerializerTypeUInt32, ioreg_read_ctr, 256, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(
+        struct ClemensDeviceDebugger, kClemensSerializerTypeUInt32, ioreg_write_ctr, 256, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(
+        struct ClemensDeviceDebugger, jsr_contexts, CLEM_DEBUG_JSR_CONTEXT_LIMIT, struct ClemensDebugJSRContext, kJSRContext),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceDebugger, jsr_context_count),
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 
 struct ClemensSerializerRecord kAudio[] = {
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceAudio, kClemensSerializerTypeUInt8, sound_ram, 65536, 0),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceAudio, address),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceAudio, ram_read_cntr),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceAudio, kClemensSerializerTypeUInt8, doc_reg, 256, 0),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceAudio, addr_auto_inc),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceAudio, is_access_ram),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceAudio, is_busy),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceAudio, volume),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceAudio, a2_speaker),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceAudio, a2_speaker_tense),
+    CLEM_SERIALIZER_RECORD_CUSTOM(struct ClemensDeviceAudio, mix_buffer,
+        struct ClemensAudioMixBuffer, CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER),
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceAudio, ts_last_frame),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceAudio, dt_mix_frame),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceAudio, dt_mix_sample),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceAudio, mix_frame_index),
+    CLEM_SERIALIZER_RECORD_FLOAT(struct ClemensDeviceAudio, tone_frame_delta),
+    CLEM_SERIALIZER_RECORD_FLOAT(struct ClemensDeviceAudio, tone_theta),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceAudio, tone_frequency),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceAudio, irq_line),
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 
 struct ClemensSerializerRecord kSCC[] = {
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceSCC, ts_last_frame),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceSCC, kClemensSerializerTypeUInt32, selected_reg, 2, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceSCC, kClemensSerializerTypeUInt8, serial, 2, 0),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCC, irq_line),
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 
 struct ClemensSerializerRecord kIWM[] = {
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, last_clocks_ts),
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, last_write_clocks_ts),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceIWM, lss_clocks_lag),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, io_flags),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, out_phase),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, enbl2),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceIWM, data),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceIWM, latch),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceIWM, write_out),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceIWM, disk_motor_on),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, q6_switch),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, q7_switch),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, timer_1sec_disabled),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, async_write_mode),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, latch_mode),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, clock_8mhz),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, state),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, ns_latch_hold),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, ns_drive_hold),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, lss_state),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, lss_write_counter),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, lss_update_dt_ns),
+    /* skip enable_debug and all debug options */
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 
@@ -238,6 +311,41 @@ struct ClemensSerializerRecord kMMIO[] = {
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, timer_60hz_us),
     CLEM_SERIALIZER_RECORD_INT32(struct ClemensMMIO, card_expansion_rom_index),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, irq_line),
+
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kDrive[] = {
+    CLEM_SERIALIZER_RECORD_CUSTOM(
+        struct ClemensDrive, data, struct ClemensWOZDisk,
+        CLEM_SERIALIZER_CUSTOM_RECORD_WOZ_DISK),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDrive, qtr_track_index),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, track_byte_index),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, track_bit_shift),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, track_bit_length),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, pulse_ns),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, read_buffer),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, q03_switch),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, cog_orient),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, state_35),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, query_35),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, step_timer_35_ns),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDrive, select_35),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDrive, write_pulse),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDrive, real_track_index),
+    CLEM_SERIALIZER_RECORD_ARRAY(
+        struct ClemensDrive, kClemensSerializerTypeUInt8, random_bits,
+        CLEM_IWM_DRIVE_RANDOM_BYTES, 0),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, random_bit_index),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+
+struct ClemensSerializerRecord kDriveBay[] = {
+    CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(
+        struct ClemensDriveBay, slot5, 2, struct ClemensDrive, kDrive),
+    CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(
+        struct ClemensDriveBay, slot6, 2, struct ClemensDrive, kDrive),
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 
@@ -250,12 +358,44 @@ struct ClemensSerializerRecord kMachine[] = {
     CLEM_SERIALIZER_RECORD_INT32(ClemensMachine, resb_counter),
     CLEM_SERIALIZER_RECORD_BOOL(ClemensMachine, mmio_bypass),
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, mmio, struct ClemensMMIO, kMMIO),
-    CLEM_SERIALIZER_RECORD_ARRAY(ClemensMachine,
-        kClemensSerializerTypeBlob, fpi_bank_map, 256, CLEM_IIGS_BANK_SIZE),
+    CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, active_drives, struct ClemensDriveBay, kDriveBay),
+
+    /* FPI bank map has custom serialization */
     CLEM_SERIALIZER_RECORD_ARRAY(ClemensMachine,
         kClemensSerializerTypeBlob, mega2_bank_map, 2, CLEM_IIGS_BANK_SIZE),
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
+
+struct ClemensSerializerRecord kWOZDisk[] = {
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, disk_type),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, boot_type),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, flags),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, required_ram_kb),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, max_track_size_bytes),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, bit_timing_ns),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, track_count),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, default_track_bit_length),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensWOZDisk,
+        kClemensSerializerTypeUInt8, meta_track_map, CLEM_WOZ_LIMIT_QTR_TRACKS, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensWOZDisk,
+        kClemensSerializerTypeUInt32, track_byte_offset, CLEM_WOZ_LIMIT_QTR_TRACKS, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensWOZDisk,
+        kClemensSerializerTypeUInt32, track_byte_count, CLEM_WOZ_LIMIT_QTR_TRACKS, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensWOZDisk,
+        kClemensSerializerTypeUInt32, track_bits_count, CLEM_WOZ_LIMIT_QTR_TRACKS, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensWOZDisk,
+        kClemensSerializerTypeUInt8, track_initialized, CLEM_WOZ_LIMIT_QTR_TRACKS, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensWOZDisk, kClemensSerializerTypeUInt8, creator, 32, 0),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+static unsigned clemens_serialize_custom(
+    mpack_writer_t* writer,
+    void* ptr,
+    unsigned sz,
+    unsigned record_id
+);
+
 
 unsigned clemens_serialize_record(
     mpack_writer_t* writer,
@@ -327,6 +467,10 @@ unsigned clemens_serialize_record(
         case kClemensSerializerTypeObject:
             sz = clemens_serialize_object(writer, data_adr + record->offset, record);
             break;
+        case kClemensSerializerTypeCustom:
+            sz = clemens_serialize_custom(
+                writer, (void *)(data_adr + record->offset), record->size, record->param);
+            break;
     }
     return sz;
 }
@@ -347,7 +491,9 @@ unsigned clemens_serialize_array(
     memset(&value_record, 0, sizeof(value_record));
     value_record.type = record->array_type;
     value_record.records = record->records;     /* for arrays of objects */
-    if (value_record.type == kClemensSerializerTypeBlob) {
+    if (value_record.type == kClemensSerializerTypeBlob ||
+        value_record.type == kClemensSerializerTypeObject
+    ) {
         value_record.size = record->param;
     }
     for (idx = 0; idx < record->size; ++idx) {
@@ -359,6 +505,64 @@ unsigned clemens_serialize_array(
     return array_value_adr - data_adr;
 }
 
+static void clemens_serialize_records(
+    mpack_writer_t* writer,
+    uintptr_t data_adr,
+    const struct ClemensSerializerRecord* record
+ ) {
+    while (record->type != kClemensSerializerTypeEmpty) {
+        mpack_write_cstr(writer, record->name);
+        clemens_serialize_record(writer, data_adr, record);
+        ++record;
+    }
+}
+
+static unsigned clemens_serialize_custom(
+    mpack_writer_t* writer,
+    void* ptr,
+    unsigned sz,
+    unsigned record_id
+) {
+    struct ClemensAudioMixBuffer* audio_mix_buffer;
+    struct ClemensWOZDisk* woz_disk;
+
+    unsigned blob_size;
+
+    mpack_build_map(writer);
+    switch (record_id) {
+        case CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER:
+            audio_mix_buffer = (struct ClemensAudioMixBuffer *)(ptr);
+            mpack_write_cstr(writer, "frame_count");
+            mpack_write_u32(writer, audio_mix_buffer->frame_count);
+            mpack_write_cstr(writer, "frames_per_second");
+            mpack_write_u32(writer, audio_mix_buffer->frames_per_second);
+            mpack_write_cstr(writer, "stride");
+            mpack_write_u32(writer, audio_mix_buffer->stride);
+            mpack_write_cstr(writer, "data");
+            mpack_write_bin(writer, (char *)audio_mix_buffer->data,
+                audio_mix_buffer->frame_count * audio_mix_buffer->stride);
+            break;
+
+        case CLEM_SERIALIZER_CUSTOM_RECORD_WOZ_DISK:
+            woz_disk = (struct ClemensWOZDisk *)ptr;
+            clemens_serialize_records(writer, (uintptr_t)woz_disk, &kWOZDisk[0]);
+            mpack_write_cstr(writer, "bits_data");
+            if (woz_disk->bits_data != NULL) {
+                mpack_write_bool(writer, true);
+                blob_size = (woz_disk->bits_data_end - woz_disk->bits_data);
+                mpack_write_cstr(writer, "blob");
+                mpack_write_bin(writer, (char *)woz_disk->bits_data, blob_size);
+            } else {
+                mpack_write_bool(writer, false);
+            }
+            break;
+
+    }
+    mpack_complete_map(writer);
+    return sz;
+}
+
+
 unsigned clemens_serialize_object(
     mpack_writer_t* writer,
     uintptr_t data_adr,
@@ -366,11 +570,7 @@ unsigned clemens_serialize_object(
 ) {
     const struct ClemensSerializerRecord* child = record->records;
     mpack_build_map(writer);
-    while (child->type != kClemensSerializerTypeEmpty) {
-        mpack_write_cstr(writer, child->name);
-        clemens_serialize_record(writer, data_adr, child);
-        ++child;
-    }
+    clemens_serialize_records(writer, data_adr, child);
     mpack_complete_map(writer);
     return record->size;
 }
@@ -383,16 +583,38 @@ mpack_writer_t* clemens_serialize_machine(
     struct ClemensSerializerRecord root;
     union ClemensSerializerVariant variant;
     void* data_adr = (void *)machine;
+    unsigned idx;
 
     memset(&root, 0, sizeof(root));
     root.type = kClemensSerializerTypeRoot;
     root.records = &kMachine[0];
     clemens_serialize_object(writer, (uintptr_t)data_adr, &root);
 
+    /* serialize FPI banks - this lies outside the procedural laying out of
+       values to serialize via record arrays since the logic is here is very
+       special cased to avoid unnecessary serialization
+    */
+    for (idx = 0; idx < 256; ++idx) {
+        mpack_write_bool(writer, machine->fpi_bank_used[idx]);
+        if (machine->fpi_bank_used[idx]) {
+            mpack_write_u8(writer, (uint8_t)(idx & 0xff));
+            mpack_write_bin(
+                writer, (char *)machine->fpi_bank_map[idx], CLEM_IIGS_BANK_SIZE);
+        }
+    }
+
     return writer;
 }
 
 /* Unserializing the Machine */
+
+static unsigned clemens_unserialize_custom(
+    mpack_reader_t* reader,
+    void* ptr,
+    unsigned sz,
+    unsigned record_id,
+    ClemensSerializerAllocateCb alloc_cb
+);
 
 unsigned clemens_unserialize_record(
     mpack_reader_t* reader,
@@ -469,10 +691,17 @@ unsigned clemens_unserialize_record(
             sz = sizeof(uint8_t*);
             break;
         case kClemensSerializerTypeArray:
-            sz = clemens_unserialize_array(reader, data_adr + record->offset, record, alloc_cb);
+            sz = clemens_unserialize_array(
+                reader, data_adr + record->offset, record, alloc_cb);
             break;
         case kClemensSerializerTypeObject:
-            sz = clemens_unserialize_object(reader, data_adr + record->offset, record, alloc_cb);
+            sz = clemens_unserialize_object(
+                reader, data_adr + record->offset, record, alloc_cb);
+            break;
+        case kClemensSerializerTypeCustom:
+            sz = clemens_unserialize_custom(
+                reader, (void *)(data_adr + record->offset), record->size,
+                record->param, alloc_cb);
             break;
     }
     return sz;
@@ -502,6 +731,71 @@ unsigned clemens_unserialize_array(
     return array_value_adr - data_adr;
 }
 
+static void clemens_unserialize_records(
+    mpack_reader_t* reader,
+    uintptr_t data_adr,
+    const struct ClemensSerializerRecord* record,
+    ClemensSerializerAllocateCb alloc_cb
+) {
+    char key[64];
+    while (record->type != kClemensSerializerTypeEmpty) {
+        mpack_expect_cstr(reader, key, sizeof(key));
+        clemens_unserialize_record(reader, data_adr, record, alloc_cb);
+        ++record;
+    }
+}
+
+static unsigned clemens_unserialize_custom(
+    mpack_reader_t* reader,
+    void* ptr,
+    unsigned sz,
+    unsigned record_id,
+    ClemensSerializerAllocateCb alloc_cb
+) {
+    struct ClemensAudioMixBuffer* audio_mix_buffer;
+    struct ClemensWOZDisk* woz_disk;
+    char key[64];
+    unsigned v0, v1;
+    switch (record_id) {
+        case CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER:
+            audio_mix_buffer = (struct ClemensAudioMixBuffer *)(ptr);
+            v0 = audio_mix_buffer->stride * audio_mix_buffer->frame_count;
+            mpack_expect_cstr(reader, key, sizeof(key));
+            audio_mix_buffer->frame_count = mpack_expect_u32(reader);
+            mpack_expect_cstr(reader, key, sizeof(key));
+            audio_mix_buffer->frames_per_second = mpack_expect_u32(reader);
+            mpack_expect_cstr(reader, key, sizeof(key));
+            audio_mix_buffer->stride = mpack_expect_u32(reader);
+            mpack_expect_cstr(reader, key, sizeof(key));
+            v1 = mpack_expect_bin(reader);
+            if (v0 != v1) {
+                audio_mix_buffer->data = (*alloc_cb)(v1);
+            }
+            mpack_read_bytes(reader, (char *)audio_mix_buffer->data, v1);
+            break;
+        case CLEM_SERIALIZER_CUSTOM_RECORD_WOZ_DISK:
+            woz_disk = (struct ClemensWOZDisk *)ptr;
+            clemens_unserialize_records(
+                reader, (uintptr_t)woz_disk, &kWOZDisk[0], alloc_cb);
+            mpack_expect_cstr(reader, key, sizeof(key));
+            if (mpack_expect_bool(reader)) {
+                mpack_expect_cstr(reader, key, sizeof(key));
+                v0 = mpack_expect_bin(reader);
+                v1 = (woz_disk->bits_data_end - woz_disk->bits_data);
+                if (v0 > v1) {
+                    woz_disk->bits_data = (uint8_t*)(*alloc_cb)(v0);
+                    woz_disk->bits_data_end = woz_disk->bits_data + v0;
+                }
+                mpack_read_bytes(reader, (char *)woz_disk->bits_data, v0);
+            } else {
+                woz_disk->bits_data = NULL;
+                woz_disk->bits_data_end = NULL;
+            }
+            break;
+    }
+    return sz;
+}
+
 unsigned clemens_unserialize_object(
     mpack_reader_t* reader,
     uintptr_t data_adr,
@@ -511,11 +805,7 @@ unsigned clemens_unserialize_object(
     char key[64];
     struct ClemensSerializerRecord* child = record->records;
     mpack_expect_map(reader);
-    while (child->type != kClemensSerializerTypeEmpty) {
-        mpack_expect_cstr(reader, key, sizeof(key));
-        clemens_unserialize_record(reader, data_adr, child, alloc_cb);
-        ++child;
-    }
+    clemens_unserialize_records(reader, data_adr, child, alloc_cb);
     mpack_done_map(reader);
     return record->size;
 }
@@ -528,8 +818,35 @@ mpack_reader_t* clemens_unserialize_machine(
     struct ClemensSerializerRecord* record = &kMachine[0];
     union ClemensSerializerVariant variant;
     void* data_adr = (void *)machine;
+    unsigned idx, sz;
 
-    clemens_unserialize_object(reader, (uintptr_t)data_adr, record, alloc_cb);
+    if (clemens_unserialize_object(
+            reader,
+            (uintptr_t)data_adr,
+            record,
+            alloc_cb) == CLEM_SERIALIZER_INVALID_RECORD
+    ) {
+        return NULL;
+    }
+
+
+    /* unserialize FPI banks - this lies outside the procedural laying out of
+       values to serialize via record arrays since the logic is here is very
+       special cased to avoid unnecessary serialization
+    */
+    for (idx = 0; idx < 256; ++idx) {
+        if (mpack_expect_bool(reader)) {
+            if (mpack_expect_u8(reader) != (uint8_t)(idx & 0xff)) {
+                return NULL;
+            }
+            sz = mpack_expect_bin(reader);
+            if (!machine->fpi_bank_map[idx]) {
+                machine->fpi_bank_map[idx] = (*alloc_cb)(sz);
+            }
+            mpack_read_bytes(reader, (char *)machine->fpi_bank_map[idx], sz);
+        }
+    }
+
 
     return reader;
 }

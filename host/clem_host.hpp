@@ -91,6 +91,7 @@ private:
   bool emulationRun(unsigned target);
   void emulationBreak();
   void resetDiagnostics();
+  void loadDisks();
 
 
   void dumpMemory(unsigned bank, const char* filename);

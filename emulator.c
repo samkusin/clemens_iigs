@@ -841,6 +841,8 @@ int clemens_init(
     void* slotExpansionROM,
     unsigned int fpiRAMBankCount
 ) {
+    unsigned idx;
+
     clemens_simple_init(machine,
                         speed_factor,
                         clocks_step,
@@ -857,11 +859,10 @@ int clemens_init(
     }
     /* memory organization for the FPI */
     /* TODO: Support ROM 01 */
-    machine->fpi_bank_map[0xfc] = (uint8_t*)rom;
-    machine->fpi_bank_map[0xfd] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE;
-    machine->fpi_bank_map[0xfe] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE * 2;
-    machine->fpi_bank_map[0xff] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE * 3;
-
+    for (idx = 0xfc; idx <= 0xff; ++idx) {
+        machine->fpi_bank_used[idx] = true;
+        machine->fpi_bank_map[idx] = (uint8_t*)rom + CLEM_IIGS_BANK_SIZE * (idx - 0xfc);
+    }
     /* TODO: remap non used banks to used banks per the wrapping mechanism on
        the IIgs
     */
@@ -871,9 +872,10 @@ int clemens_init(
     machine->mega2_bank_map[0x01] = (uint8_t*)e1bank;
     memset(machine->mega2_bank_map[0x01], 0, CLEM_IIGS_BANK_SIZE);
 
-    for (uint8_t i = 0; i < 7; ++i) {
-        machine->card_slot_memory[i] = ((uint8_t*)slotROM) + (i * 256);
-        machine->card_slot_expansion_memory[i] = ((uint8_t*)slotExpansionROM) + (i * 256);
+    for (idx = 0; idx < 7; ++idx) {
+        machine->card_slot_memory[idx] = ((uint8_t*)slotROM) + (idx * 256);
+        machine->card_slot_expansion_memory[idx] = (
+            ((uint8_t*)slotExpansionROM) + (idx * 256));
     }
 
     machine->mmio_bypass = false;
@@ -899,6 +901,7 @@ void clemens_simple_init(
 
     if (fpiRAMBankCount > 256) fpiRAMBankCount = 256;
     for (unsigned i  = 0; i < fpiRAMBankCount; ++i) {
+        machine->fpi_bank_used[i] = true;
         machine->fpi_bank_map[i] = ((uint8_t*)fpiRAM) + (i * CLEM_IIGS_BANK_SIZE);
         memset(machine->fpi_bank_map[i], 0, CLEM_IIGS_BANK_SIZE);
     }
@@ -908,6 +911,7 @@ void clemens_simple_init(
     */
     memset(s_empty_ram, 0, CLEM_IIGS_BANK_SIZE);
     for (unsigned i = fpiRAMBankCount; i < 0xff; ++i) {
+        machine->fpi_bank_used[i] = false;
         machine->fpi_bank_map[i] = s_empty_ram;
     }
 

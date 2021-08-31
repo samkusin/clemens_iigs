@@ -465,12 +465,8 @@ void clem_iwm_glu_sync(
     struct ClemensClock next_clock;
 
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
-        if (iwm->enable_debug) {
-            if (iwm->debug_timer_ns == UINT64_MAX) {
-                iwm->debug_timer_ns = 0;
-            }
-        } else {
-            iwm->debug_timer_ns = UINT64_MAX;
+        if (iwm->debug_timer_ns == UINT64_MAX) {
+            iwm->debug_timer_ns = 0;
         }
         iwm->lss_clocks_lag += (clock->ts - iwm->last_clocks_ts);
         delta_ns = _clem_calc_ns_step_from_clocks(
@@ -484,7 +480,9 @@ void clem_iwm_glu_sync(
         while (lss_budget_ns >= iwm->lss_update_dt_ns) {
             _clem_iwm_lss(iwm, drives, &next_clock);
             lss_budget_ns -= iwm->lss_update_dt_ns;
-            iwm->debug_timer_ns += iwm->lss_update_dt_ns;
+            if (iwm->enable_debug) {
+                iwm->debug_timer_ns += iwm->lss_update_dt_ns;
+            }
             next_clock.ts += _clem_calc_clocks_step_from_ns(
                 iwm->lss_update_dt_ns, next_clock.ref_step);
         }
@@ -498,7 +496,7 @@ void clem_iwm_glu_sync(
             if (iwm->ns_drive_hold == 0 || iwm->timer_1sec_disabled) {
                 CLEM_LOG("IWM: turning drive off in sync");
                 iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
-                iwm->debug_timer_ns = 0;
+                iwm->debug_timer_ns = UINT64_MAX;
             }
         }
         _iwm_debug_value(iwm, lss_budget_ns);
