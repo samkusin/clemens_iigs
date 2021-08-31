@@ -5,6 +5,7 @@
 
 union ClemensSerializerVariant {
     uint8_t* blob;
+    uint64_t u64;
     clem_clocks_time_t clocks;
     clem_clocks_duration_t duration;
     float f32;
@@ -25,7 +26,7 @@ union ClemensSerializerVariant {
     { #_name_, _type_, _arr_type_, offsetof(_struct_, _name_), _size_, _param_, _records_}
 
 #define CLEM_SERIALIZER_RECORD_ARRAY(_struct_, _type_, _name_, _size_, _param_) \
-    CLEM_SERIALIZER_RECORD_PARAM(_struct_, _type_, kClemensSerializerTypeArray, _name_, _size_, _param_, NULL)
+    CLEM_SERIALIZER_RECORD_PARAM(_struct_, kClemensSerializerTypeArray, _type_, _name_, _size_, _param_, NULL)
 
 #define CLEM_SERIALIZER_RECORD_BOOL(_struct_, _name_) \
     CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeBool, _name_)
@@ -38,6 +39,9 @@ union ClemensSerializerVariant {
 
 #define CLEM_SERIALIZER_RECORD_UINT32(_struct_, _name_) \
     CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeUInt32, _name_)
+
+#define CLEM_SERIALIZER_RECORD_UINT64(_struct_, _name_) \
+    CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeUInt64, _name_)
 
 #define CLEM_SERIALIZER_RECORD_INT32(_struct_, _name_) \
     CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeInt32, _name_)
@@ -105,6 +109,138 @@ struct ClemensSerializerRecord kCPU[] = {
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 
+struct ClemensSerializerRecord kVGC[] = {
+    /* scan lines are generated */
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensVGC, ts_last_frame),
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensVGC, ts_scanline_0),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensVGC, dt_scanline),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, mode_flags),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, text_fg_color),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, text_bg_color),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, text_language),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, irq_line),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kRTC[] = {
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceRTC, xfer_started_time),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceRTC, xfer_latency_duration),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceRTC, state),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceRTC, index),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceRTC, flags),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceRTC, seconds_since_1904),
+    CLEM_SERIALIZER_RECORD_ARRAY(
+        struct ClemensDeviceRTC, kClemensSerializerTypeUInt8, bram, 256, 0),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceRTC, data_c033),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceRTC, ctl_c034),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kADBKeyboard[] = {
+    CLEM_SERIALIZER_RECORD_ARRAY(
+        struct ClemensDeviceKeyboard, kClemensSerializerTypeUInt8, keys, CLEM_ADB_KEYB_BUFFER_LIMIT, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(
+        struct ClemensDeviceKeyboard, kClemensSerializerTypeUInt8, states, CLEM_ADB_KEY_CODE_LIMIT, 0),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceKeyboard, size),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceKeyboard, delay_ms),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceKeyboard, rate_per_sec),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceKeyboard, timer_us),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceKeyboard, repeat_count),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceKeyboard, last_a2_key_down),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceKeyboard, reset_key),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kADBMouse[] = {
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceMouse, x),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceMouse, y),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kGameport[] = {
+    CLEM_SERIALIZER_RECORD_ARRAY(
+        struct ClemensDeviceGameport, kClemensSerializerTypeUInt8, paddle, 4, 0),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceGameport, btn_mask),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceGameport, ann_mask),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kTimer[] = {
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceTimer, irq_1sec_us),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceTimer, irq_qtrsec_us),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceTimer, flags),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceTimer, irq_line),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kDebugger[] = {
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kAudio[] = {
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kSCC[] = {
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kIWM[] = {
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+
+struct ClemensSerializerRecord kADB[] = {
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceADB, state),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceADB, version),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceADB, poll_timer_us),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceADB, mode_flags),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, is_keypad_down),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, is_asciikey_down),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, has_modkey_changed),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceADB, io_key_last_ascii),
+    CLEM_SERIALIZER_RECORD_ARRAY(
+        struct ClemensDeviceADB, kClemensSerializerTypeUInt16, keyb_reg, 4, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(
+        struct ClemensDeviceADB, kClemensSerializerTypeUInt16, mouse_reg, 4, 0),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceADB, cmd_reg),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceADB, cmd_flags),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceADB, cmd_status),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceADB, cmd_data_limit),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceADB, cmd_data_sent),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceADB, cmd_data_recv),
+    CLEM_SERIALIZER_RECORD_ARRAY(
+        struct ClemensDeviceADB, kClemensSerializerTypeUInt8, cmd_data, 16, 0),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensDeviceADB, keyb, struct ClemensDeviceKeyboard, kADBKeyboard),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensDeviceADB, mouse, struct ClemensDeviceMouse, kADBMouse),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensDeviceADB, gameport, struct ClemensDeviceGameport, kGameport),
+    CLEM_SERIALIZER_RECORD_ARRAY(
+        struct ClemensDeviceADB, kClemensSerializerTypeUInt8, ram, 256, 0),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceADB, irq_line),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kMMIO[] = {
+    /* all page maps are generated from mmap_register and the shadow register */
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, vgc, struct ClemensVGC, kVGC),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_rtc, struct ClemensDeviceRTC, kRTC),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_adb, struct ClemensDeviceADB, kADB),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_timer, struct ClemensDeviceTimer, kTimer),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_debug, struct ClemensDeviceDebugger, kDebugger),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_audio, struct ClemensDeviceAudio, kAudio),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_iwm, struct ClemensDeviceIWM, kIWM),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_scc, struct ClemensDeviceSCC, kSCC),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, mmap_register),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, last_data_address),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensMMIO, new_video_c029),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensMMIO, speed_c036),
+    CLEM_SERIALIZER_RECORD_UINT64(struct ClemensMMIO, mega2_cycles),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, timer_60hz_us),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensMMIO, card_expansion_rom_index),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, irq_line),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
 struct ClemensSerializerRecord kMachine[] = {
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, cpu, struct Clemens65C816, kCPU),
     CLEM_SERIALIZER_RECORD_DURATION(ClemensMachine, clocks_step),
@@ -113,6 +249,7 @@ struct ClemensSerializerRecord kMachine[] = {
     CLEM_SERIALIZER_RECORD_CLOCKS(ClemensMachine, clocks_spent),
     CLEM_SERIALIZER_RECORD_INT32(ClemensMachine, resb_counter),
     CLEM_SERIALIZER_RECORD_BOOL(ClemensMachine, mmio_bypass),
+    CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, mmio, struct ClemensMMIO, kMMIO),
     CLEM_SERIALIZER_RECORD_ARRAY(ClemensMachine,
         kClemensSerializerTypeBlob, fpi_bank_map, 256, CLEM_IIGS_BANK_SIZE),
     CLEM_SERIALIZER_RECORD_ARRAY(ClemensMachine,
@@ -148,6 +285,11 @@ unsigned clemens_serialize_record(
             mpack_write_u32(writer, variant.u32);
             sz = sizeof(uint32_t);
             break;
+        case kClemensSerializerTypeUInt64:
+            variant.u64 = *(uint64_t *)(data_adr + record->offset);
+            mpack_write_u64(writer, variant.u64);
+            sz = sizeof(uint64_t);
+            break;
         case kClemensSerializerTypeInt32:
             variant.i32 = *(int32_t *)(data_adr + record->offset);
             mpack_write_i32(writer, variant.i32);
@@ -172,7 +314,11 @@ unsigned clemens_serialize_record(
             break;
         case kClemensSerializerTypeBlob:
             variant.blob = *(uint8_t **)(data_adr + record->offset);
-            mpack_write_bin(writer, (const char *)variant.blob, record->size);
+            if (variant.blob) {
+                mpack_write_bin(writer, (const char *)variant.blob, record->size);
+            } else {
+                mpack_write_nil(writer);
+            }
             sz = sizeof(uint8_t*);
             break;
         case kClemensSerializerTypeArray:
@@ -256,6 +402,8 @@ unsigned clemens_unserialize_record(
 ) {
     union ClemensSerializerVariant variant;
     unsigned sz = 0;
+    mpack_tag_t tag;
+
     switch (record->type) {
         case kClemensSerializerTypeBool:
             variant.b = mpack_expect_bool(reader);
@@ -300,15 +448,23 @@ unsigned clemens_unserialize_record(
             sz = sizeof(clem_clocks_time_t);
             break;
         case kClemensSerializerTypeBlob:
-            sz = mpack_expect_bin(reader);
-            variant.blob = *(uint8_t **)(data_adr + record->offset);
-            if (!variant.blob) {
-                variant.blob = (*alloc_cb)(sz);
+            variant.blob = NULL;
+            tag = mpack_read_tag(reader);
+            if (tag.type == mpack_type_bin) {
+                sz = tag.v.l;
+            } else {
+                sz = 0;
             }
-            if (sz > record->size) {
-                return CLEM_SERIALIZER_INVALID_RECORD;
+            if (sz) {
+                variant.blob = *(uint8_t **)(data_adr + record->offset);
+                if (!variant.blob) {
+                    variant.blob = (*alloc_cb)(sz);
+                }
+                if (sz > record->size) {
+                    return CLEM_SERIALIZER_INVALID_RECORD;
+                }
+                mpack_read_bytes(reader, (char *)variant.blob, sz);
             }
-            mpack_read_bytes(reader, (char *)variant.blob, sz);
             *(uint8_t **)(data_adr + record->offset) = variant.blob;
             sz = sizeof(uint8_t*);
             break;
