@@ -13,6 +13,7 @@
 #include "clem_drive.h"
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
+#include "serializer.h"
 #include "clem_vgc.h"
 
 #include "fmt/format.h"
@@ -948,6 +949,10 @@ bool ClemensHost::parseCommand(const char* buffer)
         return parseCommandReset(end);
       } else if (!strncasecmp(start, ".status", end - start)) {
         return parseCommandDebugStatus(end);
+      } else if (!strncasecmp(start, ".load", end - start)) {
+        return parseCommandLoad(end);
+      } else if (!strncasecmp(start, ".save", end - start)) {
+        return parseCommandSave(end);
       } else if (!strncasecmp(start, "step", end - start) ||
                  !strncasecmp(start, "s", end - start)) {
         return parseCommandStep(end);
@@ -1019,6 +1024,21 @@ bool ClemensHost::parseCommandReset(const char* line)
   }
   return false;
 }
+
+bool ClemensHost::parseCommandLoad(const char* line)
+{
+  return false;
+}
+
+bool ClemensHost::parseCommandSave(const char* line)
+{
+  const char* start = trimCommand(line);
+  if (!start) {
+    return saveState("save.clemulate");
+  }
+  return false;
+}
+
 
 bool ClemensHost::parseCommandDebugStatus(const char* line)
 {
@@ -1461,6 +1481,20 @@ void ClemensHost::resetMachine()
   emulationStepCountSinceReset_ = 0;
   diagnostics_.reset();
   stepMachine(2);
+}
+
+bool ClemensHost::saveState(const char* filename)
+{
+  if (!clemens_is_initialized_simple(&machine_)) {
+    return false;
+  }
+  mpack_writer_t writer;
+  //  this save buffer is probably, unnecessarily big - but it's just used for
+  //  saves and freed
+  mpack_writer_init_filename(&writer, filename);
+  clemens_serialize_machine(&writer, &machine_);
+  mpack_writer_destroy(&writer);
+  return true;
 }
 
 void ClemensHost::stepMachine(int stepCount)
