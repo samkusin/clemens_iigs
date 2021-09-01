@@ -1,7 +1,6 @@
 #include "clem_mem.h"
 #include "clem_debug.h"
 #include "clem_drive.h"
-#include "clem_game.h"
 #include "clem_mmio_defs.h"
 
 #include "clem_util.h"
@@ -765,15 +764,13 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_PADDL1:
         case CLEM_MMIO_REG_PADDL2:
         case CLEM_MMIO_REG_PADDL3:
-            result = clem_game_read_switch(&mmio->dev_game, &ref_clock, ioreg, flags);
-            break;
-        case CLEM_MMIO_REG_STATEREG:
-            result = _clem_mmio_statereg_c068(mmio);
-            break;
         case CLEM_MMIO_REG_PADDL_RESET:
             /* note c071 - 7f are reserved for ROM access - used for the
                BRK interrupt */
-            result = clem_game_read_switch(&mmio->dev_game, &ref_clock, ioreg, flags);
+            result = clem_adb_read_switch(&mmio->dev_adb, ioreg, flags);
+            break;
+        case CLEM_MMIO_REG_STATEREG:
+            result = _clem_mmio_statereg_c068(mmio);
             break;
         case CLEM_MMIO_REG_LC2_RAM_WP:
         case CLEM_MMIO_REG_LC2_RAM_WP2:
@@ -1021,8 +1018,6 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_AN2_ON:
         case CLEM_MMIO_REG_AN3_OFF:
         case CLEM_MMIO_REG_AN3_ON:
-            clem_adb_write_switch(&mmio->dev_adb, ioreg, data);
-            break;
         case CLEM_MMIO_REG_PADDL0:
         case CLEM_MMIO_REG_PADDL1:
         case CLEM_MMIO_REG_PADDL2:
@@ -1043,7 +1038,7 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_PADDL_RESET + 0xd:
         case CLEM_MMIO_REG_PADDL_RESET + 0xe:
         case CLEM_MMIO_REG_PADDL_RESET + 0xf:
-            clem_game_write_switch(&mmio->dev_game, &ref_clock, ioreg, data);
+            clem_adb_write_switch(&mmio->dev_adb, ioreg, data);
             break;
         case CLEM_MMIO_REG_LC2_RAM_WP:
         case CLEM_MMIO_REG_LC2_RAM_WP2:
@@ -1635,7 +1630,6 @@ void _clem_mmio_reset(
     clem_vgc_init(&mmio->vgc);
     clem_iwm_reset(&mmio->dev_iwm);
     clem_scc_reset(&mmio->dev_scc);
-    clem_game_reset(&mmio->dev_game);
 }
 
 void _clem_mmio_init(

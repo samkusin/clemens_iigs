@@ -17,6 +17,7 @@ enum ClemensSerializerType {
     kClemensSerializerTypeUInt8,
     kClemensSerializerTypeUInt16,
     kClemensSerializerTypeUInt32,
+    kClemensSerializerTypeUInt64,
     kClemensSerializerTypeInt32,
     kClemensSerializerTypeFloat,
     kClemensSerializerTypeDuration,

@@ -186,9 +186,9 @@ struct ClemensDeviceAudio {
  *  pulling out into its own component
  */
 struct ClemensDeviceTimer {
-    unsigned irq_1sec_us;       /**< used to trigger IRQ one sec */
-    unsigned irq_qtrsec_us;     /**< used to trigger IRQ quarter sec */
-    unsigned flags;             /**< interrupt  */
+    uint32_t irq_1sec_us;       /**< used to trigger IRQ one sec */
+    uint32_t irq_qtrsec_us;     /**< used to trigger IRQ quarter sec */
+    uint32_t flags;             /**< interrupt  */
     uint32_t irq_line;          /**< IRQ flags passed to machine */
 };
 
@@ -341,7 +341,6 @@ struct ClemensMMIO {
     struct ClemensDeviceAudio dev_audio;
     struct ClemensDeviceIWM dev_iwm;
     struct ClemensDeviceSCC dev_scc;
-    struct ClemensDeviceGame dev_game;
 
     /* Registers that do not fall easily within a device struct */
     uint32_t mmap_register;     // memory map flags- CLEM_MEM_IO_MMAP_
