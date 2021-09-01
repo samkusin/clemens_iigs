@@ -70,6 +70,21 @@ namespace {
     }
   }
 
+  unsigned calculateMaxDiskDataSize(unsigned int woz_disk_type)
+  {
+    unsigned trackDataSize = 0;
+    switch (woz_disk_type) {
+      case CLEM_WOZ_DISK_5_25:
+        trackDataSize = 40 * 0xd * 512;
+        break;
+      case CLEM_WOZ_DISK_3_5:
+        //  TODO
+        break;
+    }
+    assert(trackDataSize > 0);
+    return trackDataSize;
+  }
+
 } // namespace anon
 
 #define CLEM_HOST_COUT FormatView(terminalOutput_)
@@ -115,14 +130,6 @@ ClemensHost::ClemensHost() :
   memoryViewStatic_[1].HandlerContext = this;
   memoryViewStatic_[1].ReadFn = &ClemensHost::emulatorImGuiMemoryRead;
   memoryViewStatic_[1].WriteFn = &ClemensHost::emulatorImguiMemoryWrite;
-
-  //  TODO: move into UI
-  //FILE* fp = fopen("dos_3_3_master.woz", "rb");
-  //FILE* fp = fopen("stargate.woz", "rb");
-  loadWOZDisk("oregon_trail_disk_1.woz", 0);
-  //loadWOZDisk("ultima_i_player.woz", 1);
-  disks525_[1].disk_type = CLEM_WOZ_DISK_5_25;
-  initWOZDisk(&disks525_[1]);
 
   displayProvider_ = std::make_unique<ClemensDisplayProvider>();
   display_ = std::make_unique<ClemensDisplay>(*displayProvider_);
@@ -1399,6 +1406,7 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
 
   switch (machineType) {
     case MachineType::Apple2GS: {
+      loadDisks();
       audio_->start();
 
       const unsigned fpiBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT;
@@ -1611,11 +1619,8 @@ bool ClemensHost::parseWOZDisk(
         break;
       case CLEM_WOZ_CHUNK_TRKS:
         if (woz->track_count > 0) {
-          unsigned trackDataSize = woz->track_count * woz->max_track_size_bytes;
-          if (woz->flags & CLEM_WOZ_IMAGE_DOUBLE_SIDED) {
-            trackDataSize <<= 1;
-          }
-          woz->bits_data = (uint8_t*)malloc(trackDataSize);
+          unsigned trackDataSize = calculateMaxDiskDataSize(woz->disk_type);
+          woz->bits_data = (uint8_t*)slab_.allocate(trackDataSize);
           woz->bits_data_end = woz->bits_data + trackDataSize;
           woz->default_track_bit_length = CLEM_WOZ_DEFAULT_TRACK_BIT_LENGTH_525;
         }
@@ -1647,6 +1652,18 @@ bool ClemensHost::parseWOZDisk(
   return true;
 }
 
+void ClemensHost::loadDisks()
+{
+    //  TODO: move into UI
+  //FILE* fp = fopen("dos_3_3_master.woz", "rb");
+  //FILE* fp = fopen("stargate.woz", "rb");
+  loadWOZDisk("oregon_trail_disk_1.woz", 0);
+  //loadWOZDisk("ultima_i_player.woz", 1);
+  disks525_[1].disk_type = CLEM_WOZ_DISK_5_25;
+  initWOZDisk(&disks525_[1]);
+
+}
+
 bool ClemensHost::initWOZDisk(struct ClemensWOZDisk* woz) {
   //  This method creates a very basic WOZ disk with many assumptions.  Use
   //  real hardware if you want to experiment with copy protection, etc (and
@@ -1666,11 +1683,8 @@ bool ClemensHost::initWOZDisk(struct ClemensWOZDisk* woz) {
       return false;
   }
 
-  unsigned trackDataSize = woz->track_count * woz->max_track_size_bytes;
-  if (woz->flags & CLEM_WOZ_IMAGE_DOUBLE_SIDED) {
-      trackDataSize <<= 1;
-  }
-  woz->bits_data = (uint8_t*)malloc(trackDataSize);
+  unsigned trackDataSize = calculateMaxDiskDataSize(woz->disk_type);
+  woz->bits_data = (uint8_t*)slab_.allocate(trackDataSize);
   woz->bits_data_end = woz->bits_data + trackDataSize;
   woz->default_track_bit_length = CLEM_WOZ_BLANK_DISK_TRACK_BIT_LENGTH_525;
   memset(woz->bits_data, 0, trackDataSize);

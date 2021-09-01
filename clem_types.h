@@ -291,7 +291,6 @@ struct ClemensDeviceIWM {
     bool async_write_mode;      /**< If True, IWM delays writes until ready */
     bool latch_mode;            /**< If True, latch value lasts for full 8 xfer */
     bool clock_8mhz;            /**< If True, 8mhz clock - never used? */
-    bool enable_debug;          /**< If True, activates file logging */
 
     unsigned state;             /**< The current IWM register state */
     unsigned ns_latch_hold;     /**< The latch value expiration timer */
@@ -300,14 +299,10 @@ struct ClemensDeviceIWM {
     unsigned lss_write_counter; /**< Used for detecting write underruns */
     unsigned lss_update_dt_ns;  /**< Fast mode = 250ns, Slow = 500ns */
 
+    bool enable_debug;          /**< If True, activates file logging */
     uint64_t debug_timer_ns;
     uint32_t debug_value;       /**< option displayed during iwm_debug_event */
 };
-
-struct ClemensDeviceGame {
-    unsigned i;
-};
-
 
 
 /**
@@ -372,7 +367,7 @@ struct ClemensDrive {
     unsigned track_bit_shift;   /**< bit offset into current byte */
     unsigned track_bit_length;  /**< current track bit length */
     unsigned pulse_ns;          /**< nanosecond timer for pulse input */
-     unsigned read_buffer;       /**< Used for MC3470 emulation */
+    unsigned read_buffer;       /**< Used for MC3470 emulation */
 
     /**
      * 4-bit Q0-3 entry 5.25" = stepper control
@@ -598,6 +593,7 @@ typedef struct {
 
     /* each used bank MUST be 64K (65536) bytes */
     uint8_t* fpi_bank_map[256];     // $00 - $ff
+    bool fpi_bank_used[256];
 
     /* Provides remapping of memory read/write access per bank.  For the IIgs,
        this map covers shadowed memory as well as language card and main/aux

@@ -24,7 +24,8 @@ enum ClemensSerializerType {
     kClemensSerializerTypeClocks,
     kClemensSerializerTypeBlob,
     kClemensSerializerTypeArray,
-    kClemensSerializerTypeObject
+    kClemensSerializerTypeObject,
+    kClemensSerializerTypeCustom,
 };
 
 struct ClemensSerializerRecord {
@@ -37,6 +38,7 @@ struct ClemensSerializerRecord {
 
     struct ClemensSerializerRecord* records;
 };
+
 
 typedef uint8_t*(*ClemensSerializerAllocateCb)(unsigned);
 
