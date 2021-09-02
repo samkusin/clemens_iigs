@@ -3512,7 +3512,7 @@ void clemens_emulate(ClemensMachine* clem) {
             cpu->enabled = true;
             if (!clem->mmio_bypass) {
                 clem_disk_reset_drives(&clem->active_drives);
-                _clem_mmio_reset(mmio, clem->clocks_step_mega2);
+                clem_mmio_reset(mmio, clem->clocks_step_mega2);
             }
             _clem_cycle(clem, 1);
         }

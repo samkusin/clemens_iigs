@@ -1,5 +1,6 @@
 #include "serializer.h"
 #include "clem_woz.h"
+#include "clem_mem.h"
 
 /* Serializing the Machine */
 
@@ -425,15 +426,15 @@ unsigned clemens_serialize_record(
             mpack_write_u32(writer, variant.u32);
             sz = sizeof(uint32_t);
             break;
-        case kClemensSerializerTypeUInt64:
-            variant.u64 = *(uint64_t *)(data_adr + record->offset);
-            mpack_write_u64(writer, variant.u64);
-            sz = sizeof(uint64_t);
-            break;
         case kClemensSerializerTypeInt32:
             variant.i32 = *(int32_t *)(data_adr + record->offset);
             mpack_write_i32(writer, variant.i32);
             sz = sizeof(int32_t);
+            break;
+        case kClemensSerializerTypeUInt64:
+            variant.u64 = *(uint64_t *)(data_adr + record->offset);
+            mpack_write_u64(writer, variant.u64);
+            sz = sizeof(uint64_t);
             break;
         case kClemensSerializerTypeFloat:
             variant.f32 = *(float *)(data_adr + record->offset);
@@ -454,11 +455,16 @@ unsigned clemens_serialize_record(
             break;
         case kClemensSerializerTypeBlob:
             variant.blob = *(uint8_t **)(data_adr + record->offset);
+            mpack_build_map(writer);
+            mpack_write_cstr(writer, "ok");
             if (variant.blob) {
+                mpack_write_true(writer);
+                mpack_write_cstr(writer, "blob");
                 mpack_write_bin(writer, (const char *)variant.blob, record->size);
             } else {
-                mpack_write_nil(writer);
+                mpack_write_false(writer);
             }
+            mpack_complete_map(writer);
             sz = sizeof(uint8_t*);
             break;
         case kClemensSerializerTypeArray:
@@ -544,16 +550,20 @@ static unsigned clemens_serialize_custom(
             break;
 
         case CLEM_SERIALIZER_CUSTOM_RECORD_WOZ_DISK:
-            woz_disk = (struct ClemensWOZDisk *)ptr;
-            clemens_serialize_records(writer, (uintptr_t)woz_disk, &kWOZDisk[0]);
-            mpack_write_cstr(writer, "bits_data");
-            if (woz_disk->bits_data != NULL) {
-                mpack_write_bool(writer, true);
-                blob_size = (woz_disk->bits_data_end - woz_disk->bits_data);
-                mpack_write_cstr(writer, "blob");
-                mpack_write_bin(writer, (char *)woz_disk->bits_data, blob_size);
-            } else {
-                mpack_write_bool(writer, false);
+            woz_disk = *(struct ClemensWOZDisk **)ptr;
+            mpack_write_cstr(writer, "valid");
+            mpack_write_bool(writer, woz_disk != NULL);
+            if (woz_disk) {
+                clemens_serialize_records(writer, (uintptr_t)woz_disk, &kWOZDisk[0]);
+                mpack_write_cstr(writer, "bits_data");
+                if (woz_disk->bits_data != NULL) {
+                    mpack_write_bool(writer, true);
+                    blob_size = (woz_disk->bits_data_end - woz_disk->bits_data);
+                    mpack_write_cstr(writer, "blob");
+                    mpack_write_bin(writer, (char *)woz_disk->bits_data, blob_size);
+                } else {
+                    mpack_write_bool(writer, false);
+                }
             }
             break;
 
@@ -613,18 +623,20 @@ static unsigned clemens_unserialize_custom(
     void* ptr,
     unsigned sz,
     unsigned record_id,
-    ClemensSerializerAllocateCb alloc_cb
+    ClemensSerializerAllocateCb alloc_cb,
+    void* context
 );
 
 unsigned clemens_unserialize_record(
     mpack_reader_t* reader,
     uintptr_t data_adr,
     const struct ClemensSerializerRecord* record,
-    ClemensSerializerAllocateCb alloc_cb
+    ClemensSerializerAllocateCb alloc_cb,
+    void* context
 ) {
     union ClemensSerializerVariant variant;
     unsigned sz = 0;
-    mpack_tag_t tag;
+    char key[64];
 
     switch (record->type) {
         case kClemensSerializerTypeBool:
@@ -652,9 +664,14 @@ unsigned clemens_unserialize_record(
             *(int32_t *)(data_adr + record->offset) = variant.i32;
             sz = sizeof(int32_t);
             break;
+        case kClemensSerializerTypeUInt64:
+            variant.u64 = mpack_expect_u64(reader);
+            *(uint64_t *)(data_adr + record->offset) = variant.u64;
+            sz = sizeof(uint64_t);
+            break;
         case kClemensSerializerTypeFloat:
             variant.f32 = mpack_expect_float(reader);
-            *(float *)(data_adr + record->offset) = variant.f32;;
+            *(float *)(data_adr + record->offset) = variant.f32;
             sz = sizeof(float);
             break;
         case kClemensSerializerTypeDuration:
@@ -671,37 +688,38 @@ unsigned clemens_unserialize_record(
             break;
         case kClemensSerializerTypeBlob:
             variant.blob = NULL;
-            tag = mpack_read_tag(reader);
-            if (tag.type == mpack_type_bin) {
-                sz = tag.v.l;
-            } else {
-                sz = 0;
-            }
-            if (sz) {
+            mpack_expect_map(reader);
+            mpack_expect_cstr(reader, key, sizeof(key));
+            if (mpack_expect_bool(reader)) {
+                mpack_expect_cstr(reader, key, sizeof(key));
+                sz = mpack_expect_bin(reader);
                 variant.blob = *(uint8_t **)(data_adr + record->offset);
                 if (!variant.blob) {
-                    variant.blob = (*alloc_cb)(sz);
+                    variant.blob = (*alloc_cb)(sz, context);
                 }
                 if (sz > record->size) {
+                    mpack_done_bin(reader);
                     return CLEM_SERIALIZER_INVALID_RECORD;
                 }
                 mpack_read_bytes(reader, (char *)variant.blob, sz);
+                mpack_done_bin(reader);
             }
+            mpack_done_map(reader);
             *(uint8_t **)(data_adr + record->offset) = variant.blob;
             sz = sizeof(uint8_t*);
             break;
         case kClemensSerializerTypeArray:
             sz = clemens_unserialize_array(
-                reader, data_adr + record->offset, record, alloc_cb);
+                reader, data_adr + record->offset, record, alloc_cb, context);
             break;
         case kClemensSerializerTypeObject:
             sz = clemens_unserialize_object(
-                reader, data_adr + record->offset, record, alloc_cb);
+                reader, data_adr + record->offset, record, alloc_cb, context);
             break;
         case kClemensSerializerTypeCustom:
             sz = clemens_unserialize_custom(
                 reader, (void *)(data_adr + record->offset), record->size,
-                record->param, alloc_cb);
+                record->param, alloc_cb, context);
             break;
     }
     return sz;
@@ -711,7 +729,8 @@ unsigned clemens_unserialize_array(
     mpack_reader_t* reader,
     uintptr_t data_adr,
     const struct ClemensSerializerRecord* record,
-    ClemensSerializerAllocateCb alloc_cb
+    ClemensSerializerAllocateCb alloc_cb,
+    void* context
 ) {
     uintptr_t array_value_adr = data_adr;
     struct ClemensSerializerRecord value_record;
@@ -722,10 +741,11 @@ unsigned clemens_unserialize_array(
     }
     memset(&value_record, 0, sizeof(value_record));
     value_record.type = record->array_type;
-    value_record.records = record->records;     /* for arrays of objects */
+    value_record.records = record->records;
+    value_record.size = record->param;     /* for arrays of objects */
     for (idx = 0; idx < array_size; ++idx) {
         array_value_adr += clemens_unserialize_record(
-            reader, array_value_adr, &value_record, alloc_cb);
+            reader, array_value_adr, &value_record, alloc_cb, context);
     }
     mpack_done_array(reader);
     return array_value_adr - data_adr;
@@ -735,12 +755,13 @@ static void clemens_unserialize_records(
     mpack_reader_t* reader,
     uintptr_t data_adr,
     const struct ClemensSerializerRecord* record,
-    ClemensSerializerAllocateCb alloc_cb
+    ClemensSerializerAllocateCb alloc_cb,
+    void* context
 ) {
     char key[64];
     while (record->type != kClemensSerializerTypeEmpty) {
         mpack_expect_cstr(reader, key, sizeof(key));
-        clemens_unserialize_record(reader, data_adr, record, alloc_cb);
+        clemens_unserialize_record(reader, data_adr, record, alloc_cb, context);
         ++record;
     }
 }
@@ -750,12 +771,14 @@ static unsigned clemens_unserialize_custom(
     void* ptr,
     unsigned sz,
     unsigned record_id,
-    ClemensSerializerAllocateCb alloc_cb
+    ClemensSerializerAllocateCb alloc_cb,
+    void* context
 ) {
     struct ClemensAudioMixBuffer* audio_mix_buffer;
     struct ClemensWOZDisk* woz_disk;
     char key[64];
     unsigned v0, v1;
+    mpack_expect_map(reader);
     switch (record_id) {
         case CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER:
             audio_mix_buffer = (struct ClemensAudioMixBuffer *)(ptr);
@@ -769,30 +792,52 @@ static unsigned clemens_unserialize_custom(
             mpack_expect_cstr(reader, key, sizeof(key));
             v1 = mpack_expect_bin(reader);
             if (v0 != v1) {
-                audio_mix_buffer->data = (*alloc_cb)(v1);
+                audio_mix_buffer->data = (*alloc_cb)(v1, context);
             }
             mpack_read_bytes(reader, (char *)audio_mix_buffer->data, v1);
+            mpack_done_bin(reader);
             break;
         case CLEM_SERIALIZER_CUSTOM_RECORD_WOZ_DISK:
-            woz_disk = (struct ClemensWOZDisk *)ptr;
-            clemens_unserialize_records(
-                reader, (uintptr_t)woz_disk, &kWOZDisk[0], alloc_cb);
+            woz_disk = *(struct ClemensWOZDisk **)ptr;
+
             mpack_expect_cstr(reader, key, sizeof(key));
             if (mpack_expect_bool(reader)) {
-                mpack_expect_cstr(reader, key, sizeof(key));
-                v0 = mpack_expect_bin(reader);
-                v1 = (woz_disk->bits_data_end - woz_disk->bits_data);
-                if (v0 > v1) {
-                    woz_disk->bits_data = (uint8_t*)(*alloc_cb)(v0);
-                    woz_disk->bits_data_end = woz_disk->bits_data + v0;
+                if (!woz_disk) {
+                    //  create the disk object
+                    *(struct ClemensWOZDisk **)(ptr) = (
+                        (struct ClemensWOZDisk *)(*alloc_cb)(
+                            sizeof(struct ClemensWOZDisk), context));
+                    woz_disk = *(struct ClemensWOZDisk **)ptr;
                 }
-                mpack_read_bytes(reader, (char *)woz_disk->bits_data, v0);
             } else {
-                woz_disk->bits_data = NULL;
-                woz_disk->bits_data_end = NULL;
+                if (woz_disk) {
+                    //  invalidate it
+                    *(struct ClemensWOZDisk **)(ptr) = NULL;
+                    woz_disk = NULL;
+                }
+            }
+            if (woz_disk) {
+                clemens_unserialize_records(
+                    reader, (uintptr_t)woz_disk, &kWOZDisk[0], alloc_cb, context);
+                mpack_expect_cstr(reader, key, sizeof(key));
+                if (mpack_expect_bool(reader)) {
+                    mpack_expect_cstr(reader, key, sizeof(key));
+                    v0 = mpack_expect_bin(reader);
+                    v1 = (woz_disk->bits_data_end - woz_disk->bits_data);
+                    if (v0 > v1) {
+                        woz_disk->bits_data = (uint8_t*)(*alloc_cb)(v0, context);
+                        woz_disk->bits_data_end = woz_disk->bits_data + v0;
+                    }
+                    mpack_read_bytes(reader, (char *)woz_disk->bits_data, v0);
+                    mpack_done_bin(reader);
+                } else {
+                    woz_disk->bits_data = NULL;
+                    woz_disk->bits_data_end = NULL;
+                }
             }
             break;
     }
+    mpack_done_map(reader);
     return sz;
 }
 
@@ -800,12 +845,12 @@ unsigned clemens_unserialize_object(
     mpack_reader_t* reader,
     uintptr_t data_adr,
     const struct ClemensSerializerRecord* record,
-    ClemensSerializerAllocateCb alloc_cb
+    ClemensSerializerAllocateCb alloc_cb,
+    void* context
 ) {
-    char key[64];
     struct ClemensSerializerRecord* child = record->records;
     mpack_expect_map(reader);
-    clemens_unserialize_records(reader, data_adr, child, alloc_cb);
+    clemens_unserialize_records(reader, data_adr, child, alloc_cb, context);
     mpack_done_map(reader);
     return record->size;
 }
@@ -813,18 +858,23 @@ unsigned clemens_unserialize_object(
 mpack_reader_t* clemens_unserialize_machine(
     mpack_reader_t* reader,
     ClemensMachine* machine,
-    ClemensSerializerAllocateCb alloc_cb
+    ClemensSerializerAllocateCb alloc_cb,
+    void* context
 ) {
-    struct ClemensSerializerRecord* record = &kMachine[0];
+    struct ClemensSerializerRecord root;
     union ClemensSerializerVariant variant;
     void* data_adr = (void *)machine;
     unsigned idx, sz;
 
+    memset(&root, 0, sizeof(root));
+    root.type = kClemensSerializerTypeRoot;
+    root.records = &kMachine[0];
+
     if (clemens_unserialize_object(
             reader,
             (uintptr_t)data_adr,
-            record,
-            alloc_cb) == CLEM_SERIALIZER_INVALID_RECORD
+            &root,
+            alloc_cb, context) == CLEM_SERIALIZER_INVALID_RECORD
     ) {
         return NULL;
     }
@@ -835,18 +885,25 @@ mpack_reader_t* clemens_unserialize_machine(
        special cased to avoid unnecessary serialization
     */
     for (idx = 0; idx < 256; ++idx) {
-        if (mpack_expect_bool(reader)) {
+        machine->fpi_bank_used[idx] = mpack_expect_bool(reader);
+        if (machine->fpi_bank_used[idx]) {
             if (mpack_expect_u8(reader) != (uint8_t)(idx & 0xff)) {
                 return NULL;
             }
             sz = mpack_expect_bin(reader);
             if (!machine->fpi_bank_map[idx]) {
-                machine->fpi_bank_map[idx] = (*alloc_cb)(sz);
+                machine->fpi_bank_map[idx] = (*alloc_cb)(sz, context);
             }
             mpack_read_bytes(reader, (char *)machine->fpi_bank_map[idx], sz);
+            mpack_done_bin(reader);
         }
     }
 
+
+    /* mmio restore state */
+    if (!machine->mmio_bypass) {
+        clem_mmio_restore(&machine->mmio);
+    }
 
     return reader;
 }

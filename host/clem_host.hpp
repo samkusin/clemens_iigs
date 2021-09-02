@@ -87,6 +87,7 @@ private:
   void destroyMachine();
   void resetMachine();
   bool saveState(const char* filename);
+  bool loadState(const char* filename);
   void stepMachine(int stepCount);
   bool emulationRun(unsigned target);
   void emulationBreak();
@@ -107,6 +108,8 @@ private:
 
   static uint8_t emulatorImGuiMemoryRead(void* ctx, const uint8_t* data, size_t off);
   static void emulatorImguiMemoryWrite(void* ctx, uint8_t* data, size_t off, uint8_t d);
+
+  static uint8_t* unserializeAllocate(unsigned sz, void* context);
 
 private:
   ClemensMachine machine_;
