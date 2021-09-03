@@ -134,10 +134,13 @@ ClemensHost::ClemensHost() :
   displayProvider_ = std::make_unique<ClemensDisplayProvider>();
   display_ = std::make_unique<ClemensDisplay>(*displayProvider_);
   audio_ = std::make_unique<ClemensAudioDevice>();
+  audio_->start();
 }
 
 ClemensHost::~ClemensHost()
 {
+  audio_->stop();
+
   void* slabMemory = slab_.getHead();
   if (slabMemory) {
     free(slabMemory);
@@ -1034,6 +1037,10 @@ bool ClemensHost::parseCommandReset(const char* line)
 
 bool ClemensHost::parseCommandLoad(const char* line)
 {
+  const char* start = trimCommand(line);
+  if (!start) {
+    return loadState("save.clemulate");
+  }
   return false;
 }
 
@@ -1407,7 +1414,6 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
   switch (machineType) {
     case MachineType::Apple2GS: {
       loadDisks();
-      audio_->start();
 
       const unsigned fpiBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT;
       clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle,
@@ -1471,9 +1477,7 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
 
 void ClemensHost::destroyMachine()
 {
-  if (clemens_is_mmio_initialized(&machine_)) {
-    audio_->stop();
-  } else if (!clemens_is_initialized_simple(&machine_)) {
+  if (!clemens_is_initialized_simple(&machine_)) {
     return;
   }
   emulationBreak();
@@ -1504,6 +1508,35 @@ bool ClemensHost::saveState(const char* filename)
   mpack_writer_destroy(&writer);
   return true;
 }
+
+uint8_t* ClemensHost::unserializeAllocate(unsigned sz, void* context)
+{
+  auto* host = reinterpret_cast<ClemensHost*>(context);
+  return (uint8_t*)host->slab_.allocate(sz);
+}
+
+
+bool ClemensHost::loadState(const char* filename)
+{
+  if (!clemens_is_initialized_simple(&machine_)) {
+    //  power on and load state
+  }
+  mpack_reader_t reader;
+  mpack_reader_init_filename(&reader, filename);
+  if (!clemens_unserialize_machine(
+          &reader,
+          &machine_,
+          &ClemensHost::unserializeAllocate,
+          this)
+  ) {
+    // power off the machine
+    return false;
+  }
+  mpack_reader_destroy(&reader);
+
+  return true;
+}
+
 
 void ClemensHost::stepMachine(int stepCount)
 {

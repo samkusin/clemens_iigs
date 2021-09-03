@@ -1613,12 +1613,11 @@ void _clem_mmio_init_page_maps(
 
     /* brute force initialization of all page maps to ensure every option
        is executed on startup */
-    mmio->mmap_register = 0xffffffff;
-    _clem_mmio_memory_map(mmio, 0x0000000000);
-    _clem_mmio_memory_map(mmio, memory_flags);
+    mmio->mmap_register = memory_flags;
+    clem_mmio_restore(mmio);
 }
 
-void _clem_mmio_reset(
+void clem_mmio_reset(
     struct ClemensMMIO* mmio,
     clem_clocks_duration_t mega2_clocks_step
 ) {
@@ -1630,6 +1629,14 @@ void _clem_mmio_reset(
     clem_vgc_init(&mmio->vgc);
     clem_iwm_reset(&mmio->dev_iwm);
     clem_scc_reset(&mmio->dev_scc);
+}
+
+void clem_mmio_restore(struct ClemensMMIO* mmio)
+{
+    uint32_t memory_flags = mmio->mmap_register;
+    mmio->mmap_register = 0xffffffff;
+    _clem_mmio_memory_map(mmio, 0x0000000000);
+    _clem_mmio_memory_map(mmio, memory_flags);
 }
 
 void _clem_mmio_init(
@@ -1656,7 +1663,7 @@ void _clem_mmio_init(
                               CLEM_MEM_IO_MMAP_WRLCRAM |
                               CLEM_MEM_IO_MMAP_LCBANK2);
 
-    _clem_mmio_reset(mmio, mega2_clocks_step);
+    clem_mmio_reset(mmio, mega2_clocks_step);
 }
 
 

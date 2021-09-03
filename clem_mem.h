@@ -50,6 +50,11 @@ void clem_read(ClemensMachine* clem, uint8_t* data, uint16_t adr, uint8_t bank,
 void clem_write(ClemensMachine* clem, uint8_t data, uint16_t adr,
                 uint8_t bank, uint8_t flags);
 
+void clem_mmio_reset(struct ClemensMMIO* mmio,
+                     clem_clocks_duration_t mega2_clocks_step);
+
+void clem_mmio_restore(struct ClemensMMIO* mmio);
+
 #ifdef __cplusplus
 }
 #endif

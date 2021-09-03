@@ -40,7 +40,7 @@ struct ClemensSerializerRecord {
 };
 
 
-typedef uint8_t*(*ClemensSerializerAllocateCb)(unsigned);
+typedef uint8_t*(*ClemensSerializerAllocateCb)(unsigned, void*);
 
 /**
  * @brief
@@ -61,9 +61,10 @@ mpack_writer_t* clemens_serialize_machine(
  * @return mpack_reader_t*
  */
 mpack_reader_t* clemens_unserialize_machine(
-    mpack_reader_t* writer,
+    mpack_reader_t* reader,
     ClemensMachine* machine,
-    ClemensSerializerAllocateCb alloc_cb);
+    ClemensSerializerAllocateCb alloc_cb,
+    void* context);
 
 /* The following APIs are provided for completeness, but they are typically
    not called directly by the application (called instead by the main machine
@@ -88,19 +89,22 @@ unsigned clemens_unserialize_object(
     mpack_reader_t* reader,
     uintptr_t data_adr,
     const struct ClemensSerializerRecord* record,
-    ClemensSerializerAllocateCb alloc_cb);
+    ClemensSerializerAllocateCb alloc_cb,
+    void* context);
 
 unsigned clemens_unserialize_array(
     mpack_reader_t* reader,
     uintptr_t data_adr,
     const struct ClemensSerializerRecord* record,
-    ClemensSerializerAllocateCb alloc_cb);
+    ClemensSerializerAllocateCb alloc_cb,
+    void* context);
 
 unsigned clemens_unserialize_record(
     mpack_reader_t* reader,
     uintptr_t data_adr,
     const struct ClemensSerializerRecord* record,
-    ClemensSerializerAllocateCb alloc_cb);
+    ClemensSerializerAllocateCb alloc_cb,
+    void* context);
 
 #ifdef __cplusplus
 }
