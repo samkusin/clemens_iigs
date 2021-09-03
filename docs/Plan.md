@@ -14,10 +14,12 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
+* Load State
 * Save Battery RAM
 * Capslock
 * AN3 and Dblhires
-* Save state
+* VGC Pass 3 : Dblhires Graphics (not SHGR)
+* fix audio restart
 * remaining //e softswitches
   * Joystick, Paddle
 * Timing checks on native mode versions of:
@@ -31,7 +33,6 @@ This is a running todo list.
 * Support Disk II Card for old boot
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
 * CLEM_MMIO_REG_VGC_IRQ_BYTE
-* VGC Pass 3 : Dblhires Graphics (not SHGR)
 * Some Apple II games testing
 * C041 INTEN - enable Mega II, VBL, quartersec interrupts
 * C047 clearing timer interrupt flags for VBL and quartersec
@@ -55,6 +56,7 @@ This is a running todo list.
 
 ## DONE
 
+* Save state
 * Some Simple Apple II games testing
   * Oregon Trail Plays
   * Sammy Lightfoot Plays
