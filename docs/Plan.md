@@ -14,12 +14,10 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
-* Load State
 * Save Battery RAM
 * Capslock
 * AN3 and Dblhires
 * VGC Pass 3 : Dblhires Graphics (not SHGR)
-* fix audio restart
 * remaining //e softswitches
   * Joystick, Paddle
 * Timing checks on native mode versions of:
@@ -56,6 +54,8 @@ This is a running todo list.
 
 ## DONE
 
+* Load State
+* fix audio restart
 * Save state
 * Some Simple Apple II games testing
   * Oregon Trail Plays
