@@ -543,6 +543,7 @@ enum ClemensVideoFormat {
     kClemensVideoFormat_Text_Alternate,
     kClemensVideoFormat_Lores,
     kClemensVideoFormat_Hires,
+    kClemensVideoFormat_Double_Lores,
     kClemensVideoFormat_Double_Hires,
     kClemensVideoFormat_Count
 };

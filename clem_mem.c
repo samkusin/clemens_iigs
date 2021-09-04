@@ -754,10 +754,18 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_AN1_ON:
         case CLEM_MMIO_REG_AN2_OFF:
         case CLEM_MMIO_REG_AN2_ON:
-        case CLEM_MMIO_REG_AN3_OFF:
-        case CLEM_MMIO_REG_AN3_ON:
         case CLEM_MMIO_REG_BTN0:
         case CLEM_MMIO_REG_BTN1:
+            result = clem_adb_read_switch(&mmio->dev_adb, ioreg, flags);
+            break;
+        case CLEM_MMIO_REG_AN3_OFF:
+        case CLEM_MMIO_REG_AN3_ON:
+            /* AN3 used for double hires graphics */
+            if (ioreg == CLEM_MMIO_REG_AN3_ON) {
+                clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_ENABLE_AN3);
+            } else {
+                clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_ENABLE_AN3);
+            }
             result = clem_adb_read_switch(&mmio->dev_adb, ioreg, flags);
             break;
         case CLEM_MMIO_REG_PADDL0:
@@ -1016,8 +1024,6 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_AN1_ON:
         case CLEM_MMIO_REG_AN2_OFF:
         case CLEM_MMIO_REG_AN2_ON:
-        case CLEM_MMIO_REG_AN3_OFF:
-        case CLEM_MMIO_REG_AN3_ON:
         case CLEM_MMIO_REG_PADDL0:
         case CLEM_MMIO_REG_PADDL1:
         case CLEM_MMIO_REG_PADDL2:
@@ -1038,6 +1044,15 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_PADDL_RESET + 0xd:
         case CLEM_MMIO_REG_PADDL_RESET + 0xe:
         case CLEM_MMIO_REG_PADDL_RESET + 0xf:
+            clem_adb_write_switch(&mmio->dev_adb, ioreg, data);
+            break;
+        case CLEM_MMIO_REG_AN3_OFF:
+        case CLEM_MMIO_REG_AN3_ON:
+            if (ioreg == CLEM_MMIO_REG_AN3_ON) {
+                clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_ENABLE_AN3);
+            } else {
+                clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_ENABLE_AN3);
+            }
             clem_adb_write_switch(&mmio->dev_adb, ioreg, data);
             break;
         case CLEM_MMIO_REG_LC2_RAM_WP:

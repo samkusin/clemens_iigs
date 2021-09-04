@@ -10,6 +10,11 @@
 
    VBL particulars:
    http://www.1000bit.it/support/manuali/apple/technotes/iigs/tn.iigs.040.html
+
+   Double Hi-Res Graphics (better explanation than the reference books which
+   skirt the softswitches and video details)
+   http://www.1000bit.it/support/manuali/apple/technotes/aiie/tn.aiie.03.html
+
 */
 
 #define CLEM_VGC_VSYNC_TIME_NS  (1e9/60)
@@ -231,5 +236,9 @@ void clem_vgc_write_switch(
     uint8_t ioreg,
     uint8_t value
 ) {
-
+    switch (ioreg) {
+        default:
+            CLEM_UNIMPLEMENTED("vgc: write %02x : %02x ", ioreg, value);
+            break;
+    }
 }

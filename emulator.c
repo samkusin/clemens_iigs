@@ -1228,14 +1228,22 @@ ClemensVideo* clemens_get_graphics_video(
     if (vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE) {
         video->scanline_start = 0;
         if (vgc->mode_flags & CLEM_VGC_HIRES) {
-            video->format = kClemensVideoFormat_Hires;
+            if (vgc->mode_flags & CLEM_VGC_DBLHIRES_MASK) {
+                video->format = kClemensVideoFormat_Double_Hires;
+            } else {
+                video->format = kClemensVideoFormat_Hires;
+            }
             if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
                 video->scanline_count = 160;
             } else {
                 video->scanline_count = 192;
             }
         } else {
-            video->format = kClemensVideoFormat_Lores;
+            if (vgc->mode_flags & CLEM_VGC_DBLHIRES_MASK) {
+                video->format = kClemensVideoFormat_Double_Lores;
+            } else {
+                video->format = kClemensVideoFormat_Lores;
+            }
             if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
                 video->scanline_count = 20;
             } else {
@@ -1245,7 +1253,7 @@ ClemensVideo* clemens_get_graphics_video(
     } else {
         return NULL;
     }
-    if (video->format == kClemensVideoFormat_Hires) {
+    if (vgc->mode_flags & CLEM_VGC_HIRES) {
         if (use_page_2) {
             video->scanlines = vgc->hgr_2_scanlines;
         } else {
