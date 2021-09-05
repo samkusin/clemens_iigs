@@ -9,14 +9,14 @@
 #define CLEM_VGC_LORES             0x00000010
 #define CLEM_VGC_HIRES             0x00000020
 #define CLEM_VGC_SUPER_HIRES       0x00000040
-#define CLEM_VGC_DBLHIRES_MASK     0x00000025
 #define CLEM_VGC_RESOLUTION_MASK   0x000000F0
 #define CLEM_VGC_ALTCHARSET        0x00010000
 #define CLEM_VGC_MONOCHROME        0x00020000
 #define CLEM_VGC_PAL               0x00040000
 #define CLEM_VGC_LANGUAGE          0x00080000
 #define CLEM_VGC_ENABLE_VBL_IRQ    0x00100000
-#define CLEM_VGC_ENABLE_AN3        0x00200000
+#define CLEM_VGC_DISABLE_AN3       0x00200000
+#define CLEM_VGC_DBLHIRES_MASK     0x00200025
 #define CLEM_VGC_INIT              0x80000000
 
 /**
@@ -29,7 +29,7 @@ extern "C" {
 #endif
 
 
-void clem_vgc_init(struct ClemensVGC* vgc);
+void clem_vgc_reset(struct ClemensVGC* vgc);
 
 void clem_vgc_sync(struct ClemensVGC* vgc, struct ClemensClock* clock);
 

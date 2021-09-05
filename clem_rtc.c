@@ -29,6 +29,8 @@
 #define CLEM_RTC_CMD_BRAM                   0x07
 
 #define CLEM_RTC_FLAG_WRITE_PROTECT         1
+#define CLEM_RTC_FLAG_BRAM_DIRTY            2
+
 
 
 
@@ -50,6 +52,16 @@ void clem_rtc_set_clock_time(
     uint32_t seconds_since_1904
 ) {
     rtc->seconds_since_1904 = seconds_since_1904;
+}
+
+bool clem_rtc_clear_bram_dirty(struct ClemensDeviceRTC* rtc) {
+    bool is_dirty = (rtc->flags & CLEM_RTC_FLAG_BRAM_DIRTY) != 0;
+    rtc->flags &= ~CLEM_RTC_FLAG_BRAM_DIRTY;
+    return is_dirty;
+}
+
+void clem_rtc_set_bram_dirty(struct ClemensDeviceRTC* rtc) {
+    rtc->flags |= CLEM_RTC_FLAG_BRAM_DIRTY;
 }
 
 static void _clem_rtc_dispatch_cmd(
@@ -146,7 +158,10 @@ void _clem_rtc_bram_write(
              rtc->index, rtc->ctl_c034, data);
     */
     CLEM_ASSERT(rtc->state == CLEM_RTC_EXECUTE_WRITE_BRAM);
-    rtc->bram[rtc->index & 0xff] = data;
+   // if (!(rtc->flags & CLEM_RTC_FLAG_WRITE_PROTECT)) {
+        rtc->bram[rtc->index & 0xff] = data;
+        rtc->flags |= CLEM_RTC_FLAG_BRAM_DIRTY;
+    //}
 }
 
 uint8_t _clem_rtc_clock_read(struct ClemensDeviceRTC* rtc) {

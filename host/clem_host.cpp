@@ -246,6 +246,8 @@ void ClemensHost::frame(int width, int height, float deltaTime)
       clemens_audio_next_frame(&machine_, consumedFrames);
       diagnostics_.audioFrames += consumedFrames;
     }
+
+    saveBRAM();
   } else if (clemens_is_initialized_simple(&machine_)) {
     /* simple machine video and input */
 
@@ -1425,6 +1427,8 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
                   slab_.allocate(2048 * 7),
                   fpiBankCount);
 
+      loadBRAM();
+
       ClemensAudioMixBuffer mix_buffer;
       mix_buffer.frames_per_second = audio_->getAudioFrequency();
       mix_buffer.frame_count = mix_buffer.frames_per_second / 20;
@@ -1504,7 +1508,13 @@ bool ClemensHost::saveState(const char* filename)
   //  this save buffer is probably, unnecessarily big - but it's just used for
   //  saves and freed
   mpack_writer_init_filename(&writer, filename);
+  mpack_build_map(&writer);
+  mpack_write_cstr(&writer, "machine");
   clemens_serialize_machine(&writer, &machine_);
+  mpack_write_cstr(&writer, "bram");
+  mpack_write_bin(&writer, (char *)clemens_rtc_get_bram(&machine_, NULL),
+                  CLEM_RTC_BRAM_SIZE);
+  mpack_complete_map(&writer);
   mpack_writer_destroy(&writer);
   return true;
 }
@@ -1521,8 +1531,11 @@ bool ClemensHost::loadState(const char* filename)
   if (!clemens_is_initialized_simple(&machine_)) {
     //  power on and load state
   }
+  char key[64];
   mpack_reader_t reader;
   mpack_reader_init_filename(&reader, filename);
+  mpack_expect_map(&reader);
+  mpack_expect_cstr(&reader, key, sizeof(key));
   if (!clemens_unserialize_machine(
           &reader,
           &machine_,
@@ -1530,13 +1543,47 @@ bool ClemensHost::loadState(const char* filename)
           this)
   ) {
     // power off the machine
+    mpack_reader_destroy(&reader);
     return false;
   }
+  mpack_expect_cstr(&reader, key, sizeof(key));
+  if (mpack_expect_bin(&reader) == CLEM_RTC_BRAM_SIZE) {
+    mpack_read_bytes(&reader, (char *)machine_.mmio.dev_rtc.bram,
+                     CLEM_RTC_BRAM_SIZE);
+  }
+  mpack_done_bin(&reader);
+  clemens_rtc_set_bram_dirty(&machine_);
+  mpack_done_map(&reader);
   mpack_reader_destroy(&reader);
+
+  saveBRAM();
 
   return true;
 }
 
+void ClemensHost::saveBRAM()
+{
+  bool isDirty = false;
+  const uint8_t* bram = clemens_rtc_get_bram(&machine_, &isDirty);
+  if (!isDirty) return;
+
+  std::ofstream bramFile("clem.bram", std::ios::binary);
+  if (bramFile.is_open()) {
+    bramFile.write((char *)machine_.mmio.dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
+  } else {
+    //  TODO: display error?
+  }
+}
+
+void ClemensHost::loadBRAM()
+{
+  std::ifstream bramFile("clem.bram", std::ios::binary);
+  if (bramFile.is_open()) {
+    bramFile.read((char *)machine_.mmio.dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
+  } else {
+    //  TODO: display warning?
+  }
+}
 
 void ClemensHost::stepMachine(int stepCount)
 {

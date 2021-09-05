@@ -42,6 +42,8 @@
 #define CLEM_VGC_PAL_SCAN_TIME_NS           (CLEM_VGC_HORIZ_SCAN_TIME_NS * \
                                              CLEM_VGC_PAL_SCAN_TIME_NS)
 
+#define CLEM_RTC_BRAM_SIZE                  256
+
 /** Setting: ADB keyboard buffer size - this doesn't need to be large since
  *  Apple II apps typically expect to consume events via ISR or prompt polling
  *  of IO registers.  Our host should have the opportunity to send input to the
