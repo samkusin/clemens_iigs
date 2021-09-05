@@ -248,6 +248,22 @@ void clemens_rtc_set(ClemensMachine* clem, uint32_t seconds_since_1904);
  *
  * @param clem
  */
+void clemens_rtc_set_bram_dirty(ClemensMachine* clem);
+
+/**
+ * @brief This function can be used to persist RTC BRAM data if it has changed
+ *
+ * @param clem
+ * @param is_dirty
+ * @return const uint8_t*
+ */
+const uint8_t* clemens_rtc_get_bram(ClemensMachine* clem, bool* is_dirty);
+
+/**
+ * @brief
+ *
+ * @param clem
+ */
 void clemens_debug_status(ClemensMachine* clem);
 
 /**

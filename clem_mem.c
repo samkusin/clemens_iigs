@@ -762,9 +762,9 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_AN3_ON:
             /* AN3 used for double hires graphics */
             if (ioreg == CLEM_MMIO_REG_AN3_ON) {
-                clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_ENABLE_AN3);
+                clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_DISABLE_AN3);
             } else {
-                clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_ENABLE_AN3);
+                clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_DISABLE_AN3);
             }
             result = clem_adb_read_switch(&mmio->dev_adb, ioreg, flags);
             break;
@@ -1049,9 +1049,9 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_AN3_OFF:
         case CLEM_MMIO_REG_AN3_ON:
             if (ioreg == CLEM_MMIO_REG_AN3_ON) {
-                clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_ENABLE_AN3);
+                clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_DISABLE_AN3);
             } else {
-                clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_ENABLE_AN3);
+                clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_DISABLE_AN3);
             }
             clem_adb_write_switch(&mmio->dev_adb, ioreg, data);
             break;
@@ -1641,7 +1641,7 @@ void clem_mmio_reset(
     clem_rtc_reset(&mmio->dev_rtc, mega2_clocks_step);
     clem_adb_reset(&mmio->dev_adb);
     clem_sound_reset(&mmio->dev_audio);
-    clem_vgc_init(&mmio->vgc);
+    clem_vgc_reset(&mmio->vgc);
     clem_iwm_reset(&mmio->dev_iwm);
     clem_scc_reset(&mmio->dev_scc);
 }

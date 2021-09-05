@@ -1177,6 +1177,7 @@ bool clemens_has_disk(
     return drive != NULL ? (drive->data != NULL) : false;
 }
 
+
 ClemensMonitor* clemens_get_monitor(
     ClemensMonitor* monitor,
     ClemensMachine* clem
@@ -1228,7 +1229,7 @@ ClemensVideo* clemens_get_graphics_video(
     if (vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE) {
         video->scanline_start = 0;
         if (vgc->mode_flags & CLEM_VGC_HIRES) {
-            if (vgc->mode_flags & CLEM_VGC_DBLHIRES_MASK) {
+            if ((vgc->mode_flags & CLEM_VGC_DBLHIRES_MASK) == CLEM_VGC_DBLHIRES_MASK) {
                 video->format = kClemensVideoFormat_Double_Hires;
             } else {
                 video->format = kClemensVideoFormat_Hires;
@@ -1309,6 +1310,18 @@ void clemens_rtc_set(
     uint32_t seconds_since_1904
 ) {
     clem_rtc_set_clock_time(&machine->mmio.dev_rtc, seconds_since_1904);
+}
+
+const uint8_t* clemens_rtc_get_bram(ClemensMachine* clem, bool* is_dirty) {
+    bool flag = clem_rtc_clear_bram_dirty(&clem->mmio.dev_rtc);
+    if (is_dirty) {
+        *is_dirty = flag;
+    }
+    return clem->mmio.dev_rtc.bram;
+}
+
+void clemens_rtc_set_bram_dirty(ClemensMachine* clem) {
+    clem_rtc_set_bram_dirty(&clem->mmio.dev_rtc);
 }
 
 void clemens_debug_status(ClemensMachine* clem) {

@@ -93,6 +93,8 @@ private:
   void emulationBreak();
   void resetDiagnostics();
   void loadDisks();
+  void loadBRAM();
+  void saveBRAM();
 
 
   void dumpMemory(unsigned bank, const char* filename);

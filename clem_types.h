@@ -54,7 +54,7 @@ struct ClemensDeviceRTC {
 
     unsigned seconds_since_1904;
 
-    uint8_t bram[256];
+    uint8_t bram[CLEM_RTC_BRAM_SIZE];
 
     /*  these values are set by the app */
     uint8_t data_c033;

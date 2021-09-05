@@ -19,7 +19,7 @@
 
 #define CLEM_VGC_VSYNC_TIME_NS  (1e9/60)
 
-void clem_vgc_init(struct ClemensVGC* vgc) {
+void clem_vgc_reset(struct ClemensVGC* vgc) {
     /* setup scanline maps for all of the different modes */
     ClemensVideo* video;
     struct ClemensScanline* line;
