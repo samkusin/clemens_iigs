@@ -77,6 +77,14 @@ void clem_adb_device_input(struct ClemensDeviceADB* adb,
                            const struct ClemensInputEvent* input);
 
 /**
+ * @brief Supplies the emulator with the current state of a toggle key
+ *
+ * @param adb
+ * @param enabled see CLEM_ADB_KEYB_TOGGLE_xxx
+ */
+void clem_adb_device_key_toggle(struct ClemensDeviceADB* adb, unsigned enabled);
+
+/**
  * @brief
  *
  * @param input

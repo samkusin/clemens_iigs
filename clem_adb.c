@@ -92,6 +92,7 @@
 #define CLEM_ADB_DEVICE_MOUSE           0x03
 
 /* GLU register flags */
+#define CLEM_ADB_GLU_REG2_KEY_CAPS_TOGGLE   0x0002
 #define CLEM_ADB_GLU_REG2_KEY_CLEAR_NUMLOCK 0x0080
 #define CLEM_ADB_GLU_REG2_KEY_APPLE         0x0100
 #define CLEM_ADB_GLU_REG2_KEY_OPTION        0x0200
@@ -206,12 +207,13 @@ static void _clem_adb_add_result(struct ClemensDeviceADB* adb, uint8_t value) {
  *  Apple IIgs Hardware Reference
  *  https://developer.apple.com/library/archive/technotes/hw/hw_01.html
  */
-#define CLEM_ADB_KEY_MOD_SHIFT  0x01
-#define CLEM_ADB_KEY_MOD_CTRL   0x02
-#define CLEM_ADB_KEY_MOD_CAPS   0x04
-#define CLEM_ADB_KEY_MOD_KEYPAD 0x10
-#define CLEM_ADB_KEY_MOD_OPTION 0x40
-#define CLEM_ADB_KEY_MOD_APPLE  0x80
+#define CLEM_ADB_KEY_MOD_SHIFT      0x01
+#define CLEM_ADB_KEY_MOD_CTRL       0x02
+#define CLEM_ADB_KEY_MOD_CAPS       0x04
+#define CLEM_ADB_KEY_MOD_CAPITAL    0x08    /* capitalized if caps lock on */
+#define CLEM_ADB_KEY_MOD_KEYPAD     0x10
+#define CLEM_ADB_KEY_MOD_OPTION     0x40
+#define CLEM_ADB_KEY_MOD_APPLE      0x80
 
 /* { default, ctl, shift,  ctrl+shift, extra }
  * Apple //e Technical Reference p 14-16
@@ -224,24 +226,24 @@ static void _clem_adb_add_result(struct ClemensDeviceADB* adb, uint8_t value) {
  *  - home, pageup, end, pagedown, etc
  */
 static uint8_t g_a2_to_ascii[CLEM_ADB_KEY_CODE_LIMIT][8] = {
-    /* 0x00 */  { 'a',  0x01,   'A',    0x01,   0x00, },
-    /* 0x01 */  { 's',  0x13,   'S',    0x13,   0x00, },
-    /* 0x02 */  { 'd',  0x04,   'D',    0x04,   0x00, },
-    /* 0x03 */  { 'f',  0x06,   'F',    0x06,   0x00, },
-    /* 0x04 */  { 'h',  0x08,   'H',    0x08,   0x00, },
-    /* 0x05 */  { 'g',  0x07,   'G',    0x07,   0x00, },
-    /* 0x06 */  { 'z',  0x1a,   'Z',    0x1a,   0x00, },
-    /* 0x07 */  { 'x',  0x18,   'X',    0x18,   0x00, },
-    /* 0x08 */  { 'c',  0x03,   'C',    0x03,   0x00, },
-    /* 0x09 */  { 'v',  0x16,   'V',    0x16,   0x00, },
+    /* 0x00 */  { 'a',  0x01,   'A',    0x01,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x01 */  { 's',  0x13,   'S',    0x13,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x02 */  { 'd',  0x04,   'D',    0x04,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x03 */  { 'f',  0x06,   'F',    0x06,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x04 */  { 'h',  0x08,   'H',    0x08,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x05 */  { 'g',  0x07,   'G',    0x07,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x06 */  { 'z',  0x1a,   'Z',    0x1a,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x07 */  { 'x',  0x18,   'X',    0x18,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x08 */  { 'c',  0x03,   'C',    0x03,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x09 */  { 'v',  0x16,   'V',    0x16,   CLEM_ADB_KEY_MOD_CAPITAL, },
     /* 0x0A */  { 0xff, 0xff,   0xff,   0xff,   0x00, },
-    /* 0x0B */  { 'b',  0x02,   'B',    0x02,   0x00, },
-    /* 0x0C */  { 'q',  0x11,   'Q',    0x11,   0x00, },
-    /* 0x0D */  { 'w',  0x17,   'W',    0x17,   0x00, },
-    /* 0x0E */  { 'e',  0x05,   'E',    0x05,   0x00, },
-    /* 0x0F */  { 'r',  0x12,   'R',    0x12,   0x00, },
-    /* 0x10 */  { 't',  0x14,   'T',    0x14,   0x00, },
-    /* 0x11 */  { 'y',  0x19,   'Y',    0x19,   0x00, },
+    /* 0x0B */  { 'b',  0x02,   'B',    0x02,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x0C */  { 'q',  0x11,   'Q',    0x11,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x0D */  { 'w',  0x17,   'W',    0x17,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x0E */  { 'e',  0x05,   'E',    0x05,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x0F */  { 'r',  0x12,   'R',    0x12,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x10 */  { 't',  0x14,   'T',    0x14,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x11 */  { 'y',  0x19,   'Y',    0x19,   CLEM_ADB_KEY_MOD_CAPITAL, },
     /* 0x12 */  { '1',  '1',    '!',    '!',    0x00, },
     /* 0x13 */  { '2',  0x00,   '@',    0x00,   0x00, },
     /* 0x14 */  { '3',  '3',    '#',    '#',    0x00, },
@@ -255,22 +257,22 @@ static uint8_t g_a2_to_ascii[CLEM_ADB_KEY_CODE_LIMIT][8] = {
     /* 0x1C */  { '8',  '8',    '*',    '*',    0x00, },
     /* 0x1D */  { '0',  '0',    ')',    ')',    0x00, },
     /* 0x1E */  { ']',  0x1d,   '}',    0x1d,   0x00, },
-    /* 0x1F */  { 'o',  0x0f,   'O',    0x0f,   0x00, },
-    /* 0x20 */  { 'u',  0x15,   'U',    0x15,   0x00, },
+    /* 0x1F */  { 'o',  0x0f,   'O',    0x0f,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x20 */  { 'u',  0x15,   'U',    0x15,   CLEM_ADB_KEY_MOD_CAPITAL, },
     /* 0x21 */  { '[',  0x1b,   '{',    0x1b,   0x00, },
-    /* 0x22 */  { 'i',  0x09,   'I',    0x09,   0x00, },
-    /* 0x23 */  { 'p',  0x10,   'P',    0x10,   0x00, },
+    /* 0x22 */  { 'i',  0x09,   'I',    0x09,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x23 */  { 'p',  0x10,   'P',    0x10,   CLEM_ADB_KEY_MOD_CAPITAL, },
     /* 0x24 */  { 0x0d, 0xff,   0x0d,   0xff,   0x00, }, /* CR */
-    /* 0x25 */  { 'l',  0x0c,   'L',    0x0c,   0x00, },
-    /* 0x26 */  { 'j',  0x0a,   'J',    0x0a,   0x00, },
+    /* 0x25 */  { 'l',  0x0c,   'L',    0x0c,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x26 */  { 'j',  0x0a,   'J',    0x0a,   CLEM_ADB_KEY_MOD_CAPITAL, },
     /* 0x27 */  { 0x27, 0xff,   0x22,   0xff,   0x00, }, /* apostrophe */
-    /* 0x28 */  { 'k',  0x0b,   'K',    0x0b,   0x00, },
+    /* 0x28 */  { 'k',  0x0b,   'K',    0x0b,   CLEM_ADB_KEY_MOD_CAPITAL, },
     /* 0x29 */  { ';',  ';',    ':',    ':',    0x00, },
     /* 0x2A */  { '\\', 0x1c,   '|',    0x1c,   0x00, },
     /* 0x2B */  { ',',  ',',    '<',    '<',    0x00, },
     /* 0x2C */  { '/',  '/',    '?',    '?',    0x00, },
-    /* 0x2D */  { 'n',  0x0e,   'N',    0x0e,   0x00, },
-    /* 0x2E */  { 'm',  0x0d,   'M',    0x0d,   0x00, },
+    /* 0x2D */  { 'n',  0x0e,   'N',    0x0e,   CLEM_ADB_KEY_MOD_CAPITAL, },
+    /* 0x2E */  { 'm',  0x0d,   'M',    0x0d,   CLEM_ADB_KEY_MOD_CAPITAL, },
     /* 0x2F */  { '.',  '.',    '>',    '>',    0x00, },
     /* 0x30 */  { 0x09, 0x09,   0x09,   0x09,   0x00, }, /* TAB */
     /* 0x31 */  { 0x20, 0x20,   0x20,   0x20,   0x00, }, /* SPACE */
@@ -431,7 +433,8 @@ static uint8_t _clem_adb_glu_keyb_parse(
             if (is_key_down) modifiers |= CLEM_ADB_GLU_REG2_KEY_CAPS;
             else modifiers &= ~CLEM_ADB_GLU_REG2_KEY_CAPS;
         }
-        adb->keyb_reg[2] = modifiers;
+        adb->keyb_reg[2] &= ~CLEM_ADB_GLU_REG2_MODKEY_MASK;
+        adb->keyb_reg[2] |= modifiers;
     }
     if (ascii_table[0] != 0xff) {
         //  this is a repeatable key - reset repeat key state here
@@ -455,7 +458,13 @@ static uint8_t _clem_adb_glu_keyb_parse(
     } else if (modifiers & CLEM_ADB_GLU_REG2_KEY_CTRL) {
         ascii_key = ascii_table[1];
     } else {
-        ascii_key = ascii_table[0];
+        if (ascii_table[4] == CLEM_ADB_KEY_MOD_CAPITAL &&
+            (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_CAPS_TOGGLE)
+        ) {
+            ascii_key = ascii_table[2];
+        } else {
+            ascii_key = ascii_table[0];
+        }
     }
     if (ascii_key != 0xff) {
         //CLEM_LOG("SKS: ascii: %02X", ascii_key);
@@ -948,6 +957,17 @@ void clem_adb_device_input(
                 }
             }
             break;
+    }
+}
+
+void clem_adb_device_key_toggle(
+    struct ClemensDeviceADB* adb,
+    unsigned enabled
+) {
+    if (enabled & CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK) {
+        adb->keyb_reg[2] |= CLEM_ADB_GLU_REG2_KEY_CAPS_TOGGLE;
+    } else {
+        adb->keyb_reg[2] &= ~CLEM_ADB_GLU_REG2_KEY_CAPS_TOGGLE;
     }
 }
 
