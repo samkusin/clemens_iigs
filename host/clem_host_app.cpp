@@ -26,7 +26,6 @@ static sg_pass_action g_sgPassAction;
 
 std::array<unsigned, 512> g_sokolToADBKey;
 
-
 static void onInit()
 {
   clem_host_timepoint_init();

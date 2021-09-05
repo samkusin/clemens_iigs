@@ -35,3 +35,7 @@ double clem_host_timepoint_deltad(
   int64_t counter1 = *(int64_t *)(&t1->data[0]);
   return (counter1 - counter0) / (double)s_counter_frequency.QuadPart;
 }
+
+bool clem_host_get_caps_lock_state() {
+  return (GetKeyState(VK_CAPITAL) & 0x1) ? true : false;
+}

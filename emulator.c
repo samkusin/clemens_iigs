@@ -1301,6 +1301,10 @@ void clemens_input(
     clem_adb_device_input(&machine->mmio.dev_adb, input);
 }
 
+void clemens_input_key_toggle(ClemensMachine* clem, unsigned enabled) {
+    clem_adb_device_key_toggle(&clem->mmio.dev_adb, enabled);
+}
+
 const uint8_t* clemens_get_ascii_from_a2code(unsigned input) {
     return clem_adb_ascii_from_a2code(input);
 }

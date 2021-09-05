@@ -50,6 +50,8 @@
  *  emulator at a decent frequency (30-60hz) for us not to lose events
  */
 #define CLEM_ADB_KEYB_BUFFER_LIMIT          8
+#define CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK      0x0000001
+
 
 /** General Machine Settings */
 #define CLEM_IIGS_PAGE_SIZE                 256

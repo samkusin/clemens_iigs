@@ -181,6 +181,8 @@ private:
   std::unique_ptr<ClemensAudioDevice> audio_;
   std::vector<uint8_t> audioMixBuffer;
 
+  unsigned adbKeyToggleMask_;
+
   struct Diagnostics {
     uint32_t audioFrames;
     clem_clocks_time_t clocksSpent;

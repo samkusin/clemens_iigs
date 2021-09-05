@@ -9,6 +9,7 @@
 #include "clem_display.hpp"
 #include "clem_program_trace.hpp"
 
+#include "clem_host_platform.h"
 #include "clem_debug.h"
 #include "clem_drive.h"
 #include "clem_mem.h"
@@ -117,7 +118,8 @@ ClemensHost::ClemensHost() :
   cpu6502EmulationSaved_(true),
   widgetInputContext_(InputContext::None),
   widgetDebugContext_(DebugContext::IWM),
-  display_(nullptr)
+  display_(nullptr),
+  adbKeyToggleMask_(0)
 {
   ClemensTraceExecutedInstruction::initialize();
 
@@ -130,6 +132,7 @@ ClemensHost::ClemensHost() :
   memoryViewStatic_[1].HandlerContext = this;
   memoryViewStatic_[1].ReadFn = &ClemensHost::emulatorImGuiMemoryRead;
   memoryViewStatic_[1].WriteFn = &ClemensHost::emulatorImguiMemoryWrite;
+
 
   displayProvider_ = std::make_unique<ClemensDisplayProvider>();
   display_ = std::make_unique<ClemensDisplay>(*displayProvider_);
@@ -246,6 +249,13 @@ void ClemensHost::frame(int width, int height, float deltaTime)
       clemens_audio_next_frame(&machine_, consumedFrames);
       diagnostics_.audioFrames += consumedFrames;
     }
+
+    if (clem_host_get_caps_lock_state()) {
+      adbKeyToggleMask_ |= CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;
+    } else {
+      adbKeyToggleMask_ &= ~CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;
+    }
+    clemens_input_key_toggle(&machine_, adbKeyToggleMask_);
 
     saveBRAM();
   } else if (clemens_is_initialized_simple(&machine_)) {

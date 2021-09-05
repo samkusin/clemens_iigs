@@ -14,8 +14,6 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
-* Save Battery RAM
-* Capslock
 * Support Disk switching in the IDE
 * VGC Pass 3 : Dblhires Graphics (not SHGR)
   * Convert bit string for a scanline into colors
@@ -65,6 +63,8 @@ This is a running todo list.
 
 ## DONE
 
+* Capslock
+* Save Battery RAM
 * AN3 and Dblhires
 * Load State
 * fix audio restart

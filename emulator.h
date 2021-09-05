@@ -228,6 +228,15 @@ void clemens_input(ClemensMachine* clem,
                    const struct ClemensInputEvent* input);
 
 /**
+ * @brief Forwards state of toggle keys to the emulator
+ *
+ * @param clem
+ * @param enabled See CLEM_ADB_KEYB_TOGGLE_xxx
+ * @param disabled See CLEM_ADB_KEYB_TOGGLE_xxx
+ */
+void clemens_input_key_toggle(ClemensMachine* clem, unsigned enabled);
+
+/**
  * @brief
  *
  * @param input
