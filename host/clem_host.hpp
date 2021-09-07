@@ -48,7 +48,7 @@ public:
 private:
   void emulate(float deltaTime);
 
-  bool loadWOZDisk(const char* filename, int driveIndex);
+  bool loadWOZDisk(const char* filename, struct ClemensWOZDisk* woz);
 
   bool parseWOZDisk(struct ClemensWOZDisk* woz, uint8_t* data, size_t dataSize);
   bool initWOZDisk(struct ClemensWOZDisk* woz);
@@ -63,6 +63,7 @@ private:
   bool parseCommandReset(const char* line);
   bool parseCommandLoad(const char* line);
   bool parseCommandSave(const char* line);
+  bool parseCommandDisk(const char* line);
   bool parseCommandDebugStatus(const char* line);
   bool parseCommandStep(const char* line);
   bool parseCommandBreak(const char* line);
@@ -92,6 +93,7 @@ private:
   bool emulationRun(unsigned target);
   void emulationBreak();
   void resetDiagnostics();
+  bool loadDisk(ClemensDriveType driveType, const char* filename);
   void loadDisks();
   void loadBRAM();
   void saveBRAM();
@@ -121,6 +123,8 @@ private:
 
   std::array<struct ClemensWOZDisk, 2> disks35_;
   std::array<struct ClemensWOZDisk, 2> disks525_;
+  std::array<std::string, 2> disks35Paths_;
+  std::array<std::string, 2> disks525Paths_;
 
   float emulationRunTime_;
   float emulationSliceTimeLeft_;

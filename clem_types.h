@@ -398,7 +398,8 @@ struct ClemensDriveBay {
  *
  */
 enum ClemensDriveType {
-    kClemensDrive_3_5,
+    kClemensDrive_Invalid = -1,
+    kClemensDrive_3_5 = 0,
     kClemensDrive_3_5_D1 = kClemensDrive_3_5,
     kClemensDrive_3_5_D2,
     kClemensDrive_5_25,

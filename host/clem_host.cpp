@@ -29,6 +29,7 @@
 #include <fstream>
 
 #include <inttypes.h>
+#include <sys/stat.h>
 
 namespace {
   constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
@@ -133,6 +134,12 @@ ClemensHost::ClemensHost() :
   memoryViewStatic_[1].ReadFn = &ClemensHost::emulatorImGuiMemoryRead;
   memoryViewStatic_[1].WriteFn = &ClemensHost::emulatorImguiMemoryWrite;
 
+  for (auto& disk : disks525_) {
+    auto maxDiskDataSize = calculateMaxDiskDataSize(CLEM_WOZ_DISK_5_25);
+    disk.bits_data = (uint8_t*)malloc(maxDiskDataSize);
+    disk.bits_data_end = disk.bits_data + maxDiskDataSize;
+  }
+
 
   displayProvider_ = std::make_unique<ClemensDisplayProvider>();
   display_ = std::make_unique<ClemensDisplay>(*displayProvider_);
@@ -143,6 +150,10 @@ ClemensHost::ClemensHost() :
 ClemensHost::~ClemensHost()
 {
   audio_->stop();
+
+  for (auto& disk : disks525_) {
+    free(disk.bits_data);
+  }
 
   void* slabMemory = slab_.getHead();
   if (slabMemory) {
@@ -975,6 +986,8 @@ bool ClemensHost::parseCommand(const char* buffer)
         return parseCommandLoad(end);
       } else if (!strncasecmp(start, ".save", end - start)) {
         return parseCommandSave(end);
+      } else if (!strncasecmp(start, ".disk", end - start)) {
+        return parseCommandDisk(end);
       } else if (!strncasecmp(start, "step", end - start) ||
                  !strncasecmp(start, "s", end - start)) {
         return parseCommandStep(end);
@@ -1065,6 +1078,44 @@ bool ClemensHost::parseCommandSave(const char* line)
   return false;
 }
 
+bool ClemensHost::parseCommandDisk(const char* line)
+{
+  const char* start = trimCommand(line);
+  if (!start) {
+    for (unsigned i = 0; i < disks35Paths_.size(); ++i) {
+      CLEM_HOST_COUT.format("S5.D{}: {}", i+1,
+                            disks35Paths_[i].empty() ? "<none>": disks35Paths_[i]);
+    }
+    for (unsigned i = 0; i < disks525Paths_.size(); ++i) {
+      CLEM_HOST_COUT.format("S6.D{}: {}", i+1,
+                             disks525Paths_[i].empty() ? "<none>": disks525Paths_[i]);
+    }
+    return true;
+  }
+
+  return parseCommandToken(start,
+    [this](const char* start, const char* end) {
+      char slot[32];
+      strncpy(slot, start, std::min(sizeof(slot) - 1, size_t(end - start)));
+
+      ClemensDriveType driveType = kClemensDrive_Invalid;
+      if (slot[1] == '.') {
+        if (slot[0] == '5') {
+          if (slot[2] == '1') driveType = kClemensDrive_3_5_D1;
+          else if (slot[2] == '2') driveType = kClemensDrive_3_5_D2;
+        } else if (slot[0] == '6') {
+          if (slot[2] == '1') driveType = kClemensDrive_5_25_D1;
+          else if (slot[2] == '2') driveType = kClemensDrive_5_25_D2;
+        }
+      }
+      if (driveType == kClemensDrive_Invalid) {
+        CLEM_HOST_COUT.format("Command requires a <slot>.<drive> parameter");
+        return false;
+      }
+
+      return loadDisk(driveType, end);
+    });
+}
 
 bool ClemensHost::parseCommandDebugStatus(const char* line)
 {
@@ -1425,8 +1476,6 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
 
   switch (machineType) {
     case MachineType::Apple2GS: {
-      loadDisks();
-
       const unsigned fpiBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT;
       clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle,
                   romMemory, romMemorySize,
@@ -1524,6 +1573,13 @@ bool ClemensHost::saveState(const char* filename)
   mpack_write_cstr(&writer, "bram");
   mpack_write_bin(&writer, (char *)clemens_rtc_get_bram(&machine_, NULL),
                   CLEM_RTC_BRAM_SIZE);
+  mpack_write_cstr(&writer, "disks");
+  mpack_build_array(&writer);
+  mpack_write_cstr(&writer, disks525Paths_[0].c_str());
+  mpack_write_cstr(&writer, disks525Paths_[1].c_str());
+  mpack_write_cstr(&writer, disks35Paths_[0].c_str());
+  mpack_write_cstr(&writer, disks35Paths_[1].c_str());
+  mpack_complete_array(&writer);
   mpack_complete_map(&writer);
   mpack_writer_destroy(&writer);
   return true;
@@ -1541,11 +1597,11 @@ bool ClemensHost::loadState(const char* filename)
   if (!clemens_is_initialized_simple(&machine_)) {
     //  power on and load state
   }
-  char key[64];
+  char str[256];
   mpack_reader_t reader;
   mpack_reader_init_filename(&reader, filename);
   mpack_expect_map(&reader);
-  mpack_expect_cstr(&reader, key, sizeof(key));
+  mpack_expect_cstr(&reader, str, sizeof(str));
   if (!clemens_unserialize_machine(
           &reader,
           &machine_,
@@ -1556,13 +1612,27 @@ bool ClemensHost::loadState(const char* filename)
     mpack_reader_destroy(&reader);
     return false;
   }
-  mpack_expect_cstr(&reader, key, sizeof(key));
+  mpack_expect_cstr(&reader, str, sizeof(str));
   if (mpack_expect_bin(&reader) == CLEM_RTC_BRAM_SIZE) {
     mpack_read_bytes(&reader, (char *)machine_.mmio.dev_rtc.bram,
                      CLEM_RTC_BRAM_SIZE);
   }
   mpack_done_bin(&reader);
   clemens_rtc_set_bram_dirty(&machine_);
+
+  //  load woz filenames - the actual images have already been
+  //  unserialized inside clemens_unserialize_machine
+  mpack_expect_cstr(&reader, str, sizeof(str));
+  mpack_expect_array(&reader);
+  mpack_expect_cstr(&reader, str, sizeof(str));
+  disks525Paths_[0] = str;
+  mpack_expect_cstr(&reader, str, sizeof(str));
+  disks525Paths_[1] = str;
+  mpack_expect_cstr(&reader, str, sizeof(str));
+  disks35Paths_[0] = str;
+  mpack_expect_cstr(&reader, str, sizeof(str));
+  disks35Paths_[1] = str;
+  mpack_done_array(&reader);
   mpack_done_map(&reader);
   mpack_reader_destroy(&reader);
 
@@ -1662,7 +1732,7 @@ void ClemensHost::emulatorOpcodePrint(
   }
 }
 
-bool ClemensHost::loadWOZDisk(const char* filename, int drive_index)
+bool ClemensHost::loadWOZDisk(const char* filename, struct ClemensWOZDisk* woz)
 {
   std::ifstream wozFile(filename, std::ios::binary | std::ios::ate);
   if (wozFile.is_open()) {
@@ -1671,8 +1741,8 @@ bool ClemensHost::loadWOZDisk(const char* filename, int drive_index)
     wozFile.seekg(0, std::ios::beg);
     wozFile.read(tmp, sz);
     wozFile.close();
-    parseWOZDisk(&disks525_[drive_index], (uint8_t*)tmp, sz);
-    free(tmp);
+    parseWOZDisk(woz, (uint8_t*)tmp, sz);
+    delete[] tmp;
     return true;
   }
   return false;
@@ -1709,9 +1779,6 @@ bool ClemensHost::parseWOZDisk(
         break;
       case CLEM_WOZ_CHUNK_TRKS:
         if (woz->track_count > 0) {
-          unsigned trackDataSize = calculateMaxDiskDataSize(woz->disk_type);
-          woz->bits_data = (uint8_t*)slab_.allocate(trackDataSize);
-          woz->bits_data_end = woz->bits_data + trackDataSize;
           woz->default_track_bit_length = CLEM_WOZ_DEFAULT_TRACK_BIT_LENGTH_525;
         }
         current = clem_woz_parse_trks_chunk(
@@ -1742,15 +1809,72 @@ bool ClemensHost::parseWOZDisk(
   return true;
 }
 
+bool ClemensHost::loadDisk(ClemensDriveType driveType, const char* filename)
+{
+  ClemensWOZDisk* disk = nullptr;
+  decltype(disks525Paths_)* diskPaths = nullptr;
+  unsigned diskType = 0;
+
+  int driveIndex = -1;
+  switch (driveType) {
+    case kClemensDrive_5_25_D1:
+      disk = &disks525_[0];
+      diskPaths = &disks525Paths_;
+      driveIndex = 0;
+      diskType = CLEM_WOZ_DISK_5_25;
+      break;
+    case kClemensDrive_5_25_D2:
+      disk = &disks525_[1];
+      diskPaths = &disks525Paths_;
+      driveIndex = 1;
+      diskType = CLEM_WOZ_DISK_5_25;
+      break;
+    case kClemensDrive_3_5_D1:
+      disk = &disks35_[0];
+      diskPaths = &disks35Paths_;
+      driveIndex = 0;
+      diskType = CLEM_WOZ_DISK_3_5;
+      break;
+    case kClemensDrive_3_5_D2:
+      disk = &disks35_[1];
+      diskPaths = &disks35Paths_;
+      driveIndex = 1;
+      diskType = CLEM_WOZ_DISK_3_5;
+      break;
+  }
+  if (!disk) return false;
+
+  //  TODO: support dsk2woz
+  while (std::isspace(*filename)) ++filename;
+  diskPaths->at(driveIndex) = filename;
+  if (filename[0]) {
+    struct stat fileStat;
+    bool isOk = false;
+
+    uint8_t* bits = disk->bits_data;
+    uint8_t* bitsEnd = disk->bits_data_end;
+    memset(disk, 0, sizeof(*disk));
+    disk->bits_data = bits;
+    disk->bits_data_end = bitsEnd;
+    if (stat(filename, &fileStat) != 0) {
+      disk->disk_type = diskType;
+      isOk = initWOZDisk(disk);
+    }
+
+    isOk = loadWOZDisk(filename, disk);
+    if (!isOk) {
+      return false;
+    }
+  } else {
+    disk = nullptr;
+  }
+
+  return clemens_assign_disk(&machine_, driveType, disk);
+}
+
 void ClemensHost::loadDisks()
 {
-    //  TODO: move into UI
-  //FILE* fp = fopen("dos_3_3_master.woz", "rb");
-  //FILE* fp = fopen("stargate.woz", "rb");
-  loadWOZDisk("oregon_trail_disk_1.woz", 0);
-  //loadWOZDisk("ultima_i_player.woz", 1);
-  disks525_[1].disk_type = CLEM_WOZ_DISK_5_25;
-  initWOZDisk(&disks525_[1]);
+
 
 }
 
@@ -1773,9 +1897,7 @@ bool ClemensHost::initWOZDisk(struct ClemensWOZDisk* woz) {
       return false;
   }
 
-  unsigned trackDataSize = calculateMaxDiskDataSize(woz->disk_type);
-  woz->bits_data = (uint8_t*)slab_.allocate(trackDataSize);
-  woz->bits_data_end = woz->bits_data + trackDataSize;
+  auto trackDataSize = woz->bits_data_end - woz->bits_data;
   woz->default_track_bit_length = CLEM_WOZ_BLANK_DISK_TRACK_BIT_LENGTH_525;
   memset(woz->bits_data, 0, trackDataSize);
 
