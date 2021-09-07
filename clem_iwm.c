@@ -278,6 +278,7 @@ void clem_iwm_eject_disk(
     struct ClemensDeviceIWM* iwm,
    struct ClemensDrive* drive
 ) {
+    drive->data = NULL;
     // clear disk after timeout
     // after timeout, reset drive state
 }

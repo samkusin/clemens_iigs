@@ -428,7 +428,7 @@ void clem_disk_read_and_position_head_525(
         qtr_track_index = 0;
     }
     else if (qtr_track_index >= 160) qtr_track_index = 160;
-    if (qtr_track_index != drive->qtr_track_index) {
+    if (qtr_track_index != drive->qtr_track_index && drive->data) {
         /*
         CLEM_LOG("IWM: Disk525[%u]: Motor: %u; Head @ (%d,%d)",
             (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
@@ -474,6 +474,9 @@ void clem_disk_read_and_position_head_525(
     drive->track_byte_index = track_cur_pos / 8;
     drive->track_bit_shift = 7 - (track_cur_pos % 8);
     drive->pulse_ns = clem_util_timer_increment(drive->pulse_ns, 1000000, dt_ns);
+    if (!drive->data) {
+        return;
+    }
     if (drive->pulse_ns >= drive->data->bit_timing_ns) {
         bool valid_disk_data = drive->real_track_index != 0xff &&
             drive->data->track_initialized[drive->real_track_index];
@@ -509,6 +512,9 @@ void clem_disk_update_head_525(
     bool write_pulse = (*io_flags & CLEM_IWM_FLAG_WRITE_HEAD_ON) == (
             CLEM_IWM_FLAG_WRITE_HEAD_ON);
     bool write_transition = write_pulse != drive->write_pulse;
+    if (!drive->data) {
+        return;
+    }
 
     if (!(drive->data->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT)) {
         if (*io_flags & CLEM_IWM_FLAG_WRITE_REQUEST) {
