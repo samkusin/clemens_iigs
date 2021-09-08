@@ -16,14 +16,7 @@
 //  ClemensVideo comes in two packages: text and graphics.  This method allows
 //  us to render the Apple IIgs mixed video modes.
 //
-//  def Setup():
-//    Create a texture for the Screen: (1024x256)
-//
-//  def DrawTextMode(ClemensVideo):
-//    Iterate through the window described in ClemensVideo for each text
-//    character.  Obtain character set information from MMIO VGC settings
-//    passed by the emulator applciation
-//
+
 
 static const int kDisplayTextColumnLimit = 80;
 static const int kDisplayTextRowLimit = 24;
@@ -80,6 +73,22 @@ static const uint8_t kHiresColors[8][4] = {
   { 0x22, 0x22, 0xFF, 0xFF },       // medium blue
   { 0xFF, 0xFF, 0xFF, 0xFF }        // white group 2
 };
+
+//  Double Hi-Res Graphics (better explanation than the reference books which
+//  skirt the softswitches and video details)
+//  http://www.1000bit.it/support/manuali/apple/technotes/aiie/tn.aiie.03.html
+
+//  And a good description of the color pecularities between different monitors
+//  and systems (//e vs IIgs) is here.
+//  https://lukazi.blogspot.com/2017/03/double-high-resolution-graphics-dhgr.html
+//
+//  For this reason, the implementation can't promise to be IIgs accurate, or
+//  even //e accurate
+//
+//  The hardware reference mentions a 'sliding window', which kind of follows
+//  what has been done with our high-res graphics implementation.  See the
+//  double hi-res plotter for details on the eventual implementation.
+//
 
 static const uint8_t kDblHiresColors[16][4] = {
   {   0,    0,    0,    255 },      // black
@@ -149,7 +158,7 @@ unsigned stateToColorAction[8] = {
   /* b111 */  3,    //  > 2 adjacent on = white
 };
 
-void a2hgrToABGR8Scale2x1(uint8_t* pixout, const uint8_t* hgr){
+void a2hgrToABGR8Scale2x2(uint8_t* pixout, uint8_t* pixout2, const uint8_t* hgr) {
   //  input is 40 bytes of hgr data to 280 bytes (1 byte per pixel)
   //  colors are one, zero, even, odd
   //  strategy:
@@ -215,6 +224,8 @@ void a2hgrToABGR8Scale2x1(uint8_t* pixout, const uint8_t* hgr){
         pixel = (abgrFromHGRBitTable[color][group & 1] << 5) + 16;
         pixout[xpos] = pixel;
         pixout[xpos+1] = pixel;
+        pixout2[xpos] = pixel;
+        pixout2[xpos+1] = pixel;
       }
       xpos += 2;
     }
@@ -233,6 +244,8 @@ void a2hgrToABGR8Scale2x1(uint8_t* pixout, const uint8_t* hgr){
   pixel = (abgrFromHGRBitTable[color][group & 1] << 5) + 16;
   pixout[xpos] = pixel;
   pixout[xpos+1] = pixel;
+  pixout2[xpos] = pixel;
+  pixout2[xpos+1] = pixel;
 }
 
 uint32_t grColorToABGR(unsigned color)
@@ -758,11 +771,49 @@ void ClemensDisplay::renderHiresGraphics(
     int row = i + video.scanline_start;
     const uint8_t* scanline = memory + video.scanlines[row].offset;
     uint8_t* pixout = emulatorVideoBuffer_ + i * 2 * kGraphicsTextureWidth;
-    a2hgrToABGR8Scale2x1(pixout, scanline);
-    a2hgrToABGR8Scale2x1(pixout + kGraphicsTextureWidth, scanline);
+    a2hgrToABGR8Scale2x2(pixout, pixout + kGraphicsTextureWidth, scanline);
   }
 
   renderHiresGraphicsTexture(video, vertexParams, hgrColorArray_);
+}
+
+//  Interesting...
+//    References: Patent - US4786893A
+//    "Method and apparatus for generating RGB color signals from composite
+//      digital video signal"
+//
+//    https://patents.google.com/patent/US4786893A/en?oq=US4786893
+//
+//    Patent seems to refer to Apple II composite signals converted to RGB
+//    using the sliding bit window as referred to in the Hardware Reference.
+//    It's likely this method is used in the IIgs - and so it's good enough for
+//    a baseline (doesn't fix IIgs Double Hires issues related to artifacting
+//    that allows better quality for NTSC hardware... which is another issue)
+//
+//  Notes:
+//    The "Prior Art Method" described in the patent matches my first naive
+//    implementation (4 bits per effective pixel = the color.)  The problem
+//    with this is that data is streamed serially to the controller vs on a per
+//    nibble basis.  This becomes an issue when transitioning between colors
+//    and the 4-bit color isn't aligned on the nibble.
+//
+//  Concept:
+//    Implement a version of the "Present Invention" from the patent
+//    - Given the most recent bit from the bitstream
+//    - if the result indicates a color pattern change, then render the
+//      original color until the color pattern change occurs
+//
+//  Details:
+//    Bit stream = incoming from pixin
+//    Shift register = history (most recent 4 bits being relevant)
+//
+//
+//
+//
+void a2dhgrToABGR81x2(uint8_t* pixout0, uint8_t* pixout1, const uint8_t* scanlines[2])
+{
+  unsigned pixelShiftRegister = 0;
+  const uint8_t* pixin = scanlines[0];
 }
 
 void ClemensDisplay::renderDoubleHiresGraphics(
@@ -776,10 +827,16 @@ void ClemensDisplay::renderDoubleHiresGraphics(
   auto vertexParams = createVertexParams(
     emulatorVideoDimensions_[0], emulatorVideoDimensions_[1]);
 
-  //  through each scan line, bit shift machine bits into a register
-  //  when 4 bits have been shifted, this will be the color
-  //  output color byte to write the graphics texture
-  //  every seven pixels, alternate memory banks
+
+  //  An oversimplication of double hires reads that the 'effective' resolution
+  //  is 4 pixels per color (so 140x192 - let's say a color is a 'block' of 4
+  //  pixels.   Since a block is a 4-bit pattern representing actual pixels on
+  //  the screen, adjacent blocks to the current block of interest will effect
+  //  this block.   To best handle the 'bit per pixel' method of rendering,
+  //  where the pixel color is determine by past state, our plotter will
+  //  'slide' along the bit array.  At some point the plotter will decide what
+  //  color to render at an earlier point in the array and proceed ahead.
+  //
   for (int y = 0; y < video.scanline_count; ++y) {
     int row = y + video.scanline_start;
     const uint8_t* pixsources[2] = {
@@ -787,6 +844,8 @@ void ClemensDisplay::renderDoubleHiresGraphics(
       main + video.scanlines[row].offset
     };
     uint8_t* pixout = emulatorVideoBuffer_ + y * 2 * kGraphicsTextureWidth;
+    a2dhgrToABGR81x2(pixout, pixout + kGraphicsTextureWidth, pixsources);
+    /*
     const uint8_t* pixin = pixsources[0];
     unsigned color = 0;
     unsigned x = 0, xi = 0;
@@ -810,6 +869,7 @@ void ClemensDisplay::renderDoubleHiresGraphics(
         data = pixin[xi >> 1];
       }
     }
+    */
   }
   //
   renderHiresGraphicsTexture(video, vertexParams, dblhgrColorArray_);

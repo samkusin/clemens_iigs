@@ -10,11 +10,6 @@
 
    VBL particulars:
    http://www.1000bit.it/support/manuali/apple/technotes/iigs/tn.iigs.040.html
-
-   Double Hi-Res Graphics (better explanation than the reference books which
-   skirt the softswitches and video details)
-   http://www.1000bit.it/support/manuali/apple/technotes/aiie/tn.aiie.03.html
-
 */
 
 #define CLEM_VGC_VSYNC_TIME_NS  (1e9/60)
