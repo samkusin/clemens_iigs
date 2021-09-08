@@ -246,7 +246,10 @@ void ClemensHost::frame(int width, int height, float deltaTime)
       }
     }
     if (clemens_get_graphics_video(&video, &machine_)) {
-      if (machine_.mmio.vgc.mode_flags & CLEM_VGC_HIRES) {
+      if (video.format == kClemensVideoFormat_Double_Hires) {
+        display_->renderDoubleHiresGraphics(video, machine_.mega2_bank_map[0],
+                                            machine_.mega2_bank_map[1]);
+      } else if (video.format == kClemensVideoFormat_Hires) {
         display_->renderHiresGraphics(video, machine_.mega2_bank_map[0]);
       } else if (machine_.mmio.vgc.mode_flags & CLEM_VGC_LORES) {
         display_->renderLoresGraphics(video, machine_.mega2_bank_map[0]);

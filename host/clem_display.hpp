@@ -67,27 +67,34 @@ public:
     bool useAlternateCharacterSet);
 
   void renderLoresGraphics(const ClemensVideo& video, const uint8_t* memory);
-
   void renderHiresGraphics(const ClemensVideo& video, const uint8_t* memory);
-
+  void renderDoubleHiresGraphics(const ClemensVideo& video,
+                                 const uint8_t* main, const uint8_t* aux);
 
   // Returns the color texture for the display for rendering
   sg_image getScreenTarget() const { return screenTarget_; }
 
 private:
+  using DrawVertex = ClemensDisplayVertex;
+  using DisplayVertexParams = ClemensDisplayVertexParams;
+
   void renderTextPlane(const ClemensVideo& video, int columns, const uint8_t* memory,
                        int phase, bool useAlternateCharacterSet);
   void renderLoresPlane(const ClemensVideo& video, int columns, const uint8_t* memory,
                        int phase);
+  void renderHiresGraphicsTexture(const ClemensVideo& video,
+                                  const DisplayVertexParams& params,
+                                  sg_image colorArray);
+  DisplayVertexParams createVertexParams(float virtualDimX, float virtualDimY);
 
   ClemensDisplayProvider& provider_;
 
-  using DrawVertex = ClemensDisplayVertex;
-  using DisplayVertexParams = ClemensDisplayVertexParams;
+
 
   sg_buffer textVertexBuffer_;
   sg_buffer vertexBuffer_;
-  sg_image colorArray_;
+  sg_image hgrColorArray_;
+  sg_image dblhgrColorArray_;
   sg_image graphicsTarget_;
   sg_image screenTarget_;
   sg_pass screenPass_;

@@ -3,6 +3,7 @@ cbuffer Globals {
     float2 display_ratio;   //  Ratio convert virtual to target
     float2 virtual_dims;    //  Emulator 'pixel' resolution
     float2 offsets;         //  x,y offset from top, left
+
 };
 
 struct Input {

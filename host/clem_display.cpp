@@ -81,6 +81,24 @@ static const uint8_t kHiresColors[8][4] = {
   { 0xFF, 0xFF, 0xFF, 0xFF }        // white group 2
 };
 
+static const uint8_t kDblHiresColors[16][4] = {
+  {   0,    0,    0,    255 },      // black
+  { 221,    0,   51,    255 },      // deep red
+  { 136,   85,    0,    255 },      // brown
+  { 255,  102,    0,    255 },      // orange
+  {   0,  119,   34,    255 },      // dark green
+  {  85,   85,   85,    255 },      // dark gray
+  {  17,  221,    0,    255 },      // lt. green
+  { 255,  255,    0,    255 },      // yellow
+  {   0,    0,  153,    255 },      // dark blue
+  { 221,   34,  221,    255 },      // purple
+  { 170,  170,  170,    255 },      // lt. gray
+  { 255,  153,  136,    255 },      // pink
+  {  34,   34,  255,    255 },      // med blue
+  { 102,  170,  255,    255 },      // light blue
+  {  68,  255,  153,    255 },      // aquamarine
+  { 255,  255,  255,    255 }       // white
+};
 
 static const uint8_t kGr16Colors[16][4] = {
   {   0,    0,    0,    255 },      // black
@@ -100,7 +118,6 @@ static const uint8_t kGr16Colors[16][4] = {
   {  68,  255,  153,    255 },      // aquamarine
   { 255,  255,  255,    255 }       // white
 };
-
 
 enum {
   kZero,
@@ -421,7 +438,32 @@ ClemensDisplay::ClemensDisplay(ClemensDisplayProvider& provider) :
   imageDesc.usage = SG_USAGE_IMMUTABLE;
   imageDesc.data.subimage[0][0].ptr = hiresColorData;
   imageDesc.data.subimage[0][0].size = sizeof(hiresColorData);
-  colorArray_ = sg_make_image(imageDesc);
+  hgrColorArray_ = sg_make_image(imageDesc);
+
+  uint8_t dblHiresColorData[64 * 8];
+  for (int y = 0; y < 8; ++y) {
+    uint8_t* texdata = &dblHiresColorData[64 * y];
+    for (int x = 0; x < 16; ++x) {
+      texdata[x * 4] = kDblHiresColors[x][0];
+      texdata[x * 4 + 1] = kDblHiresColors[x][1];
+      texdata[x * 4 + 2] = kDblHiresColors[x][2];
+      texdata[x * 4 + 3] = kDblHiresColors[x][3];
+    }
+  }
+
+  imageDesc = {};
+  imageDesc.width = 16;
+  imageDesc.height = 8;
+  imageDesc.type = SG_IMAGETYPE_2D;
+  imageDesc.pixel_format = SG_PIXELFORMAT_RGBA8;
+  imageDesc.min_filter = SG_FILTER_LINEAR;
+  imageDesc.mag_filter = SG_FILTER_LINEAR;
+  imageDesc.wrap_u = SG_WRAP_CLAMP_TO_EDGE;
+  imageDesc.wrap_v = SG_WRAP_CLAMP_TO_EDGE;
+  imageDesc.usage = SG_USAGE_IMMUTABLE;
+  imageDesc.data.subimage[0][0].ptr = dblHiresColorData;
+  imageDesc.data.subimage[0][0].size = sizeof(dblHiresColorData);
+  dblhgrColorArray_ = sg_make_image(imageDesc);
 
   imageDesc = {};
   imageDesc.width = kGraphicsTextureWidth;
@@ -459,7 +501,8 @@ ClemensDisplay::~ClemensDisplay()
   sg_destroy_pass(screenPass_);
   sg_destroy_image(screenTarget_);
   sg_destroy_image(graphicsTarget_);
-  sg_destroy_image(colorArray_);
+  sg_destroy_image(hgrColorArray_);
+  sg_destroy_image(dblhgrColorArray_);
   sg_destroy_buffer(vertexBuffer_);
   sg_destroy_buffer(textVertexBuffer_);
 }
@@ -530,18 +573,9 @@ void ClemensDisplay::renderTextPlane(
 
   const int kPhaseCount = columns / 40;
 
-  DisplayVertexParams vertexParams;
-  vertexParams.virtual_dims[0] = columns;
-  vertexParams.virtual_dims[1] = 24;
-  vertexParams.display_ratio[0] = emulatorVideoDimensions_[0] / vertexParams.virtual_dims[0];
-  vertexParams.display_ratio[1] = emulatorVideoDimensions_[1] / vertexParams.virtual_dims[1];
-  vertexParams.render_dims[0] = kRenderTargetWidth;
-  vertexParams.render_dims[1] = kRenderTargetHeight;
-  vertexParams.offsets[0] = (emulatorMonitorDimensions_[0] - emulatorVideoDimensions_[0]) * 0.5f;
-  vertexParams.offsets[1] = (emulatorMonitorDimensions_[1] - emulatorVideoDimensions_[1]) * 0.5f;
+  auto vertexParams = createVertexParams(columns, 24);
 
   stbtt_bakedchar* glyphSet;
-
   sg_bindings textBindings_ = {};
   textBindings_.vertex_buffers[0] = textVertexBuffer_;
   if (columns == 80) {
@@ -650,16 +684,7 @@ void ClemensDisplay::renderLoresPlane(
 
   const int kPhaseCount = columns / 40;
 
-  DisplayVertexParams vertexParams;
-  vertexParams.virtual_dims[0] = columns;
-  vertexParams.virtual_dims[1] = 48;
-  vertexParams.display_ratio[0] = emulatorVideoDimensions_[0] / vertexParams.virtual_dims[0];
-  vertexParams.display_ratio[1] = emulatorVideoDimensions_[1] / vertexParams.virtual_dims[1];
-  vertexParams.render_dims[0] = kRenderTargetWidth;
-  vertexParams.render_dims[1] = kRenderTargetHeight;
-  vertexParams.offsets[0] = (emulatorMonitorDimensions_[0] - emulatorVideoDimensions_[0]) * 0.5f;
-  vertexParams.offsets[1] = (emulatorMonitorDimensions_[1] - emulatorVideoDimensions_[1]) * 0.5f;
-
+  auto vertexParams = createVertexParams(columns, 48);
   sg_bindings pixelBindings_ = {};
   pixelBindings_.vertex_buffers[0] = textVertexBuffer_;
   pixelBindings_.fs_images[0] = provider_.blankImage_;
@@ -713,7 +738,6 @@ void ClemensDisplay::renderLoresPlane(
   }
 }
 
-
 void ClemensDisplay::renderHiresGraphics(
   const ClemensVideo& video,
   const uint8_t* memory
@@ -725,17 +749,11 @@ void ClemensDisplay::renderHiresGraphics(
   //  TODO: simplify vertex shader for graphics screens
   //        a lot of these uniforms don't seem  necessary, but we have to set
   //        them up so the shader works.
-  DisplayVertexParams vertexParams;
-  vertexParams.virtual_dims[0] = emulatorMonitorDimensions_[0];
-  vertexParams.virtual_dims[1] = emulatorMonitorDimensions_[1];
-  vertexParams.display_ratio[0] = 1;
-  vertexParams.display_ratio[1] = 1;
-  vertexParams.render_dims[0] = kRenderTargetWidth;
-  vertexParams.render_dims[1] = kRenderTargetHeight;
-  vertexParams.offsets[0] = 0;
-  vertexParams.offsets[1] = 0;
-
-  //
+  auto vertexParams = createVertexParams(
+    emulatorVideoDimensions_[0], emulatorVideoDimensions_[1]);
+  //  draw the graphics data with the incredible A2 hires color rules in mind
+  //  and scale in software the pixels to 2x2 so they conform to our output
+  //  texture size (which is 4x the size of a 280x192 screen)
   for (int i = 0; i < video.scanline_count; ++i) {
     int row = i + video.scanline_start;
     const uint8_t* scanline = memory + video.scanlines[row].offset;
@@ -744,6 +762,64 @@ void ClemensDisplay::renderHiresGraphics(
     a2hgrToABGR8Scale2x1(pixout + kGraphicsTextureWidth, scanline);
   }
 
+  renderHiresGraphicsTexture(video, vertexParams, hgrColorArray_);
+}
+
+void ClemensDisplay::renderDoubleHiresGraphics(
+  const ClemensVideo& video,
+  const uint8_t* main,
+  const uint8_t* aux
+) {
+  if (video.format != kClemensVideoFormat_Double_Hires) {
+    return;
+  }
+  auto vertexParams = createVertexParams(
+    emulatorVideoDimensions_[0], emulatorVideoDimensions_[1]);
+
+  //  through each scan line, bit shift machine bits into a register
+  //  when 4 bits have been shifted, this will be the color
+  //  output color byte to write the graphics texture
+  //  every seven pixels, alternate memory banks
+  for (int y = 0; y < video.scanline_count; ++y) {
+    int row = y + video.scanline_start;
+    const uint8_t* pixsources[2] = {
+      aux + video.scanlines[row].offset,
+      main + video.scanlines[row].offset
+    };
+    uint8_t* pixout = emulatorVideoBuffer_ + y * 2 * kGraphicsTextureWidth;
+    const uint8_t* pixin = pixsources[0];
+    unsigned color = 0;
+    unsigned x = 0, xi = 0;
+    uint8_t data = pixin[0];
+    while (x < 560) {
+      color <<= 1;
+      if (data & 0x1) color |= 0x1;
+      data >>= 1;
+      ++x;
+      if ((x % 4) == 0) {
+        unsigned xo = x - 4;
+        for (unsigned xo = x - 4; xo < x; ++xo) {
+          unsigned pixel = ((color & 0xf) << 4) + 8;
+          pixout[xo] = pixel;
+          (pixout + kGraphicsTextureWidth)[xo] = pixel;
+        }
+      }
+      if ((x % 7) == 0) {
+        ++xi;
+        pixin = pixsources[xi % 2];
+        data = pixin[xi >> 1];
+      }
+    }
+  }
+  //
+  renderHiresGraphicsTexture(video, vertexParams, dblhgrColorArray_);
+}
+
+void ClemensDisplay::renderHiresGraphicsTexture(
+  const ClemensVideo& video,
+  const DisplayVertexParams& vertexParams,
+  sg_image colorArray
+) {
   sg_image_data graphicsImageData = {};
   graphicsImageData.subimage[0][0].ptr = emulatorVideoBuffer_;
   graphicsImageData.subimage[0][0].size = kGraphicsTextureWidth * kGraphicsTextureHeight;
@@ -761,9 +837,9 @@ void ClemensDisplay::renderHiresGraphics(
   //  to avoid UV rounding issues
   DrawVertex vertices[6];
   float y_scalar = emulatorVideoDimensions_[1] / 192.0f;
-  float x0 = (emulatorMonitorDimensions_[0] - emulatorVideoDimensions_[0]) * 0.5f;
+  float x0 = 0.0f;
+  float y0 = 0.0f;
   float x1 = x0 + emulatorVideoDimensions_[0];
-  float y0 = (emulatorMonitorDimensions_[1] - emulatorVideoDimensions_[1]) * 0.5f;
   float y1 = y0 + (video.scanline_count * y_scalar);
   float u1 = emulatorVideoDimensions_[0] / kGraphicsTextureWidth;
   float v1 = (video.scanline_count * y_scalar) / kGraphicsTextureHeight;
@@ -781,9 +857,27 @@ void ClemensDisplay::renderHiresGraphics(
   sg_bindings renderBindings = {};
   renderBindings.vertex_buffers[0] = vertexBuffer_;
   renderBindings.fs_images[0] = graphicsTarget_;
-  renderBindings.fs_images[1] = colorArray_;
+  renderBindings.fs_images[1] = colorArray;
   renderBindings.vertex_buffer_offsets[0] = (
     sg_append_buffer(renderBindings.vertex_buffers[0], verticesRange));
   sg_apply_bindings(renderBindings);
   sg_draw(0, 6, 1);
+}
+
+
+auto ClemensDisplay::createVertexParams(
+  float virtualDimX,
+  float virtualDimY
+) -> DisplayVertexParams
+{
+  DisplayVertexParams vertexParams;
+  vertexParams.virtual_dims[0] = virtualDimX;
+  vertexParams.virtual_dims[1] = virtualDimY;
+  vertexParams.display_ratio[0] = emulatorVideoDimensions_[0] / virtualDimX;
+  vertexParams.display_ratio[1] = emulatorVideoDimensions_[1] / virtualDimY;
+  vertexParams.render_dims[0] = kRenderTargetWidth;
+  vertexParams.render_dims[1] = kRenderTargetHeight;
+  vertexParams.offsets[0] = (emulatorMonitorDimensions_[0] - emulatorVideoDimensions_[0]) * 0.5f;
+  vertexParams.offsets[1] = (emulatorMonitorDimensions_[1] - emulatorVideoDimensions_[1]) * 0.5f;
+  return vertexParams;
 }
