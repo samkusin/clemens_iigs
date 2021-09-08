@@ -14,7 +14,6 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
-* Support Disk switching in the IDE
 * VGC Pass 3 : Dblhires Graphics (not SHGR)
   * Convert bit string for a scanline into colors
   * 4-bits per color, 7 bits per byte of data from bit 0 to 6 (7 ignored)
@@ -63,6 +62,7 @@ This is a running todo list.
 
 ## DONE
 
+* Support Disk switching in the IDE
 * Capslock
 * Save Battery RAM
 * AN3 and Dblhires
