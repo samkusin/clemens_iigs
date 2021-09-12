@@ -1251,6 +1251,7 @@ ClemensVideo* clemens_get_graphics_video(
                 video->scanline_count = 24;
             }
         }
+        video->scanline_byte_cnt = 40;
     } else {
         return NULL;
     }
