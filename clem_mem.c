@@ -1261,7 +1261,7 @@ static void _clem_mmio_memory_map(
     //  RAMRD/RAMWRT minus the page 1 Apple //e video regions
     if (remap_flags & (CLEM_MEM_IO_MMAP_RAMRD + CLEM_MEM_IO_MMAP_RAMWRT)) {
         remap_flags |= CLEM_MEM_IO_MMAP_NSHADOW;
-        for (page_idx = 0x02; page_idx < 0x03; ++page_idx) {
+        for (page_idx = 0x02; page_idx < 0x04; ++page_idx) {
             page_B00 = &page_map_B00->pages[page_idx];
             page_B00->bank_read =(
                 (memory_flags & CLEM_MEM_IO_MMAP_RAMRD) ? 0x01 : 00);
