@@ -804,16 +804,77 @@ void ClemensDisplay::renderHiresGraphics(
 //      original color until the color pattern change occurs
 //
 //  Details:
-//    Bit stream = incoming from pixin
-//    Shift register = history (most recent 4 bits being relevant)
+//    Bit stream: incoming from pixin
+//    Shift register:
+//        history (most recent 4 bits being relevant)
+//    Barrel shifter:
+//        the original color at the start of the 4-bit string
+//        (this can be simplified in software as just a stored-off value)
+//    Color Change Test:
+//        If Shift Register Bit 3 != incoming bit, then color change
+//    Plot:
+//        If Color Change, Select Latch Color
+//        Else Select Barrel Shifted Color (Current)
+//        Set Latch color to selected color
+//    Latched Color:
+//        Initially Zero
 //
+//  This is a literal translation of the patent's Fig. 4 - which works pretty
+//  well to emulate the IIgs implementation.   This could be optimized via
+//  lookup tables.
 //
+//  TODO: optimize using lookup tables
 //
-//
-void a2dhgrToABGR81x2(uint8_t* pixout0, uint8_t* pixout1, const uint8_t* scanlines[2])
-{
-  unsigned pixelShiftRegister = 0;
-  const uint8_t* pixin = scanlines[0];
+static inline bool jk_ff(bool j, bool k, bool q) {
+  if (!j && !k) return q;
+  if (!j && k) return 0;
+  if (j && !k) return 1;
+  return !q;
+}
+
+void a2dhgrToABGR81x2(
+  uint8_t* pixout0, uint8_t* pixout1,
+  const uint8_t* scanlines[2],
+  int scanlineByteCnt
+) {
+  int pixinByteCounter = 0;
+  int pixinBitCounter = 0;
+  uint8_t pixinByte = *scanlines[0];
+  uint8_t shifter = 0;
+  uint8_t barrel = 0;
+  uint8_t latch = 0;
+  bool jk0 = false;
+  bool jk1 = false;
+
+  scanlineByteCnt <<= 1;
+  while (pixinByteCounter < scanlineByteCnt) {
+    bool pixinBit = (pixinByte & 0x1);
+    bool colorChanged0 = (pixinBit && !(shifter & 0x8));
+    bool colorChanged1 = (!pixinBit && (shifter & 0x8));
+    unsigned barrelShift = (pixinBitCounter % 4);
+    barrel = shifter >> barrelShift;
+    barrel |= (shifter << (4 - barrelShift));
+    barrel &= 0xf;
+
+    uint8_t selected =  (jk0 || jk1) ? latch : barrel;
+    uint8_t pixout = (latch << 4) + 8;
+    *(pixout0++) = pixout;
+    *(pixout1++) = pixout;
+
+    //  next clock
+    jk0 = jk_ff(colorChanged0, shifter & 0x4, jk0);
+    jk1 = jk_ff(colorChanged1, !(shifter & 0x4), jk1);
+    shifter <<= 1;
+    shifter |= (pixinBit ? 0x1 : 0);
+    latch = selected;
+    pixinByte >>= 1;
+    ++pixinBitCounter;
+    if (!(pixinBitCounter % 7)) {
+      ++scanlines[pixinByteCounter % 2];
+      ++pixinByteCounter;
+      pixinByte = *scanlines[pixinByteCounter % 2];
+    }
+  }
 }
 
 void ClemensDisplay::renderDoubleHiresGraphics(
@@ -844,7 +905,7 @@ void ClemensDisplay::renderDoubleHiresGraphics(
       main + video.scanlines[row].offset
     };
     uint8_t* pixout = emulatorVideoBuffer_ + y * 2 * kGraphicsTextureWidth;
-    a2dhgrToABGR81x2(pixout, pixout + kGraphicsTextureWidth, pixsources);
+    a2dhgrToABGR81x2(pixout, pixout + kGraphicsTextureWidth, pixsources, video.scanline_byte_cnt);
     /*
     const uint8_t* pixin = pixsources[0];
     unsigned color = 0;
