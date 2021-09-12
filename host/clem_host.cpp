@@ -569,21 +569,6 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   }
   ImGui::End();
 
-  ImGui::SetNextWindowSize(memoryViewSize);
-  ImGui::Begin("Memory 1", nullptr, ImGuiWindowFlags_NoResize |
-                                    ImGuiWindowFlags_NoCollapse |
-                                    ImGuiWindowFlags_NoBringToFrontOnFocus);
-  if (clemens_is_initialized_simple(&machine_)) {
-    ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[1],
-                       nullptr, nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
-    uint8_t viewBank = memoryViewBank_[1];
-    if (!isRunningEmulation() || isRunningEmulationStep()) {
-      memoryViewStatic_[1].DrawContents((void*)
-        (void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
-    }
-  }
-  ImGui::End();
-
   if (diagnostics_.deltaTime >= diagnostics_.frameTime) {
     float scalar = 1.0f / diagnostics_.deltaTime;
     printf("diag_host: audio (%.01f/sec)\n"
