@@ -217,17 +217,9 @@ struct ClemensInputEvent {
     unsigned value;
 };
 
-struct ClemensDebugJSRContext {
-    unsigned adr;
-    unsigned jmp;
-    uint16_t sp;
-};
-
 struct ClemensDeviceDebugger {
     unsigned ioreg_read_ctr[256];
     unsigned ioreg_write_ctr[256];
-    struct ClemensDebugJSRContext jsr_contexts[CLEM_DEBUG_JSR_CONTEXT_LIMIT];
-    unsigned jsr_context_count;
 };
 
 /**

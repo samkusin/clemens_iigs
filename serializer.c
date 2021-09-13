@@ -186,21 +186,11 @@ struct ClemensSerializerRecord kTimer[] = {
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 
-struct ClemensSerializerRecord kJSRContext[] = {
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDebugJSRContext, adr),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDebugJSRContext, jmp),
-    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensDebugJSRContext, sp),
-    CLEM_SERIALIZER_RECORD_EMPTY()
-};
-
 struct ClemensSerializerRecord kDebugger[] = {
     CLEM_SERIALIZER_RECORD_ARRAY(
         struct ClemensDeviceDebugger, kClemensSerializerTypeUInt32, ioreg_read_ctr, 256, 0),
     CLEM_SERIALIZER_RECORD_ARRAY(
         struct ClemensDeviceDebugger, kClemensSerializerTypeUInt32, ioreg_write_ctr, 256, 0),
-    CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(
-        struct ClemensDeviceDebugger, jsr_contexts, CLEM_DEBUG_JSR_CONTEXT_LIMIT, struct ClemensDebugJSRContext, kJSRContext),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceDebugger, jsr_context_count),
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 

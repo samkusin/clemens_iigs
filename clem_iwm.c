@@ -544,6 +544,8 @@ void _clem_iwm_io_switch(
                 CLEM_LOG("IWM: turning drive on");
                 iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_ON;
                 _clem_iwm_reset_lss(iwm, drives, clock);
+            } else if (iwm->ns_drive_hold > 0) {
+                iwm->ns_drive_hold = 0;
             }
             break;
         case CLEM_MMIO_REG_IWM_DRIVE_0:
