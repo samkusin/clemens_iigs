@@ -14,22 +14,20 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
-* VGC Pass 3 : Dblhires Graphics (not SHGR)
-  * Convert bit string for a scanline into colors
-  * 4-bits per color, 7 bits per byte of data from bit 0 to 6 (7 ignored)
-  * Alternate between aux and main (just like 80 column text)
-  * Same scanlines as the hires mode
-  * Test one double-hires title
+* Dblhires is offset by 4 pixels (1 block) in display due to conversion method
 * ProDOS boot (1.x or ProDOS 8)
+* Mockingboard?
+  * Enable custom logic for card slot reads/writes since different cards map
+    registers to their dedicated page instead of at $c0xx
+* remaining //e softswitches
+  * Joystick, Paddle
 * Test Bards Tale and Ultima IV
   * How does A2 Speaker support sound
   * If bad (relatively speaking...) then look at the system beep task below
-* Mockingboard?
 * Support Disk II Card for old boot
-* remaining //e softswitches
-  * Joystick, Paddle
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
 * IWM 3.5" read write support
+  between color bits and rgb in clem_display.cpp
 * Timing checks on native mode versions of:
   * STA (DP), Y and likely other direct-indirect indexed ops are missing a
     IO cycle (likely just writes, but evaluate rules in wd65c816 docs...)
@@ -62,6 +60,14 @@ This is a running todo list.
 
 ## DONE
 
+* Fixed memory mapping bug for page 0x3 in main/aux banks (RAMRD)
+* VGC Pass 3 : Dblhires Graphics (not SHGR)
+  * Convert bit string for a scanline into colors
+  * 4-bits per color, 7 bits per byte of data from bit 0 to 6 (7 ignored)
+  * Alternate between aux and main (just like 80 column text)
+  * Same scanlines as the hires mode
+  * Use original IIgs conversion from composite to RGB
+  * Test one double-hires title
 * Support Disk switching in the IDE
 * Capslock
 * Save Battery RAM
