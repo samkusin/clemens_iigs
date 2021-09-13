@@ -46,14 +46,7 @@ void clem_debug_reset(struct ClemensDeviceDebugger* dbg) {
 }
 
 void clem_debug_call_stack(struct ClemensDeviceDebugger* dbg) {
-    for (unsigned i = 0; i < dbg->jsr_context_count; ++i) {
-        struct ClemensDebugJSRContext* ctx = &dbg->jsr_contexts[i];
-        CLEM_LOG("[%02X:%04X] %02X%04X, S=%04X", (ctx->adr >> 16) & 0xff,
-                                                 ctx->adr & 0xffff,
-                                                 (ctx->jmp >> 16) & 0xff,
-                                                 ctx->jmp & 0xffff,
-                                                 ctx->sp);
-    }
+    /* TODO : look at stack */
 }
 
 
@@ -83,33 +76,4 @@ void clem_debug_break(
         default:
             break;
     }
-}
-
-void clem_debug_jsr(
-    struct ClemensDeviceDebugger* dbg,
-    struct Clemens65C816* cpu,
-    uint16_t next_pc,
-    uint8_t pbr
-) {
-    struct ClemensDebugJSRContext* ctx;
-    CLEM_ASSERT(dbg->jsr_context_count < CLEM_DEBUG_JSR_CONTEXT_LIMIT);
-    if (dbg->jsr_context_count >= CLEM_DEBUG_JSR_CONTEXT_LIMIT) return;
-    ctx = &dbg->jsr_contexts[dbg->jsr_context_count++];
-    ctx->sp = cpu->regs.S;
-    ctx->adr = ((unsigned)(cpu->regs.PBR) << 16) | cpu->regs.PC;
-    ctx->jmp = ((unsigned)(pbr) << 16) | next_pc;
-}
-
-void clem_debug_rts(
-    struct ClemensDeviceDebugger* dbg,
-    struct Clemens65C816* cpu,
-    uint16_t next_pc,
-    uint8_t pbr
-) {
-    struct ClemensDebugJSRContext* ctx;
-
-    if (dbg->jsr_context_count >= CLEM_DEBUG_JSR_CONTEXT_LIMIT) return;
-    if (dbg->jsr_context_count == 0) return;
-
-    ctx = &dbg->jsr_contexts[--dbg->jsr_context_count];
 }
