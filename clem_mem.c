@@ -1702,8 +1702,9 @@ void clem_read(
             *data = _clem_mmio_read(
                 clem, offset, read_only ? CLEM_MEM_IO_READ_NO_OP : 0, &mega2_access);
         } else if (page->flags & CLEM_MEM_PAGE_CARDMEM_FLAG) {
-            if (page->bank_read == 0x00) {
-                *data = clem->card_slot_memory[page->read][offset & 0xff];
+            if (page->bank_read == 0x00 && clem->card_slot[page->read]) {
+                (*clem->card_slot[page->read]->io_read)(
+                    data, offset, read_only ? CLEM_MEM_IO_READ_NO_OP : 0);
             } else if (clem->mmio.card_expansion_rom_index >= 0) {
                 *data = clem->card_slot_expansion_memory[(
                     clem->mmio.card_expansion_rom_index)][offset];
@@ -1777,8 +1778,13 @@ void clem_write(
                 mega2_access = true;
             }
         } else if (page->flags & CLEM_MEM_PAGE_CARDMEM_FLAG) {
-            //  Always ROM?
-            CLEM_ASSERT(false);
+            if (page->bank_write == 0x00 && clem->card_slot[page->write]) {
+                (*clem->card_slot[page->write]->io_write)(
+                    data, offset, mem_flags);
+            } else {
+                //  Always ROM?
+                CLEM_ASSERT(false);
+            }
         } else {
             CLEM_ASSERT(false);
         }

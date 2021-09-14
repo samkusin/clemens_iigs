@@ -837,7 +837,6 @@ int clemens_init(
     void* e0bank,
     void* e1bank,
     void* fpiRAM,
-    void* slotROM,
     void* slotExpansionROM,
     unsigned int fpiRAMBankCount
 ) {
@@ -873,7 +872,7 @@ int clemens_init(
     memset(machine->mega2_bank_map[0x01], 0, CLEM_IIGS_BANK_SIZE);
 
     for (idx = 0; idx < 7; ++idx) {
-        machine->card_slot_memory[idx] = ((uint8_t*)slotROM) + (idx * 256);
+        machine->card_slot[idx] = NULL;
         machine->card_slot_expansion_memory[idx] = (
             ((uint8_t*)slotExpansionROM) + (idx * 256));
     }

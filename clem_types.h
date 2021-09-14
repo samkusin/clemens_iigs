@@ -570,6 +570,12 @@ typedef struct {
     unsigned frame_stride;      /** each frame is this size */
 } ClemensAudio;
 
+typedef struct {
+    void (*io_read)(uint8_t* data, uint16_t adr, uint8_t flags);
+    void (*io_write)(uint8_t data, uint16_t adr, uint8_t flags);
+    uint32_t (*io_sync)(struct ClemensClock* clock);
+} ClemensCard;
+
 /**
  * @brief
  *
@@ -613,9 +619,8 @@ typedef struct {
        for the IIgs
     */
     uint8_t* mega2_bank_map[2];     // $e0 - $e1
-    /** ROM memory for individual card slots.  Only slots 1,2,4,5,6,7 are used
-     *  and each slot should have 256 bytes allocated for it */
-    uint8_t* card_slot_memory[7];
+    /** Handlers for all slots */
+    ClemensCard* card_slot[7];
     /** Expansion ROM area for each card.  This area is paged into addressable
      *  memory with the correct IO instructions.  Each area should be 2K in
      *  size.  As with card slot memory, slot 3 is ignored */
