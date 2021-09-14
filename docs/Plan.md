@@ -15,7 +15,6 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 This is a running todo list.
 
 * Dblhires is offset by 4 pixels (1 block) in display due to conversion method
-* ProDOS boot (1.x or ProDOS 8)
 * Mockingboard?
   * Enable custom logic for card slot reads/writes since different cards map
     registers to their dedicated page instead of at $c0xx
@@ -60,6 +59,8 @@ This is a running todo list.
 
 ## DONE
 
+* ProDOS boot (1.x or ProDOS 8)
+  * Fixed IWM drive enable after a delayed disable
 * Fixed memory mapping bug for page 0x3 in main/aux banks (RAMRD)
 * VGC Pass 3 : Dblhires Graphics (not SHGR)
   * Convert bit string for a scanline into colors

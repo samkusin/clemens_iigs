@@ -1470,7 +1470,6 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
                   slab_.allocate(CLEM_IIGS_BANK_SIZE),
                   slab_.allocate(CLEM_IIGS_BANK_SIZE),
                   slab_.allocate(CLEM_IIGS_BANK_SIZE * fpiBankCount),
-                  slab_.allocate(256 * 7), // TODO make this a little less magic-numberish
                   slab_.allocate(2048 * 7),
                   fpiBankCount);
 
