@@ -14,10 +14,12 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
+* Enable custom logic for card slot reads/writes since different cards map
+  registers to their dedicated page instead of at $c0xx
+* AY8910 emulation for Mockingboard
+* Ensoniq 5503 emulation
+  * http://www.buchty.net/ensoniq/5503.html
 * Dblhires is offset by 4 pixels (1 block) in display due to conversion method
-* Mockingboard?
-  * Enable custom logic for card slot reads/writes since different cards map
-    registers to their dedicated page instead of at $c0xx
 * remaining //e softswitches
   * Joystick, Paddle
 * Test Bards Tale and Ultima IV
