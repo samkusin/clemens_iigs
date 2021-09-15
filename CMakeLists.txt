@@ -42,6 +42,7 @@ set(EMULATOR_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_debug.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_drive.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_drive35.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_iwm.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_rtc.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_scc.c"

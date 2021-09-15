@@ -80,7 +80,7 @@ namespace {
         trackDataSize = 40 * 0xd * 512;
         break;
       case CLEM_WOZ_DISK_3_5:
-        trackDataSize = 80 * 0xd * 512;
+        trackDataSize = 160 * 19 * 512;
         break;
     }
     assert(trackDataSize > 0);
@@ -1772,9 +1772,6 @@ bool ClemensHost::parseWOZDisk(
           woz, &chunkHeader, current, chunkHeader.data_size);
         break;
       case CLEM_WOZ_CHUNK_TRKS:
-        if (woz->track_count > 0) {
-          woz->default_track_bit_length = CLEM_WOZ_DEFAULT_TRACK_BIT_LENGTH_525;
-        }
         current = clem_woz_parse_trks_chunk(
           woz, &chunkHeader, current, chunkHeader.data_size);
         break;
@@ -1808,6 +1805,7 @@ bool ClemensHost::loadDisk(ClemensDriveType driveType, const char* filename)
   ClemensWOZDisk* disk = nullptr;
   decltype(disks525Paths_)* diskPaths = nullptr;
   unsigned diskType = 0;
+  bool doubleSided = false;         // 3.5" only
 
   int driveIndex = -1;
   switch (driveType) {
@@ -1828,12 +1826,14 @@ bool ClemensHost::loadDisk(ClemensDriveType driveType, const char* filename)
       diskPaths = &disks35Paths_;
       driveIndex = 0;
       diskType = CLEM_WOZ_DISK_3_5;
+      doubleSided = true;
       break;
     case kClemensDrive_3_5_D2:
       disk = &disks35_[1];
       diskPaths = &disks35Paths_;
       driveIndex = 1;
       diskType = CLEM_WOZ_DISK_3_5;
+      doubleSided = true;
       break;
   }
   if (!disk) return false;
@@ -1852,6 +1852,11 @@ bool ClemensHost::loadDisk(ClemensDriveType driveType, const char* filename)
     disk->bits_data_end = bitsEnd;
     if (stat(filename, &fileStat) != 0) {
       disk->disk_type = diskType;
+      if (doubleSided && diskType == CLEM_WOZ_DISK_3_5) {
+        disk->flags |= CLEM_WOZ_IMAGE_DOUBLE_SIDED;
+      } else {
+        disk->flags &= ~CLEM_WOZ_IMAGE_DOUBLE_SIDED;
+      }
       isOk = initWOZDisk(disk);
     } else {
       isOk = loadWOZDisk(filename, disk);
@@ -1879,38 +1884,73 @@ bool ClemensHost::initWOZDisk(struct ClemensWOZDisk* woz) {
   //
   //  exoected inputs :
   //    disk_type
+  unsigned max_track_size_bytes, track_byte_offset;
+  unsigned max_sectors_per_region_35[5] = { 19, 17, 16, 14, 13 };
+  unsigned track_start_per_region_35[6] = { 0, 32, 64, 96, 128, 160 };
+
+  auto trackDataSize = woz->bits_data_end - woz->bits_data;
+  memset(woz->bits_data, 0, trackDataSize);
 
   switch (woz->disk_type) {
     case CLEM_WOZ_DISK_5_25:
       woz->boot_type = CLEM_WOZ_BOOT_5_25_16;
-      woz->max_track_size_bytes = 0x0d * 512;
       woz->bit_timing_ns = 4000;
       woz->track_count = 35;
+
+      max_track_size_bytes = 0x0d * 512;
+      for (unsigned i = 0; i < CLEM_WOZ_LIMIT_QTR_TRACKS; ++i) {
+        if ((i % 4) == 0 || (i % 4) == 1) {
+          woz->meta_track_map[i] = (i / 4);
+        } else {
+          woz->meta_track_map[i] = 0xff;
+        }
+      }
+      track_byte_offset = 0;
+      for (unsigned i = 0; i < woz->track_count; ++i) {
+        woz->track_byte_offset[i] = track_byte_offset;
+        woz->track_byte_count[i] = max_track_size_bytes;
+        woz->track_bits_count[i] = CLEM_WOZ_BLANK_DISK_TRACK_BIT_LENGTH_525;
+        woz->track_initialized[i] = 0;
+        track_byte_offset += i * max_track_size_bytes;
+      }
+      break;
+    case CLEM_WOZ_DISK_3_5:
+      woz->boot_type = CLEM_WOZ_BOOT_UNDEFINED;
+      woz->bit_timing_ns = 2000;
+      woz->track_count = (woz->flags & CLEM_WOZ_IMAGE_DOUBLE_SIDED) ? 160 : 80;
+      for (unsigned i = 0; i < CLEM_WOZ_LIMIT_QTR_TRACKS; ++i) {
+        if (woz->flags & CLEM_WOZ_IMAGE_DOUBLE_SIDED) {
+          woz->meta_track_map[i] = i;
+        } else if ((i % 2) == 0) {
+          woz->meta_track_map[i] = (i / 2);
+        } else {
+          woz->meta_track_map[i] = 0xff;
+        }
+      }
+      track_byte_offset = 0;
+      for (unsigned region_index = 0; region_index < 5; ++region_index) {
+        max_track_size_bytes = max_sectors_per_region_35[region_index] * 512;
+        for (unsigned i = track_start_per_region_35[region_index];
+                      i < track_start_per_region_35[region_index + 1];
+        ) {
+          unsigned track_index = i;
+          if (!(woz->flags & CLEM_WOZ_IMAGE_DOUBLE_SIDED)) {
+            track_index /= 2;
+            i += 2;
+          } else {
+            i += 1;
+          }
+          woz->track_byte_offset[track_index] = track_byte_offset;
+          woz->track_byte_count[track_index] = max_track_size_bytes;
+          woz->track_bits_count[track_index] = CLEM_WOZ_BLANK_DISK_TRACK_BIT_LENGTH_525;
+          woz->track_initialized[track_index] = 0;
+          track_byte_offset += max_track_size_bytes;
+        }
+      }
       break;
     default:
       return false;
   }
-
-  auto trackDataSize = woz->bits_data_end - woz->bits_data;
-  woz->default_track_bit_length = CLEM_WOZ_BLANK_DISK_TRACK_BIT_LENGTH_525;
-  memset(woz->bits_data, 0, trackDataSize);
-
-  unsigned track_index = 0;
-  for (unsigned i = 0; i < CLEM_WOZ_LIMIT_QTR_TRACKS; ++i) {
-    if ((i % 4) == 0 || (i % 4) == 1) {
-      woz->meta_track_map[i] = (i / 4);
-    } else {
-      woz->meta_track_map[i] = 0xff;
-    }
-  }
-
-  for (unsigned i = 0; i < woz->track_count; ++i) {
-    woz->track_byte_offset[i] = i * woz->max_track_size_bytes;
-    woz->track_byte_count[i] = woz->max_track_size_bytes;
-    woz->track_bits_count[i] = woz->default_track_bit_length;
-    woz->track_initialized[i] = 0;
-  }
-
   return true;
 }
 
