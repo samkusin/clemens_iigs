@@ -453,8 +453,9 @@ void clem_disk_read_and_position_head_525(
             if (drive->real_track_index != 0xff) {
                 drive->track_bit_length = _clem_disk_get_track_bit_length_525(
                     drive, drive->qtr_track_index);
-            } else {
-                drive->track_bit_length = drive->data->default_track_bit_length;
+            } else if (drive->track_bit_length == 0) {
+                /* just use the prior bit length if there's no track defined */
+                drive->track_bit_length = drive->data->track_bits_count[0];
             }
             if (track_prev_len) {
                 track_cur_pos = track_cur_pos * drive->track_bit_length / track_prev_len;

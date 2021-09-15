@@ -80,7 +80,7 @@ namespace {
         trackDataSize = 40 * 0xd * 512;
         break;
       case CLEM_WOZ_DISK_3_5:
-        //  TODO
+        trackDataSize = 80 * 0xd * 512;
         break;
     }
     assert(trackDataSize > 0);
@@ -139,6 +139,13 @@ ClemensHost::ClemensHost() :
     disk.bits_data = (uint8_t*)malloc(maxDiskDataSize);
     disk.bits_data_end = disk.bits_data + maxDiskDataSize;
   }
+
+  for (auto& disk : disks35_) {
+    auto maxDiskDataSize = calculateMaxDiskDataSize(CLEM_WOZ_DISK_3_5);
+    disk.bits_data = (uint8_t*)malloc(maxDiskDataSize);
+    disk.bits_data_end = disk.bits_data + maxDiskDataSize;
+  }
+
 
 
   displayProvider_ = std::make_unique<ClemensDisplayProvider>();
@@ -1846,9 +1853,9 @@ bool ClemensHost::loadDisk(ClemensDriveType driveType, const char* filename)
     if (stat(filename, &fileStat) != 0) {
       disk->disk_type = diskType;
       isOk = initWOZDisk(disk);
+    } else {
+      isOk = loadWOZDisk(filename, disk);
     }
-
-    isOk = loadWOZDisk(filename, disk);
     if (!isOk) {
       return false;
     }
