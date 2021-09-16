@@ -365,12 +365,11 @@ struct ClemensDrive {
      * 4-bit Q0-3 entry 5.25" = stepper control
      * Control/Status/Strobe bits for 3.5"
      */
-    unsigned q03_switch;
+    unsigned ctl_switch;
     unsigned cog_orient;        /**< emulated orientation of stepper cog */
-    unsigned state_35;          /**< 3.5" state machine */
-    unsigned query_35;          /**< 3.5" status query  */
     unsigned step_timer_35_ns;  /**< 3.5" track step timer */
-    bool select_35;             /**< 3.5" select state */
+    uint16_t state_35;          /**< 3.5" state machine */
+    uint16_t status_mask_35;    /**< 3.5" status mask */
     bool write_pulse;           /**< Changes in the write field translate as pulses */
 
     uint8_t real_track_index;   /**< the index into the raw woz track data */

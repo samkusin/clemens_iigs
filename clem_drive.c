@@ -80,34 +80,6 @@ static int s_disk2_phase_states[8][16] = {
 /* NW */ {  0,  1,  3,  2, -3,  1,  0,  3, -1,  0, -1,  1, -2, -1, -3,  0 }
 };
 
-/*  Follows the status and control values from https://llx.com/Neil/a2/disk
- */
-#define CLEM_IWM_DISK35_QUERY_STEP_DIR      0x00
-#define CLEM_IWM_DISK35_QUERY_IO_HEAD_LOWER 0x01
-#define CLEM_IWM_DISK35_QUERY_DISK_IN_DRIVE 0x02
-#define CLEM_IWM_DISK35_QUERY_IO_HEAD_UPPER 0x03
-#define CLEM_IWM_DISK35_QUERY_IS_STEPPING   0x04
-#define CLEM_IWM_DISK35_QUERY_WRITE_PROTECT 0x06
-#define CLEM_IWM_DISK35_QUERY_MOTOR_ON      0x08
-#define CLEM_IWM_DISK35_QUERY_DOUBLE_SIDED  0x09
-#define CLEM_IWM_DISK35_QUERY_TRACK_0       0x0A
-#define CLEM_IWM_DISK35_QUERY_READ_READY    0x0B
-#define CLEM_IWM_DISK35_QUERY_EJECTED       0x0C
-#define CLEM_IWM_DISK35_QUERY_60HZ_ROTATION 0x0E
-#define CLEM_IWM_DISK35_QUERY_ENABLED       0x0F
-
-#define CLEM_IWM_DISK35_CTL_STEP_IN         0x00
-#define CLEM_IWM_DISK35_CTL_STEP_OUT        0x01
-#define CLEM_IWM_DISK35_CTL_EJECTED_RESET   0x03
-#define CLEM_IWM_DISK35_CTL_STEP_ONE        0x04
-#define CLEM_IWM_DISK35_CTL_MOTOR_ON        0x08
-#define CLEM_IWM_DISK35_CTL_MOTOR_OFF       0x09
-#define CLEM_IWM_DISK35_CTL_EJECT           0x0D
-
-#define CLEM_IWM_DISK35_STATE_MOTOR_ON      0x01
-#define CLEM_IWM_DISK35_STATE_STEP_IN       0x02
-#define CLEM_IWM_DISK35_STATE_STEP_ONE      0x04
-
 #define CLEM_IWM_DRIVE_MAX_RANDOM_BITS \
     (sizeof(uint8_t) * CLEM_IWM_DRIVE_RANDOM_BYTES)
 
@@ -125,7 +97,7 @@ static int s_disk2_phase_states[8][16] = {
 */
 
 static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
-    drive->q03_switch = 0;
+    drive->ctl_switch = 0;
     drive->pulse_ns = 0;
     drive->track_byte_index = 0;
     drive->track_bit_shift = 7;
@@ -133,6 +105,8 @@ static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
     drive->random_bit_index = 0;
     drive->qtr_track_index = 0;
     drive->read_buffer = 0;
+    drive->state_35 = 0;
+    drive->status_mask_35 = 0;
 
     /* not going to change the cog orientation since this could be a soft
        reset */
@@ -158,165 +132,6 @@ void clem_disk_reset_drives(struct ClemensDriveBay* drives) {
     _clem_disk_reset_drive(&drives->slot6[1]);
 }
 
-static unsigned _clem_disk_step_state_35(
-    struct ClemensDrive* drive,
-    unsigned dt_ns
-) {
-    if (drive->state_35 & CLEM_IWM_DISK35_STATE_STEP_ONE) {
-        drive->step_timer_35_ns = clem_util_timer_decrement(
-            drive->step_timer_35_ns, dt_ns);
-        if (drive->step_timer_35_ns == 0) {
-            if (drive->state_35 & CLEM_IWM_DISK35_STATE_STEP_IN) {
-                if ((drive->qtr_track_index % 2) < 80) {
-                    drive->qtr_track_index += 2;
-                }
-            } else {
-                if ((drive->qtr_track_index % 2) > 1) {
-                    drive->qtr_track_index -= 2;
-                }
-            }
-            drive->state_35 &= ~CLEM_IWM_DISK35_STATE_STEP_ONE;
-        }
-    }
-    return drive->state_35;
-}
-
-
-
-static unsigned _clem_disk_exec_ctl_35(
-    struct ClemensDrive* drive,
-    unsigned ctl
-) {
-    unsigned old_state = drive->state_35;
-    switch (ctl) {
-        case CLEM_IWM_DISK35_CTL_STEP_IN:
-            drive->state_35 |= CLEM_IWM_DISK35_STATE_STEP_IN;
-            break;
-        case CLEM_IWM_DISK35_CTL_STEP_OUT:
-            drive->state_35 &= ~CLEM_IWM_DISK35_STATE_STEP_IN;
-            break;
-        case CLEM_IWM_DISK35_CTL_MOTOR_ON:
-            drive->state_35 |= CLEM_IWM_DISK35_STATE_MOTOR_ON;
-            break;
-        case CLEM_IWM_DISK35_CTL_MOTOR_OFF:
-            drive->state_35 &= ~CLEM_IWM_DISK35_STATE_MOTOR_ON;
-            break;
-        case CLEM_IWM_DISK35_CTL_STEP_ONE:
-            drive->state_35 |= CLEM_IWM_DISK35_STATE_STEP_ONE;
-            drive->step_timer_35_ns = CLEM_1MS_NS * 5; /* very arbitrary... */
-            break;
-        case CLEM_IWM_DISK35_CTL_EJECTED_RESET:
-            CLEM_LOG("IWM: disk switch reset?");
-            break;
-    }
-    return drive->state_35;
-}
-
-/*
-    control/status set/get params:
-        in_phase = PH0, PH1, PH2
-        io_flags = HEAD_SEL
-
-        control is set by toggling the PH3 bit from off -> on -> off
- */
-
-void clem_disk_read_and_position_head_35(
-    struct ClemensDrive* drive,
-    unsigned *io_flags,
-    unsigned in_phase,
-    unsigned dt_ns
-) {
-    bool next_select = (*io_flags & CLEM_IWM_FLAG_HEAD_SEL) != 0;
-    bool query_true = true;
-
-    drive->state_35 = _clem_disk_step_state_35(drive, dt_ns);
-
-    if (in_phase != drive->q03_switch || drive->select_35 != next_select) {
-        if (!(drive->q03_switch & 0x08) && (in_phase & 0x08)) {
-            /* do control action */
-            unsigned ctl = ((in_phase << 2)       & 0x08) |
-                           ((in_phase << 2)       & 0x04) |
-                           (!next_select ? 0x00 :   0x02) |
-                           ((in_phase >> 2)       & 0x01);
-            CLEM_LOG("IWM: Disk35[%u]: Power: %u; Ctl: %02X",
-                (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
-                (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
-                ctl);
-            drive->state_35 = _clem_disk_exec_ctl_35(drive, ctl);
-        } else if (!(in_phase & 0x08)) {
-            /* do status query */
-            unsigned query = ((in_phase << 2)     & 0x08) |
-                             ((in_phase << 2)     & 0x04) |
-                             (!next_select ? 0x00 : 0x02) |
-                             ((in_phase >> 2)     & 0x01);
-            drive->query_35 = query;
-        }
-        drive->q03_switch = in_phase;
-        drive->select_35 = next_select;
-    }
-
-    switch (drive->query_35) {
-        case CLEM_IWM_DISK35_QUERY_STEP_DIR:
-            if (drive->state_35 & CLEM_IWM_DISK35_STATE_STEP_IN) {
-                query_true = true;
-            }
-            break;
-        case CLEM_IWM_DISK35_QUERY_IO_HEAD_LOWER:
-            break;
-        case CLEM_IWM_DISK35_QUERY_DISK_IN_DRIVE:
-            query_true = false;
-            break;
-        case CLEM_IWM_DISK35_QUERY_IO_HEAD_UPPER:
-            break;
-        case CLEM_IWM_DISK35_QUERY_IS_STEPPING:
-            if (drive->state_35 & CLEM_IWM_DISK35_STATE_STEP_ONE) {
-                query_true = true;
-            }
-            break;
-        case CLEM_IWM_DISK35_QUERY_WRITE_PROTECT:
-            break;
-        case CLEM_IWM_DISK35_QUERY_MOTOR_ON:
-            if (drive->state_35 & CLEM_IWM_DISK35_STATE_MOTOR_ON) {
-                query_true = true;
-            }
-            break;
-        case CLEM_IWM_DISK35_QUERY_DOUBLE_SIDED:
-            if (!drive->data || !(drive->data->flags & CLEM_WOZ_IMAGE_DOUBLE_SIDED)) {
-                query_true = false;
-            }
-            break;
-        case CLEM_IWM_DISK35_QUERY_TRACK_0:
-            if (drive->qtr_track_index == 0) {
-                query_true = true;
-            }
-            break;
-        case CLEM_IWM_DISK35_QUERY_READ_READY:
-            query_true = false;
-            break;
-        case CLEM_IWM_DISK35_QUERY_EJECTED:
-            break;
-        case CLEM_IWM_DISK35_QUERY_60HZ_ROTATION:
-            break;
-        case CLEM_IWM_DISK35_QUERY_ENABLED:
-            query_true = false;
-            break;
-    }
-    if (!query_true) {
-        *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
-    } else {
-        *io_flags &= ~CLEM_IWM_FLAG_WRPROTECT_SENSE;
-    }
-}
-
-void clem_disk_update_head_35(
-    struct ClemensDrive* drive,
-    unsigned *io_flags,
-    unsigned dt_ns
-) {
-
-}
-
-
 /*  Mechanical Summary: 5.25"
 
     Each floppy drive head is driven by a 4 phase stepper motor.  Drive
@@ -337,9 +152,10 @@ void clem_disk_update_head_35(
          "Half-step single-coil mode"
     Mechanical Summary: 3.5"
 */
-static unsigned _clem_disk_get_track_bit_length_525(
+static unsigned _clem_disk_get_track_bit_length(
     struct ClemensDrive* drive,
-    int qtr_track_index
+    int qtr_track_index,
+    bool is_drive_525
 ) {
     if (drive->data->meta_track_map[qtr_track_index] != 0xff) {
         return drive->data->track_bits_count[(
@@ -349,7 +165,7 @@ static unsigned _clem_disk_get_track_bit_length_525(
     return 51200;
 }
 
-static void _clem_disk_write_bit_525(struct ClemensDrive* drive, bool value) {
+static void _clem_disk_write_bit(struct ClemensDrive* drive, bool value) {
     uint8_t* data = drive->data->bits_data + (
         drive->data->track_byte_offset[drive->real_track_index]);
     if (value) {
@@ -359,7 +175,7 @@ static void _clem_disk_write_bit_525(struct ClemensDrive* drive, bool value) {
     }
 }
 
-static uint8_t _clem_disk_read_bit_525(struct ClemensDrive* drive) {
+static uint8_t _clem_disk_read_bit(struct ClemensDrive* drive) {
     uint8_t* data = drive->data->bits_data + (
         drive->data->track_byte_offset[drive->real_track_index]);
     uint8_t byte_value = data[drive->track_byte_index];
@@ -374,6 +190,107 @@ static inline uint8_t _clem_disk_read_fake_bit_525(struct ClemensDrive* drive) {
     ++drive->random_bit_index;
     return random_bit ? CLEM_IWM_FLAG_READ_DATA : 0x00;
 }
+
+unsigned clem_drive_pre_step(
+    struct ClemensDrive* drive,
+    unsigned *io_flags
+) {
+    unsigned track_cur_pos = (drive->track_byte_index * 8) + (7 - drive->track_bit_shift);
+
+    *io_flags &= ~CLEM_IWM_FLAG_READ_DATA;
+    *io_flags &= ~CLEM_IWM_FLAG_WRPROTECT_SENSE;
+    *io_flags &= ~CLEM_IWM_FLAG_PULSE_HIGH;
+
+    if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
+        drive->read_buffer = 0;
+        return CLEM_IWM_DRIVE_INVALID_TRACK_POS;
+    }
+    return track_cur_pos;
+}
+
+unsigned clem_drive_step(
+    struct ClemensDrive* drive,
+    unsigned *io_flags,
+    int qtr_track_index,
+    unsigned track_cur_pos,
+    unsigned dt_ns
+) {
+    bool is_drive_525 = (*io_flags & CLEM_IWM_FLAG_DRIVE_35) ? false : true;
+    if (qtr_track_index != drive->qtr_track_index && drive->data) {
+        /*
+        CLEM_LOG("IWM: Disk525[%u]: Motor: %u; Head @ (%d,%d)",
+            (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
+            (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
+            qtr_track_index / 4, qtr_track_index % 4);
+        */
+        if (drive->data->meta_track_map[drive->qtr_track_index] !=
+            drive->data->meta_track_map[qtr_track_index]
+        ) {
+            /* force lookup of the real track if the arm has changed */
+            drive->real_track_index = 0xfe;
+        }
+
+        drive->qtr_track_index = qtr_track_index;
+    }
+    if (drive->data) {
+        if (drive->real_track_index == 0xfe) {
+            unsigned track_prev_len = drive->track_bit_length;
+            drive->real_track_index = drive->data->meta_track_map[drive->qtr_track_index];
+            if (drive->real_track_index != 0xff) {
+                drive->track_bit_length = _clem_disk_get_track_bit_length(
+                    drive, drive->qtr_track_index, is_drive_525);
+            } else if (drive->track_bit_length == 0) {
+                /* just use the prior bit length if there's no track defined */
+                drive->track_bit_length = drive->data->track_bits_count[0];
+            }
+            if (track_prev_len) {
+                track_cur_pos = track_cur_pos * drive->track_bit_length / track_prev_len;
+            }
+        }
+    } else {
+        /* also we need to fake it being write protected?  check this? */
+        drive->qtr_track_index = qtr_track_index;
+        if (is_drive_525) {
+            *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
+        }
+    }
+    if (track_cur_pos >= drive->track_bit_length) {
+        /* wrap to beginning of track */
+        track_cur_pos -= drive->track_bit_length;
+    }
+    drive->track_byte_index = track_cur_pos / 8;
+    drive->track_bit_shift = 7 - (track_cur_pos % 8);
+    drive->pulse_ns = clem_util_timer_increment(drive->pulse_ns, 1000000, dt_ns);
+    if (!drive->data) {
+        return track_cur_pos;
+    }
+    if (drive->pulse_ns >= drive->data->bit_timing_ns) {
+        bool valid_disk_data = drive->real_track_index != 0xff &&
+            drive->data->track_initialized[drive->real_track_index];
+        *io_flags |= CLEM_IWM_FLAG_PULSE_HIGH;
+        /* read a pulse from the bitstream, following WOZ emulation suggestions
+            to emulate errors - this is effectively a copypasta from
+            https://applesaucefdc.com/woz/reference2/ */
+        drive->read_buffer <<= 1;
+        if (valid_disk_data) {
+            if (_clem_disk_read_bit(drive)) {
+                drive->read_buffer |= 0x1;
+            }
+        }
+        if ((drive->read_buffer & 0xf) && valid_disk_data) {
+            if (drive->read_buffer & 0x2) {
+                *io_flags |= CLEM_IWM_FLAG_READ_DATA;
+            }
+        } else if (is_drive_525) {
+            /* 3.5" drives don't have the same hardware as the Disk II, so
+               I *think* fake bits don't apply
+            */
+            *io_flags |= _clem_disk_read_fake_bit_525(drive);
+        }
+    }
+    return track_cur_pos;
+}
+
 
 /**
  * @brief Emulates a 5.25" Disk II compliant drive
@@ -401,19 +318,13 @@ void clem_disk_read_and_position_head_525(
     int qtr_track_index = drive->qtr_track_index;
     int qtr_track_delta;
     unsigned track_cur_pos;
-    unsigned bit_timing_ns;
-    bool track_phase_change = false;
 
-    *io_flags &= ~CLEM_IWM_FLAG_READ_DATA;
-    *io_flags &= ~CLEM_IWM_FLAG_WRPROTECT_SENSE;
-    *io_flags &= ~CLEM_IWM_FLAG_PULSE_HIGH;
+    track_cur_pos = clem_drive_pre_step(drive, io_flags);
 
     if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
         drive->read_buffer = 0;
         return;
     }
-
-    track_cur_pos = (drive->track_byte_index * 8) + (7 - drive->track_bit_shift);
 
     /* clamp quarter track index to 5.25" limits */
     /* turning a cog that can be oriented in one of 8 directions */
@@ -428,84 +339,20 @@ void clem_disk_read_and_position_head_525(
         qtr_track_index = 0;
     }
     else if (qtr_track_index >= 160) qtr_track_index = 160;
-    if (qtr_track_index != drive->qtr_track_index && drive->data) {
-        /*
-        CLEM_LOG("IWM: Disk525[%u]: Motor: %u; Head @ (%d,%d)",
-            (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
-            (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
-            qtr_track_index / 4, qtr_track_index % 4);
-        */
-        if (drive->data->meta_track_map[drive->qtr_track_index] !=
-            drive->data->meta_track_map[qtr_track_index]
-        ) {
-            /* force lookup of the real track if the arm has changed */
-            drive->real_track_index = 0xfe;
-        }
+    drive->ctl_switch = in_phase;
 
-        drive->qtr_track_index = qtr_track_index;
-        track_phase_change = true;
-    }
-    drive->q03_switch = in_phase;
-    if (drive->data) {
-        if (drive->real_track_index == 0xfe) {
-            unsigned track_prev_len = drive->track_bit_length;
-            drive->real_track_index = drive->data->meta_track_map[drive->qtr_track_index];
-            if (drive->real_track_index != 0xff) {
-                drive->track_bit_length = _clem_disk_get_track_bit_length_525(
-                    drive, drive->qtr_track_index);
-            } else if (drive->track_bit_length == 0) {
-                /* just use the prior bit length if there's no track defined */
-                drive->track_bit_length = drive->data->track_bits_count[0];
-            }
-            if (track_prev_len) {
-                track_cur_pos = track_cur_pos * drive->track_bit_length / track_prev_len;
-            }
-        }
-        bit_timing_ns = drive->data->bit_timing_ns;
-    } else {
-        /* also we need to fake it being write protected?  check this? */
-        drive->qtr_track_index = qtr_track_index;
-        bit_timing_ns = 4000;
-        *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
-    }
-    if (track_cur_pos >= drive->track_bit_length) {
-        /* wrap to beginning of track */
-        track_cur_pos -= drive->track_bit_length;
-    }
-    drive->track_byte_index = track_cur_pos / 8;
-    drive->track_bit_shift = 7 - (track_cur_pos % 8);
-    drive->pulse_ns = clem_util_timer_increment(drive->pulse_ns, 1000000, dt_ns);
-    if (!drive->data) {
-        return;
-    }
-    if (drive->pulse_ns >= drive->data->bit_timing_ns) {
-        bool valid_disk_data = drive->real_track_index != 0xff &&
-            drive->data->track_initialized[drive->real_track_index];
-        *io_flags |= CLEM_IWM_FLAG_PULSE_HIGH;
-        /* read a pulse from the bitstream, following WOZ emulation suggestions
-            to emulate errors - this is effectively a copypasta from
-            https://applesaucefdc.com/woz/reference2/ */
-        drive->read_buffer <<= 1;
-        if (valid_disk_data) {
-            if (_clem_disk_read_bit_525(drive)) {
-                drive->read_buffer |= 0x1;
-            }
-        }
-        if ((drive->read_buffer & 0xf) && valid_disk_data) {
-            if (drive->read_buffer & 0x2) {
-                *io_flags |= CLEM_IWM_FLAG_READ_DATA;
-            }
-        } else {
-            *io_flags |= _clem_disk_read_fake_bit_525(drive);
-        }
-    }
+    track_cur_pos = clem_drive_step(drive,
+                                    io_flags,
+                                    qtr_track_index,
+                                    track_cur_pos,
+                                    dt_ns);
 
-    if (drive->data->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) {
+    if (drive->data && drive->data->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) {
         *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
     }
 }
 
-void clem_disk_update_head_525(
+void clem_disk_update_head(
     struct ClemensDrive* drive,
     unsigned *io_flags,
     unsigned dt_ns
@@ -534,7 +381,7 @@ void clem_disk_update_head_525(
                     }
                 }
                 if (drive->data->track_initialized[drive->real_track_index]) {
-                    _clem_disk_write_bit_525(drive, write_transition);
+                    _clem_disk_write_bit(drive, write_transition);
                 }
             }
         }

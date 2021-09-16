@@ -1607,6 +1607,10 @@
 "Addr":16515072},
 
 {
+"Offset":247040,
+"Addr":50432},
+
+{
 "Offset":247296,
 "Addr":50688},
 
@@ -2389,6 +2393,7 @@
 "218834":"write data and q6 = on",
 "219992":"writing IWM mode",
 "219999":"ensure only mode flags are used",
+"220894":"Spin for 5 iterations = 2 * 5 + 3 + 1 = 14 cycles",
 "221049":"this initiates a bunch of 3.5\" disk IO",
 "226816":"TBD - A=$fb at this time, so storing $fbfb?",
 "226826":"Storing vectors into bank $e1 used during initialization?",
@@ -3004,6 +3009,18 @@
 
 "221102":{
 "Text":"This block seems crucial for handling the sense input from the IWM on startup",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"247092":{
+"Text":"Clear out disk speed detect flags",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"220889":{
+"Text":"This operation sets the IWM mode to #$0B really. It just uses bit 5 (#$20) as a way to check if the mode has been applied, and spin until the mode from the IWM actually comes back as #$0B.",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -6354,5 +6371,9 @@
 "Bank":225},
 
 "219133":{
+"FollowPbr":false,
+"Bank":225},
+
+"220913":{
 "FollowPbr":false,
 "Bank":225}}}

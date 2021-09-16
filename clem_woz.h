@@ -69,7 +69,6 @@ struct ClemensWOZDisk {
     unsigned max_track_size_bytes;
     unsigned bit_timing_ns;             /* time to read (and write?) */
     unsigned track_count;
-    unsigned default_track_bit_length;  /* used for on-demand WOZ files */
 
     /* maps quarter tracks (for 5.25) and 80 tracks per side (for 3.25).  the
        drive head mechanism should track current head position by the meta

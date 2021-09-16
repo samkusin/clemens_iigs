@@ -431,9 +431,9 @@ static void _clem_iwm_lss(
 
     if (!iwm->enbl2) {
         if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-            clem_disk_update_head_35(drive, &iwm->io_flags, 250);
+            clem_disk_update_head(drive, &iwm->io_flags, 250);
         } else {
-            clem_disk_update_head_525(drive, &iwm->io_flags, 500);
+            clem_disk_update_head(drive, &iwm->io_flags, 500);
         }
     } else {
         /* TODO: enbl2 drives? */
