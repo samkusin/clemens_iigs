@@ -322,6 +322,7 @@ struct ClemensSerializerRecord kDrive[] = {
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensDrive, status_mask_35),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, step_timer_35_ns),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDrive, write_pulse),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDrive, is_spindle_on),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDrive, real_track_index),
     CLEM_SERIALIZER_RECORD_ARRAY(
         struct ClemensDrive, kClemensSerializerTypeUInt8, random_bits,
