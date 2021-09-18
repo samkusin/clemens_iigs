@@ -107,6 +107,7 @@ static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
     drive->read_buffer = 0;
     drive->state_35 = 0;
     drive->status_mask_35 = 0;
+    drive->is_spindle_on = false;
 
     /* not going to change the cog orientation since this could be a soft
        reset */
@@ -254,6 +255,9 @@ unsigned clem_drive_step(
             *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
         }
     }
+    if (!drive->is_spindle_on) {
+        return track_cur_pos;
+    }
     if (track_cur_pos >= drive->track_bit_length) {
         /* wrap to beginning of track */
         track_cur_pos -= drive->track_bit_length;
@@ -323,8 +327,10 @@ void clem_disk_read_and_position_head_525(
 
     if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
         drive->read_buffer = 0;
+        drive->is_spindle_on = false;
         return;
     }
+    drive->is_spindle_on = true;
 
     /* clamp quarter track index to 5.25" limits */
     /* turning a cog that can be oriented in one of 8 directions */
@@ -360,7 +366,7 @@ void clem_disk_update_head(
     bool write_pulse = (*io_flags & CLEM_IWM_FLAG_WRITE_HEAD_ON) == (
             CLEM_IWM_FLAG_WRITE_HEAD_ON);
     bool write_transition = write_pulse != drive->write_pulse;
-    if (!drive->data) {
+    if (!drive->data || !drive->is_spindle_on) {
         return;
     }
 

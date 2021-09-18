@@ -276,6 +276,57 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"IO_IWM_DISABLE_DRIVE":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_IWM_DISABLE_DRIVE",
+"Value":14794984,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_IWM_DRIVE_0":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_IWM_DRIVE_0",
+"Value":14794986,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_IWM_DRIVE_ENABLE":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_IWM_DRIVE_ENABLE",
+"Value":14794985,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "IO_IWM_DRIVE_OFF":{
 "DataDescriptor":{
 "Length":1,
@@ -378,6 +429,40 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"IO_IWM_Q6_OFF":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_IWM_Q6_OFF",
+"Value":14794892,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_IWM_Q6_ON":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_IWM_Q6_ON",
+"Value":14794893,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "IO_IWM_Q7_LO":{
 "DataDescriptor":{
 "Length":1,
@@ -391,6 +476,23 @@
 "MultiMask":null,
 "Label":"IO_IWM_Q7_LO",
 "Value":49294,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"IO_IWM_Q7_OFF":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"IO_IWM_Q7_OFF",
+"Value":14794894,
 "Source":"Project",
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
@@ -1177,6 +1279,23 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"SYM_BOOT_E10FB6":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"SYM_BOOT_E10FB6",
+"Value":14749622,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "SYM_BRAM_BKG_COLOR":{
 "DataDescriptor":{
 "Length":1,
@@ -1309,6 +1428,23 @@
 "MultiMask":null,
 "Label":"SYM_BRAM_SLOT3_INTEXT",
 "Value":14746339,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"SYM_BRAM_STARTUP_SLOT":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"SYM_BRAM_STARTUP_SLOT",
+"Value":14746344,
 "Source":"Project",
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
@@ -1568,6 +1704,23 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"SYS_BOOT_E10F56_ERR":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"SYS_BOOT_E10F56_ERR",
+"Value":14749526,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"Uncertain"},
+
 "SYS_BRAM_0318":{
 "DataDescriptor":{
 "Length":1,
@@ -1733,6 +1886,16 @@
 "Hint":"Code"},
 
 {
+"Low":216147,
+"High":216147,
+"Hint":"Code"},
+
+{
+"Low":218627,
+"High":218627,
+"Hint":"Code"},
+
+{
 "Low":218654,
 "High":218654,
 "Hint":"Code"},
@@ -1750,6 +1913,11 @@
 {
 "Low":226964,
 "High":226964,
+"Hint":"Code"},
+
+{
+"Low":227596,
+"High":227596,
 "Hint":"Code"},
 
 {
@@ -2005,6 +2173,11 @@
 {
 "Low":247040,
 "High":247040,
+"Hint":"Code"},
+
+{
+"Low":247053,
+"High":247053,
 "Hint":"Code"},
 
 {
@@ -2334,8 +2507,12 @@
 "182305":3145984,
 "195764":304,
 "212574":256,
+"216147":256,
+"221236":256,
+"221238":304,
 "226857":11796739,
 "226964":3145984,
+"227596":304,
 "228339":3145984,
 "228371":3145984,
 "236343":256,
@@ -2368,12 +2545,18 @@
 "133019":"index WAPT",
 "133023":"Get arg wapt-pointer hi",
 "134740":"QuickDraw:Shutdown",
+"211984":"Init some vars?",
+"211987":"More state",
+"211990":"More state!",
+"211993":"Some real IWM state initialization",
 "212016":"Setting 5.25\" mode",
 "212574":"==5 on startup with default BRAM",
 "214767":"Setting 3.5\" IWM",
 "214801":"Disabling the current drive",
 "214804":"Read the IWM status",
 "214810":"Wait for it to be disabled",
+"214816":"This will switch to IWM set mode (likely to $0f)",
+"214839":"Carry clear if no error",
 "218640":"read data mode",
 "218652":"80 half tracks",
 "218687":"read data from disk",
@@ -2395,11 +2578,16 @@
 "219999":"ensure only mode flags are used",
 "220894":"Spin for 5 iterations = 2 * 5 + 3 + 1 = 14 cycles",
 "221049":"this initiates a bunch of 3.5\" disk IO",
+"221264":"JML FF790C",
+"221381":"If 0, then scan",
+"221385":"On boot, this seems to be 0",
 "226816":"TBD - A=$fb at this time, so storing $fbfb?",
 "226826":"Storing vectors into bank $e1 used during initialization?",
 "226836":"JML $FF7629",
 "226850":"JML $FFA9AA",
 "226880":"Slot 3 Peripheral RAM byte",
+"227617":"Carry is set if A was set to 6 before this instruction",
+"227626":"A will be 0",
 "227902":"inhibit text page 2 shadowing",
 "227909":"bit 5 has no effect on the 256k board",
 "229266":"open apple status",
@@ -2774,7 +2962,7 @@
 "BackgroundColor":0},
 
 "214749":{
-"Text":"This block seems to be looking at the 3.5\" drive and disabling it?",
+"Text":"Set 3.5 Drive Mode",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},
@@ -3014,13 +3202,157 @@
 "BackgroundColor":0},
 
 "247092":{
-"Text":"Clear out disk speed detect flags",
+"Text":"Clear out disk speed detect flags and ensure we\u0027re running in FAST mode",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},
 
 "220889":{
 "Text":"This operation sets the IWM mode to #$0B really. It just uses bit 5 (#$20) as a way to check if the mode has been applied, and spin until the mode from the IWM actually comes back as #$0B.",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"247040":{
+"Text":"Smartport Firmware\r\nSignature bytes 0x20, 0x00, 0x03, 0x00\r\nFrom Firmware Reference - Locating SmartPort",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"247295":{
+"Text":"Offset for Smartport entry point relative to $C500",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"247050":{
+"Text":"ProDOS entry point",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"247053":{
+"Text":"Smartport Entry Point",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"218630":{
+"Text":"This is called from the internal slot 5 ROM",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"220077":{
+"Text":"This was called indirectly from the Slot 5 Boot ROM",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"221397":{
+"Text":"Copying some data into zero page",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"221236":{
+"Text":"save off some zero page data at $040 (34 bytes?)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"227596":{
+"Text":"A = 6",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"227617":{
+"Text":"This will rotate the value of SLOTROMSEL 6 times (if A = 6 from original call)\r\nOn boot this ends up with the value #$03 (last two bits set, likely slot 6 and 7?)\r\n\r\nCarry will be clear at end given the above.\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"227667":{
+"Text":"The above will return X = #$807E\r\nCarry will be clear\r\nA = 0",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"220011":{
+"Text":"Wait until current selected drive has stopped",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"220024":{
+"Text":"Spin wait (Read Data state selected.)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"215551":{
+"Text":"These seem to be 3.5\" drive commands\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"215645":{
+"Text":"This appears to be a spinlock/wait subroutine that is a 3 level nested loop.\r\nThe outmost loop runs just twice.\r\nA = L1 iterations\r\nL0 iterations is hardcoded to #$64\r\nThe inner two loops L1, L0 run in slow mode\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"215397":{
+"Text":"guessing this waits until the motor is up and running\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"215188":{
+"Text":"This waits until we hit track 0",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"215170":{
+"Text":"This waits until we hit track zero on the 3.5\" drive.\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"216147":{
+"Text":"This is invoked from a hook jmp at $E10F6F\r\nThe accuumlator is set to ??\r\nExample: A = #$03, Carry clear\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"216262":{
+"Text":"This call seems to set the 3.5\" disk head to the upper or lower (side)\r\nAnd then sets the IWM state to read disk.",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"216159":{
+"Text":"Now, wait for the sector header (checking for bytes D5 AA 96)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"214836":{
+"Text":"Scan for sector\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"247153":{
+"Text":"Bootloaded sector entry point",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"211974":{
+"Text":"I think we\u0027re checking if we already ran this.. if not, then read in.",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -4787,7 +5119,7 @@
 "LabelAnno":"None"},
 
 "215439":{
-"Label":"SUB_IWM_SEL35_CTL",
+"Label":"SUB_IWM_SEL35",
 "Value":16730511,
 "Source":"User",
 "Type":"GlobalAddr",
@@ -5368,7 +5700,7 @@
 "LabelAnno":"None"},
 
 "218633":{
-"Label":"SUB_RESET_DRIVE_SLOT6",
+"Label":"SUB_RESET_DRIVE_525",
 "Value":16733705,
 "Source":"User",
 "Type":"GlobalAddr",
@@ -5547,6 +5879,209 @@
 "Value":50722,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247054":{
+"Label":"common_external_entry",
+"Value":50446,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"227596":{
+"Label":"SUB_TMP_HOOK_BOOT_SLOT5",
+"Value":16742668,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"220006":{
+"Label":"SUB_WAIT_IWM_IDLE",
+"Value":16735078,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"220030":{
+"Label":"next_y",
+"Value":16735102,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"220017":{
+"Label":"poll_status",
+"Value":16735089,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215645":{
+"Label":"SUB_TMP_DISK35_WAIT",
+"Value":16730717,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215650":{
+"Label":"SUB_TMP_DISK35_WAIT_INNER",
+"Value":16730722,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215661":{
+"Label":"l1_loop",
+"Value":16730733,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215665":{
+"Label":"l0_loop",
+"Value":16730737,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215397":{
+"Label":"shorter_wait",
+"Value":16730469,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215399":{
+"Label":"longer_wait",
+"Value":16730471,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215367":{
+"Label":"SUB_IWM_35_MOTOR_ON",
+"Value":16730439,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215207":{
+"Label":"disk35_at_tr0",
+"Value":16730279,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215190":{
+"Label":"next_wait_tr0",
+"Value":16730262,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215170":{
+"Label":"SUB_IWM_35_GOTO_TRACK_0",
+"Value":16730242,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215333":{
+"Label":"SUB_IWM_35_CHECK_DISKRDY",
+"Value":16730405,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215345":{
+"Label":"not_ready",
+"Value":16730417,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215343":{
+"Label":"is_ready",
+"Value":16730415,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215349":{
+"Label":"wait_ready",
+"Value":16730421,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"216251":{
+"Label":"disk_not_ready",
+"Value":16731323,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"216262":{
+"Label":"SUB_IWM_35_SET_HEAD_LO_HI",
+"Value":16731334,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"216271":{
+"Label":"set_head",
+"Value":16731343,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"216170":{
+"Label":"wait_for_nib",
+"Value":16731242,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"214831":{
+"Label":"SUB_IWM_35_READ_SECTOR_HEADER",
+"Value":16729903,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"214888":{
+"Label":"SUB_IWM_35_ZERO_TRACK_START",
+"Value":16729960,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"247170":{
+"Label":"basic_exit",
+"Value":50562,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"247156":{
+"Label":"fail_to_boot",
+"Value":50548,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"218630":{
+"Label":"SUB_BOOTLOADER_35",
+"Value":16733702,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"220077":{
+"Label":"SUB_RESET_DRIVE_35",
+"Value":16735149,
+"Source":"User",
+"Type":"GlobalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -6375,5 +6910,9 @@
 "Bank":225},
 
 "220913":{
+"FollowPbr":false,
+"Bank":225},
+
+"220008":{
 "FollowPbr":false,
 "Bank":225}}}

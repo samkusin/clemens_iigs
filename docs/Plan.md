@@ -14,6 +14,9 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
+* IWM 3.5" read write support
+  * Debug what error if any happens within ff/3c19 (seems to set the error
+    bit checked in the instruction after the subroutine)
 * Enable custom logic for card slot reads/writes since different cards map
   registers to their dedicated page instead of at $c0xx
 * AY8910 emulation for Mockingboard
@@ -27,8 +30,6 @@ This is a running todo list.
   * If bad (relatively speaking...) then look at the system beep task below
 * Support Disk II Card for old boot
 * Look at fast vs slow for iigs specific IO registers (FPI, CYA based)
-* IWM 3.5" read write support
-  between color bits and rgb in clem_display.cpp
 * Timing checks on native mode versions of:
   * STA (DP), Y and likely other direct-indirect indexed ops are missing a
     IO cycle (likely just writes, but evaluate rules in wd65c816 docs...)

@@ -35,11 +35,11 @@
 #define CLEM_IWM_DISK35_CTL_MOTOR_OFF       0x09
 #define CLEM_IWM_DISK35_CTL_EJECT           0x0D
 
-#define CLEM_IWM_DISK35_STATUS_MOTOR_ON     0x0001
-#define CLEM_IWM_DISK35_STATUS_STEP_IN      0x0002
-#define CLEM_IWM_DISK35_STATUS_IO_HEAD_HI   0x0004
+#define CLEM_IWM_DISK35_STATUS_STEP_IN      0x0001
+#define CLEM_IWM_DISK35_STATUS_IO_HEAD_HI   0x0002
 #define CLEM_IWM_DISK35_STATUS_EJECTED      0x0008
 #define CLEM_IWM_DISK35_STATUS_EJECTING     0x0010
+#define CLEM_IWM_DISK35_STATUS_STROBE       0x8000
 
 #define CLEM_IWM_DISK35_STEP_TIME_NS        (12 * 1000000)
 #define CLEM_IWM_DISK35_EJECT_TIME_NS       (500 * 1000000)
@@ -69,6 +69,7 @@ void clem_disk_read_and_position_head_35(
     unsigned dt_ns
 ) {
     bool sense_out = false;
+    bool ctl_strobe = (in_phase & 0x8) != 0;
     unsigned cur_step_timer_ns = drive->step_timer_35_ns;
     unsigned ctl_switch;
     unsigned track_cur_pos;
@@ -110,104 +111,113 @@ void clem_disk_read_and_position_head_35(
     ctl_switch |= ((in_phase << 2) & 0x4);     /* PHASE0 */
     ctl_switch |= ((in_phase << 2) & 0x8);     /* PHASE1 */
 
-    if (in_phase & 0x8) {
-        /* control strobe = perform command now */
-        switch (ctl_switch) {
-            case CLEM_IWM_DISK35_CTL_STEP_IN:
-                drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_STEP_IN;
-                break;
-            case CLEM_IWM_DISK35_CTL_STEP_OUT:
-                drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_STEP_IN;
-                break;
-            case CLEM_IWM_DISK35_CTL_EJECTED_RESET:
-                drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_EJECTED;
-                break;
-            case CLEM_IWM_DISK35_CTL_STEP_ONE:
-                if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {
-                    drive->step_timer_35_ns = CLEM_IWM_DISK35_STEP_TIME_NS;
-                } else {
-                    CLEM_LOG("clem_drive35: attempt to step while ejecting");
-                }
-                break;
-            case CLEM_IWM_DISK35_CTL_MOTOR_ON:
-                drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_MOTOR_ON;
-                break;
-            case CLEM_IWM_DISK35_CTL_MOTOR_OFF:
-                drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_MOTOR_ON;
-                break;
-            case CLEM_IWM_DISK35_CTL_EJECT:
-                if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {
-                    drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_MOTOR_ON;
-                    drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_EJECTING;
-                    drive->step_timer_35_ns = CLEM_IWM_DISK35_EJECT_TIME_NS;
-                    CLEM_LOG("clem_drive35: ejecting disk");
-                }
-                break;
-            default:
-                CLEM_LOG("clem_drive35: ctl %u not supported?", ctl_switch);
-                break;
-        }
-
+    if (ctl_strobe) {
+        drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_STROBE;
     } else {
-        /* control query */
-        switch (ctl_switch) {
-            case CLEM_IWM_DISK35_QUERY_STEP_DIR:
-                sense_out = (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_STEP_IN) == 0;
-                break;
-            case CLEM_IWM_DISK35_QUERY_DISK_IN_DRIVE:
-                sense_out = (drive->data == NULL);
-                break;
-            case CLEM_IWM_DISK35_QUERY_IS_STEPPING:
-                sense_out = (drive->step_timer_35_ns == 0);
-                break;
-            case CLEM_IWM_DISK35_QUERY_WRITE_PROTECT:
-                sense_out = (drive->data && drive->data->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) == 0;
-                break;
-            case CLEM_IWM_DISK35_QUERY_MOTOR_ON:
-                sense_out = (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_MOTOR_ON) == 0;
-                break;
-            case CLEM_IWM_DISK35_QUERY_TRACK_0:
-                sense_out = (drive->qtr_track_index/2 == 0);
-                break;
-            case CLEM_IWM_DISK35_QUERY_EJECTED:
-                sense_out = (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTED) == 0;
-                break;
-            case CLEM_IWM_DISK35_QUERY_60HZ_ROTATION:
-                assert(true);
-                break;
-            case CLEM_IWM_DISK35_QUERY_IO_HEAD_LOWER:
-                if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_IO_HEAD_HI) {
-                    drive->qtr_track_index -= 1;
-                    drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_IO_HEAD_HI;
-                    CLEM_LOG("clem_drive35: switching to lower head, track = %u", drive->qtr_track_index);
-                }
-                break;
-            case CLEM_IWM_DISK35_QUERY_IO_HEAD_UPPER:
-                if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_IO_HEAD_HI)) {
-                    drive->qtr_track_index += 1;
-                    drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_IO_HEAD_HI;
-                    CLEM_LOG("clem_drive35: switching to upper head, track = %u", drive->qtr_track_index);
-                }
-                break;
-            case CLEM_IWM_DISK35_QUERY_DOUBLE_SIDED:
-                sense_out = (drive->data && drive->data->flags & CLEM_WOZ_IMAGE_DOUBLE_SIDED) != 0;
-                break;
-            case CLEM_IWM_DISK35_QUERY_READ_READY:
-                sense_out = (drive->step_timer_35_ns > 0);
-                break;
-            case CLEM_IWM_DISK35_QUERY_ENABLED:
-                /* TODO, can this drive be disabled? */
-                sense_out = false;
-                break;
-            default:
-                CLEM_LOG("clem_drive35: query %u not supported?", ctl_switch);
-                break;
+        if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_STROBE) {
+            drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_STROBE;
+            /* control strobe = perform command now */
+            switch (ctl_switch) {
+                case CLEM_IWM_DISK35_CTL_STEP_IN:
+                    drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_STEP_IN;
+                    break;
+                case CLEM_IWM_DISK35_CTL_STEP_OUT:
+                    drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_STEP_IN;
+                    break;
+                case CLEM_IWM_DISK35_CTL_EJECTED_RESET:
+                    drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_EJECTED;
+                    break;
+                case CLEM_IWM_DISK35_CTL_STEP_ONE:
+                    if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {
+                        drive->step_timer_35_ns = CLEM_IWM_DISK35_STEP_TIME_NS;
+                        CLEM_LOG("clem_drive35: step from track %u", qtr_track_index);
+                    } else {
+                        CLEM_LOG("clem_drive35: attempt to step while ejecting");
+                    }
+                    break;
+                case CLEM_IWM_DISK35_CTL_MOTOR_ON:
+                    drive->is_spindle_on = true;
+                    CLEM_LOG("clem_drive35: drive motor on");
+                    break;
+                case CLEM_IWM_DISK35_CTL_MOTOR_OFF:
+                    drive->is_spindle_on = false;
+                    CLEM_LOG("clem_drive35: drive motor off");
+                    break;
+                case CLEM_IWM_DISK35_CTL_EJECT:
+                    if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {
+                        drive->is_spindle_on = false;
+                        drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_EJECTING;
+                        drive->step_timer_35_ns = CLEM_IWM_DISK35_EJECT_TIME_NS;
+                        CLEM_LOG("clem_drive35: ejecting disk");
+                    }
+                    break;
+                default:
+                    CLEM_LOG("clem_drive35: ctl %02X not supported?", ctl_switch);
+                    break;
+            }
+            CLEM_LOG("clem_drive35: control switch %02X <= %02X",
+                        ctl_switch, drive->ctl_switch);
+        } else {
+            /* control query */
+            switch (ctl_switch) {
+                case CLEM_IWM_DISK35_QUERY_STEP_DIR:
+                    sense_out = (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_STEP_IN) == 0;
+                    break;
+                case CLEM_IWM_DISK35_QUERY_DISK_IN_DRIVE:
+                    sense_out = (drive->data == NULL);
+                    break;
+                case CLEM_IWM_DISK35_QUERY_IS_STEPPING:
+                    sense_out = (drive->step_timer_35_ns == 0);
+                    break;
+                case CLEM_IWM_DISK35_QUERY_WRITE_PROTECT:
+                    sense_out = (drive->data && drive->data->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) == 0;
+                    break;
+                case CLEM_IWM_DISK35_QUERY_MOTOR_ON:
+                    sense_out = !drive->is_spindle_on;
+                    break;
+                case CLEM_IWM_DISK35_QUERY_TRACK_0:
+                    sense_out = (drive->qtr_track_index/2 != 0);
+                    break;
+                case CLEM_IWM_DISK35_QUERY_EJECTED:
+                    sense_out = (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTED) == 0;
+                    break;
+                case CLEM_IWM_DISK35_QUERY_60HZ_ROTATION:
+                    assert(true);
+                    break;
+                case CLEM_IWM_DISK35_QUERY_IO_HEAD_LOWER:
+                    if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_IO_HEAD_HI) {
+                        qtr_track_index -= 1;
+                        drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_IO_HEAD_HI;
+                        CLEM_LOG("clem_drive35: switching to lower head, track = %u", qtr_track_index);
+                    }
+                    break;
+                case CLEM_IWM_DISK35_QUERY_IO_HEAD_UPPER:
+                    if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_IO_HEAD_HI)) {
+                        qtr_track_index += 1;
+                        drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_IO_HEAD_HI;
+                        CLEM_LOG("clem_drive35: switching to upper head, track = %u", qtr_track_index);
+                    }
+                    break;
+                case CLEM_IWM_DISK35_QUERY_DOUBLE_SIDED:
+                    sense_out = (drive->data && drive->data->flags & CLEM_WOZ_IMAGE_DOUBLE_SIDED) != 0;
+                    break;
+                case CLEM_IWM_DISK35_QUERY_READ_READY:
+                    sense_out = (drive->step_timer_35_ns > 0);
+                    break;
+                case CLEM_IWM_DISK35_QUERY_ENABLED:
+                    /* TODO, can this drive be disabled? */
+                    sense_out = false;
+                    break;
+                default:
+                    CLEM_LOG("clem_drive35: query %02X not supported?", ctl_switch);
+                    break;
+            }
+
+            if (ctl_switch != drive->ctl_switch || ctl_strobe) {
+                CLEM_LOG("clem_drive35: query switch %02X <= %02X",
+                         ctl_switch, drive->ctl_switch);
+            }
         }
-    }
-    if (ctl_switch != drive->ctl_switch) {
-        CLEM_LOG("clem_drive35: %s switch %02X <= %02X",
-                 (in_phase & 0x8) ? "control" : "query",
-                 ctl_switch, drive->ctl_switch);
     }
     drive->ctl_switch = ctl_switch;
 

@@ -325,18 +325,15 @@ static void _clem_iwm_lss(
     int drive_index = (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 1 : 0;
     struct ClemensDrive* drive;
 
-    if (!iwm->enbl2) {
-        if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-            drive = &drives->slot5[drive_index];
-            clem_disk_read_and_position_head_35(
-                drive, &iwm->io_flags, iwm->out_phase, 250);
-        } else {
-            drive = &drives->slot6[drive_index];
-            clem_disk_read_and_position_head_525(
-                drive, &iwm->io_flags, iwm->out_phase, 500);
-        }
+    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+        drive = &drives->slot5[drive_index];
+        clem_disk_read_and_position_head_35(
+            drive, &iwm->io_flags, iwm->out_phase, 250);
+    } else if (!iwm->enbl2) {
+        drive = &drives->slot6[drive_index];
+        clem_disk_read_and_position_head_525(
+            drive, &iwm->io_flags, iwm->out_phase, 500);
     } else {
-        /* TODO: enbl2 drives? */
         drive = NULL;
     }
 
@@ -429,14 +426,10 @@ static void _clem_iwm_lss(
         iwm->data = iwm->latch;
     }
 
-    if (!iwm->enbl2) {
-        if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-            clem_disk_update_head(drive, &iwm->io_flags, 250);
-        } else {
-            clem_disk_update_head(drive, &iwm->io_flags, 500);
-        }
-    } else {
-        /* TODO: enbl2 drives? */
+    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+        clem_disk_update_head(drive, &iwm->io_flags, 250);
+    } else if (!iwm->enbl2) {
+        clem_disk_update_head(drive, &iwm->io_flags, 500);
     }
 
 

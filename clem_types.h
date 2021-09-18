@@ -371,6 +371,7 @@ struct ClemensDrive {
     uint16_t state_35;          /**< 3.5" state machine */
     uint16_t status_mask_35;    /**< 3.5" status mask */
     bool write_pulse;           /**< Changes in the write field translate as pulses */
+    bool is_spindle_on;         /**< Drive spindle running */
 
     uint8_t real_track_index;   /**< the index into the raw woz track data */
 
