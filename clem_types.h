@@ -368,7 +368,6 @@ struct ClemensDrive {
     unsigned ctl_switch;
     unsigned cog_orient;        /**< emulated orientation of stepper cog */
     unsigned step_timer_35_ns;  /**< 3.5" track step timer */
-    uint16_t state_35;          /**< 3.5" state machine */
     uint16_t status_mask_35;    /**< 3.5" status mask */
     bool write_pulse;           /**< Changes in the write field translate as pulses */
     bool is_spindle_on;         /**< Drive spindle running */

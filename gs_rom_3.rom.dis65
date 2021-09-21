@@ -2557,6 +2557,14 @@
 "214810":"Wait for it to be disabled",
 "214816":"This will switch to IWM set mode (likely to $0f)",
 "214839":"Carry clear if no error",
+"214969":"X = drive index (0 or 1)",
+"214975":"Carry set, skip startup on this drive",
+"214977":"Reset disk-switched flag?",
+"214993":"What is this?",
+"215042":"Step inward and get direction",
+"215050":"expected to be 0, otherwise some kind of error",
+"215052":"Step outwards (lower tracks, and side 0 head.)",
+"215062":"Step inward",
 "218640":"read data mode",
 "218652":"80 half tracks",
 "218687":"read data from disk",
@@ -2974,7 +2982,7 @@
 "BackgroundColor":0},
 
 "212574":{
-"Text":"Appears to be the jump point from FF/3E5A after a redirect from the $E1 jump table\r\n\r\nContinues some initial IWM/disk access on startup",
+"Text":"Appears to be the jump point from FF/3E5A after a redirect from the $E1 jump table... Continues some initial IWM/disk access on startup",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},
@@ -3353,6 +3361,12 @@
 
 "211974":{
 "Text":"I think we\u0027re checking if we already ran this.. if not, then read in.",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"214961":{
+"Text":"Sets the high bit used by the caller to skip this call.",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -6082,6 +6096,20 @@
 "Value":16735149,
 "Source":"User",
 "Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215073":{
+"Label":"error",
+"Value":16730145,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215032":{
+"Label":"next_drive",
+"Value":16730104,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
