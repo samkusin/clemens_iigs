@@ -97,17 +97,9 @@ static int s_disk2_phase_states[8][16] = {
 */
 
 static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
-    drive->ctl_switch = 0;
-    drive->pulse_ns = 0;
-    drive->track_byte_index = 0;
-    drive->track_bit_shift = 7;
     drive->real_track_index = 0xfe;
     drive->random_bit_index = 0;
     drive->qtr_track_index = 0;
-    drive->read_buffer = 0;
-    drive->state_35 = 0;
-    drive->status_mask_35 = 0;
-    drive->is_spindle_on = false;
 
     /* not going to change the cog orientation since this could be a soft
        reset */
@@ -124,6 +116,16 @@ static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
         }
         ++drive->random_bit_index;
     } while (drive->random_bit_index < CLEM_IWM_DRIVE_MAX_RANDOM_BITS);
+}
+
+void clem_disk_start_drive(struct ClemensDrive* drive) {
+    drive->ctl_switch = 0;
+    drive->status_mask_35 = 0;
+    drive->is_spindle_on = false;
+    drive->track_byte_index = 0;
+    drive->track_bit_shift = 0;
+    drive->pulse_ns = 0;
+    drive->read_buffer = 0;
 }
 
 void clem_disk_reset_drives(struct ClemensDriveBay* drives) {

@@ -275,7 +275,7 @@ void clem_iwm_insert_disk(
 }
 
 void clem_iwm_eject_disk(
-    struct ClemensDeviceIWM* iwm,
+   struct ClemensDeviceIWM* iwm,
    struct ClemensDrive* drive
 ) {
     drive->data = NULL;
@@ -283,28 +283,33 @@ void clem_iwm_eject_disk(
     // after timeout, reset drive state
 }
 
+struct ClemensDrive* _clem_iwm_select_drive(
+    struct ClemensDeviceIWM* iwm,
+    struct ClemensDriveBay* drive_bay
+) {
+    struct ClemensDrive* drives;
+    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+        drives = drive_bay->slot5;
+    } else {
+        drives = drive_bay->slot6;
+    }
+    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
+        return &drives[0];
+    } else {
+        return &drives[1];
+    }
+}
+
 static void _clem_iwm_reset_lss(
     struct ClemensDeviceIWM* iwm,
     struct ClemensDriveBay* drives,
     struct ClemensClock* clock
 ) {
+    struct ClemensDrive* drive = _clem_iwm_select_drive(iwm, drives);
     iwm->lss_clocks_lag = 0;
     iwm->ns_drive_hold = 0;
     iwm->last_clocks_ts = clock->ts;
-
-    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-        if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
-            drives->slot5[0].pulse_ns = 0;
-        } else {
-            drives->slot5[1].pulse_ns = 0;
-        }
-    } else {
-        if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
-            drives->slot6[0].pulse_ns = 0;
-        } else {
-            drives->slot6[1].pulse_ns = 0;
-        }
-    }
+    clem_disk_start_drive(drive);
 }
 
 
