@@ -170,7 +170,12 @@ void clem_disk_read_and_position_head_35(
                     sense_out = (drive->step_timer_35_ns == 0);
                     break;
                 case CLEM_IWM_DISK35_QUERY_WRITE_PROTECT:
-                    sense_out = (drive->data && drive->data->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) == 0;
+                    if (drive->data) {
+                        sense_out = (drive->data && (
+                            drive->data->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT)) == 0;
+                    } else {
+                        sense_out = false;
+                    }
                     break;
                 case CLEM_IWM_DISK35_QUERY_MOTOR_ON:
                     sense_out = !drive->is_spindle_on;
