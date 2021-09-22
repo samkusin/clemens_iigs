@@ -1738,6 +1738,57 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"VAR_FWR_IWM_0F24_X":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"Drive states?",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"VAR_FWR_IWM_0F24_X",
+"Value":14749476,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"VAR_FWR_IWM_0F4C":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"VAR_FWR_IWM_0F4C",
+"Value":14749516,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"VAR_FWR_IWM_DRIVE_FAIL_STAT_X":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"VAR_FWR_IWM_DRIVE_FAIL_STAT_X",
+"Value":14749502,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "VAR_INTCXROM":{
 "DataDescriptor":{
 "Length":1,
@@ -2565,6 +2616,9 @@
 "215050":"expected to be 0, otherwise some kind of error",
 "215052":"Step outwards (lower tracks, and side 0 head.)",
 "215062":"Step inward",
+"215551":"write_protect check",
+"215552":"disk_in_place",
+"215553":"disk_switched reset",
 "218640":"read data mode",
 "218652":"80 half tracks",
 "218687":"read data from disk",
@@ -3367,6 +3421,18 @@
 
 "214961":{
 "Text":"Sets the high bit used by the caller to skip this call.",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"215520":{
+"Text":"Sets some state for the current drive.\r\nValidates a disk is available for the drive.",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"215503":{
+"Text":"A = Returns whether bit 6 was set\r\n(6: write prot I think)",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -6110,6 +6176,41 @@
 "Value":16730104,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215042":{
+"Label":"SUB_IWM_35_DRIVE_RESET",
+"Value":16730114,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215551":{
+"Label":"TABL_IWM_35_QUERY_CMDS",
+"Value":16730623,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215485":{
+"Label":"SUB_IWM_35_DRIVE_ENABLE_2",
+"Value":16730557,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215503":{
+"Label":"SUB_IWM_35_DRIVE_HAS_DISK_2",
+"Value":16730575,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215506":{
+"Label":"SUB_IWM_35_DRIVE_HAS_DISK",
+"Value":16730578,
+"Source":"User",
+"Type":"GlobalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -6700,6 +6801,59 @@
 "Part":"Low"}}},
 
 "LvTables":{
+"214749":{
+"Variables":[{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":true,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"ZP_FWR_IWM_45",
+"Value":69,
+"Source":"Variable",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":true,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"ZP_FWR_IWM_48",
+"Value":72,
+"Source":"Variable",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":true,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"ZP_FWR_IWM_4E",
+"Value":78,
+"Source":"Variable",
+"Type":"ExternalAddr",
+"LabelAnno":"None"}],
+"ClearPrevious":false},
+
 "247296":{
 "Variables":[{
 "DataDescriptor":{
