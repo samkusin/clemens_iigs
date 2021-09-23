@@ -1279,6 +1279,23 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"SUB_HOOK_BOOT_SLOT5":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"SUB_HOOK_BOOT_SLOT5",
+"Value":14746120,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "SYM_BOOT_E10FB6":{
 "DataDescriptor":{
 "Length":1,
@@ -1785,6 +1802,23 @@
 "MultiMask":null,
 "Label":"VAR_FWR_IWM_DRIVE_FAIL_STAT_X",
 "Value":14749502,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+"VAR_FWR_IWM_DRIVE_INDEX":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"VAR_FWR_IWM_DRIVE_INDEX",
+"Value":14749480,
 "Source":"Project",
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
@@ -2616,6 +2650,7 @@
 "215050":"expected to be 0, otherwise some kind of error",
 "215052":"Step outwards (lower tracks, and side 0 head.)",
 "215062":"Step inward",
+"215328":"Sets drive status to fail (X = drive index)",
 "215551":"write_protect check",
 "215552":"disk_in_place",
 "215553":"disk_switched reset",
@@ -2638,11 +2673,17 @@
 "218834":"write data and q6 = on",
 "219992":"writing IWM mode",
 "219999":"ensure only mode flags are used",
+"220093":"Some kind of slot enumeration + checking drive state",
+"220808":"Hitting this error condition?",
+"220829":"This value must be 00, else error (i.e. 2F)",
+"220841":"error",
 "220894":"Spin for 5 iterations = 2 * 5 + 3 + 1 = 14 cycles",
 "221049":"this initiates a bunch of 3.5\" disk IO",
 "221264":"JML FF790C",
 "221381":"If 0, then scan",
 "221385":"On boot, this seems to be 0",
+"221438":"failure point",
+"221463":"$00,$01 = slot address (i.e $C500)",
 "226816":"TBD - A=$fb at this time, so storing $fbfb?",
 "226826":"Storing vectors into bank $e1 used during initialization?",
 "226836":"JML $FF7629",
@@ -3433,6 +3474,30 @@
 
 "215503":{
 "Text":"A = Returns whether bit 6 was set\r\n(6: write prot I think)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"227608":{
+"Text":"I think this code checks for slot 0 or 3?   Basically slots that can\u0027t be booted from.",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"221463":{
+"Text":"This block of code will set the error condition if we booted from the 16-bit address in $00, $01 ($01 == $07f8) \r\n(branch to end, which sets the carry flag.) ",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"220517":{
+"Text":"Returned value of A is the code used to detect an error.\r\nPossibly X,Y are returned as well.",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"211968":{
+"Text":"Returns \u0027A\u0027, and maybe \u0027X\u0027 and \u0027Y\u0027.\r\nAn \u0027A\u0027 less than #$40 may be an error.",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -5969,7 +6034,7 @@
 "LabelAnno":"None"},
 
 "227596":{
-"Label":"SUB_TMP_HOOK_BOOT_SLOT5",
+"Label":"SUB_SCAN_BOOT_SLOTS",
 "Value":16742668,
 "Source":"User",
 "Type":"GlobalAddr",
@@ -6211,6 +6276,55 @@
 "Value":16730578,
 "Source":"User",
 "Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"214909":{
+"Label":"disk_in_place",
+"Value":16729981,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"214929":{
+"Label":"exit_fail",
+"Value":16730001,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"214932":{
+"Label":"exit_success",
+"Value":16730004,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"211968":{
+"Label":"SUB_IWM_35_ENUM_DRIVES",
+"Value":16727040,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"221233":{
+"Label":"SUB_CHECK_35_STATE",
+"Value":16736305,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"220812":{
+"Label":"success_tmp",
+"Value":16735884,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"220813":{
+"Label":"fail_tmp",
+"Value":16735885,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
