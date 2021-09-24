@@ -14,6 +14,7 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
+* Debug resume at FF/617a - should get to FF/61a1 if everything is OK?
 * IWM 3.5" read write support
   * Debug what error if any happens within ff/3c19 (seems to set the error
     bit checked in the instruction after the subroutine)

@@ -910,7 +910,18 @@ bool ClemensHost::hitBreakpoint() {
     uint8_t b_bank = (uint8_t)(it->addr >> 16);
     bool b_adr_hit = (machine_.cpu.regs.PBR == b_bank &&
                       machine_.cpu.regs.PC == b_adr);
+    bool b_data_hit = (machine_.cpu.regs.DBR == b_bank &&
+                       machine_.cpu.pins.adr == b_adr);
     if (b_adr_hit) {
+      switch (it->op) {
+        case Breakpoint::PC:
+          if (machine_.cpu.pins.vpaOut) {
+            return true;
+          }
+          break;
+      }
+    }
+    if (b_data_hit) {
       switch (it->op) {
         case Breakpoint::Read:
           if (machine_.cpu.pins.rwbOut && machine_.cpu.pins.vdaOut) {
@@ -919,11 +930,6 @@ bool ClemensHost::hitBreakpoint() {
           break;
         case Breakpoint::Write:
           if (!machine_.cpu.pins.rwbOut && machine_.cpu.pins.vdaOut) {
-            return true;
-          }
-          break;
-        case Breakpoint::PC:
-          if (machine_.cpu.pins.vpaOut) {
             return true;
           }
           break;
