@@ -915,10 +915,7 @@ bool ClemensHost::hitBreakpoint() {
     if (b_adr_hit) {
       switch (it->op) {
         case Breakpoint::PC:
-          if (machine_.cpu.pins.vpaOut) {
-            return true;
-          }
-          break;
+          return true;
       }
     }
     if (b_data_hit) {
@@ -1171,15 +1168,16 @@ bool ClemensHost::parseCommandBreak(const char* line) {
       strncpy(number, start, std::min(sizeof(number) - 1, size_t(end - start)));
       number[15] = '\0';
       if (size_t(end - start) > 2) {
-        unsigned addr = strtoul(&number[2], nullptr, 16);
+        unsigned addr;
         if (number[0] == 'r' && number[1] == '@') {
+          addr = strtoul(&number[2], nullptr, 16);
           breakpoints_.emplace_back(Breakpoint { Breakpoint::Read, addr });
         } else if (number[0] == 'w' && number[1] == '@') {
+          addr = strtoul(&number[2], nullptr, 16);
           breakpoints_.emplace_back(Breakpoint { Breakpoint::Write, addr });
-        } else if (addr != 0) {
-          breakpoints_.emplace_back(Breakpoint { Breakpoint::PC, addr });
         } else {
-          return false;
+          addr = strtoul(&number[0], nullptr, 16);
+          breakpoints_.emplace_back(Breakpoint { Breakpoint::PC, addr });
         }
         return true;
       }
@@ -1498,7 +1496,8 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
 
       clemens_assign_disk(&machine_, kClemensDrive_5_25_D1, &disks525_[0]);
       clemens_assign_disk(&machine_, kClemensDrive_5_25_D2, &disks525_[1]);
-
+      clemens_assign_disk(&machine_, kClemensDrive_3_5_D1, &disks35_[0]);
+      clemens_assign_disk(&machine_, kClemensDrive_3_5_D2, &disks35_[1]);
       success = true;
     } break;
     case MachineType::Simple128K: {
