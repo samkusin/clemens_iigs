@@ -100,6 +100,9 @@ static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
     drive->real_track_index = 0xfe;
     drive->random_bit_index = 0;
     drive->qtr_track_index = 0;
+    drive->status_mask_35 = 0;
+
+    clem_disk_start_drive(drive);
 
     /* not going to change the cog orientation since this could be a soft
        reset */
@@ -120,7 +123,6 @@ static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
 
 void clem_disk_start_drive(struct ClemensDrive* drive) {
     drive->ctl_switch = 0;
-    drive->status_mask_35 = 0;
     drive->is_spindle_on = false;
     drive->track_byte_index = 0;
     drive->track_bit_shift = 0;
@@ -283,15 +285,22 @@ unsigned clem_drive_step(
                 drive->read_buffer |= 0x1;
             }
         }
-        if ((drive->read_buffer & 0xf) && valid_disk_data) {
-            if (drive->read_buffer & 0x2) {
-                *io_flags |= CLEM_IWM_FLAG_READ_DATA;
-            }
-        } else if (is_drive_525) {
+
+        if (is_drive_525) {
             /* 3.5" drives don't have the same hardware as the Disk II, so
                I *think* fake bits don't apply
             */
-            *io_flags |= _clem_disk_read_fake_bit_525(drive);
+            if ((drive->read_buffer & 0xf) && valid_disk_data) {
+                if (drive->read_buffer & 0x2) {
+                    *io_flags |= CLEM_IWM_FLAG_READ_DATA;
+                }
+            } else {
+                *io_flags |= _clem_disk_read_fake_bit_525(drive);
+            }
+        } else {
+            if (drive->read_buffer & 0x1) {
+                *io_flags |= CLEM_IWM_FLAG_READ_DATA;
+            }
         }
     }
     return track_cur_pos;

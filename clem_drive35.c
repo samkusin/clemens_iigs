@@ -120,9 +120,11 @@ void clem_disk_read_and_position_head_35(
             switch (ctl_switch) {
                 case CLEM_IWM_DISK35_CTL_STEP_IN:
                     drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_STEP_IN;
+                    CLEM_LOG("clem_drive35: step to inward tracks");
                     break;
                 case CLEM_IWM_DISK35_CTL_STEP_OUT:
                     drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_STEP_IN;
+                    CLEM_LOG("clem_drive35: step to outward tracks");
                     break;
                 case CLEM_IWM_DISK35_CTL_EJECTED_RESET:
                     drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_EJECTED;
@@ -136,7 +138,11 @@ void clem_disk_read_and_position_head_35(
                     }
                     break;
                 case CLEM_IWM_DISK35_CTL_MOTOR_ON:
-                    drive->is_spindle_on = true;
+                    if (!drive->is_spindle_on) {
+                        drive->is_spindle_on = true;
+                        drive->pulse_ns = 0;
+                        drive->read_buffer = 0;
+                    }
                     CLEM_LOG("clem_drive35: drive motor on");
                     break;
                 case CLEM_IWM_DISK35_CTL_MOTOR_OFF:
@@ -155,8 +161,10 @@ void clem_disk_read_and_position_head_35(
                     CLEM_LOG("clem_drive35: ctl %02X not supported?", ctl_switch);
                     break;
             }
+            /*
             CLEM_LOG("clem_drive35: control switch %02X <= %02X",
                         ctl_switch, drive->ctl_switch);
+            */
         } else {
             /* control query */
             switch (ctl_switch) {
@@ -181,7 +189,7 @@ void clem_disk_read_and_position_head_35(
                     sense_out = !drive->is_spindle_on;
                     break;
                 case CLEM_IWM_DISK35_QUERY_TRACK_0:
-                    sense_out = (drive->qtr_track_index/2 != 0);
+                    sense_out = (drive->qtr_track_index != 0);
                     break;
                 case CLEM_IWM_DISK35_QUERY_EJECTED:
                     sense_out = (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTED) == 0;
@@ -217,11 +225,12 @@ void clem_disk_read_and_position_head_35(
                     CLEM_LOG("clem_drive35: query %02X not supported?", ctl_switch);
                     break;
             }
-
+            /*
             if (ctl_switch != drive->ctl_switch || ctl_strobe) {
                 CLEM_LOG("clem_drive35: query switch %02X <= %02X",
                          ctl_switch, drive->ctl_switch);
             }
+            */
         }
     }
     drive->ctl_switch = ctl_switch;
