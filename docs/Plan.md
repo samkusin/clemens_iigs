@@ -14,7 +14,11 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
-* Debug resume at FF/617a - should get to FF/61a1 if everything is OK?
+* ProDOS 16 boot
+  * Bootloader at 087C seems OK so far (has loaded the directory listing)
+  * @ 08E3 reading in kernel
+    * failing after a few blocks read (carry set @ 08e6)
+    * idx (index pointer y = 5 is the last one and it fails)
 * IWM 3.5" read write support
   * Debug what error if any happens within ff/3c19 (seems to set the error
     bit checked in the instruction after the subroutine)
@@ -63,6 +67,7 @@ This is a running todo list.
 
 ## DONE
 
+* Fixed machine power cycle and 3.5" disks not being persisted
 * ProDOS boot (1.x or ProDOS 8)
   * Fixed IWM drive enable after a delayed disable
 * Fixed memory mapping bug for page 0x3 in main/aux banks (RAMRD)
