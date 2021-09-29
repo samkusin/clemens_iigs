@@ -1,0 +1,26 @@
+Entry
+=====
+$42         = Command? == 1 for read
+$43         = Unit (16 * slot) + (128 * drive-1) == 16*5 + 0 == #$50
+$44,$45     = RAM address (buffer to write to?)
+$46,$47     = disk address (blocks?)
+$48,$49     = entry point
+
+Prodos Entry ($00C5xx)
+======================
+$0007F8     = #$C5
+
+$E10FB0     = Stores the incoming carry flag in bit 7 (always #$80)
+$E10FCB     = #$04
+$E10FCC     = value of $C036 (Speed) at start (#$84)
+
+
+Prodos Firmware ($FF5BAD)
+=========================
+$E10FB6     = don't know = #$A5 on start from slot 5 boot
+$E10FB7     = xor of FB6?
+$E10FB8     = don't know = #$03 on start
+$E10FC6     = stored SLTROMSEL (=#$80)
+$E10FC7.FC8 = stored #$807e (SLTROMSEL and XOR SLTROMSEL with bits 0,8 = 0) 
+$E10FC9     = processor status at entry with Decimal cleared
+$E114E2.1504 = saved zero page $40-$62
