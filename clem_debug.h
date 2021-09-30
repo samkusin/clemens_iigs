@@ -5,29 +5,32 @@
 #include <stdio.h>
 #include <assert.h>
 
-#define CLEM_UNIMPLEMENTED(_fmt_, ...) do { \
-  fprintf(stderr, "UNIMPLEMENTED: " _fmt_, __VA_ARGS__); \
-  fputc('\n', stderr);  assert(0); \
-} while (0)
-
 #define CLEM_ASSERT(_cond_) do { \
   assert(_cond_); \
 } while (0)
 
+#define CLEM_UNIMPLEMENTED(_fmt_, ...) do { \
+  clem_debug_log(CLEM_DEBUG_LOG_UNIMPL, _fmt_, __VA_ARGS__); \
+} while (0)
+
 #define CLEM_WARN(_fmt_, ...) do { \
-  fprintf(stderr, _fmt_, __VA_ARGS__); \
-  fputc('\n', stderr); \
+  clem_debug_log(CLEM_DEBUG_LOG_WARN, _fmt_, __VA_ARGS__); \
 } while (0)
 
 #define CLEM_LOG(_fmt_, ...) do { \
-  fprintf(stdout, _fmt_, __VA_ARGS__); \
-  fputc('\n', stdout); \
+  clem_debug_log(CLEM_DEBUG_LOG_INFO, _fmt_, __VA_ARGS__); \
 } while (0)
 
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef struct ClemensMachine ClemensMachine;
+
+void clem_debug_context(ClemensMachine* context);
+
+void clem_debug_log(int log_level, const char* fmt, ...);
 
 char* clem_debug_acquire_log(unsigned amt);
 

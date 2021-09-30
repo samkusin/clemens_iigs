@@ -654,6 +654,23 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"VAR_FWR_IWM_SEL_TRACK":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"VAR_FWR_IWM_SEL_TRACK",
+"Value":14749482,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "VAR_INTCXROM":{
 "DataDescriptor":{
 "Length":1,
@@ -1472,12 +1489,15 @@
 "211993":"Some real IWM state initialization",
 "212016":"Setting 5.25\" mode",
 "212574":"==5 on startup with default BRAM",
+"212976":"Sector header read OK",
 "214767":"Setting 3.5\" IWM",
 "214801":"Disabling the current drive",
 "214804":"Read the IWM status",
 "214810":"Wait for it to be disabled",
 "214816":"This will switch to IWM set mode (likely to $0f)",
 "214839":"Carry clear if no error",
+"214841":"Retry count",
+"214844":"error!",
 "214969":"X = drive index (0 or 1)",
 "214975":"Carry set, skip startup on this drive",
 "214977":"Reset disk-switched flag?",
@@ -1490,6 +1510,12 @@
 "215551":"write_protect check",
 "215552":"disk_in_place",
 "215553":"disk_switched reset",
+"216175":"96, AA, D5",
+"216178":"not an address header",
+"216201":"checksum calc",
+"216214":"==#$DE",
+"216224":"==#$AA",
+"216274":"Read state",
 "218640":"read data mode",
 "218652":"80 half tracks",
 "218687":"read data from disk",
@@ -2270,13 +2296,13 @@
 "BackgroundColor":0},
 
 "216262":{
-"Text":"This call seems to set the 3.5\" disk head to the upper or lower (side)\r\nAnd then sets the IWM state to read disk.",
+"Text":"This call seems to set the 3.5\" disk head to the upper or lower (side)\r\nAnd then sets the IWM state to read disk.\r\n$0F2b if bit 7 then upper else lower",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},
 
 "216159":{
-"Text":"Now, wait for the sector header (checking for bytes D5 AA 96)",
+"Text":"Now, wait for the address header (checking for bytes D5 AA 96)",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},
@@ -2373,6 +2399,24 @@
 
 "220464":{
 "Text":"Command from external call was == 0",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"216183":{
+"Text":"We have an address header and now read VOLUME and TRACK words, decoding from GCR to actual numbers",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"216209":{
+"Text":"Maybe finding the end of the header",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"215095":{
+"Text":"calculate track delta",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -5240,6 +5284,104 @@
 "220468":{
 "Label":"non_zero_cmd",
 "Value":16735540,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"216161":{
+"Label":"scan_adr_hdr",
+"Value":16731233,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"216244":{
+"Label":"adr_hdr_fail",
+"Value":16731316,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"216163":{
+"Label":"next_adr_hdr_byte",
+"Value":16731235,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"216187":{
+"Label":"next_trksec_byte",
+"Value":16731259,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"216143":{
+"Label":"SUB_FWR_PRODOS_SECTOR_READ",
+"Value":16731215,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"214850":{
+"Label":"error",
+"Value":16729922,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"214836":{
+"Label":"retry_read_sector",
+"Value":16729908,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"214852":{
+"Label":"sector_ok",
+"Value":16729924,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"212978":{
+"Label":"error",
+"Value":16728050,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215117":{
+"Label":"do_track_step",
+"Value":16730189,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215125":{
+"Label":"done_track_step",
+"Value":16730197,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215078":{
+"Label":"SUB_FWR_PRODOS_SET_TRACK",
+"Value":16730150,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"215075":{
+"Label":"SUB_FWR_PRODOS_SET_TRACK_A",
+"Value":16730147,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"213057":{
+"Label":"read_sector_hdr",
+"Value":16728129,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},

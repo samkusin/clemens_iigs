@@ -240,6 +240,11 @@ static void _clem_mmio_speed_c036_set(
     uint8_t setflags = clem->mmio.speed_c036 ^ value;
 
     if (setflags & CLEM_MMIO_SPEED_FAST_ENABLED) {
+        if (value & CLEM_MMIO_SPEED_FAST_ENABLED) {
+            CLEM_LOG("C036: Fast Mode: %02X:%04X", clem->cpu.regs.PBR, clem->cpu.regs.PC);
+        } else {
+            CLEM_LOG("C036: Slow Mode: %02X:%04X", clem->cpu.regs.PBR, clem->cpu.regs.PC);
+        }
         if (value & CLEM_MMIO_SPEED_FAST_ENABLED &&
             !clem->mmio.dev_iwm.disk_motor_on
         ) {
@@ -257,10 +262,12 @@ static void _clem_mmio_speed_c036_set(
             CLEM_LOG("C036: Powered On CLEARED");
         }
     }
+    /*
     if (setflags & CLEM_MMIO_SPEED_DISK_FLAGS) {
         CLEM_LOG("C036: Disk motor detect mask: %02X",
                  value & CLEM_MMIO_SPEED_DISK_FLAGS);
     }
+    */
 
     /* bit 5 should always be 0 */
     /* for ROM 3, bit 6 can be on or off - for ROM 1, must be off */

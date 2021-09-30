@@ -2,11 +2,26 @@
 #include "clem_device.h"
 
 #include <stdio.h>
+#include <stdarg.h>
 
 static FILE* g_fp_debug_out = NULL;
 static char s_clem_debug_buffer[65536 * 102];
 static unsigned s_clem_debug_cnt = 0;
+static ClemensMachine* s_clem_machine = NULL;
 
+
+void clem_debug_context(ClemensMachine* context) {
+    s_clem_machine = context;
+}
+
+void clem_debug_log(int log_level, const char* fmt, ...) {
+    char* buffer = s_clem_machine->mmio.dev_debug.log_buffer;
+    va_list arg_list;
+    va_start(arg_list, fmt);
+    vsnprintf(buffer, CLEM_DEBUG_LOG_BUFFER_SIZE, fmt, arg_list);
+    va_end(arg_list);
+    s_clem_machine->logger_fn(log_level, s_clem_machine, buffer);
+}
 
 char* clem_debug_acquire_log(unsigned amt) {
     char* next;
@@ -45,11 +60,6 @@ void clem_debug_reset(struct ClemensDeviceDebugger* dbg) {
     memset(dbg, 0, sizeof(*dbg));
 }
 
-void clem_debug_call_stack(struct ClemensDeviceDebugger* dbg) {
-    /* TODO : look at stack */
-}
-
-
 void clem_debug_counters(struct ClemensDeviceDebugger* dbg) {
     _clem_print_io_reg_counters(dbg);
 }
@@ -63,7 +73,6 @@ void clem_debug_break(
 ) {
     CLEM_WARN("PC=%02X:%04X: DBR=%02X P=%02X",
               cpu->regs.PBR, cpu->regs.PC, cpu->regs.DBR, cpu->regs.P);
-    clem_debug_call_stack(dbg);
     switch (debug_reason) {
         case CLEM_DEBUG_BREAK_UNIMPL_IOREAD:
             _clem_print_io_reg_counters(dbg);

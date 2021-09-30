@@ -1329,7 +1329,6 @@ void clemens_rtc_set_bram_dirty(ClemensMachine* clem) {
 }
 
 void clemens_debug_status(ClemensMachine* clem) {
-    clem_debug_call_stack(&clem->mmio.dev_debug);
     clem_debug_counters(&clem->mmio.dev_debug);
 }
 
@@ -3502,6 +3501,8 @@ void clemens_emulate(ClemensMachine* clem) {
     struct ClemensMMIO* mmio = &clem->mmio;
     struct ClemensClock clock;
     uint32_t delta_mega2_cycles;
+
+    clem_debug_context(clem);
 
     if (!cpu->pins.resbIn) {
         /*  the reset interrupt overrides any other state

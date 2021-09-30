@@ -44,6 +44,16 @@
 
 #define CLEM_RTC_BRAM_SIZE                  256
 
+#define CLEM_DEBUG_LOG_BUFFER_SIZE          256
+#define CLEM_DEBUG_BREAK_UNIMPL_IOREAD      1U
+#define CLEM_DEBUG_BREAK_UNIMPL_IOWRITE     2U
+
+#define CLEM_DEBUG_LOG_INFO                 0
+#define CLEM_DEBUG_LOG_WARN                 1
+#define CLEM_DEBUG_LOG_UNIMPL               2
+#define CLEM_DEBUG_LOG_FATAL                3
+
+
 /** Setting: ADB keyboard buffer size - this doesn't need to be large since
  *  Apple II apps typically expect to consume events via ISR or prompt polling
  *  of IO registers.  Our host should have the opportunity to send input to the
@@ -491,9 +501,6 @@
 #define CLEM_ADB_KEY_RESET                  0x7F
 
 #define CLEM_ADB_KEY_CODE_LIMIT             0x80
-
-#define CLEM_DEBUG_BREAK_UNIMPL_IOREAD      1U
-#define CLEM_DEBUG_BREAK_UNIMPL_IOWRITE     2U
 
 #define CLEM_VGC_TEXT_SCANLINE_COUNT        24
 #define CLEM_VGC_HGR_SCANLINE_COUNT         192

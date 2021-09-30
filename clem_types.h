@@ -6,8 +6,17 @@
 
 #include "clem_defs.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef uint64_t clem_clocks_time_t;
 typedef uint32_t clem_clocks_duration_t;
+
+typedef struct ClemensMachine ClemensMachine;
+
+typedef void (*LoggerFn)(int level, ClemensMachine* machine, const char* msg);
+
 
 #define CLEM_TIME_UNINITIALIZED         ((clem_clocks_time_t)(-1))
 
@@ -220,6 +229,8 @@ struct ClemensInputEvent {
 struct ClemensDeviceDebugger {
     unsigned ioreg_read_ctr[256];
     unsigned ioreg_write_ctr[256];
+    char log_buffer[CLEM_DEBUG_LOG_BUFFER_SIZE];
+    LoggerFn log_message;
 };
 
 /**
@@ -579,7 +590,7 @@ typedef struct {
  * @brief
  *
  */
-typedef struct {
+typedef struct ClemensMachine {
     struct Clemens65C816 cpu;
     /* clocks spent per cycle as set by the current speed settings */
     clem_clocks_duration_t clocks_step;
@@ -607,7 +618,10 @@ typedef struct {
     */
     uint32_t debug_flags;           // See enum kClemensDebugFlag_
     void* debug_user_ptr;
+    /* opcode print callback */
     ClemensOpcodeCallback opcode_post;
+    /* logger callback (if NULL, uses stdout) */
+    LoggerFn logger_fn;
 
     /** Internal, tracks cycle count for holding down the reset key */
     int resb_counter;
@@ -628,5 +642,9 @@ typedef struct {
     struct ClemensMMIO mmio;
     struct ClemensDriveBay active_drives;
 } ClemensMachine;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
