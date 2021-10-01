@@ -14,16 +14,9 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
-* ProDOS 16 boot
-  * Bootloader at 087C seems OK so far (has loaded the directory listing)
-  * @ 08E3 reading in kernel
-    * failing after a few blocks read (carry set @ 08e6)
-    * idx (index pointer y = 5 is the last one and it fails)
-  * @ff3fed - here read the sector header
-  * @ff3ff6 - current debug after reading sector header
-* IWM 3.5" read write support
-  * Debug what error if any happens within ff/3c19 (seems to set the error
-    bit checked in the instruction after the subroutine)
+*
+* Scan boot to slot 5 may not work vs direct boot to 5
+* IWM 3.5" write support
 * Enable custom logic for card slot reads/writes since different cards map
   registers to their dedicated page instead of at $c0xx
 * AY8910 emulation for Mockingboard
@@ -69,6 +62,9 @@ This is a running todo list.
 
 ## DONE
 
+* GUI improvements
+* ProDOS 16 boot
+* IWM 3.5" read support
 * Fixed machine power cycle and 3.5" disks not being persisted
 * ProDOS boot (1.x or ProDOS 8)
   * Fixed IWM drive enable after a delayed disable

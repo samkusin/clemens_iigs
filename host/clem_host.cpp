@@ -41,9 +41,6 @@ namespace {
   constexpr float kMinDebugTerminalScalar = 0.320f;
 
   constexpr float kMinConsoleWidth = 384;
-  constexpr float kMinConsoleHeight = kMinDebugHistoryHeight +
-                                      kMinDebugStatusHeight +
-                                      kMinDebugTerminalHeight;
   constexpr float kConsoleWidthScalar = 0.333f;
 
   constexpr unsigned kEmulationRunForever = 0x00ffffff;
@@ -342,6 +339,7 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   windowCursorPos.y = 0;
   windowSize.x = std::max(kMinConsoleWidth, width * kConsoleWidthScalar);
   windowSize.y = std::max(kMinDebugHistoryHeight, height * kMinDebugHistoryScalar);
+  windowSize.y -= ImGui::GetTextLineHeightWithSpacing();
 
   ImGui::SetNextWindowPos(windowCursorPos);
   ImGui::SetNextWindowSize(windowSize);
@@ -360,6 +358,39 @@ void ClemensHost::frame(int width, int height, float deltaTime)
   }
   if (emulationRan) {
     ImGui::SetScrollHereY();
+  }
+  ImGui::End();
+
+  windowCursorPos.y += windowSize.y;
+  windowSize.y = ImGui::GetTextLineHeightWithSpacing();
+  ImGui::SetNextWindowPos(windowCursorPos);
+  ImGui::SetNextWindowSize(windowSize);
+  ImGui::Begin("Panel", nullptr, ImGuiWindowFlags_NoTitleBar |
+                                 ImGuiWindowFlags_NoScrollbar |
+                                 ImGuiWindowFlags_NoResize |
+                                 ImGuiWindowFlags_NoCollapse |
+                                 ImGuiWindowFlags_NoBringToFrontOnFocus);
+  {
+    ImGui::BeginTable("leds", 3, 0);
+    ImGui::TableNextColumn();
+    ImGui::Text("S5"); ImGui::SameLine();
+    doDriveBayLights(machine_.active_drives.slot5, 2,
+        (machine_.mmio.dev_iwm.io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 1 : 0,
+        (machine_.mmio.dev_iwm.io_flags & CLEM_IWM_FLAG_DRIVE_35) != 0,
+        (machine_.mmio.dev_iwm.io_flags & CLEM_IWM_FLAG_DRIVE_ON) != 0);
+    ImGui::SameLine();
+    ImGui::Text("S6"); ImGui::SameLine();
+    doDriveBayLights(machine_.active_drives.slot6, 2,
+        (machine_.mmio.dev_iwm.io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 1 : 0,
+        (machine_.mmio.dev_iwm.io_flags & CLEM_IWM_FLAG_DRIVE_35) == 0,
+        (machine_.mmio.dev_iwm.io_flags & CLEM_IWM_FLAG_DRIVE_ON) != 0);
+    ImGui::TableNextColumn();
+    ImGui::Text("SPD"); ImGui::SameLine();
+    if (clemens_is_initialized_simple(&machine_)) {
+      ImGui::Text("%0.2f MHz", 1.023f * float(machine_.clocks_step_mega2) / machine_.clocks_step);
+    }
+    ImGui::TableNextColumn(); ImGui::Text("???");
+    ImGui::EndTable();
   }
   ImGui::End();
 
@@ -841,6 +872,41 @@ void ClemensHost::doMemoryMapWindow()
   ImGui::EndTable();
   ImGui::EndGroup();
 
+}
+
+void ClemensHost::doDriveBayLights(
+  ClemensDrive* drives,
+  int driveCount,
+  int driveIndex,
+  bool isEnabled,
+  bool isRunning
+) {
+    const float kLineHeight = ImGui::GetTextLineHeightWithSpacing();
+    const float kCircleRadius = ImGui::GetFontSize() * 0.5f;
+    ClemensDrive* drive = drives;
+    ImVec2 p0 = ImGui::GetCursorScreenPos();
+    ImVec2 p = p0;
+    for (int i = 0; i < driveCount; ++i) {
+      ImColor color;
+      if (isEnabled) {
+        if (isRunning && driveIndex == i) {
+          color = drive->data ? 0xff0000ff : 0xff0000aa;
+        } else {
+          color = drive->data ? 0x666666ff : 0x666666aa;
+        }
+      } else {
+        color = drive->data ? 0x333333ff : 0x333333aa;
+      }
+      ImGui::GetWindowDrawList()->AddCircleFilled(
+        ImVec2(p.x + kCircleRadius, p.y + kCircleRadius), kCircleRadius, color);
+      if (i != driveIndex) {
+        ImGui::GetWindowDrawList()->AddCircle(
+          ImVec2(p.x + kCircleRadius, p.y + kCircleRadius),
+          kCircleRadius, ImColor(0x000000aa));
+      }
+      p.x += kCircleRadius * 2 + kCircleRadius * 0.25f;
+    }
+    ImGui::Dummy(ImVec2(p.x - p0.x, kLineHeight));
 }
 
 void ClemensHost::emulate(float deltaTime)
