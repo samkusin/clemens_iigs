@@ -123,7 +123,6 @@ static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
 
 void clem_disk_start_drive(struct ClemensDrive* drive) {
     drive->ctl_switch = 0;
-    drive->is_spindle_on = false;
     drive->track_byte_index = 0;
     drive->track_bit_shift = 0;
     drive->pulse_ns = 0;
@@ -377,6 +376,10 @@ void clem_disk_update_head(
     bool write_pulse = (*io_flags & CLEM_IWM_FLAG_WRITE_HEAD_ON) == (
             CLEM_IWM_FLAG_WRITE_HEAD_ON);
     bool write_transition = write_pulse != drive->write_pulse;
+
+    if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
+        return;
+    }
     if (!drive->data || !drive->is_spindle_on) {
         return;
     }

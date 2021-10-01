@@ -326,8 +326,6 @@ const uint8_t* clem_woz_parse_trks_chunk(
         uint8_t* out_bits = disk->bits_data;
         for (idx = 0; idx < CLEM_WOZ_LIMIT_QTR_TRACKS; ++idx) {
             if (out_bits + disk->track_byte_count[idx] > disk->bits_data_end) {
-                CLEM_WARN("Raw data not found for track %u." \
-                    "WOZ file may be corrupt", idx);
                 CLEM_ASSERT(false);
                 return NULL;
             }

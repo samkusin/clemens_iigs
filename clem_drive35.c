@@ -41,7 +41,7 @@
 #define CLEM_IWM_DISK35_STATUS_EJECTING     0x0010
 #define CLEM_IWM_DISK35_STATUS_STROBE       0x8000
 
-#define CLEM_IWM_DISK35_STEP_TIME_NS        (12 * 1000000)
+#define CLEM_IWM_DISK35_STEP_TIME_NS        (12 * 1000)
 #define CLEM_IWM_DISK35_EJECT_TIME_NS       (500 * 1000000)
 
 #include <stdio.h>
@@ -120,11 +120,11 @@ void clem_disk_read_and_position_head_35(
             switch (ctl_switch) {
                 case CLEM_IWM_DISK35_CTL_STEP_IN:
                     drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_STEP_IN;
-                    CLEM_LOG("clem_drive35: step to inward tracks");
+                    //CLEM_LOG("clem_drive35: step to inward tracks");
                     break;
                 case CLEM_IWM_DISK35_CTL_STEP_OUT:
                     drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_STEP_IN;
-                    CLEM_LOG("clem_drive35: step to outward tracks");
+                    //CLEM_LOG("clem_drive35: step to outward tracks");
                     break;
                 case CLEM_IWM_DISK35_CTL_EJECTED_RESET:
                     drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_EJECTED;
@@ -132,7 +132,7 @@ void clem_disk_read_and_position_head_35(
                 case CLEM_IWM_DISK35_CTL_STEP_ONE:
                     if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {
                         drive->step_timer_35_ns = CLEM_IWM_DISK35_STEP_TIME_NS;
-                        CLEM_LOG("clem_drive35: step from track %u", qtr_track_index);
+                        //CLEM_LOG("clem_drive35: step from track %u", qtr_track_index);
                     } else {
                         CLEM_LOG("clem_drive35: attempt to step while ejecting");
                     }
@@ -201,14 +201,14 @@ void clem_disk_read_and_position_head_35(
                     if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_IO_HEAD_HI) {
                         qtr_track_index -= 1;
                         drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_IO_HEAD_HI;
-                        CLEM_LOG("clem_drive35: switching to lower head, track = %u", qtr_track_index);
+                        //CLEM_LOG("clem_drive35: switching to lower head, track = %u", qtr_track_index);
                     }
                     break;
                 case CLEM_IWM_DISK35_QUERY_IO_HEAD_UPPER:
                     if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_IO_HEAD_HI)) {
                         qtr_track_index += 1;
                         drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_IO_HEAD_HI;
-                        CLEM_LOG("clem_drive35: switching to upper head, track = %u", qtr_track_index);
+                        //CLEM_LOG("clem_drive35: switching to upper head, track = %u", qtr_track_index);
                     }
                     break;
                 case CLEM_IWM_DISK35_QUERY_DOUBLE_SIDED:

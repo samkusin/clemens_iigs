@@ -13,7 +13,6 @@ extern "C" {
 #endif
 
 void clem_debug_reset(struct ClemensDeviceDebugger* dbg);
-void clem_debug_call_stack(struct ClemensDeviceDebugger* dbg);
 void clem_debug_counters(struct ClemensDeviceDebugger* dbg);
 
 void clem_debug_break(struct ClemensDeviceDebugger* dbg,

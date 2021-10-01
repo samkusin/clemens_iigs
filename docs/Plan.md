@@ -19,6 +19,8 @@ This is a running todo list.
   * @ 08E3 reading in kernel
     * failing after a few blocks read (carry set @ 08e6)
     * idx (index pointer y = 5 is the last one and it fails)
+  * @ff3fed - here read the sector header
+  * @ff3ff6 - current debug after reading sector header
 * IWM 3.5" read write support
   * Debug what error if any happens within ff/3c19 (seems to set the error
     bit checked in the instruction after the subroutine)

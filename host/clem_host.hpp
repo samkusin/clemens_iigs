@@ -115,6 +115,8 @@ private:
 
   static uint8_t* unserializeAllocate(unsigned sz, void* context);
 
+  static void emulatorLog(int log_level, ClemensMachine* machine, const char* msg);
+
 private:
   ClemensMachine machine_;
   cinek::FixedStack slab_;

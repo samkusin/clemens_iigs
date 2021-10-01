@@ -17,6 +17,7 @@ $E10FCC     = value of $C036 (Speed) at start (#$84)
 
 Prodos Firmware ($FF5BAD)
 =========================
+
 $E10FB6     = don't know = #$A5 on start from slot 5 boot
 $E10FB7     = xor of FB6?
 $E10FB8     = don't know = #$03 on start
@@ -24,3 +25,26 @@ $E10FC6     = stored SLTROMSEL (=#$80)
 $E10FC7.FC8 = stored #$807e (SLTROMSEL and XOR SLTROMSEL with bits 0,8 = 0) 
 $E10FC9     = processor status at entry with Decimal cleared
 $E114E2.1504 = saved zero page $40-$62
+
+
+$E10F28		= drive index?
+$E10F2B		= set to 0 after calling SUB_IWM_35_GOTO_TRACK_0 (seems to mean lower head)
+$E10F2F 	= 0x80 or 0x00
+$E10F30.F34 = Sector header?
+$E10F3A		= current 3.5" track number?
+$E10F44		= ??? (0x20 set if failed to find address header)
+
+$E10F69		= 96 AA D5 (address header in reverse)
+
+SUB_IWM_35_READ_SECTOR_HEADER
+=============================
+X = drive index
+
+$E10F37		= $03 at start
+
+Call via E1 hook to FF/4C53 
+	Call SUB_IWM_35_CHECK_DISKRDY
+	If not ready then... ?
+	Call SUB_IWM_35_SET_HEAD_LO_HI
+		Select drive head (from $F2B, if 0 then lower, if bit 7 on, then upper.)
+	Find address header on disk

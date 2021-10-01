@@ -87,6 +87,12 @@ namespace {
     return trackDataSize;
   }
 
+
+  double calculateTimeSpent(ClemensMachine* machine) {
+    return (machine->clocks_spent / double(CLEM_CLOCKS_MEGA2_CYCLE)) *
+      (1.0 / CLEM_MEGA2_CYCLES_PER_SECOND);
+  }
+
 } // namespace anon
 
 #define CLEM_HOST_COUT FormatView(terminalOutput_)
@@ -165,6 +171,21 @@ ClemensHost::~ClemensHost()
   void* slabMemory = slab_.getHead();
   if (slabMemory) {
     free(slabMemory);
+  }
+}
+
+void ClemensHost::emulatorLog(
+  int log_level,
+  ClemensMachine* machine,
+  const char* msg
+) {
+  static const char* levels[] = { " INFO", " WARN", "UNIMP", "FATAL" };
+  ClemensHost* host = reinterpret_cast<ClemensHost*>(machine->debug_user_ptr);
+  fprintf(stdout, "[%s][%6.9lf]: ", levels[log_level], calculateTimeSpent(machine));
+  fputs(msg, stdout);
+  fputc('\n', stdout);
+  if (log_level == CLEM_DEBUG_LOG_UNIMPL) {
+    host->emulationBreak();
   }
 }
 
@@ -1318,7 +1339,7 @@ bool ClemensHost::parseCommandUnlog(const char* line)
         programTrace_->exportTrace("trace.out");
         if (isRunningEmulationUntilBreak()) {
           // don't log
-          clemens_opcode_callback(&machine_, NULL, NULL);
+          clemens_opcode_callback(&machine_, NULL, this);
         }
         programTrace_ = nullptr;
         return true;
@@ -1472,6 +1493,8 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
     CLEM_HOST_COUT.format("{} not found", filename);
     return false;
   }
+
+  machine_.logger_fn = &ClemensHost::emulatorLog;
 
   switch (machineType) {
     case MachineType::Apple2GS: {
@@ -1683,7 +1706,7 @@ bool ClemensHost::emulationRun(unsigned target) {
     return false;
   }
   if (!programTrace_) {
-    clemens_opcode_callback(&machine_, NULL, NULL);
+    clemens_opcode_callback(&machine_, NULL, this);
   }
   return true;
 }
