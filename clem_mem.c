@@ -240,11 +240,6 @@ static void _clem_mmio_speed_c036_set(
     uint8_t setflags = clem->mmio.speed_c036 ^ value;
 
     if (setflags & CLEM_MMIO_SPEED_FAST_ENABLED) {
-        if (value & CLEM_MMIO_SPEED_FAST_ENABLED) {
-            CLEM_LOG("C036: Fast Mode: %02X:%04X", clem->cpu.regs.PBR, clem->cpu.regs.PC);
-        } else {
-            CLEM_LOG("C036: Slow Mode: %02X:%04X", clem->cpu.regs.PBR, clem->cpu.regs.PC);
-        }
         if (value & CLEM_MMIO_SPEED_FAST_ENABLED &&
             !clem->mmio.dev_iwm.disk_motor_on
         ) {

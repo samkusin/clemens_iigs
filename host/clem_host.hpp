@@ -57,6 +57,8 @@ private:
 
   void doIWMContextWindow();
   void doMemoryMapWindow();
+  void doDriveBayLights(ClemensDrive* drives, int driveCount, int driveIndex,
+                        bool isEnabled, bool isRunning);
 
   bool parseCommand(const char* buffer);
   bool parseCommandPower(const char* line);
