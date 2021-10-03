@@ -21,6 +21,11 @@
   clem_debug_log(CLEM_DEBUG_LOG_INFO, _fmt_, __VA_ARGS__); \
 } while (0)
 
+#define CLEM_DEBUG(_fmt_, ...) do { \
+  clem_debug_log(CLEM_DEBUG_LOG_DEBUG, _fmt_, __VA_ARGS__); \
+} while (0)
+
+
 
 #ifdef __cplusplus
 extern "C" {

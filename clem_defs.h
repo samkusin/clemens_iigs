@@ -48,10 +48,11 @@
 #define CLEM_DEBUG_BREAK_UNIMPL_IOREAD      1U
 #define CLEM_DEBUG_BREAK_UNIMPL_IOWRITE     2U
 
-#define CLEM_DEBUG_LOG_INFO                 0
-#define CLEM_DEBUG_LOG_WARN                 1
-#define CLEM_DEBUG_LOG_UNIMPL               2
-#define CLEM_DEBUG_LOG_FATAL                3
+#define CLEM_DEBUG_LOG_DEBUG                0
+#define CLEM_DEBUG_LOG_INFO                 1
+#define CLEM_DEBUG_LOG_WARN                 2
+#define CLEM_DEBUG_LOG_UNIMPL               3
+#define CLEM_DEBUG_LOG_FATAL                4
 
 
 /** Setting: ADB keyboard buffer size - this doesn't need to be large since

@@ -232,7 +232,7 @@ struct ClemensSerializerRecord kIWM[] = {
     CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceIWM, lss_clocks_lag),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, io_flags),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, out_phase),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, enbl2),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, enable2),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceIWM, data),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceIWM, latch),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceIWM, write_out),
