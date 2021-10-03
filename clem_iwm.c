@@ -335,7 +335,7 @@ static void _clem_iwm_lss(
         clem_disk_read_and_position_head_35(
             drive, &iwm->io_flags, iwm->out_phase, 250);
         if (!drive->is_spindle_on) return;
-    } else if (!iwm->enbl2) {
+    } else if (!iwm->enable2) {
         drive = &drives->slot6[drive_index];
         clem_disk_read_and_position_head_525(
             drive, &iwm->io_flags, iwm->out_phase, 500);
@@ -434,7 +434,7 @@ static void _clem_iwm_lss(
 
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
         clem_disk_update_head(drive, &iwm->io_flags, 250);
-    } else if (!iwm->enbl2) {
+    } else if (!iwm->enable2) {
         clem_disk_update_head(drive, &iwm->io_flags, 500);
     }
 
@@ -452,6 +452,12 @@ static void _clem_iwm_lss(
             (uint8_t)(drive->track_byte_index & 0xff));
     }
 #endif
+}
+
+static void _clem_drive_off(struct ClemensDeviceIWM* iwm) {
+    iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
+    iwm->debug_timer_ns = UINT64_MAX;
+    CLEM_DEBUG("IWM: turning drive off now");
 }
 
 
@@ -495,8 +501,7 @@ void clem_iwm_glu_sync(
                 iwm->ns_drive_hold, delta_ns);
             if (iwm->ns_drive_hold == 0 || iwm->timer_1sec_disabled) {
                 CLEM_LOG("IWM: turning drive off in sync");
-                iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
-                iwm->debug_timer_ns = UINT64_MAX;
+                _clem_drive_off(iwm);
             }
         }
         _iwm_debug_value(iwm, lss_budget_ns);
@@ -529,18 +534,15 @@ void _clem_iwm_io_switch(
         case CLEM_MMIO_REG_IWM_DRIVE_DISABLE:
             if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
                 if (iwm->timer_1sec_disabled) {
-                    CLEM_LOG("IWM: turning drive off now");
-                    iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
-                    iwm->debug_timer_ns = 0;
+                    _clem_drive_off(iwm);
                 } else if (iwm->ns_drive_hold == 0) {
-                    //CLEM_LOG("IWM: turning drive off in 1 second");
                     iwm->ns_drive_hold = CLEM_1SEC_NS;
                 }
             }
             break;
         case CLEM_MMIO_REG_IWM_DRIVE_ENABLE:
             if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
-                CLEM_LOG("IWM: turning drive on");
+                CLEM_DEBUG("IWM: turning drive on");
                 iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_ON;
                 _clem_iwm_reset_lss(iwm, drives, clock);
             } else if (iwm->ns_drive_hold > 0) {
@@ -595,12 +597,11 @@ void _clem_iwm_io_switch(
                 }
 
                 if ((iwm->out_phase & 2) && (iwm->out_phase & 8)) {
-                    /* PH1 and PH3 ON this sets the ENBL2 line (for hard-drives
-                       and other smartport devices)
-                    */
-                    iwm->enbl2 = true;
+                    /* PH1 and PH3 ON this sets the ENABLE2 line (for other
+                       smartport devices) */
+                    iwm->enable2 = true;
                 } else {
-                    iwm->enbl2 = false;
+                    iwm->enable2 = false;
                 }
             }
             break;
@@ -632,10 +633,10 @@ static void _clem_iwm_write_mode(struct ClemensDeviceIWM* iwm, uint8_t value) {
     }
     if (value & 0x08) {
         iwm->lss_update_dt_ns = CLEM_IWM_SYNC_FRAME_NS_FAST;
-        CLEM_LOG("IWM: fast mode");
+        CLEM_DEBUG("IWM: fast mode");
     } else {
         iwm->lss_update_dt_ns = CLEM_IWM_SYNC_FRAME_NS;
-        CLEM_LOG("IWM: slow mode");
+        CLEM_DEBUG("IWM: slow mode");
     }
     if (value & 0x04) {
         iwm->timer_1sec_disabled = true;
@@ -675,12 +676,12 @@ void clem_iwm_write_switch(
             }
             if (value & 0x40) {
                 if (!(old_io_flags & CLEM_IWM_FLAG_DRIVE_35)) {
-                    CLEM_LOG("IWM: setting 3.5 drive mode");
+                    CLEM_DEBUG("IWM: setting 3.5 drive mode");
                     iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_35;
                 }
             } else {
                 if (old_io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-                    CLEM_LOG("IWM: setting 5.25 drive mode");
+                    CLEM_DEBUG("IWM: setting 5.25 drive mode");
                     iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_35;
                 }
             }
@@ -693,7 +694,9 @@ void clem_iwm_write_switch(
             _clem_iwm_io_switch(iwm, drives, clock, ioreg, CLEM_IO_WRITE);
             _iwm_debug_event(iwm, 'w', ioreg, 0, 0, 0);
             if (ioreg & 1) {
-                iwm->data = value;
+                if (!iwm->enable2) {
+                    iwm->data = value;
+                }
                 switch (iwm->state) {
                     case CLEM_IWM_STATE_WRITE_MODE:
                         _clem_iwm_write_mode(iwm, value);
@@ -720,7 +723,7 @@ static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM* iwm) {
     if (iwm->io_flags & CLEM_IWM_FLAG_WRPROTECT_SENSE) {
         result |= 0x80;
     }
-    if (iwm->enbl2) {
+    if (iwm->enable2) {
         /* TODO: justify this if we can, but ROM code seems to assume this for
            a proper boot up sequence */
         result |= 0x80;
@@ -746,6 +749,8 @@ static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM* iwm) {
     return result;
 }
 
+static int s_enbl2_tmp = 0;
+
 static uint8_t _clem_iwm_read_handshake(
     struct ClemensDeviceIWM* iwm,
     struct ClemensClock* clock,
@@ -754,6 +759,9 @@ static uint8_t _clem_iwm_read_handshake(
     uint8_t result = 0x80;  /* start with ready */
     unsigned ns_write = _clem_calc_ns_step_from_clocks(
         clock->ts - iwm->last_write_clocks_ts, clock->ref_step);
+    if (iwm->enable2) {
+        return result;
+    }
     /* TODO: IWM is busy during a valid write? Then clear result.
     */
     if ((iwm->lss_write_counter & 0xf) > 8) {
@@ -809,7 +817,12 @@ uint8_t clem_iwm_read_switch(
                         result = _clem_iwm_read_handshake(iwm, clock, is_noop);
                         break;
                     default:
-                        result = iwm->data;
+                        if (iwm->enable2) {
+                            // all ones, empty (SWIM Chip Ref p 11 doc)
+                            result = 0xff;
+                        } else {
+                            result = iwm->data;
+                        }
                         break;
                 }
             }
@@ -822,21 +835,24 @@ uint8_t clem_iwm_read_switch(
 
 void clem_iwm_speed_disk_gate(ClemensMachine* clem) {
     struct ClemensDeviceIWM* iwm = &clem->mmio.dev_iwm;
-    uint8_t slot_index = 2;         // TODO: see note below
-    uint8_t old_disk_flags = iwm->disk_motor_on;
-    // TODO: this is sloppy - right now we're hardcoding slot 6
-    // as the only slot the IWM manages (which is not the case.)
-    // until we get there though, let's get the mechanism (timing)
-    // right before cleaning up for all slots.
-    if ((clem->mmio.speed_c036 & 0x0f) & (1 << slot_index)) {
-        if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
-            iwm->disk_motor_on |= (1 << slot_index);
-        } else {
-            iwm->disk_motor_on &= ~(1 << slot_index);
+    uint8_t old_disk_motor_on = iwm->disk_motor_on;
+    uint8_t speed_slot_mask = clem->mmio.speed_c036 & 0xf;
+    bool drive_on = (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) != 0;
+    bool drive_35 = (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) != 0;
+
+    iwm->disk_motor_on = 0x00;
+    if (speed_slot_mask & 0x2) {
+        if (drive_35 && drive_on) {
+            iwm->disk_motor_on |= 0x02;
+        }
+    }
+    if (speed_slot_mask & 0x4) {
+        if (!drive_35 && drive_on) {
+            iwm->disk_motor_on |= 0x04;
         }
     }
     if (iwm->disk_motor_on) {
-        if (!old_disk_flags) {
+        if (!old_disk_motor_on) {
             CLEM_LOG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
         }
         clem->clocks_step = clem->clocks_step_mega2;
@@ -845,12 +861,12 @@ void clem_iwm_speed_disk_gate(ClemensMachine* clem) {
     if (clem->mmio.speed_c036 & CLEM_MMIO_SPEED_FAST_ENABLED) {
         clem->clocks_step = clem->clocks_step_fast;
 
-        if (old_disk_flags) {
+        if (old_disk_motor_on) {
             CLEM_LOG("SPEED FAST Disk: %02X", iwm->disk_motor_on);
         }
     } else {
         clem->clocks_step = clem->clocks_step_mega2;
-        if (old_disk_flags) {
+        if (old_disk_motor_on) {
             CLEM_LOG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
         }
     }

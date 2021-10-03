@@ -95,12 +95,12 @@ void clem_disk_read_and_position_head_35(
             if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_STEP_IN) {
                 if (qtr_track_index < 158) {
                     qtr_track_index += 2;
-                    CLEM_LOG("clem_drive35: stepped in track = %u", qtr_track_index);
+                    CLEM_DEBUG("clem_drive35: stepped in track = %u", qtr_track_index);
                 }
             } else {
                 if (qtr_track_index >= 2) {
                     qtr_track_index -= 2;
-                    CLEM_LOG("clem_drive35: stepped out track = %u", qtr_track_index);
+                    CLEM_DEBUG("clem_drive35: stepped out track = %u", qtr_track_index);
                 }
             }
         }
@@ -120,11 +120,11 @@ void clem_disk_read_and_position_head_35(
             switch (ctl_switch) {
                 case CLEM_IWM_DISK35_CTL_STEP_IN:
                     drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_STEP_IN;
-                    //CLEM_LOG("clem_drive35: step to inward tracks");
+                    CLEM_DEBUG("clem_drive35: step to inward tracks");
                     break;
                 case CLEM_IWM_DISK35_CTL_STEP_OUT:
                     drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_STEP_IN;
-                    //CLEM_LOG("clem_drive35: step to outward tracks");
+                    CLEM_DEBUG("clem_drive35: step to outward tracks");
                     break;
                 case CLEM_IWM_DISK35_CTL_EJECTED_RESET:
                     drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_EJECTED;
@@ -132,7 +132,7 @@ void clem_disk_read_and_position_head_35(
                 case CLEM_IWM_DISK35_CTL_STEP_ONE:
                     if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {
                         drive->step_timer_35_ns = CLEM_IWM_DISK35_STEP_TIME_NS;
-                        //CLEM_LOG("clem_drive35: step from track %u", qtr_track_index);
+                        CLEM_DEBUG("clem_drive35: step from track %u", qtr_track_index);
                     } else {
                         CLEM_LOG("clem_drive35: attempt to step while ejecting");
                     }
@@ -143,11 +143,11 @@ void clem_disk_read_and_position_head_35(
                         drive->pulse_ns = 0;
                         drive->read_buffer = 0;
                     }
-                    CLEM_LOG("clem_drive35: drive motor on");
+                    CLEM_DEBUG("clem_drive35: drive motor on");
                     break;
                 case CLEM_IWM_DISK35_CTL_MOTOR_OFF:
                     drive->is_spindle_on = false;
-                    CLEM_LOG("clem_drive35: drive motor off");
+                    CLEM_DEBUG("clem_drive35: drive motor off");
                     break;
                 case CLEM_IWM_DISK35_CTL_EJECT:
                     if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {

@@ -280,7 +280,7 @@ struct ClemensDeviceIWM {
     /** Drive I/O */
     unsigned io_flags;          /**< Disk port I/O flags */
     unsigned out_phase;         /**< PH0-PH3 bits sent to drive */
-    bool enbl2;                 /**< ENBL2 line */
+    bool enable2;               /**< ENABLE2 line */
 
     /** Internal Registers */
     uint8_t data;               /**< IO switch data (D0-D7) */

@@ -176,7 +176,9 @@ void ClemensHost::emulatorLog(
   ClemensMachine* machine,
   const char* msg
 ) {
-  static const char* levels[] = { " INFO", " WARN", "UNIMP", "FATAL" };
+  static const char* levels[] = { "DEBUG", " INFO", " WARN", "UNIMP", "FATAL" };
+  //  TODO: log level config
+  if (log_level < CLEM_DEBUG_LOG_INFO) return;
   ClemensHost* host = reinterpret_cast<ClemensHost*>(machine->debug_user_ptr);
   fprintf(stdout, "[%s][%6.9lf]: ", levels[log_level], calculateTimeSpent(machine));
   fputs(msg, stdout);
@@ -758,9 +760,9 @@ void ClemensHost::doIWMContextWindow()
         ImGui::Text("0");
       }
       ImGui::TableNextRow();
-      ImGui::TableNextColumn(); ImGui::Text("ENBL2");
+      ImGui::TableNextColumn(); ImGui::Text("ENABLE2");
       ImGui::TableNextColumn();
-      if (iwm.enbl2) {
+      if (iwm.enable2) {
         ImGui::Text("1");
       } else {
         ImGui::Text("0");
