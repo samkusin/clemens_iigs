@@ -14,8 +14,7 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
-*
-* Scan boot to slot 5 may not work vs direct boot to 5
+* Support DSK and PO, 2IMG files
 * IWM 3.5" write support
 * Enable custom logic for card slot reads/writes since different cards map
   registers to their dedicated page instead of at $c0xx
@@ -62,6 +61,7 @@ This is a running todo list.
 
 ## DONE
 
+* Scan boot to slot 5 may not work vs direct boot to 5
 * GUI improvements
 * ProDOS 16 boot
 * IWM 3.5" read support

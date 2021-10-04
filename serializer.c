@@ -1,4 +1,5 @@
 #include "serializer.h"
+#include "clem_2img.h"
 #include "clem_woz.h"
 #include "clem_mem.h"
 
@@ -20,6 +21,7 @@ union ClemensSerializerVariant {
 
 #define CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER      0x00000001
 #define CLEM_SERIALIZER_CUSTOM_RECORD_WOZ_DISK              0x00000002
+#define CLEM_SERIALIZER_CUSTOM_RECORD_2IMG_DISK             0x00000003
 
 
 #define CLEM_SERIALIZER_RECORD_COUNT(_records_) \
@@ -229,7 +231,6 @@ struct ClemensSerializerRecord kSCC[] = {
 struct ClemensSerializerRecord kIWM[] = {
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, last_clocks_ts),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, last_write_clocks_ts),
-    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceIWM, lss_clocks_lag),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, io_flags),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, out_phase),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, enable2),
@@ -310,6 +311,10 @@ struct ClemensSerializerRecord kDrive[] = {
     CLEM_SERIALIZER_RECORD_CUSTOM(
         struct ClemensDrive, data, struct ClemensWOZDisk,
         CLEM_SERIALIZER_CUSTOM_RECORD_WOZ_DISK),
+    CLEM_SERIALIZER_RECORD_CUSTOM(
+        struct ClemensDrive, data_2img, struct Clemens2IMGDisk,
+        CLEM_SERIALIZER_CUSTOM_RECORD_2IMG_DISK),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDrive, disk_type),
     CLEM_SERIALIZER_RECORD_INT32(struct ClemensDrive, qtr_track_index),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, track_byte_index),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, track_bit_shift),
@@ -555,6 +560,9 @@ static unsigned clemens_serialize_custom(
             }
             break;
 
+        case CLEM_SERIALIZER_CUSTOM_RECORD_2IMG_DISK:
+            mpack_break_hit("Unimplemented");
+            break;
     }
     mpack_complete_map(writer);
     return sz;
@@ -823,6 +831,9 @@ static unsigned clemens_unserialize_custom(
                     woz_disk->bits_data_end = NULL;
                 }
             }
+            break;
+        case CLEM_SERIALIZER_CUSTOM_RECORD_2IMG_DISK:
+            mpack_break_hit("Unimplemented");
             break;
     }
     mpack_done_map(reader);
