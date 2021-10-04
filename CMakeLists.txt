@@ -40,6 +40,7 @@ set(PROJECT_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}-run")
 set(EMULATOR_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_adb.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_2img.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_debug.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_drive.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_drive35.c"

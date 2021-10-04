@@ -199,23 +199,31 @@ void clemens_audio_next_frame(ClemensMachine* clem, unsigned consumed);
  *
  * @param clem
  * @param drive_type
- * @param disk
- * @return true
- * @return false
+ * @return struct ClemensDrive*
  */
-bool clemens_assign_disk(ClemensMachine* clem,
-                         enum ClemensDriveType drive_type,
-                         struct ClemensWOZDisk* disk);
+struct ClemensDrive* clemens_drive_get(ClemensMachine* clem,
+                                       enum ClemensDriveType drive_type);
 
 /**
  * @brief
  *
  * @param clem
  * @param drive_type
+ * @param disk
  * @return true
  * @return false
  */
-bool clemens_has_disk(ClemensMachine* clem, enum ClemensDriveType drive_type);
+bool clemens_assign_disk_woz(ClemensMachine* clem,
+                             enum ClemensDriveType drive_type,
+                             struct ClemensWOZDisk* disk);
+
+/**
+ * @brief
+ *
+ * @param clem
+ * @param drive_type
+ */
+void clemens_eject_disk(ClemensMachine* clem, enum ClemensDriveType drive_type);
 
 /**
  * @brief Forwards input from ths host machine to the ADB

@@ -264,7 +264,7 @@ void clem_iwm_reset(struct ClemensDeviceIWM* iwm) {
     iwm->state = CLEM_IWM_STATE_UNKNOWN;
 }
 
-void clem_iwm_insert_disk(
+void clem_iwm_insert_disk_woz(
    struct ClemensDeviceIWM* iwm,
    struct ClemensDrive* drive,
    struct ClemensWOZDisk* disk
@@ -279,6 +279,7 @@ void clem_iwm_eject_disk(
    struct ClemensDrive* drive
 ) {
     drive->data = NULL;
+    drive->data_2img = NULL;
     // clear disk after timeout
     // after timeout, reset drive state
 }
@@ -306,7 +307,6 @@ static void _clem_iwm_reset_lss(
     struct ClemensClock* clock
 ) {
     struct ClemensDrive* drive = _clem_iwm_select_drive(iwm, drives);
-    iwm->lss_clocks_lag = 0;
     iwm->ns_drive_hold = 0;
     iwm->last_clocks_ts = clock->ts;
     clem_disk_start_drive(drive);
@@ -315,7 +315,7 @@ static void _clem_iwm_reset_lss(
 
 static void _clem_iwm_lss(
     struct ClemensDeviceIWM* iwm,
-    struct ClemensDriveBay* drives,
+    struct ClemensDrive* drive,
     struct ClemensClock* clock
 ) {
     /* Uses the Disk II sequencer.
@@ -326,23 +326,16 @@ static void _clem_iwm_lss(
        latch value to maximize compatibility with legacy Disk I/O.
     */
     unsigned adr, cmd, res = 0;
-    unsigned delta_ns;
-    int drive_index = (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 1 : 0;
-    struct ClemensDrive* drive;
 
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-        drive = &drives->slot5[drive_index];
         clem_disk_read_and_position_head_35(
             drive, &iwm->io_flags, iwm->out_phase, 250);
-        if (!drive->is_spindle_on) return;
     } else if (!iwm->enable2) {
-        drive = &drives->slot6[drive_index];
         clem_disk_read_and_position_head_525(
             drive, &iwm->io_flags, iwm->out_phase, 500);
     } else {
-        drive = NULL;
+        return;
     }
-
     adr = (unsigned)(iwm->lss_state) << 4 |
           (iwm->q7_switch ? 0x08 : 00) |
           (iwm->q6_switch ? 0x04 : 00) |
@@ -440,9 +433,7 @@ static void _clem_iwm_lss(
 
 
 #ifdef CLEM_IWM_DEBUG_DIAGNOSTIC
-    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
-        _iwm_debug_event(iwm, 'l', cmd, 0, 0, 0);
-    }
+    _iwm_debug_event(iwm, 'l', cmd, 0, 0, 0);
     if (drive && drive->real_track_index != 0xff) {
         _iwm_debug_event(iwm,
             (iwm->io_flags & CLEM_IWM_FLAG_PULSE_HIGH) ? 'D' : 'd',
@@ -466,7 +457,7 @@ void clem_iwm_glu_sync(
     struct ClemensDriveBay* drives,
     struct ClemensClock* clock
 ) {
-    unsigned delta_ns, lss_budget_ns;
+    unsigned delta_ns, lss_time_left_ns;
     int drive_index = (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 1 : 0;
     struct ClemensClock next_clock;
 
@@ -474,27 +465,28 @@ void clem_iwm_glu_sync(
         if (iwm->debug_timer_ns == UINT64_MAX) {
             iwm->debug_timer_ns = 0;
         }
-        iwm->lss_clocks_lag += (clock->ts - iwm->last_clocks_ts);
         delta_ns = _clem_calc_ns_step_from_clocks(
-            iwm->lss_clocks_lag, clock->ref_step);
-        lss_budget_ns = delta_ns;
-        _iwm_debug_value(iwm, lss_budget_ns);
+            (clock->ts - iwm->last_clocks_ts), clock->ref_step);
+        lss_time_left_ns = delta_ns;
+
+        _iwm_debug_value(iwm, execution_time_left_ns);
         _iwm_debug_event(iwm, 's', 'b', 0, 0, 0);
 
         next_clock.ts = clock->ts;
         next_clock.ref_step = clock->ref_step;
-        while (lss_budget_ns >= iwm->lss_update_dt_ns) {
-            _clem_iwm_lss(iwm, drives, &next_clock);
-            lss_budget_ns -= iwm->lss_update_dt_ns;
+        while (lss_time_left_ns >= iwm->lss_update_dt_ns) {
+            if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+                _clem_iwm_lss(iwm, &drives->slot5[drive_index], &next_clock);
+            } else if (!iwm->enable2) {
+                _clem_iwm_lss(iwm, &drives->slot6[drive_index], &next_clock);
+            }
+            lss_time_left_ns -= iwm->lss_update_dt_ns;
             if (iwm->enable_debug) {
                 iwm->debug_timer_ns += iwm->lss_update_dt_ns;
             }
             next_clock.ts += _clem_calc_clocks_step_from_ns(
                 iwm->lss_update_dt_ns, next_clock.ref_step);
         }
-        //iwm->lss_clocks_lag = _clem_calc_clocks_step_from_ns(
-        //    lss_budget_ns, clock->ref_step);
-        iwm->lss_clocks_lag = 0;
         /* handle the 1 second drive motor timer */
         if (iwm->ns_drive_hold > 0) {
             iwm->ns_drive_hold = clem_util_timer_decrement(
@@ -504,7 +496,7 @@ void clem_iwm_glu_sync(
                 _clem_drive_off(iwm);
             }
         }
-        _iwm_debug_value(iwm, lss_budget_ns);
+        _iwm_debug_value(iwm, lss_time_left_ns);
         _iwm_debug_event(iwm, 's', 'e', 0, 0, 0);
     }
 

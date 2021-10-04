@@ -1116,7 +1116,7 @@ unsigned clemens_out_hex_data_body(
 
 
 
-static inline struct ClemensDrive* _clem_drive_get(
+struct ClemensDrive* clemens_drive_get(
     ClemensMachine* clem,
     enum ClemensDriveType drive_type
 ) {
@@ -1131,12 +1131,12 @@ static inline struct ClemensDrive* _clem_drive_get(
     return drive;
 }
 
-bool clemens_assign_disk(
+bool clemens_assign_disk_woz(
     ClemensMachine* clem,
     enum ClemensDriveType drive_type,
     struct ClemensWOZDisk* disk
 ) {
-    struct ClemensDrive* drive = _clem_drive_get(clem, drive_type);
+    struct ClemensDrive* drive = clemens_drive_get(clem, drive_type);
     if (!drive) {
         return false;
     }
@@ -1145,10 +1145,8 @@ bool clemens_assign_disk(
         return false;
     }
     if (!disk) {
-        clem_iwm_eject_disk(&clem->mmio.dev_iwm, drive);
-        return true;
+        return false;
     }
-
     /* filter out 'bad' disk/drive pairings before the IWM has a chance to flag
        them
     */
@@ -1164,18 +1162,15 @@ bool clemens_assign_disk(
         return false;
     }
 
-    clem_iwm_insert_disk(&clem->mmio.dev_iwm, drive, disk);
+    clem_iwm_insert_disk_woz(&clem->mmio.dev_iwm, drive, disk);
     return true;
 }
 
-bool clemens_has_disk(
-    ClemensMachine* clem,
-    enum ClemensDriveType drive_type
-) {
-    struct ClemensDrive* drive = _clem_drive_get(clem, drive_type);
-    return drive != NULL ? (drive->data != NULL) : false;
+void clemens_eject_disk(ClemensMachine* clem, enum ClemensDriveType drive_type) {
+    struct ClemensDrive* drive = clemens_drive_get(clem, drive_type);
+    if (!drive) return;
+    clem_iwm_eject_disk(&clem->mmio.dev_iwm, drive);
 }
-
 
 ClemensMonitor* clemens_get_monitor(
     ClemensMonitor* monitor,

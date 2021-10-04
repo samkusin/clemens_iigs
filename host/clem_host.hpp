@@ -3,6 +3,7 @@
 
 #include "emulator.h"
 #include "clem_woz.h"
+#include "clem_2img.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_memory_editor.h"
 
@@ -48,12 +49,14 @@ public:
 private:
   void emulate(float deltaTime);
 
-  bool loadWOZDisk(const char* filename, struct ClemensWOZDisk* woz);
+  bool loadWOZDisk(const char* filename, struct ClemensWOZDisk* woz,
+                   ClemensDriveType driveType);
 
   bool parseWOZDisk(struct ClemensWOZDisk* woz, uint8_t* data, size_t dataSize);
   bool initWOZDisk(struct ClemensWOZDisk* woz);
 
 private:
+  struct ClemensDisk;
 
   void doIWMContextWindow();
   void doMemoryMapWindow();
@@ -96,6 +99,7 @@ private:
   void emulationBreak();
   void resetDiagnostics();
   bool loadDisk(ClemensDriveType driveType, const char* filename);
+  void loadDisk(ClemensDriveType driveType, ClemensDisk* drive);
   void loadDisks();
   void loadBRAM();
   void saveBRAM();
@@ -125,10 +129,21 @@ private:
 
   ClemensMemoryPageMap simpleDirectPageMap_;
 
-  std::array<struct ClemensWOZDisk, 2> disks35_;
-  std::array<struct ClemensWOZDisk, 2> disks525_;
-  std::array<std::string, 2> disks35Paths_;
-  std::array<std::string, 2> disks525Paths_;
+  struct ClemensDisk {
+
+    ClemensDiskType diskType;
+    union {
+      ClemensWOZDisk dataWOZ;
+      Clemens2IMGDisk data2IMG;
+    };
+  };
+
+  std::array<struct ClemensDisk, 2> disks35_;
+  std::array<struct ClemensDisk, 2> disks525_;
+
+  using DiskPathnames = std::array<std::string, 2>;
+  DiskPathnames disks35Paths_;
+  DiskPathnames disks525Paths_;
 
   float emulationRunTime_;
   float emulationSliceTimeLeft_;

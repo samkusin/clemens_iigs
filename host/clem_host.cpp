@@ -139,17 +139,18 @@ ClemensHost::ClemensHost() :
 
   for (auto& disk : disks525_) {
     auto maxDiskDataSize = calculateMaxDiskDataSize(CLEM_WOZ_DISK_5_25);
-    disk.bits_data = (uint8_t*)malloc(maxDiskDataSize);
-    disk.bits_data_end = disk.bits_data + maxDiskDataSize;
+    disk.dataWOZ.bits_data = (uint8_t*)malloc(maxDiskDataSize);
+    disk.dataWOZ.bits_data_end = disk.dataWOZ.bits_data + maxDiskDataSize;
+    disk.diskType = kClemensDiskType_None;
   }
 
   for (auto& disk : disks35_) {
+    //  preallocate some buffers
     auto maxDiskDataSize = calculateMaxDiskDataSize(CLEM_WOZ_DISK_3_5);
-    disk.bits_data = (uint8_t*)malloc(maxDiskDataSize);
-    disk.bits_data_end = disk.bits_data + maxDiskDataSize;
+    disk.dataWOZ.bits_data = (uint8_t*)malloc(maxDiskDataSize);
+    disk.dataWOZ.bits_data_end = disk.dataWOZ.bits_data + maxDiskDataSize;
+    disk.diskType = kClemensDiskType_None;
   }
-
-
 
   displayProvider_ = std::make_unique<ClemensDisplayProvider>();
   display_ = std::make_unique<ClemensDisplay>(*displayProvider_);
@@ -162,7 +163,10 @@ ClemensHost::~ClemensHost()
   audio_->stop();
 
   for (auto& disk : disks525_) {
-    free(disk.bits_data);
+    free(disk.dataWOZ.bits_data);
+  }
+  for (auto& disk : disks35_) {
+    free(disk.dataWOZ.bits_data);
   }
 
   void* slabMemory = slab_.getHead();
@@ -1584,11 +1588,7 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
       mix_buffer.data = (uint8_t*)(
         slab_.allocate(mix_buffer.frame_count * mix_buffer.stride));
       clemens_assign_audio_mix_buffer(&machine_, &mix_buffer);
-
-      clemens_assign_disk(&machine_, kClemensDrive_5_25_D1, &disks525_[0]);
-      clemens_assign_disk(&machine_, kClemensDrive_5_25_D2, &disks525_[1]);
-      clemens_assign_disk(&machine_, kClemensDrive_3_5_D1, &disks35_[0]);
-      clemens_assign_disk(&machine_, kClemensDrive_3_5_D2, &disks35_[1]);
+      loadDisks();
       success = true;
     } break;
     case MachineType::Simple128K: {
@@ -1822,8 +1822,166 @@ void ClemensHost::emulatorOpcodePrint(
   }
 }
 
-bool ClemensHost::loadWOZDisk(const char* filename, struct ClemensWOZDisk* woz)
+void ClemensHost::dumpMemory(unsigned bank, const char* filename)
 {
+  if (!clemens_is_initialized_simple(&machine_)) {
+    CLEM_HOST_COUT.format("Machine not powered on");
+    return;
+  }
+
+  std::string dumpFilePath;
+  if (!filename || !filename[0]) {
+    dumpFilePath = fmt::format("memory_{:02X}.txt", bank);
+  }
+
+  std::ofstream dumpFile(dumpFilePath, std::ios::binary);
+  constexpr unsigned kHexByteCountPerLine = 64;
+  constexpr unsigned kByteCountPerLine = 6 + kHexByteCountPerLine * 2;
+  char* hexDump = new char[kByteCountPerLine + 1];
+  unsigned adr = 0x0000;
+
+  while (adr < 0x10000) {
+    snprintf(hexDump, kByteCountPerLine + 1, "%04X: ", adr);
+    clemens_out_hex_data_body(
+      &machine_, hexDump + 6, kHexByteCountPerLine * 2, bank, adr);
+    hexDump[kByteCountPerLine] = '\n';
+    dumpFile.write(hexDump, kByteCountPerLine + 1);
+    adr += 0x40;
+  }
+  delete[] hexDump;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Disk Management
+
+void ClemensHost::loadDisks()
+{
+  loadDisk(kClemensDrive_5_25_D1, &disks525_[0]);
+  loadDisk(kClemensDrive_5_25_D2, &disks525_[1]);
+  loadDisk(kClemensDrive_3_5_D1, &disks35_[0]);
+  loadDisk(kClemensDrive_3_5_D2, &disks35_[1]);
+}
+
+void ClemensHost::loadDisk(ClemensDriveType driveType, ClemensDisk* disk)
+{
+  switch(disk->diskType) {
+    case kClemensDiskType_WOZ:
+      clemens_assign_disk_woz(&machine_, driveType, &disk->dataWOZ);
+      break;
+    case kClemensDiskType_2IMG:
+      //clemens_assign_disk_woz(&machine_, driveType, &disk->dataWOZ);
+      break;
+  }
+}
+
+bool ClemensHost::loadDisk(ClemensDriveType driveType, const char* filename)
+{
+  ClemensDisk* disk = nullptr;
+  ClemensDiskType diskType = kClemensDiskType_None;
+
+  while (std::isspace(*filename)) ++filename;
+
+  std::string filename_ext = filename;
+  auto filename_ext_pos = filename_ext.find_last_of('.');
+  if (filename_ext_pos != std::string::npos) {
+    if (filename_ext.compare(filename_ext_pos + 1, std::string::npos,
+                             "woz") == 0) {
+      diskType = kClemensDiskType_WOZ;
+    } else if (filename_ext.compare(filename_ext_pos + 1, std::string::npos,
+                                    "2mg") == 0) {
+      diskType = kClemensDiskType_2IMG;
+    }
+  }
+
+  DiskPathnames* diskPaths = nullptr;
+  int driveIndex = -1;
+  switch (driveType) {
+    case kClemensDrive_5_25_D1:
+      disk = &disks525_[0];
+      diskPaths = &disks525Paths_;
+      driveIndex = 0;
+      break;
+    case kClemensDrive_5_25_D2:
+      disk = &disks525_[1];
+      diskPaths = &disks525Paths_;
+      driveIndex = 1;
+      break;
+    case kClemensDrive_3_5_D1:
+      disk = &disks35_[0];
+      diskPaths = &disks35Paths_;
+      driveIndex = 0;
+      break;
+    case kClemensDrive_3_5_D2:
+      disk = &disks35_[1];
+      diskPaths = &disks35Paths_;
+      driveIndex = 1;
+      break;
+  }
+  if (!disk) return false;
+
+  bool isOk = false;
+  switch (diskType) {
+    case kClemensDiskType_WOZ:
+      isOk = loadWOZDisk(filename, &disk->dataWOZ, driveType);
+      break;
+    case kClemensDiskType_2IMG:
+      //isOk = load2IMGDisk(filename, disk);
+      break;
+  }
+  if (isOk) {
+    diskPaths->at(driveIndex) = filename;
+  } else {
+    diskPaths->at(driveIndex).clear();
+  }
+
+  return isOk;
+}
+
+
+bool ClemensHost::loadWOZDisk(
+  const char* filename,
+  struct ClemensWOZDisk* woz,
+  ClemensDriveType driveType
+) {
+  unsigned wozDiskType = 0;
+  bool doubleSided = false;         // 3.5" only
+
+  switch (driveType) {
+    case kClemensDrive_5_25_D1:
+      wozDiskType = CLEM_WOZ_DISK_5_25;
+      break;
+    case kClemensDrive_5_25_D2:
+      wozDiskType = CLEM_WOZ_DISK_5_25;
+      break;
+    case kClemensDrive_3_5_D1:
+      wozDiskType = CLEM_WOZ_DISK_3_5;
+      doubleSided = true;
+      break;
+    case kClemensDrive_3_5_D2:
+      wozDiskType = CLEM_WOZ_DISK_3_5;
+      doubleSided = true;
+      break;
+  }
+  if (!filename[0]) {
+    return false;
+  }
+  struct stat fileStat;
+  bool isOk = false;
+
+  uint8_t* bits = woz->bits_data;
+  uint8_t* bitsEnd = woz->bits_data_end;
+  memset(woz, 0, sizeof(*woz));
+  woz->bits_data = bits;
+  woz->bits_data_end = bitsEnd;
+  if (stat(filename, &fileStat) != 0) {
+    woz->disk_type = wozDiskType;
+    if (doubleSided && wozDiskType == CLEM_WOZ_DISK_3_5) {
+      woz->flags |= CLEM_WOZ_IMAGE_DOUBLE_SIDED;
+    } else {
+      woz->flags &= ~CLEM_WOZ_IMAGE_DOUBLE_SIDED;
+    }
+    isOk = initWOZDisk(woz);
+  }
   std::ifstream wozFile(filename, std::ios::binary | std::ios::ate);
   if (wozFile.is_open()) {
     unsigned sz = unsigned(wozFile.tellg());
@@ -1833,9 +1991,14 @@ bool ClemensHost::loadWOZDisk(const char* filename, struct ClemensWOZDisk* woz)
     wozFile.close();
     parseWOZDisk(woz, (uint8_t*)tmp, sz);
     delete[] tmp;
-    return true;
+    isOk = true;
   }
-  return false;
+  if (isOk) {
+    clemens_assign_disk_woz(&machine_, driveType, woz);
+  } else {
+    clemens_eject_disk(&machine_, driveType);
+  }
+  return isOk;
 }
 
 bool ClemensHost::parseWOZDisk(
@@ -1894,83 +2057,6 @@ bool ClemensHost::parseWOZDisk(
 
   //woz->flags &= ~CLEM_WOZ_IMAGE_WRITE_PROTECT;
   return true;
-}
-
-bool ClemensHost::loadDisk(ClemensDriveType driveType, const char* filename)
-{
-  ClemensWOZDisk* disk = nullptr;
-  decltype(disks525Paths_)* diskPaths = nullptr;
-  unsigned diskType = 0;
-  bool doubleSided = false;         // 3.5" only
-
-  int driveIndex = -1;
-  switch (driveType) {
-    case kClemensDrive_5_25_D1:
-      disk = &disks525_[0];
-      diskPaths = &disks525Paths_;
-      driveIndex = 0;
-      diskType = CLEM_WOZ_DISK_5_25;
-      break;
-    case kClemensDrive_5_25_D2:
-      disk = &disks525_[1];
-      diskPaths = &disks525Paths_;
-      driveIndex = 1;
-      diskType = CLEM_WOZ_DISK_5_25;
-      break;
-    case kClemensDrive_3_5_D1:
-      disk = &disks35_[0];
-      diskPaths = &disks35Paths_;
-      driveIndex = 0;
-      diskType = CLEM_WOZ_DISK_3_5;
-      doubleSided = true;
-      break;
-    case kClemensDrive_3_5_D2:
-      disk = &disks35_[1];
-      diskPaths = &disks35Paths_;
-      driveIndex = 1;
-      diskType = CLEM_WOZ_DISK_3_5;
-      doubleSided = true;
-      break;
-  }
-  if (!disk) return false;
-
-  //  TODO: support dsk2woz
-  while (std::isspace(*filename)) ++filename;
-  diskPaths->at(driveIndex) = filename;
-  if (filename[0]) {
-    struct stat fileStat;
-    bool isOk = false;
-
-    uint8_t* bits = disk->bits_data;
-    uint8_t* bitsEnd = disk->bits_data_end;
-    memset(disk, 0, sizeof(*disk));
-    disk->bits_data = bits;
-    disk->bits_data_end = bitsEnd;
-    if (stat(filename, &fileStat) != 0) {
-      disk->disk_type = diskType;
-      if (doubleSided && diskType == CLEM_WOZ_DISK_3_5) {
-        disk->flags |= CLEM_WOZ_IMAGE_DOUBLE_SIDED;
-      } else {
-        disk->flags &= ~CLEM_WOZ_IMAGE_DOUBLE_SIDED;
-      }
-      isOk = initWOZDisk(disk);
-    } else {
-      isOk = loadWOZDisk(filename, disk);
-    }
-    if (!isOk) {
-      return false;
-    }
-  } else {
-    disk = nullptr;
-  }
-
-  return clemens_assign_disk(&machine_, driveType, disk);
-}
-
-void ClemensHost::loadDisks()
-{
-
-
 }
 
 bool ClemensHost::initWOZDisk(struct ClemensWOZDisk* woz) {
@@ -2048,34 +2134,4 @@ bool ClemensHost::initWOZDisk(struct ClemensWOZDisk* woz) {
       return false;
   }
   return true;
-}
-
-
-void ClemensHost::dumpMemory(unsigned bank, const char* filename)
-{
-  if (!clemens_is_initialized_simple(&machine_)) {
-    CLEM_HOST_COUT.format("Machine not powered on");
-    return;
-  }
-
-  std::string dumpFilePath;
-  if (!filename || !filename[0]) {
-    dumpFilePath = fmt::format("memory_{:02X}.txt", bank);
-  }
-
-  std::ofstream dumpFile(dumpFilePath, std::ios::binary);
-  constexpr unsigned kHexByteCountPerLine = 64;
-  constexpr unsigned kByteCountPerLine = 6 + kHexByteCountPerLine * 2;
-  char* hexDump = new char[kByteCountPerLine + 1];
-  unsigned adr = 0x0000;
-
-  while (adr < 0x10000) {
-    snprintf(hexDump, kByteCountPerLine + 1, "%04X: ", adr);
-    clemens_out_hex_data_body(
-      &machine_, hexDump + 6, kHexByteCountPerLine * 2, bank, adr);
-    hexDump[kByteCountPerLine] = '\n';
-    dumpFile.write(hexDump, kByteCountPerLine + 1);
-    adr += 0x40;
-  }
-  delete[] hexDump;
 }

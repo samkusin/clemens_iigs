@@ -274,8 +274,6 @@ struct ClemensDeviceIWM {
     clem_clocks_time_t last_clocks_ts;
     /** Used for async write timing */
     clem_clocks_time_t last_write_clocks_ts;
-    /** Used for lss processing per frame */
-    clem_clocks_duration_t lss_clocks_lag;
 
     /** Drive I/O */
     unsigned io_flags;          /**< Disk port I/O flags */
@@ -358,19 +356,31 @@ struct ClemensMMIO {
  */
 
 struct ClemensWOZDisk;
+struct Clemens2IMGDisk;
+
+enum ClemensDiskType {
+    kClemensDiskType_None,
+    kClemensDiskType_WOZ,
+    kClemensDiskType_2IMG
+};
 
 /**
  * @brief
  *
  */
 struct ClemensDrive {
-    struct ClemensWOZDisk* data;    /**< The parsed WOZ data */
-    int qtr_track_index;        /**< Current track position of the head */
-    unsigned track_byte_index;  /**< byte index into track */
-    unsigned track_bit_shift;   /**< bit offset into current byte */
-    unsigned track_bit_length;  /**< current track bit length */
-    unsigned pulse_ns;          /**< nanosecond timer for pulse input */
-    unsigned read_buffer;       /**< Used for MC3470 emulation */
+    /* The IWM will only access one of these based on the disk_type */
+    struct ClemensWOZDisk* data;        /**< The parsed WOZ data */
+    struct Clemens2IMGDisk* data_2img;  /**< The parsed 2MG data */
+
+    enum ClemensDiskType disk_type;     /**< Selects the disk to use */
+
+    int qtr_track_index;            /**< Current track position of the head */
+    unsigned track_byte_index;      /**< byte index into track */
+    unsigned track_bit_shift;       /**< bit offset into current byte */
+    unsigned track_bit_length;      /**< current track bit length */
+    unsigned pulse_ns;              /**< nanosecond timer for pulse input */
+    unsigned read_buffer;           /**< Used for MC3470 emulation */
 
     /**
      * 4-bit Q0-3 entry 5.25" = stepper control

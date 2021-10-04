@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef CLEM_DISK_H
-#define CLEM_DISK_H
+#ifndef CLEM_WOZ_DISK_H
+#define CLEM_WOZ_DISK_H
 
 #include <stdint.h>
 
@@ -56,6 +56,10 @@
 
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct ClemensWOZChunkHeader {
     size_t data_size;
     unsigned type;
@@ -96,12 +100,6 @@ struct ClemensWOZDisk {
     /* Extra data not necessary for the backend */
     char creator[32];
 };
-
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /*
     These functions are designed to be called in the following order:
