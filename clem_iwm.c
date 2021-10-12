@@ -545,10 +545,10 @@ void _clem_iwm_io_switch(
             /*if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1)) {
             }
             */
-            if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) {
+            iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_2;
+            if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1)) {
                 CLEM_LOG("IWM: setting drive 1");
                 iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_1;
-                iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_2;
                 _clem_iwm_reset_lss(iwm, drives, clock);
             }
             break;
@@ -557,12 +557,13 @@ void _clem_iwm_io_switch(
             if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2)) {
             }
             */
-           if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
+
+            iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_1;
+            if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2)) {
                 CLEM_LOG("IWM: setting drive 2");
-                iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_2;
-                iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_1;
+                iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_2;;
                 _clem_iwm_reset_lss(iwm, drives, clock);
-           }
+            }
             break;
         case CLEM_MMIO_REG_IWM_Q6_LO:
             iwm->q6_switch = false;

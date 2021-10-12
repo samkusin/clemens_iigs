@@ -2093,7 +2093,7 @@ bool ClemensHost::initWOZDisk(struct ClemensWOZDisk* woz) {
         woz->track_byte_count[i] = max_track_size_bytes;
         woz->track_bits_count[i] = CLEM_WOZ_BLANK_DISK_TRACK_BIT_LENGTH_525;
         woz->track_initialized[i] = 0;
-        track_byte_offset += i * max_track_size_bytes;
+        track_byte_offset += max_track_size_bytes;
       }
       break;
     case CLEM_WOZ_DISK_3_5:
