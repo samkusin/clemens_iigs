@@ -264,12 +264,13 @@ void clem_iwm_reset(struct ClemensDeviceIWM* iwm) {
     iwm->state = CLEM_IWM_STATE_UNKNOWN;
 }
 
-void clem_iwm_insert_disk_woz(
+void clem_iwm_insert_disk(
    struct ClemensDeviceIWM* iwm,
    struct ClemensDrive* drive,
-   struct ClemensWOZDisk* disk
+   struct ClemensNibbleDisk* disk
 ) {
-    drive->data = disk;
+    memcpy(&drive->disk, disk, sizeof(drive->disk));
+    drive->has_disk = true;
     // set disk
     // reset drive state
 }
@@ -278,8 +279,8 @@ void clem_iwm_eject_disk(
    struct ClemensDeviceIWM* iwm,
    struct ClemensDrive* drive
 ) {
-    drive->data = NULL;
-    drive->data_2img = NULL;
+    memset(&drive->disk, 0, sizeof(drive->disk));
+    drive->has_disk = false;
     // clear disk after timeout
     // after timeout, reset drive state
 }

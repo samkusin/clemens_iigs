@@ -1,6 +1,5 @@
 #include "serializer.h"
 #include "clem_2img.h"
-#include "clem_woz.h"
 #include "clem_mem.h"
 
 /* Serializing the Machine */
@@ -20,8 +19,7 @@ union ClemensSerializerVariant {
 };
 
 #define CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER      0x00000001
-#define CLEM_SERIALIZER_CUSTOM_RECORD_WOZ_DISK              0x00000002
-#define CLEM_SERIALIZER_CUSTOM_RECORD_2IMG_DISK             0x00000003
+#define CLEM_SERIALIZER_CUSTOM_RECORD_NIBBLE_DISK           0x00000002
 
 
 #define CLEM_SERIALIZER_RECORD_COUNT(_records_) \
@@ -309,12 +307,8 @@ struct ClemensSerializerRecord kMMIO[] = {
 
 struct ClemensSerializerRecord kDrive[] = {
     CLEM_SERIALIZER_RECORD_CUSTOM(
-        struct ClemensDrive, data, struct ClemensWOZDisk,
-        CLEM_SERIALIZER_CUSTOM_RECORD_WOZ_DISK),
-    CLEM_SERIALIZER_RECORD_CUSTOM(
-        struct ClemensDrive, data_2img, struct Clemens2IMGDisk,
-        CLEM_SERIALIZER_CUSTOM_RECORD_2IMG_DISK),
-    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDrive, disk_type),
+        struct ClemensDrive, disk, struct ClemensNibbleDisk,
+        CLEM_SERIALIZER_CUSTOM_RECORD_NIBBLE_DISK),
     CLEM_SERIALIZER_RECORD_INT32(struct ClemensDrive, qtr_track_index),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, track_byte_index),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, track_bit_shift),
@@ -361,25 +355,28 @@ struct ClemensSerializerRecord kMachine[] = {
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 
-struct ClemensSerializerRecord kWOZDisk[] = {
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, disk_type),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, boot_type),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, flags),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, required_ram_kb),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, max_track_size_bytes),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, bit_timing_ns),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensWOZDisk, track_count),
-    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensWOZDisk,
-        kClemensSerializerTypeUInt8, meta_track_map, CLEM_WOZ_LIMIT_QTR_TRACKS, 0),
-    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensWOZDisk,
-        kClemensSerializerTypeUInt32, track_byte_offset, CLEM_WOZ_LIMIT_QTR_TRACKS, 0),
-    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensWOZDisk,
-        kClemensSerializerTypeUInt32, track_byte_count, CLEM_WOZ_LIMIT_QTR_TRACKS, 0),
-    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensWOZDisk,
-        kClemensSerializerTypeUInt32, track_bits_count, CLEM_WOZ_LIMIT_QTR_TRACKS, 0),
-    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensWOZDisk,
-        kClemensSerializerTypeUInt8, track_initialized, CLEM_WOZ_LIMIT_QTR_TRACKS, 0),
-    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensWOZDisk, kClemensSerializerTypeUInt8, creator, 32, 0),
+struct ClemensSerializerRecord kNibbleDisk[] = {
+    //CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, disk_type),
+    //CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, boot_type),
+    //CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, flags),
+    //CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, required_ram_kb),
+    //CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, max_track_size_bytes),
+    //CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensNibbleDisk, kClemensSerializerTypeUInt8, creator, 32, 0),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, disk_type),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, bit_timing_ns),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, track_count),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensNibbleDisk, is_write_protected),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensNibbleDisk, is_double_sided),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensNibbleDisk,
+        kClemensSerializerTypeUInt8, meta_track_map, CLEM_DISK_LIMIT_QTR_TRACKS, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensNibbleDisk,
+        kClemensSerializerTypeUInt32, track_byte_offset, CLEM_DISK_LIMIT_QTR_TRACKS, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensNibbleDisk,
+        kClemensSerializerTypeUInt32, track_byte_count, CLEM_DISK_LIMIT_QTR_TRACKS, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensNibbleDisk,
+        kClemensSerializerTypeUInt32, track_bits_count, CLEM_DISK_LIMIT_QTR_TRACKS, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensNibbleDisk,
+        kClemensSerializerTypeUInt8, track_initialized, CLEM_DISK_LIMIT_QTR_TRACKS, 0),
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 
@@ -523,7 +520,7 @@ static unsigned clemens_serialize_custom(
     unsigned record_id
 ) {
     struct ClemensAudioMixBuffer* audio_mix_buffer;
-    struct ClemensWOZDisk* woz_disk;
+    struct ClemensNibbleDisk* nib_disk;
 
     unsigned blob_size;
 
@@ -542,26 +539,22 @@ static unsigned clemens_serialize_custom(
                 audio_mix_buffer->frame_count * audio_mix_buffer->stride);
             break;
 
-        case CLEM_SERIALIZER_CUSTOM_RECORD_WOZ_DISK:
-            woz_disk = *(struct ClemensWOZDisk **)ptr;
+        case CLEM_SERIALIZER_CUSTOM_RECORD_NIBBLE_DISK:
+            nib_disk = *(struct ClemensNibbleDisk **)ptr;
             mpack_write_cstr(writer, "valid");
-            mpack_write_bool(writer, woz_disk != NULL);
-            if (woz_disk) {
-                clemens_serialize_records(writer, (uintptr_t)woz_disk, &kWOZDisk[0]);
+            mpack_write_bool(writer, nib_disk != NULL);
+            if (nib_disk) {
+                clemens_serialize_records(writer, (uintptr_t)nib_disk, &kNibbleDisk[0]);
                 mpack_write_cstr(writer, "bits_data");
-                if (woz_disk->bits_data != NULL) {
+                if (nib_disk->bits_data != NULL) {
                     mpack_write_bool(writer, true);
-                    blob_size = (woz_disk->bits_data_end - woz_disk->bits_data);
+                    blob_size = (nib_disk->bits_data_end - nib_disk->bits_data);
                     mpack_write_cstr(writer, "blob");
-                    mpack_write_bin(writer, (char *)woz_disk->bits_data, blob_size);
+                    mpack_write_bin(writer, (char *)nib_disk->bits_data, blob_size);
                 } else {
                     mpack_write_bool(writer, false);
                 }
             }
-            break;
-
-        case CLEM_SERIALIZER_CUSTOM_RECORD_2IMG_DISK:
-            mpack_break_hit("Unimplemented");
             break;
     }
     mpack_complete_map(writer);
@@ -771,7 +764,7 @@ static unsigned clemens_unserialize_custom(
     void* context
 ) {
     struct ClemensAudioMixBuffer* audio_mix_buffer;
-    struct ClemensWOZDisk* woz_disk;
+    struct ClemensNibbleDisk* nib_disk;
     char key[64];
     unsigned v0, v1;
     mpack_expect_map(reader);
@@ -793,47 +786,44 @@ static unsigned clemens_unserialize_custom(
             mpack_read_bytes(reader, (char *)audio_mix_buffer->data, v1);
             mpack_done_bin(reader);
             break;
-        case CLEM_SERIALIZER_CUSTOM_RECORD_WOZ_DISK:
-            woz_disk = *(struct ClemensWOZDisk **)ptr;
+        case CLEM_SERIALIZER_CUSTOM_RECORD_NIBBLE_DISK:
+            nib_disk = *(struct ClemensNibbleDisk **)ptr;
 
             mpack_expect_cstr(reader, key, sizeof(key));
             if (mpack_expect_bool(reader)) {
-                if (!woz_disk) {
+                if (!nib_disk) {
                     //  create the disk object
-                    *(struct ClemensWOZDisk **)(ptr) = (
-                        (struct ClemensWOZDisk *)(*alloc_cb)(
-                            sizeof(struct ClemensWOZDisk), context));
-                    woz_disk = *(struct ClemensWOZDisk **)ptr;
+                    *(struct ClemensNibbleDisk **)(ptr) = (
+                        (struct ClemensNibbleDisk *)(*alloc_cb)(
+                            sizeof(struct ClemensNibbleDisk), context));
+                    nib_disk = *(struct ClemensNibbleDisk **)ptr;
                 }
             } else {
-                if (woz_disk) {
+                if (nib_disk) {
                     //  invalidate it
-                    *(struct ClemensWOZDisk **)(ptr) = NULL;
-                    woz_disk = NULL;
+                    *(struct ClemensNibbleDisk **)(ptr) = NULL;
+                    nib_disk = NULL;
                 }
             }
-            if (woz_disk) {
+            if (nib_disk) {
                 clemens_unserialize_records(
-                    reader, (uintptr_t)woz_disk, &kWOZDisk[0], alloc_cb, context);
+                    reader, (uintptr_t)nib_disk, &kNibbleDisk[0], alloc_cb, context);
                 mpack_expect_cstr(reader, key, sizeof(key));
                 if (mpack_expect_bool(reader)) {
                     mpack_expect_cstr(reader, key, sizeof(key));
                     v0 = mpack_expect_bin(reader);
-                    v1 = (woz_disk->bits_data_end - woz_disk->bits_data);
+                    v1 = (nib_disk->bits_data_end - nib_disk->bits_data);
                     if (v0 > v1) {
-                        woz_disk->bits_data = (uint8_t*)(*alloc_cb)(v0, context);
-                        woz_disk->bits_data_end = woz_disk->bits_data + v0;
+                        nib_disk->bits_data = (uint8_t*)(*alloc_cb)(v0, context);
+                        nib_disk->bits_data_end = nib_disk->bits_data + v0;
                     }
-                    mpack_read_bytes(reader, (char *)woz_disk->bits_data, v0);
+                    mpack_read_bytes(reader, (char *)nib_disk->bits_data, v0);
                     mpack_done_bin(reader);
                 } else {
-                    woz_disk->bits_data = NULL;
-                    woz_disk->bits_data_end = NULL;
+                    nib_disk->bits_data = NULL;
+                    nib_disk->bits_data_end = NULL;
                 }
             }
-            break;
-        case CLEM_SERIALIZER_CUSTOM_RECORD_2IMG_DISK:
-            mpack_break_hit("Unimplemented");
             break;
     }
     mpack_done_map(reader);

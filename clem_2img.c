@@ -2,6 +2,14 @@
 #include "contrib/cross_endian.h"
 
 #include <string.h>
+
+#define CLEM_2IMG_DISK_TYPE_UNKNOWN     0
+#define CLEM_2IMG_DISK_TYPE_5_25        1
+#define CLEM_2IMG_DISK_TYPE_3_5         2
+
+#define CLEM_2IMG_DISK_SIZE_5_25        (140 * 1024)
+#define CLEM_2IMG_DISK_SIZE_3_5         (800 * 1024)
+
 /*
 https://apple2.org.za/gswv/a2zine/Docs/DiskImage_2MG_Info.txt
 
@@ -44,8 +52,8 @@ bool clem_2img_parse_header(
 ) {
     size_t allocation_amt = 0;
     int state = 0;
-    uint8_t* data_start = data;
     uint32_t param32;
+    disk->image_buffer = data;
     while (data < data_end) {
         size_t data_size = 0;
         switch (state) {
@@ -113,7 +121,8 @@ bool clem_2img_parse_header(
             case 7:             // points to the start of the data chunk
                 data_size = _increment_data_ptr(data, 4, data_end);
                 if (data_size == 4) {
-                    disk->data = data_start + _decode_u32(data);
+                    disk->image_data_offset = _decode_u32(data);
+                    disk->data = disk->image_buffer + disk->image_data_offset;
                     ++state;
                 } else {
                     return false;
@@ -122,8 +131,13 @@ bool clem_2img_parse_header(
             case 8:             // data_end - data = size
                 data_size = _increment_data_ptr(data, 4, data_end);
                 if (data_size == 4) {
-                    param32 = _decode_u32(data);
-                    disk->data_end = disk->data + param32;
+                    disk->image_data_offset = _decode_u32(data);
+                    if (disk->image_data_offset == 0) {
+                        //  this is possible for prodos images
+                        //  use blocks * 512
+                        disk->image_data_offset = disk->block_count * 512;
+                    }
+                    disk->data_end = disk->data + disk->image_data_offset;
                     allocation_amt += param32;
                     ++state;
                 } else {
@@ -133,7 +147,7 @@ bool clem_2img_parse_header(
             case 9:             // points to the start of the comment chunk
                 data_size = _increment_data_ptr(data, 4, data_end);
                 if (data_size == 4) {
-                    disk->comment = data_start + _decode_u32(data);
+                    disk->comment = disk->image_buffer + _decode_u32(data);
                     ++state;
                 } else {
                     return false;
@@ -153,7 +167,7 @@ bool clem_2img_parse_header(
             case 11:             // points to the start of the creator chunk
                 data_size = _increment_data_ptr(data, 4, data_end);
                 if (data_size == 4) {
-                    disk->creator_data = data_start + _decode_u32(data);
+                    disk->creator_data = disk->image_buffer + _decode_u32(data);
                     ++state;
                 } else {
                     return false;
@@ -184,5 +198,41 @@ bool clem_2img_parse_header(
         }
         data += data_size;
     }
+    return false;
+}
+
+size_t clem_2img_calculate_nibble_data_size(struct Clemens2IMGDisk* disk) {
+    /* It's assumed that disk has been intiialized via clem_2img_parse_header.
+       The de-nibblized data is stored in image_buffer + image_data_offset
+    */
+   size_t data_size = disk->block_count * 512;
+   int disk_type = CLEM_2IMG_DISK_TYPE_UNKNOWN;
+
+    if (disk->image_data_length != data_size) {
+        if (data_size == 0) {
+            data_size = disk->image_data_length;
+        }
+        if (data_size > disk->image_data_length) {
+            data_size = disk->image_data_length;
+        }
+    }
+    if (data_size == CLEM_2IMG_DISK_SIZE_5_25) {
+        disk_type = CLEM_2IMG_DISK_TYPE_5_25;
+    } else if (data_size == CLEM_2IMG_DISK_SIZE_3_5) {
+        disk_type = CLEM_2IMG_DISK_TYPE_3_5;
+    }
+    data_size = 0;
+    if (disk_type == CLEM_2IMG_DISK_TYPE_5_25) {
+
+    }
+
+    return data_size;
+}
+
+bool clem_2img_nibblize_data(
+    struct Clemens2IMGDisk* disk,
+    uint8_t* data_start,
+    uint8_t* data_end
+) {
     return false;
 }

@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "clem_defs.h"
+#include "clem_disk.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -358,23 +359,15 @@ struct ClemensMMIO {
 struct ClemensWOZDisk;
 struct Clemens2IMGDisk;
 
-enum ClemensDiskType {
-    kClemensDiskType_None,
-    kClemensDiskType_WOZ,
-    kClemensDiskType_2IMG
-};
-
 /**
  * @brief
  *
  */
 struct ClemensDrive {
-    /* The IWM will only access one of these based on the disk_type */
-    struct ClemensWOZDisk* data;        /**< The parsed WOZ data */
-    struct Clemens2IMGDisk* data_2img;  /**< The parsed 2MG data */
+    struct ClemensNibbleDisk disk;  /**< Disk Nibble Data */
 
-    enum ClemensDiskType disk_type;     /**< Selects the disk to use */
-
+    //  TODO: Move the below to the host - we only care about nibblized data
+    //  here
     int qtr_track_index;            /**< Current track position of the head */
     unsigned track_byte_index;      /**< byte index into track */
     unsigned track_bit_shift;       /**< bit offset into current byte */
@@ -392,6 +385,7 @@ struct ClemensDrive {
     uint16_t status_mask_35;    /**< 3.5" status mask */
     bool write_pulse;           /**< Changes in the write field translate as pulses */
     bool is_spindle_on;         /**< Drive spindle running */
+    bool has_disk;              /**< Has a disk in the drive */
 
     uint8_t real_track_index;   /**< the index into the raw woz track data */
 

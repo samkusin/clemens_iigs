@@ -214,6 +214,7 @@ const uint8_t* clem_woz_parse_info_chunk(
     disk->disk_type = _clem_woz_read_u8(&woz_iter);
     if (_clem_woz_read_u8(&woz_iter) != 0) {
         disk->flags |= CLEM_WOZ_IMAGE_WRITE_PROTECT;
+        disk->nib->is_write_protected = true;
     }
     if (_clem_woz_read_u8(&woz_iter) != 0) {
         disk->flags |= CLEM_WOZ_IMAGE_SYNCHRONIZED;
@@ -226,6 +227,7 @@ const uint8_t* clem_woz_parse_info_chunk(
     if (version > 1) {
         if (_clem_woz_read_u8(&woz_iter) == 2) {
             disk->flags |= CLEM_WOZ_IMAGE_DOUBLE_SIDED;
+            disk->nib->is_double_sided = true;
         }
         param = _clem_woz_read_u8(&woz_iter);
         if (param == 1) {
@@ -238,17 +240,19 @@ const uint8_t* clem_woz_parse_info_chunk(
             disk->boot_type = CLEM_WOZ_BOOT_UNDEFINED;
         }
         /* WOZ timing here is in 125 ns increments */
-        disk->bit_timing_ns = _clem_woz_read_u8(&woz_iter) * 125;
+        disk->nib->bit_timing_ns = _clem_woz_read_u8(&woz_iter) * 125;
         disk->flags |= _clem_woz_read_u16(&woz_iter);
         disk->required_ram_kb = _clem_woz_read_u16(&woz_iter);
         disk->max_track_size_bytes = _clem_woz_read_u16(&woz_iter) * 512;
 
     } else {
         if (disk->disk_type == CLEM_WOZ_DISK_5_25) {
-            disk->bit_timing_ns = 4 * 1000;
+            disk->nib->bit_timing_ns = 4 * 1000;
             disk->max_track_size_bytes = 6646;  /* v1 max track size */
+            disk->nib->disk_type = CLEM_DISK_TYPE_5_25;
         } else if (disk->disk_type == CLEM_WOZ_DISK_3_5) {
-            disk->bit_timing_ns = 2 * 1000;
+            disk->nib->bit_timing_ns = 2 * 1000;
+            disk->nib->disk_type = CLEM_DISK_TYPE_3_5;
             /* this appears to be the upper limit of all tracks on 3.5" disks
                according to experiments with WOZ files - may be overkill
             */
@@ -274,18 +278,18 @@ const uint8_t* clem_woz_parse_tmap_chunk(
     woz_iter.cur = data;
     woz_iter.end = data + header->data_size;
 
-    for (idx = 0; idx < CLEM_WOZ_LIMIT_QTR_TRACKS; ++idx) {
-        disk->meta_track_map[idx] = _clem_woz_read_u8(&woz_iter);
-        if (disk->meta_track_map[idx] != 0xff) {
+    for (idx = 0; idx < CLEM_DISK_LIMIT_QTR_TRACKS; ++idx) {
+        disk->nib->meta_track_map[idx] = _clem_woz_read_u8(&woz_iter);
+        if (disk->nib->meta_track_map[idx] != 0xff) {
             if (track_idx == (unsigned)(-1) ||
-                track_idx < disk->meta_track_map[idx]
+                track_idx < disk->nib->meta_track_map[idx]
             ) {
-                track_idx = disk->meta_track_map[idx];
+                track_idx = disk->nib->meta_track_map[idx];
             }
         }
     }
     if (track_idx < (unsigned)(-1)) {
-        disk->track_count = track_idx + 1;
+        disk->nib->track_count = track_idx + 1;
     }
 
     return woz_iter.end;
@@ -311,29 +315,29 @@ const uint8_t* clem_woz_parse_trks_chunk(
     woz_iter.end = data + header->data_size;
 
     last_byte_offset = 0;
-    for (idx = 0; idx < CLEM_WOZ_LIMIT_QTR_TRACKS; ++idx) {
+    for (idx = 0; idx < CLEM_DISK_LIMIT_QTR_TRACKS; ++idx) {
         param = (uint32_t)_clem_woz_read_u16(&woz_iter) * 512;
-        disk->track_byte_count[idx] = (
+        disk->nib->track_byte_count[idx] = (
             (uint32_t)_clem_woz_read_u16(&woz_iter) * 512);
-        disk->track_bits_count[idx] = _clem_woz_read_u32(&woz_iter);
+        disk->nib->track_bits_count[idx] = _clem_woz_read_u32(&woz_iter);
         if (param != 0) {
-            disk->track_byte_offset[idx] = param - CLEM_WOZ_OFFSET_TRACK_DATA;
+            disk->nib->track_byte_offset[idx] = param - CLEM_WOZ_OFFSET_TRACK_DATA;
         }
-        last_byte_offset += disk->track_byte_count[idx];
+        last_byte_offset += disk->nib->track_byte_count[idx];
     }
 
-    if (disk->bits_data && disk->bits_data_end) {
-        uint8_t* out_bits = disk->bits_data;
-        for (idx = 0; idx < CLEM_WOZ_LIMIT_QTR_TRACKS; ++idx) {
-            if (out_bits + disk->track_byte_count[idx] > disk->bits_data_end) {
+    if (disk->nib->bits_data && disk->nib->bits_data_end) {
+        uint8_t* out_bits = disk->nib->bits_data;
+        for (idx = 0; idx < CLEM_DISK_LIMIT_QTR_TRACKS; ++idx) {
+            if (out_bits + disk->nib->track_byte_count[idx] > disk->nib->bits_data_end) {
                 CLEM_ASSERT(false);
                 return NULL;
             }
-            if (disk->track_byte_count[idx]) {
-                disk->track_initialized[idx] = 1;
+            if (disk->nib->track_byte_count[idx]) {
+                disk->nib->track_initialized[idx] = 1;
                 _clem_woz_read_bytes(
-                    &woz_iter, out_bits, disk->track_byte_count[idx]);
-                out_bits += disk->track_byte_count[idx];
+                    &woz_iter, out_bits, disk->nib->track_byte_count[idx]);
+                out_bits += disk->nib->track_byte_count[idx];
             }
         }
     } else {

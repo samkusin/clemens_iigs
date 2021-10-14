@@ -12,7 +12,6 @@
 #include "clem_debug.h"
 #include "clem_drive.h"
 #include "clem_util.h"
-#include "clem_woz.h"
 
 #include <stdlib.h>
 
@@ -97,6 +96,7 @@ static int s_disk2_phase_states[8][16] = {
 */
 
 static void _clem_disk_reset_drive(struct ClemensDrive* drive) {
+
     drive->real_track_index = 0xfe;
     drive->random_bit_index = 0;
     drive->qtr_track_index = 0;
@@ -161,17 +161,17 @@ static unsigned _clem_disk_get_track_bit_length(
     int qtr_track_index,
     bool is_drive_525
 ) {
-    if (drive->data->meta_track_map[qtr_track_index] != 0xff) {
-        return drive->data->track_bits_count[(
-            drive->data->meta_track_map[qtr_track_index])];
+    if (drive->disk.meta_track_map[qtr_track_index] != 0xff) {
+        return drive->disk.track_bits_count[(
+            drive->disk.meta_track_map[qtr_track_index])];
     }
     /* empty track - use a 6400 byte, 51200 bit track size per WOZ2 spec */
     return 51200;
 }
 
 static void _clem_disk_write_bit(struct ClemensDrive* drive, bool value) {
-    uint8_t* data = drive->data->bits_data + (
-        drive->data->track_byte_offset[drive->real_track_index]);
+    uint8_t* data = drive->disk.bits_data + (
+        drive->disk.track_byte_offset[drive->real_track_index]);
     if (value) {
         data[drive->track_byte_index] |= (1 << drive->track_bit_shift);
     } else {
@@ -180,8 +180,8 @@ static void _clem_disk_write_bit(struct ClemensDrive* drive, bool value) {
 }
 
 static uint8_t _clem_disk_read_bit(struct ClemensDrive* drive) {
-    uint8_t* data = drive->data->bits_data + (
-        drive->data->track_byte_offset[drive->real_track_index]);
+    uint8_t* data = drive->disk.bits_data + (
+        drive->disk.track_byte_offset[drive->real_track_index]);
     uint8_t byte_value = data[drive->track_byte_index];
     return (byte_value & (1 << drive->track_bit_shift)) != 0;
 }
@@ -220,15 +220,15 @@ unsigned clem_drive_step(
     unsigned dt_ns
 ) {
     bool is_drive_525 = (*io_flags & CLEM_IWM_FLAG_DRIVE_35) ? false : true;
-    if (qtr_track_index != drive->qtr_track_index && drive->data) {
+    if (qtr_track_index != drive->qtr_track_index && drive->has_disk) {
         /*
         CLEM_LOG("IWM: Disk525[%u]: Motor: %u; Head @ (%d,%d)",
             (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
             (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
             qtr_track_index / 4, qtr_track_index % 4);
         */
-        if (drive->data->meta_track_map[drive->qtr_track_index] !=
-            drive->data->meta_track_map[qtr_track_index]
+        if (drive->disk.meta_track_map[drive->qtr_track_index] !=
+            drive->disk.meta_track_map[qtr_track_index]
         ) {
             /* force lookup of the real track if the arm has changed */
             drive->real_track_index = 0xfe;
@@ -236,16 +236,16 @@ unsigned clem_drive_step(
 
         drive->qtr_track_index = qtr_track_index;
     }
-    if (drive->data) {
+    if (drive->has_disk) {
         if (drive->real_track_index == 0xfe) {
             unsigned track_prev_len = drive->track_bit_length;
-            drive->real_track_index = drive->data->meta_track_map[drive->qtr_track_index];
+            drive->real_track_index = drive->disk.meta_track_map[drive->qtr_track_index];
             if (drive->real_track_index != 0xff) {
                 drive->track_bit_length = _clem_disk_get_track_bit_length(
                     drive, drive->qtr_track_index, is_drive_525);
             } else if (drive->track_bit_length == 0) {
                 /* just use the prior bit length if there's no track defined */
-                drive->track_bit_length = drive->data->track_bits_count[0];
+                drive->track_bit_length = drive->disk.track_bits_count[0];
             }
             if (track_prev_len) {
                 track_cur_pos = track_cur_pos * drive->track_bit_length / track_prev_len;
@@ -265,12 +265,12 @@ unsigned clem_drive_step(
     drive->track_byte_index = track_cur_pos / 8;
     drive->track_bit_shift = 7 - (track_cur_pos % 8);
     drive->pulse_ns = clem_util_timer_increment(drive->pulse_ns, 1000000, dt_ns);
-    if (!drive->data) {
+    if (!drive->has_disk) {
         return track_cur_pos;
     }
-    if (drive->pulse_ns >= drive->data->bit_timing_ns) {
+    if (drive->pulse_ns >= drive->disk.bit_timing_ns) {
         bool valid_disk_data = drive->real_track_index != 0xff &&
-            drive->data->track_initialized[drive->real_track_index];
+            drive->disk.track_initialized[drive->real_track_index];
         *io_flags |= CLEM_IWM_FLAG_PULSE_HIGH;
         /* read a pulse from the bitstream, following WOZ emulation suggestions
             to emulate errors - this is effectively a copypasta from
@@ -357,7 +357,7 @@ void clem_disk_read_and_position_head_525(
                                     track_cur_pos,
                                     dt_ns);
 
-    if (drive->data && drive->data->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) {
+    if (drive->disk.is_write_protected) {
         *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
     }
 }
@@ -374,14 +374,14 @@ void clem_disk_update_head(
     if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
         return;
     }
-    if (!drive->data) {
+    if (!drive->has_disk) {
         return;
     }
 
-    if (!(drive->data->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT)) {
+    if (!drive->disk.is_write_protected) {
         if (*io_flags & CLEM_IWM_FLAG_WRITE_REQUEST) {
             if (drive->real_track_index != 0xff) {
-                if (!drive->data->track_initialized[drive->real_track_index]) {
+                if (!drive->disk.track_initialized[drive->real_track_index]) {
                     if (write_transition) {
                         /* first time write to an uninitialized track will start
                         writes at the beginning of the data block.  most
@@ -389,19 +389,19 @@ void clem_disk_update_head(
                         The first genuine byte will have its high bit will
                         always be on as defined by GCR 6-2 encoding
                         */
-                        drive->data->track_initialized[drive->real_track_index] = 1;
+                        drive->disk.track_initialized[drive->real_track_index] = 1;
                         drive->track_bit_shift = 7;
                         drive->track_byte_index = 0;
                     }
                 }
-                if (drive->data->track_initialized[drive->real_track_index]) {
+                if (drive->disk.track_initialized[drive->real_track_index]) {
                     _clem_disk_write_bit(drive, write_transition);
                 }
             }
         }
     }
 
-    if (drive->pulse_ns >= drive->data->bit_timing_ns) {
+    if (drive->pulse_ns >= drive->disk.bit_timing_ns) {
         *io_flags |= CLEM_IWM_FLAG_PULSE_HIGH;
 
 

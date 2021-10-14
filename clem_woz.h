@@ -12,6 +12,8 @@
 #ifndef CLEM_WOZ_DISK_H
 #define CLEM_WOZ_DISK_H
 
+#include "clem_disk.h"
+
 #include <stdint.h>
 
 #define CLEM_WOZ_INVALID_DATA       (-1)
@@ -46,14 +48,7 @@
 #define CLEM_WOZ_IMAGE_SYNCHRONIZED     0x40000000
 #define CLEM_WOZ_IMAGE_WRITE_PROTECT    0x80000000
 
-#define CLEM_WOZ_LIMIT_QTR_TRACKS   160
 #define CLEM_WOZ_OFFSET_TRACK_DATA  1536
-
-/* value from woz spec - evaluate if this can be used for blank disks */
-#define CLEM_WOZ_DEFAULT_TRACK_BIT_LENGTH_525       51200
-/* value from dsk2woz2 */
-#define CLEM_WOZ_BLANK_DISK_TRACK_BIT_LENGTH_525    50624
-
 
 
 #ifdef __cplusplus
@@ -71,34 +66,11 @@ struct ClemensWOZDisk {
     unsigned flags;                     /* CLEM_WOZ_SUPPORT, CLEM_WOZ_IMAGE */
     unsigned required_ram_kb;
     unsigned max_track_size_bytes;
-    unsigned bit_timing_ns;             /* time to read (and write?) */
-    unsigned track_count;
-
-    /* maps quarter tracks (for 5.25) and 80 tracks per side (for 3.25).  the
-       drive head mechanism should track current head position by the meta
-       index 0-159.  So for typical DOS disks, our head position will be
-       0, 4, 8, 12, ....  A value of 255 is consider an undefined track
-    */
-    uint8_t meta_track_map[CLEM_WOZ_LIMIT_QTR_TRACKS];
-    /* Pay attention
-        - byte offsets into the bits buffer per track relative to the end of
-          the track list (vs the file, as specified in the WOZ spec)
-        - bit count for the track (bytes = (count / 8) + 1 if remainder else 0)
-    */
-    uint32_t track_byte_offset[CLEM_WOZ_LIMIT_QTR_TRACKS];
-    uint32_t track_byte_count[CLEM_WOZ_LIMIT_QTR_TRACKS];
-    uint32_t track_bits_count[CLEM_WOZ_LIMIT_QTR_TRACKS];
-    uint8_t track_initialized[CLEM_WOZ_LIMIT_QTR_TRACKS];
-
-    /* This buffer is supplied by the application that can be allocated from
-       values within the INFO chunk (written out to max_track_size_bytes), and
-       can be released upon eject
-    */
-    uint8_t* bits_data;
-    uint8_t* bits_data_end;
 
     /* Extra data not necessary for the backend */
     char creator[32];
+
+    struct ClemensNibbleDisk* nib;
 };
 
 /*
