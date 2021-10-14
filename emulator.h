@@ -213,9 +213,9 @@ struct ClemensDrive* clemens_drive_get(ClemensMachine* clem,
  * @return true
  * @return false
  */
-bool clemens_assign_disk_woz(ClemensMachine* clem,
-                             enum ClemensDriveType drive_type,
-                             struct ClemensWOZDisk* disk);
+bool clemens_assign_disk(ClemensMachine* clem,
+                         enum ClemensDriveType drive_type,
+                         struct ClemensNibbleDisk* disk);
 
 /**
  * @brief

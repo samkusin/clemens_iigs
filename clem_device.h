@@ -179,9 +179,10 @@ void clem_iwm_reset(struct ClemensDeviceIWM* iwm);
  * @param iwm
  * @param drive_type
  */
-void clem_iwm_insert_disk_woz(struct ClemensDeviceIWM* iwm,
-                              struct ClemensDrive* drive,
-                              struct ClemensWOZDisk* disk);
+void clem_iwm_insert_disk(struct ClemensDeviceIWM* iwm,
+                          struct ClemensDrive* drive,
+                          struct ClemensNibbleDisk* disk);
+
 /**
  * @brief
  *

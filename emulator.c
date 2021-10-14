@@ -14,6 +14,8 @@
 #include "clem_device.h"
 #include "clem_debug.h"
 #include "clem_vgc.h"
+
+#include "clem_2img.h"
 #include "clem_woz.h"
 
 #define ANSI_COLOR_RED     "\x1b[31m"
@@ -1131,16 +1133,16 @@ struct ClemensDrive* clemens_drive_get(
     return drive;
 }
 
-bool clemens_assign_disk_woz(
+bool clemens_assign_disk(
     ClemensMachine* clem,
     enum ClemensDriveType drive_type,
-    struct ClemensWOZDisk* disk
+    struct ClemensNibbleDisk* disk
 ) {
     struct ClemensDrive* drive = clemens_drive_get(clem, drive_type);
     if (!drive) {
         return false;
     }
-    if (disk && drive->data) {
+    if (disk && drive->has_disk) {
         /* active disk found.; must unassign first */
         return false;
     }
@@ -1151,18 +1153,18 @@ bool clemens_assign_disk_woz(
        them
     */
     if (drive_type == kClemensDrive_5_25_D1 || drive_type == kClemensDrive_5_25_D2) {
-        if (disk->disk_type != CLEM_WOZ_DISK_5_25) {
+        if (disk->disk_type != CLEM_DISK_TYPE_5_25) {
             return false;
         }
     } else if (drive_type == kClemensDrive_3_5_D1 || drive_type == kClemensDrive_3_5_D2) {
-        if (disk->disk_type != CLEM_WOZ_DISK_3_5) {
+        if (disk->disk_type != CLEM_DISK_TYPE_3_5) {
             return false;
         }
     } else {
         return false;
     }
 
-    clem_iwm_insert_disk_woz(&clem->mmio.dev_iwm, drive, disk);
+    clem_iwm_insert_disk(&clem->mmio.dev_iwm, drive, disk);
     return true;
 }
 

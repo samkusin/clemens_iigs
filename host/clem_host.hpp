@@ -8,8 +8,8 @@
 #include "imgui/imgui_memory_editor.h"
 
 #include "cinek/fixedstack.hpp"
-
 #include "clem_host_utils.hpp"
+#include "contrib/mpack.h"
 
 #include <cstdint>
 #include <vector>
@@ -49,11 +49,15 @@ public:
 private:
   void emulate(float deltaTime);
 
+  // TODO: consolidate these load/parse/init/release patterns into a class
+  //       for reuse/subclassing of different disk types
+  bool createBlankDisk(struct ClemensNibbleDisk* disk);
   bool loadWOZDisk(const char* filename, struct ClemensWOZDisk* woz,
                    ClemensDriveType driveType);
-
-  bool parseWOZDisk(struct ClemensWOZDisk* woz, uint8_t* data, size_t dataSize);
-  bool initWOZDisk(struct ClemensWOZDisk* woz);
+  bool load2IMGDisk(const char* filename, struct Clemens2IMGDisk* disk,
+                    ClemensDriveType driveType);
+  bool parse2IMGDisk(struct Clemens2IMGDisk* disk, uint8_t* data, size_t dataSize);
+  void release2IMGDisk(struct Clemens2IMGDisk* disk);
 
 private:
   struct ClemensDisk;
@@ -99,11 +103,12 @@ private:
   void emulationBreak();
   void resetDiagnostics();
   bool loadDisk(ClemensDriveType driveType, const char* filename);
-  void loadDisk(ClemensDriveType driveType, ClemensDisk* drive);
   void loadDisks();
   void loadBRAM();
   void saveBRAM();
 
+  void saveDiskMetadata(mpack_writer_t* writer, const ClemensDisk& disk);
+  void loadDiskMetadata(mpack_reader_t* reader, ClemensDisk& disk);
 
   void dumpMemory(unsigned bank, const char* filename);
 
@@ -130,8 +135,15 @@ private:
   ClemensMemoryPageMap simpleDirectPageMap_;
 
   struct ClemensDisk {
-
-    ClemensDiskType diskType;
+    enum Brand {
+      None,
+      WOZ,
+      IMG2
+    };
+    std::string path;
+    Brand diskBrand;
+    //  preallocated nibble memory buffer
+    ClemensNibbleDisk nib;
     union {
       ClemensWOZDisk dataWOZ;
       Clemens2IMGDisk data2IMG;
@@ -140,10 +152,6 @@ private:
 
   std::array<struct ClemensDisk, 2> disks35_;
   std::array<struct ClemensDisk, 2> disks525_;
-
-  using DiskPathnames = std::array<std::string, 2>;
-  DiskPathnames disks35Paths_;
-  DiskPathnames disks525Paths_;
 
   float emulationRunTime_;
   float emulationSliceTimeLeft_;

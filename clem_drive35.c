@@ -8,7 +8,6 @@
 #include "clem_debug.h"
 #include "clem_drive.h"
 #include "clem_util.h"
-#include "clem_woz.h"
 
 
 /*  Follows the status and control values from https://llx.com/Neil/a2/disk
@@ -89,7 +88,7 @@ void clem_disk_read_and_position_head_35(
         if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING) {
             drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_EJECTING;
             drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_EJECTED;
-            drive->data = NULL;
+            drive->has_disk = false;
             CLEM_LOG("clem_drive35: ejected disk");
         } else {
             if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_STEP_IN) {
@@ -172,15 +171,14 @@ void clem_disk_read_and_position_head_35(
                     sense_out = (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_STEP_IN) == 0;
                     break;
                 case CLEM_IWM_DISK35_QUERY_DISK_IN_DRIVE:
-                    sense_out = (drive->data == NULL);
+                    sense_out = !drive->has_disk;
                     break;
                 case CLEM_IWM_DISK35_QUERY_IS_STEPPING:
                     sense_out = (drive->step_timer_35_ns == 0);
                     break;
                 case CLEM_IWM_DISK35_QUERY_WRITE_PROTECT:
-                    if (drive->data) {
-                        sense_out = (drive->data && (
-                            drive->data->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT)) == 0;
+                    if (drive->has_disk) {
+                        sense_out = !drive->disk.is_write_protected;
                     } else {
                         sense_out = false;
                     }
@@ -212,7 +210,7 @@ void clem_disk_read_and_position_head_35(
                     }
                     break;
                 case CLEM_IWM_DISK35_QUERY_DOUBLE_SIDED:
-                    sense_out = (drive->data && drive->data->flags & CLEM_WOZ_IMAGE_DOUBLE_SIDED) != 0;
+                    sense_out = drive->disk.is_double_sided;
                     break;
                 case CLEM_IWM_DISK35_QUERY_READ_READY:
                     sense_out = (drive->step_timer_35_ns > 0);
