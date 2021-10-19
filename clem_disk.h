@@ -4,9 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/*  Track Limit for 'nibble-like' disks (i.e. not Smartport drives) */
-#define CLEM_DISK_LIMIT_QTR_TRACKS          160
-
 #define CLEM_DISK_TYPE_NONE                 0
 #define CLEM_DISK_TYPE_5_25                 1
 #define CLEM_DISK_TYPE_3_5                  2
@@ -16,10 +13,28 @@
 /* value from dsk2woz2 */
 #define CLEM_DISK_BLANK_TRACK_BIT_LENGTH_525    50624
 
+/*  Track Limit for 'nibble-like' disks (i.e. not Smartport drives) */
+#define CLEM_DISK_LIMIT_QTR_TRACKS              160
+/*  Always 16 sectors per track on DOS/ProDOS 5.25" disks */
+#define CLEM_DISK_525_NUM_SECTORS_PER_TRACK     16
+
+/*  3.5" drives have variable spin speed to maximize space - and these speeds
+    are divided into regions, where outer regions have more sectors vs inner
+    regions.  See the declared globals below
+*/
+#define CLEM_DISK_35_NUM_REGIONS                5
+
+/* Ciderpress 3.5" sector byte estimates * 8 bits = 6180 bits? */
+#define CLEM_DISK_35_BITS_PER_SECTOR    6180
+#define CLEM_DISK_35_CALC_BITS_FROM_SECTORS(_sectors_) \
+    ((_sectors_) * CLEM_DISK_35_BITS_PER_SECTOR)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+extern unsigned g_clem_max_sectors_per_region_35[CLEM_DISK_35_NUM_REGIONS];
+extern unsigned g_clem_track_start_per_region_35[CLEM_DISK_35_NUM_REGIONS + 1];
 
 /**
  * @brief Represents a nibbilized disk from a WOZ or 2IMG compliant image

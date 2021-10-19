@@ -15,6 +15,13 @@
 
 #include <stdlib.h>
 
+unsigned g_clem_max_sectors_per_region_35[CLEM_DISK_35_NUM_REGIONS] = {
+    12, 11, 10, 9, 8
+};
+unsigned g_clem_track_start_per_region_35[CLEM_DISK_35_NUM_REGIONS + 1] = {
+    0, 32, 64, 96, 128, 160
+};
+
 /*  Disk II stepper emulation
 
     Much of this is based on Understanding the Apple IIe Chapter 9

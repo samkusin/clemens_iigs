@@ -56,7 +56,6 @@ private:
                    ClemensDriveType driveType);
   bool load2IMGDisk(const char* filename, struct Clemens2IMGDisk* disk,
                     ClemensDriveType driveType);
-  bool parse2IMGDisk(struct Clemens2IMGDisk* disk, uint8_t* data, size_t dataSize);
   void release2IMGDisk(struct Clemens2IMGDisk* disk);
 
 private:

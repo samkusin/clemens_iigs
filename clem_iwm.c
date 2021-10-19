@@ -16,6 +16,7 @@
 #include "clem_util.h"
 
 #include <string.h>
+#include <inttypes.h>
 
 /*
     IWM emulation
@@ -270,7 +271,7 @@ void clem_iwm_insert_disk(
    struct ClemensNibbleDisk* disk
 ) {
     memcpy(&drive->disk, disk, sizeof(drive->disk));
-    drive->has_disk = true;
+    drive->has_disk =  disk->track_count > 0;
     // set disk
     // reset drive state
 }
@@ -368,7 +369,7 @@ static void _clem_iwm_lss(
                 if (iwm->state & 0x02) {
                     iwm->lss_write_counter = 0x81;
                     iwm->last_write_clocks_ts = clock->ts;
-                    //CLEM_LOG("lss_ld:  %02X", iwm->latch);
+                    CLEM_LOG("lss_ld:  %02X, %" PRIu64 , iwm->latch, iwm->last_write_clocks_ts);
                 } else {
                     CLEM_WARN("IWM: state: %02X load byte %02X in read?",
                         iwm->state, iwm->data);
@@ -403,13 +404,7 @@ static void _clem_iwm_lss(
         } else {
             iwm->io_flags &= ~CLEM_IWM_FLAG_WRITE_DATA;
         }
-        /*
-        if (iwm->io_flags & CLEM_IWM_FLAG_PULSE_HIGH) {
-            CLEM_LOG("drv_wr: (%u ns) => %02X, %c",
-                drive->pulse_ns,
-                iwm->latch, (iwm->io_flags & CLEM_IWM_FLAG_WRITE_DATA) ? '1' : '0');
-        }
-        */
+
     } else {
         /* read mode - data = latch except when holding the current read byte
            note, that the LSS ROM does this for us, but when IIgs latch mode is
@@ -753,23 +748,29 @@ static uint8_t _clem_iwm_read_handshake(
     uint8_t result = 0x80;  /* start with ready */
     unsigned ns_write = _clem_calc_ns_step_from_clocks(
         clock->ts - iwm->last_write_clocks_ts, clock->ref_step);
+    bool sync_fast_mode = iwm->lss_update_dt_ns == CLEM_IWM_SYNC_FRAME_NS_FAST;
+    unsigned ns_write_overflow = sync_fast_mode ? (8 * 2000) : (8 * 4000);
     if (iwm->enable2) {
         return result;
     }
     /* TODO: IWM is busy during a valid write? Then clear result.
     */
-    if ((iwm->lss_write_counter & 0xf) > 8) {
-        result |= 0x04;     /* we should be loading the next write byte */
-        if (!is_noop) {
-            CLEM_WARN("IWM: write_ovr dt = %.3f us", ns_write * 0.001f);
+    if ((iwm->lss_write_counter & 0x80)) {  /* write latch loaded */
+        if (ns_write < ns_write_overflow) {
+            result |= 0x40;
+        } else {
+            if (!is_noop) {
+                CLEM_WARN("IWM: write_ovr dt = %.3f us, counter=%u", ns_write * 0.001f, iwm->lss_write_counter & 0x7f);
+            }
         }
-    } else if ((iwm->lss_write_counter % 8) != 0) {
-        result &= ~0x80;
-    } else {
-        if (!is_noop) {
-            //CLEM_LOG("IWM: write_rdy dt = %.3f us", ns_write * 0.001f);
+        if ((iwm->lss_write_counter % 8) != 0) {
+            result &= ~0x80;
         }
     }
+    /* TODO: read handshake read ready?  latch mode and holding the latch
+             for a fixed period of time?
+    */
+
     return result;
 }
 

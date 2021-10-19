@@ -49,3 +49,10 @@ This is used by the Monitor firmware as well.  Y = {Function}
 1. $C046 polled here with $C061/$C062 on boot uses the 'DIAGTYPE' definition
 2. If $C061/BTN0 or $C062/BTN1 do self or burn-in diagnostics
 3.
+
+
+# ProDOS firmware
+
+- SUB_FWR_PRODOS_SECTOR_READ
+  - looks for a matching sector header
+  -

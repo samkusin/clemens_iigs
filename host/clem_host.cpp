@@ -69,14 +69,14 @@ namespace {
     }
   }
 
-  unsigned calculateMaxDiskDataSize(unsigned int woz_disk_type)
+  unsigned calculateMaxDiskDataSize(unsigned int disk_type)
   {
     unsigned trackDataSize = 0;
-    switch (woz_disk_type) {
-      case CLEM_WOZ_DISK_5_25:
+    switch (disk_type) {
+      case CLEM_DISK_TYPE_5_25:
         trackDataSize = 40 * 0xd * 512;
         break;
-      case CLEM_WOZ_DISK_3_5:
+      case CLEM_DISK_TYPE_3_5:
         trackDataSize = 160 * 19 * 512;
         break;
     }
@@ -138,14 +138,16 @@ ClemensHost::ClemensHost() :
   memoryViewStatic_[1].WriteFn = &ClemensHost::emulatorImguiMemoryWrite;
 
   for (auto& disk : disks525_) {
-    auto maxDiskDataSize = calculateMaxDiskDataSize(CLEM_WOZ_DISK_5_25);
+    auto maxDiskDataSize = calculateMaxDiskDataSize(CLEM_DISK_TYPE_5_25);
+    disk.nib.disk_type = CLEM_DISK_TYPE_5_25;
     disk.nib.bits_data = (uint8_t*)malloc(maxDiskDataSize);
     disk.nib.bits_data_end = disk.nib.bits_data + maxDiskDataSize;
     disk.diskBrand = ClemensDisk::None;
   }
 
   for (auto& disk : disks35_) {
-    auto maxDiskDataSize = calculateMaxDiskDataSize(CLEM_WOZ_DISK_3_5);
+    auto maxDiskDataSize = calculateMaxDiskDataSize(CLEM_DISK_TYPE_3_5);
+    disk.nib.disk_type = CLEM_DISK_TYPE_3_5;
     disk.nib.bits_data = (uint8_t*)malloc(maxDiskDataSize);
     disk.nib.bits_data_end = disk.nib.bits_data + maxDiskDataSize;
     disk.diskBrand = ClemensDisk::None;
@@ -2015,7 +2017,7 @@ bool ClemensHost::loadDisk(ClemensDriveType driveType, const char* filename)
         isOk = loadWOZDisk(filename, &disk->dataWOZ, driveType);
         break;
       case ClemensDisk::IMG2:
-        //disk->data2IMG.nib =  &disk->nib;
+        disk->data2IMG.nib =  &disk->nib;
         isOk = load2IMGDisk(filename, &disk->data2IMG, driveType);
         break;
     }
@@ -2105,8 +2107,6 @@ bool ClemensHost::createBlankDisk(struct ClemensNibbleDisk* disk)
   //  generate the image using other tools.
   //
   unsigned max_track_size_bytes, track_byte_offset;
-  unsigned max_sectors_per_region_35[5] = { 19, 17, 16, 14, 13 };
-  unsigned track_start_per_region_35[6] = { 0, 32, 64, 96, 128, 160 };
 
   auto trackDataSize = disk->bits_data_end - disk->bits_data;
   memset(disk->bits_data, 0, trackDataSize);
@@ -2133,7 +2133,7 @@ bool ClemensHost::createBlankDisk(struct ClemensNibbleDisk* disk)
         track_byte_offset += max_track_size_bytes;
       }
       break;
-    case CLEM_WOZ_DISK_3_5:
+    case CLEM_DISK_TYPE_3_5:
       disk->bit_timing_ns = 2000;
       disk->track_count = disk->is_double_sided ? 160 : 80;
       for (unsigned i = 0; i < CLEM_DISK_LIMIT_QTR_TRACKS; ++i) {
@@ -2147,9 +2147,11 @@ bool ClemensHost::createBlankDisk(struct ClemensNibbleDisk* disk)
       }
       track_byte_offset = 0;
       for (unsigned region_index = 0; region_index < 5; ++region_index) {
-        max_track_size_bytes = max_sectors_per_region_35[region_index] * 512;
-        for (unsigned i = track_start_per_region_35[region_index];
-                      i < track_start_per_region_35[region_index + 1];
+        unsigned bits_cnt = CLEM_DISK_35_CALC_BITS_FROM_SECTORS(
+          g_clem_max_sectors_per_region_35[region_index]);
+        max_track_size_bytes = bits_cnt / 8;
+        for (unsigned i = g_clem_track_start_per_region_35[region_index];
+                      i < g_clem_track_start_per_region_35[region_index + 1];
         ) {
           unsigned track_index = i;
           if (!disk->is_double_sided) {
@@ -2160,7 +2162,7 @@ bool ClemensHost::createBlankDisk(struct ClemensNibbleDisk* disk)
           }
           disk->track_byte_offset[track_index] = track_byte_offset;
           disk->track_byte_count[track_index] = max_track_size_bytes;
-          disk->track_bits_count[track_index] = CLEM_DISK_BLANK_TRACK_BIT_LENGTH_525;
+          disk->track_bits_count[track_index] = bits_cnt;
           disk->track_initialized[track_index] = 0;
           track_byte_offset += max_track_size_bytes;
         }
@@ -2176,6 +2178,7 @@ void ClemensHost::release2IMGDisk(struct Clemens2IMGDisk* disk)
 {
   if (disk->image_buffer) {
     free(disk->image_buffer);
+    disk->image_buffer = NULL;
   }
   memset(disk, 0, sizeof(*disk));
 }
@@ -2185,52 +2188,25 @@ bool ClemensHost::load2IMGDisk(
   struct Clemens2IMGDisk* disk,
   ClemensDriveType driveType
 ) {
+  ClemensNibbleDisk* nib = disk->nib;
   release2IMGDisk(disk);
+  disk->nib = nib;
 
-  switch (driveType) {
-    case kClemensDrive_5_25_D1:
-      break;
-    case kClemensDrive_5_25_D2:
-      break;
-    case kClemensDrive_3_5_D1:
-      break;
-    case kClemensDrive_3_5_D2:
-      break;
-  }
-  if (!filename[0]) {
-    return false;
-  }
-
-  struct stat fileStat;
-  bool isOk = false;
-
-  if (stat(filename, &fileStat) != 0) {
-    // TODO: blank 2mg
-    isOk = false;
-  } else {
-    std::ifstream dskFile(filename, std::ios::binary | std::ios::ate);
-    if (dskFile.is_open()) {
-      unsigned sz = unsigned(dskFile.tellg());
-      uint8_t* image_buffer = (uint8_t*)malloc(sz);
-      dskFile.seekg(0, std::ios::beg);
-      dskFile.read((char *)image_buffer, sz);
-      dskFile.close();
-      parse2IMGDisk(disk, image_buffer, sz);
-      isOk = true;
+  std::ifstream dskFile(filename, std::ios::binary | std::ios::ate);
+  if (dskFile.is_open()) {
+    unsigned sz = unsigned(dskFile.tellg());
+    uint8_t* image_buffer = (uint8_t*)malloc(sz);
+    dskFile.seekg(0, std::ios::beg);
+    dskFile.read((char *)image_buffer, sz);
+    dskFile.close();
+    if (clem_2img_parse_header(disk, image_buffer, image_buffer + sz)) {
+      //  output parsed metadata in log
+      if (clem_2img_nibblize_data(disk)) {
+        return true;
+      }
+      printf("load2IMGDisk: nibbilization pass failed.\n");
     }
   }
-  if (isOk) {
-    //clemens_assign_disk_2img(&machine_, driveType, disk);
-  } else {
-    clemens_eject_disk(&machine_, driveType);
-  }
-  return isOk;
-}
 
-bool ClemensHost::parse2IMGDisk(
-  struct Clemens2IMGDisk* disk,
-  uint8_t* data,
-  size_t dataSize
-) {
-  return clem_2img_parse_header(disk, data, data + dataSize);
+  return false;
 }
