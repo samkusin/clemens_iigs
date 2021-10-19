@@ -244,21 +244,24 @@ const uint8_t* clem_woz_parse_info_chunk(
         disk->flags |= _clem_woz_read_u16(&woz_iter);
         disk->required_ram_kb = _clem_woz_read_u16(&woz_iter);
         disk->max_track_size_bytes = _clem_woz_read_u16(&woz_iter) * 512;
-
     } else {
         if (disk->disk_type == CLEM_WOZ_DISK_5_25) {
             disk->nib->bit_timing_ns = 4 * 1000;
             disk->max_track_size_bytes = 6646;  /* v1 max track size */
-            disk->nib->disk_type = CLEM_DISK_TYPE_5_25;
         } else if (disk->disk_type == CLEM_WOZ_DISK_3_5) {
             disk->nib->bit_timing_ns = 2 * 1000;
-            disk->nib->disk_type = CLEM_DISK_TYPE_3_5;
             /* this appears to be the upper limit of all tracks on 3.5" disks
                according to experiments with WOZ files - may be overkill
             */
             disk->max_track_size_bytes = 19 * 512;
         }
         disk->boot_type = CLEM_WOZ_BOOT_UNDEFINED;
+    }
+
+    if (disk->disk_type == CLEM_WOZ_DISK_5_25) {
+        disk->nib->disk_type = CLEM_DISK_TYPE_5_25;
+    } else if (disk->disk_type == CLEM_WOZ_DISK_3_5) {
+        disk->nib->disk_type = CLEM_DISK_TYPE_3_5;
     }
     return woz_iter.end;
 }

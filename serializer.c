@@ -540,20 +540,16 @@ static unsigned clemens_serialize_custom(
             break;
 
         case CLEM_SERIALIZER_CUSTOM_RECORD_NIBBLE_DISK:
-            nib_disk = *(struct ClemensNibbleDisk **)ptr;
-            mpack_write_cstr(writer, "valid");
-            mpack_write_bool(writer, nib_disk != NULL);
-            if (nib_disk) {
-                clemens_serialize_records(writer, (uintptr_t)nib_disk, &kNibbleDisk[0]);
-                mpack_write_cstr(writer, "bits_data");
-                if (nib_disk->bits_data != NULL) {
-                    mpack_write_bool(writer, true);
-                    blob_size = (nib_disk->bits_data_end - nib_disk->bits_data);
-                    mpack_write_cstr(writer, "blob");
-                    mpack_write_bin(writer, (char *)nib_disk->bits_data, blob_size);
-                } else {
-                    mpack_write_bool(writer, false);
-                }
+            nib_disk = (struct ClemensNibbleDisk *)ptr;
+            clemens_serialize_records(writer, (uintptr_t)nib_disk, &kNibbleDisk[0]);
+            mpack_write_cstr(writer, "bits_data");
+            if (nib_disk->bits_data != NULL) {
+                mpack_write_bool(writer, true);
+                blob_size = (nib_disk->bits_data_end - nib_disk->bits_data);
+                mpack_write_cstr(writer, "blob");
+                mpack_write_bin(writer, (char *)nib_disk->bits_data, blob_size);
+            } else {
+                mpack_write_bool(writer, false);
             }
             break;
     }
@@ -787,42 +783,23 @@ static unsigned clemens_unserialize_custom(
             mpack_done_bin(reader);
             break;
         case CLEM_SERIALIZER_CUSTOM_RECORD_NIBBLE_DISK:
-            nib_disk = *(struct ClemensNibbleDisk **)ptr;
-
+            nib_disk = (struct ClemensNibbleDisk *)ptr;
+            clemens_unserialize_records(
+                reader, (uintptr_t)nib_disk, &kNibbleDisk[0], alloc_cb, context);
             mpack_expect_cstr(reader, key, sizeof(key));
             if (mpack_expect_bool(reader)) {
-                if (!nib_disk) {
-                    //  create the disk object
-                    *(struct ClemensNibbleDisk **)(ptr) = (
-                        (struct ClemensNibbleDisk *)(*alloc_cb)(
-                            sizeof(struct ClemensNibbleDisk), context));
-                    nib_disk = *(struct ClemensNibbleDisk **)ptr;
-                }
-            } else {
-                if (nib_disk) {
-                    //  invalidate it
-                    *(struct ClemensNibbleDisk **)(ptr) = NULL;
-                    nib_disk = NULL;
-                }
-            }
-            if (nib_disk) {
-                clemens_unserialize_records(
-                    reader, (uintptr_t)nib_disk, &kNibbleDisk[0], alloc_cb, context);
                 mpack_expect_cstr(reader, key, sizeof(key));
-                if (mpack_expect_bool(reader)) {
-                    mpack_expect_cstr(reader, key, sizeof(key));
-                    v0 = mpack_expect_bin(reader);
-                    v1 = (nib_disk->bits_data_end - nib_disk->bits_data);
-                    if (v0 > v1) {
-                        nib_disk->bits_data = (uint8_t*)(*alloc_cb)(v0, context);
-                        nib_disk->bits_data_end = nib_disk->bits_data + v0;
-                    }
-                    mpack_read_bytes(reader, (char *)nib_disk->bits_data, v0);
-                    mpack_done_bin(reader);
-                } else {
-                    nib_disk->bits_data = NULL;
-                    nib_disk->bits_data_end = NULL;
+                v0 = mpack_expect_bin(reader);
+                v1 = (nib_disk->bits_data_end - nib_disk->bits_data);
+                if (v0 > v1) {
+                    nib_disk->bits_data = (uint8_t*)(*alloc_cb)(v0, context);
+                    nib_disk->bits_data_end = nib_disk->bits_data + v0;
                 }
+                mpack_read_bytes(reader, (char *)nib_disk->bits_data, v0);
+                mpack_done_bin(reader);
+            } else {
+                nib_disk->bits_data = NULL;
+                nib_disk->bits_data_end = NULL;
             }
             break;
     }

@@ -809,6 +809,26 @@
 "Hint":"Code"},
 
 {
+"Low":213287,
+"High":213287,
+"Hint":"Code"},
+
+{
+"Low":213320,
+"High":213320,
+"Hint":"Code"},
+
+{
+"Low":213399,
+"High":213399,
+"Hint":"Code"},
+
+{
+"Low":213453,
+"High":213453,
+"Hint":"Code"},
+
+{
 "Low":214273,
 "High":214273,
 "Hint":"Code"},
@@ -1445,6 +1465,7 @@
 "182305":3145984,
 "195764":304,
 "212574":256,
+"213453":3145984,
 "216147":256,
 "221236":256,
 "221238":304,
@@ -1490,6 +1511,9 @@
 "212016":"Setting 5.25\" mode",
 "212574":"==5 on startup with default BRAM",
 "212976":"Sector header read OK",
+"213461":"4 10-bit self-sync bytes",
+"213464":"check handshake",
+"213469":"write data onto latch",
 "214767":"Setting 3.5\" IWM",
 "214801":"Disabling the current drive",
 "214804":"Read the IWM status",
@@ -5384,6 +5408,27 @@
 "Value":16728129,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213464":{
+"Label":"poll_ready",
+"Value":16728536,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213461":{
+"Label":"next_byte",
+"Value":16728533,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213459":{
+"Label":"next_byte_string",
+"Value":16728531,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -5478,6 +5523,42 @@
 "SymbolRef":{
 "Label":"TFF4549",
 "Part":"Low"}},
+
+"213448":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"213449":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"213450":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"213451":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"213452":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"213453":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
 
 "226934":{
 "Length":2,
@@ -6380,5 +6461,9 @@
 "Bank":225},
 
 "220008":{
+"FollowPbr":false,
+"Bank":225},
+
+"213453":{
 "FollowPbr":false,
 "Bank":225}}}

@@ -220,7 +220,7 @@ void clem_disk_read_and_position_head_35(
                     sense_out = false;
                     break;
                 default:
-                    CLEM_LOG("clem_drive35: query %02X not supported?", ctl_switch);
+                    //CLEM_LOG("clem_drive35: query %02X not supported?", ctl_switch);
                     break;
             }
             /*

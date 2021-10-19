@@ -50,17 +50,44 @@ struct Clemens2IMGDisk {
     struct ClemensNibbleDisk* nib;
 };
 
+struct ClemensNibEncoder {
+    uint8_t* cur;
+    uint8_t* end;
+    unsigned bit_index;
+    unsigned bit_index_end;
+    unsigned overflow_cnt;
+};
 
+
+/**
+ * @brief Obtains information from a 2IMG disk image used for processing
+ *
+ * Calling this function is required before running the nibbilization pass via
+ * clem_2img_nibblize_data
+ *
+ * @param disk
+ * @param image
+ * @param image_end
+ * @return true
+ * @return false
+ */
 bool clem_2img_parse_header(struct Clemens2IMGDisk* disk,
                             uint8_t* image,
                             uint8_t* image_end);
 
-size_t clem_2img_calculate_nibble_data_size(struct Clemens2IMGDisk* disk);
-
-
-bool clem_2img_nibblize_data(struct Clemens2IMGDisk* disk,
-                               uint8_t* data_start,
-                               uint8_t* data_end);
+/**
+ * @brief Runs the nibbilization pass on the disk image.
+ *
+ * A ClemensNibbleDisk with an allocated bits buffer is required.  This function
+ * will return false if the nibbilization pass fails if there's not enough
+ * storage.
+ *
+ * @param disk A parsed disk image with an attached ClemensNibbleDisk buffer
+ * @return true
+ * @return false Nibbilization failed due to lack of space or invalid data from
+ *      the source 2IMG (DSK, PO) data.
+ */
+bool clem_2img_nibblize_data(struct Clemens2IMGDisk* disk);
 
 
 #ifdef __cplusplus
