@@ -74,10 +74,10 @@ namespace {
     unsigned trackDataSize = 0;
     switch (disk_type) {
       case CLEM_DISK_TYPE_5_25:
-        trackDataSize = 40 * 0xd * 512;
+        trackDataSize = 40 * 13 * 512;
         break;
       case CLEM_DISK_TYPE_3_5:
-        trackDataSize = 160 * 19 * 512;
+        trackDataSize = 160 * CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(12);
         break;
     }
     assert(trackDataSize > 0);
@@ -1083,6 +1083,9 @@ bool ClemensHost::parseCommand(const char* buffer)
       } else if (!strncasecmp(start, "step", end - start) ||
                  !strncasecmp(start, "s", end - start)) {
         return parseCommandStep(end);
+      } else if (!strncasecmp(start, "stepover", end - start) ||
+                 !strncasecmp(start, "so", end - start)) {
+        return parseCommandStepOver(end);
       } else if (!strncasecmp(start, "run", end - start) ||
                  !strncasecmp(start, "r", end - start)) {
         return parseCommandRun(end);
@@ -1244,6 +1247,24 @@ bool ClemensHost::parseCommandStep(const char* line)
       stepMachine(strtol(number, nullptr, 10));
       return true;
     });
+}
+
+bool ClemensHost::parseCommandStepOver(const char* line)
+{
+  const char* start = trimCommand(line);
+  if (!clemens_is_initialized(&machine_)) {
+    CLEM_HOST_COUT.format("Machine not powered on.");
+    return false;
+  }
+  emulationBreak();
+  if (!start) {
+    //  run to next instruction after a JSR
+    //  TODO: detect if next instruction is a JSR! or JSL!  otherwise just
+    //        treat as a step.
+    unsigned runto = (machine_.cpu.regs.PBR << 16) | (machine_.cpu.regs.PC + 3);
+    return emulationRun(runto);
+  }
+  return false;
 }
 
 bool ClemensHost::parseCommandBreak(const char* line) {
@@ -1785,7 +1806,7 @@ void ClemensHost::saveDiskMetadata(mpack_writer_t* writer, const ClemensDisk& di
       mpack_write_cstr(writer, "max_track_size_bytes");
       mpack_write_u32(writer, disk.dataWOZ.max_track_size_bytes);
       mpack_write_cstr(writer, "creator");
-      mpack_write_cstr(writer, disk.dataWOZ.creator);
+      mpack_write_str(writer, disk.dataWOZ.creator, sizeof(disk.dataWOZ.creator));
       break;
     case ClemensDisk::IMG2:
       mpack_write_str(writer, "2img", 4);
@@ -1840,6 +1861,18 @@ void ClemensHost::loadDiskMetadata(mpack_reader_t* reader, ClemensDisk& disk)
     case ClemensDisk::None:
       break;
     case ClemensDisk::WOZ:
+      mpack_expect_cstr_match(reader, "disk_type");
+      disk.dataWOZ.disk_type = mpack_expect_u32(reader);
+      mpack_expect_cstr_match(reader, "boot_type");
+      disk.dataWOZ.boot_type = mpack_expect_u32(reader);
+      mpack_expect_cstr_match(reader, "flags");
+      disk.dataWOZ.flags = mpack_expect_u32(reader);
+      mpack_expect_cstr_match(reader, "required_ram_kb");
+      disk.dataWOZ.required_ram_kb = mpack_expect_u32(reader);
+      mpack_expect_cstr_match(reader, "max_track_size_bytes");
+      disk.dataWOZ.max_track_size_bytes = mpack_expect_u32(reader);
+      mpack_expect_cstr_match(reader, "creator");
+      mpack_expect_str_buf(reader, disk.dataWOZ.creator, sizeof(disk.dataWOZ.creator));
       break;
     case ClemensDisk::IMG2:
       break;
@@ -2147,8 +2180,8 @@ bool ClemensHost::createBlankDisk(struct ClemensNibbleDisk* disk)
       }
       track_byte_offset = 0;
       for (unsigned region_index = 0; region_index < 5; ++region_index) {
-        unsigned bits_cnt = CLEM_DISK_35_CALC_BITS_FROM_SECTORS(
-          g_clem_max_sectors_per_region_35[region_index]);
+        unsigned bits_cnt = CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(
+          g_clem_max_sectors_per_region_35[region_index]) * 8;
         max_track_size_bytes = bits_cnt / 8;
         for (unsigned i = g_clem_track_start_per_region_35[region_index];
                       i < g_clem_track_start_per_region_35[region_index + 1];
