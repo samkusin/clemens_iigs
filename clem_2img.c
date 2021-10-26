@@ -262,7 +262,7 @@ static void _clem_nib_init_encoder(
     encoder->cur = start;
     encoder->end = end;
     encoder->bit_index = 0;
-    encoder->bit_index_end = CLEM_DISK_35_BITS_PER_SECTOR;
+    encoder->bit_index_end = (end - start) * 8;
     encoder->overflow_cnt = 0;
 }
 
@@ -448,7 +448,7 @@ bool clem_2img_nibblize_data(
         //  isolate into a function for readability
         unsigned sector_count = clem_max_sectors_per_region[current_region];
         uint8_t* nib_end = disk->nib->bits_data + (
-            CLEM_DISK_35_CALC_BITS_FROM_SECTORS(sector_count));
+            CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(sector_count));
         uint8_t* data_in = disk->data;
         uint8_t* nib_cur = nib_out;
         unsigned sector_index;

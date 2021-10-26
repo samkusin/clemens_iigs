@@ -74,6 +74,7 @@ private:
   bool parseCommandDisk(const char* line);
   bool parseCommandDebugStatus(const char* line);
   bool parseCommandStep(const char* line);
+  bool parseCommandStepOver(const char* line);
   bool parseCommandBreak(const char* line);
   bool parseCommandListBreak(const char* line);
   bool parseCommandRemoveBreak(const char* line);

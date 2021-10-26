@@ -829,6 +829,11 @@
 "Hint":"Code"},
 
 {
+"Low":213862,
+"High":213862,
+"Hint":"Code"},
+
+{
 "Low":214273,
 "High":214273,
 "Hint":"Code"},
@@ -846,6 +851,11 @@
 {
 "Low":216147,
 "High":216147,
+"Hint":"Code"},
+
+{
+"Low":216285,
+"High":216285,
 "Hint":"Code"},
 
 {
@@ -1511,9 +1521,23 @@
 "212016":"Setting 5.25\" mode",
 "212574":"==5 on startup with default BRAM",
 "212976":"Sector header read OK",
+"213367":"80 tracks?",
+"213369":"format next track",
+"213443":"Sector number",
 "213461":"4 10-bit self-sync bytes",
 "213464":"check handshake",
 "213469":"write data onto latch",
+"213489":"X #$0057",
+"213512":"x = #$02BF",
+"213515":"A=#$96",
+"213534":"x = #$0002",
+"213537":"DE AA",
+"213554":"increment sector",
+"213558":"maximum sector for this track",
+"213561":"done with track?",
+"213570":"pad byte",
+"213625":"spin until we get an write underrun",
+"213867":"get sector count",
 "214767":"Setting 3.5\" IWM",
 "214801":"Disabling the current drive",
 "214804":"Read the IWM status",
@@ -2441,6 +2465,48 @@
 
 "215095":{
 "Text":"calculate track delta",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"213445":{
+"Text":"Write out the 3.5\" track header\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"213486":{
+"Text":"Write the sector header (self-sync), address header and start of the data header",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"213507":{
+"Text":"Write the data body (all cleared)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"213618":{
+"Text":"End of track",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"213576":{
+"Text":"Updates the byte table used to fill out sector data\r\nThis code identifies the logical sector of the next physical sector and stores\r\nit for recording on the disk",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"213596":{
+"Text":"Generate new checksum for next data sector",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"213316":{
+"Text":"This section retries track format if errors were detected.",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -4263,11 +4329,11 @@
 "LabelAnno":"Generated"},
 
 "213283":{
-"Label":"TFF4123",
+"Label":"SUB_PRODOS_35_FORMAT_HOOK",
 "Value":16728355,
 "Source":"User",
 "Type":"GlobalAddr",
-"LabelAnno":"Generated"},
+"LabelAnno":"None"},
 
 "214273":{
 "Label":"TFF4501",
@@ -5341,7 +5407,7 @@
 "LabelAnno":"None"},
 
 "216143":{
-"Label":"SUB_FWR_PRODOS_SECTOR_READ",
+"Label":"SUB_PRODOS_35_SECTOR_READ",
 "Value":16731215,
 "Source":"User",
 "Type":"GlobalAddr",
@@ -5429,6 +5495,118 @@
 "Value":16728531,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213518":{
+"Label":"next_byte",
+"Value":16728590,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213537":{
+"Label":"data_epilog",
+"Value":16728609,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213618":{
+"Label":"end_of_track",
+"Value":16728690,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213482":{
+"Label":"SUB_NEXT_SECTOR_FORMAT_WRITE",
+"Value":16728554,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"213492":{
+"Label":"next_self_sync",
+"Value":16728564,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213385":{
+"Label":"error_format",
+"Value":16728457,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213395":{
+"Label":"SUB_PRODOS_35_FMT_TRACK_HOOK",
+"Value":16728467,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"213909":{
+"Label":"error",
+"Value":16728981,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213872":{
+"Label":"next_sector",
+"Value":16728944,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213858":{
+"Label":"SUB_PRODOS_35_CHECK_TRACK_HOOK",
+"Value":16728930,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"213302":{
+"Label":"do_format_35_disk",
+"Value":16728374,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213316":{
+"Label":"format_track",
+"Value":16728388,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213320":{
+"Label":"retry_format_track",
+"Value":16728392,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213390":{
+"Label":"error_format_2",
+"Value":16728462,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213343":{
+"Label":"success_format",
+"Value":16728415,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213361":{
+"Label":"try_next_track",
+"Value":16728433,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -5505,7 +5683,7 @@
 "Format":"NumericLE",
 "SubFormat":"Symbol",
 "SymbolRef":{
-"Label":"TFF4123",
+"Label":"SUB_PRODOS_35_FORMAT_HOOK",
 "Part":"Low"}},
 
 "212660":{
@@ -6464,6 +6642,6 @@
 "FollowPbr":false,
 "Bank":225},
 
-"213453":{
+"213399":{
 "FollowPbr":false,
 "Bank":225}}}

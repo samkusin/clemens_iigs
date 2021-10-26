@@ -24,10 +24,49 @@
 */
 #define CLEM_DISK_35_NUM_REGIONS                5
 
-/* Ciderpress 3.5" sector byte estimates * 8 bits = 6180 bits? */
-#define CLEM_DISK_35_BITS_PER_SECTOR    6180
-#define CLEM_DISK_35_CALC_BITS_FROM_SECTORS(_sectors_) \
-    ((_sectors_) * CLEM_DISK_35_BITS_PER_SECTOR)
+/* From ProDOS firmware for 3.5" Apple Disk Drive Format
+   Routine from ROM 03 - ff/4197 - ff/428d
+
+   Track (counts are 8-bit bytes)
+    1       FF              Padding
+    1000    Self Sync (GAP 1)
+                            4 10-bit bytes * 200 = 800 10-bit bytes, or
+                            1000 8-bit byte
+                            Bytes Self Sync (GAP 1)
+                            Note, this buffer may bump the track size beyond
+                            the theoretical size limit on the disk.  The gaps
+                            are here to take into account disk speed differences
+                            in the real world.  In our world we can be
+                            consistent.  let's choose 500
+
+   Sector
+     65     Self Sync (GAP 2)
+                            13 strings of 4 10-bit self-syncs (13 * 5) =
+                            42 10-bit bytes, or 65 8-bit bytes
+     1      FF              Padding
+     3      D5 AA 96        Address Prologue
+     5      xx xx xx xx xx  Address Header
+     2      D5 AA           Address Epilogue
+     1      FF              Padding
+     3      D5 AA AD        Data Prologue
+     1      xx              Logical Sector
+     699    xx xx xx xx ..  Data Body
+     3      xx xx xx        6-2 encoded checksum
+     2      DE AA           Data Epilogue
+     3      FF              Padding (not for the last sector)
+
+    = 788 bytes per sector
+    = 785 bytes for the last sector
+    + 400 for the track
+
+ */
+#define CLEM_DISK_35_BYTES_PER_SECTOR        788
+#define CLEM_DISK_35_BYTES_PER_LAST_SECTOR   785
+#define CLEM_DISK_35_BYTES_TRACK_GAP_1       768
+#define CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(_sectors_) ( \
+    CLEM_DISK_35_BYTES_TRACK_GAP_1 + CLEM_DISK_35_BYTES_PER_LAST_SECTOR + \
+    (((_sectors_) - 1) * CLEM_DISK_35_BYTES_PER_SECTOR))
+
 
 #ifdef __cplusplus
 extern "C" {

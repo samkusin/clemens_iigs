@@ -298,7 +298,7 @@ struct ClemensDeviceIWM {
     unsigned ns_latch_hold;     /**< The latch value expiration timer */
     unsigned ns_drive_hold;     /**< Time until drive motor off */
     unsigned lss_state;         /**< State of our custom LSS */
-    unsigned lss_write_counter; /**< Used for detecting write underruns */
+    unsigned lss_write_reg;     /**< Used for detecting write underruns */
     unsigned lss_update_dt_ns;  /**< Fast mode = 250ns, Slow = 500ns */
 
     bool enable_debug;          /**< If True, activates file logging */
