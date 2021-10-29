@@ -58,6 +58,13 @@ void clemens_simple_init(
 );
 
 /**
+ * @brief
+ *
+ * @param machine
+ */
+void clemens_debug_context(ClemensMachine* machine);
+
+/**
  * @brief Verify the machine is initialized/ready for emulation
  *
  * The emulator does not ever allocate memory.  This method checks if the
@@ -222,8 +229,10 @@ bool clemens_assign_disk(ClemensMachine* clem,
  *
  * @param clem
  * @param drive_type
+ * @param disk  The output disk
  */
-void clemens_eject_disk(ClemensMachine* clem, enum ClemensDriveType drive_type);
+void clemens_eject_disk(ClemensMachine* clem, enum ClemensDriveType drive_type,
+                        struct ClemensNibbleDisk* disk);
 
 /**
  * @brief Forwards input from ths host machine to the ADB

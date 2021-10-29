@@ -89,6 +89,7 @@ private:
   bool parseImmediateString(std::string& value, const char* line);
 
   enum class MachineType {
+    None,
     Apple2GS,
     Simple128K
   };
@@ -104,6 +105,7 @@ private:
   void resetDiagnostics();
   bool loadDisk(ClemensDriveType driveType, const char* filename);
   void loadDisks();
+  void ejectDisks();
   void loadBRAM();
   void saveBRAM();
 
@@ -131,6 +133,8 @@ private:
 private:
   ClemensMachine machine_;
   cinek::FixedStack slab_;
+
+  MachineType machineType_;
 
   ClemensMemoryPageMap simpleDirectPageMap_;
 

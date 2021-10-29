@@ -15,8 +15,10 @@ void clem_debug_context(ClemensMachine* context) {
 }
 
 void clem_debug_log(int log_level, const char* fmt, ...) {
-    char* buffer = s_clem_machine->mmio.dev_debug.log_buffer;
+    char* buffer;
     va_list arg_list;
+    if (!s_clem_machine) return;
+    buffer = s_clem_machine->mmio.dev_debug.log_buffer;
     va_start(arg_list, fmt);
     vsnprintf(buffer, CLEM_DEBUG_LOG_BUFFER_SIZE, fmt, arg_list);
     va_end(arg_list);
