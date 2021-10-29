@@ -34,12 +34,6 @@
 #define CLEM_IWM_DISK35_CTL_MOTOR_OFF       0x09
 #define CLEM_IWM_DISK35_CTL_EJECT           0x0D
 
-#define CLEM_IWM_DISK35_STATUS_STEP_IN      0x0001
-#define CLEM_IWM_DISK35_STATUS_IO_HEAD_HI   0x0002
-#define CLEM_IWM_DISK35_STATUS_EJECTED      0x0008
-#define CLEM_IWM_DISK35_STATUS_EJECTING     0x0010
-#define CLEM_IWM_DISK35_STATUS_STROBE       0x8000
-
 #define CLEM_IWM_DISK35_STEP_TIME_NS        (12 * 1000)
 #define CLEM_IWM_DISK35_EJECT_TIME_NS       (500 * 1000000)
 
@@ -77,6 +71,7 @@ void clem_disk_read_and_position_head_35(
     track_cur_pos = clem_drive_pre_step(drive, io_flags);
     if (track_cur_pos == CLEM_IWM_DRIVE_INVALID_TRACK_POS) {
         /* should we clear state ? */
+
         return;
     }
 

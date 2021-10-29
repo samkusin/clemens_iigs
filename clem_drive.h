@@ -37,13 +37,18 @@
 
 #define CLEM_IWM_DRIVE_INVALID_TRACK_POS    0xffffffff
 
+#define CLEM_IWM_DISK35_STATUS_STEP_IN      0x0001
+#define CLEM_IWM_DISK35_STATUS_IO_HEAD_HI   0x0002
+#define CLEM_IWM_DISK35_STATUS_EJECTED      0x0008
+#define CLEM_IWM_DISK35_STATUS_EJECTING     0x0010
+#define CLEM_IWM_DISK35_STATUS_STROBE       0x8000
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 void clem_disk_reset_drives(struct ClemensDriveBay* drives);
-
 void clem_disk_start_drive(struct ClemensDrive* drive);
 
 void clem_disk_read_and_position_head_35(

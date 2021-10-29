@@ -105,6 +105,7 @@ void ClemensHost::Diagnostics::reset()
 
 ClemensHost::ClemensHost() :
   machine_(),
+  machineType_(MachineType::None),
   disks35_{},
   disks525_{},
   emulationRunTime_(0.0f),
@@ -139,7 +140,7 @@ ClemensHost::ClemensHost() :
 
   for (auto& disk : disks525_) {
     auto maxDiskDataSize = calculateMaxDiskDataSize(CLEM_DISK_TYPE_5_25);
-    disk.nib.disk_type = CLEM_DISK_TYPE_5_25;
+    disk.nib.disk_type = CLEM_DISK_TYPE_NONE;
     disk.nib.bits_data = (uint8_t*)malloc(maxDiskDataSize);
     disk.nib.bits_data_end = disk.nib.bits_data + maxDiskDataSize;
     disk.diskBrand = ClemensDisk::None;
@@ -147,7 +148,7 @@ ClemensHost::ClemensHost() :
 
   for (auto& disk : disks35_) {
     auto maxDiskDataSize = calculateMaxDiskDataSize(CLEM_DISK_TYPE_3_5);
-    disk.nib.disk_type = CLEM_DISK_TYPE_3_5;
+    disk.nib.disk_type = CLEM_DISK_TYPE_NONE;
     disk.nib.bits_data = (uint8_t*)malloc(maxDiskDataSize);
     disk.nib.bits_data_end = disk.nib.bits_data + maxDiskDataSize;
     disk.diskBrand = ClemensDisk::None;
@@ -1590,6 +1591,8 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
 
   machine_.logger_fn = &ClemensHost::emulatorLog;
 
+  clemens_debug_context(&machine_);
+
   switch (machineType) {
     case MachineType::Apple2GS: {
       const unsigned fpiBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT;
@@ -1639,6 +1642,8 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
 
       simpleMachineIO_ = SimpleMachineIO {};
     } break;
+
+    machineType_ = machineType;
   }
 
   clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
@@ -1656,7 +1661,12 @@ void ClemensHost::destroyMachine()
     return;
   }
   emulationBreak();
+  if (machineType_ == MachineType::Apple2GS) {
+    ejectDisks();
+  }
+  clemens_debug_context(NULL);
   memset(&machine_, 0, sizeof(ClemensMachine));
+  machineType_ = MachineType::None;
 }
 
 void ClemensHost::resetMachine()
@@ -1988,6 +1998,14 @@ void ClemensHost::loadDisks()
   clemens_assign_disk(&machine_, kClemensDrive_3_5_D2, &disks35_[1].nib);
 }
 
+void ClemensHost::ejectDisks()
+{
+  clemens_eject_disk(&machine_, kClemensDrive_5_25_D1, &disks525_[0].nib);
+  clemens_eject_disk(&machine_, kClemensDrive_5_25_D2, &disks525_[1].nib);
+  clemens_eject_disk(&machine_, kClemensDrive_3_5_D1, &disks35_[0].nib);
+  clemens_eject_disk(&machine_, kClemensDrive_3_5_D2, &disks35_[1].nib);
+}
+
 bool ClemensHost::loadDisk(ClemensDriveType driveType, const char* filename)
 {
   ClemensDisk* disk = nullptr;
@@ -2021,46 +2039,55 @@ bool ClemensHost::loadDisk(ClemensDriveType driveType, const char* filename)
   }
   if (!disk) return false;
 
-  while (std::isspace(*filename)) ++filename;
-
   disk->diskBrand = ClemensDisk::None;
 
-  std::string filename_ext = filename;
-  auto filename_ext_pos = filename_ext.find_last_of('.');
-  if (filename_ext_pos != std::string::npos) {
-    if (filename_ext.compare(filename_ext_pos + 1, std::string::npos,
-                             "woz") == 0) {
-      disk->diskBrand = ClemensDisk::WOZ;
-    } else if (filename_ext.compare(filename_ext_pos + 1, std::string::npos,
-                                    "2mg") == 0) {
-      disk->diskBrand = ClemensDisk::IMG2;
-    }
-  }
+  bool isOk = true;
+  if (filename != NULL && filename[0]) {
+    while (std::isspace(*filename)) ++filename;
 
-  struct stat fileStat;
-  bool isOk = false;
-  if (stat(filename, &fileStat) != 0) {
-    disk->nib.disk_type = diskType;
-    disk->nib.is_double_sided = doubleSided;
-    isOk = createBlankDisk(&disk->nib);
-  } else {
-    switch (disk->diskBrand) {
-      case ClemensDisk::WOZ:
-        disk->dataWOZ.nib = &disk->nib;
-        isOk = loadWOZDisk(filename, &disk->dataWOZ, driveType);
-        break;
-      case ClemensDisk::IMG2:
-        disk->data2IMG.nib =  &disk->nib;
-        isOk = load2IMGDisk(filename, &disk->data2IMG, driveType);
-        break;
+    std::string filename_ext = filename;
+    auto filename_ext_pos = filename_ext.find_last_of('.');
+    if (filename_ext_pos != std::string::npos) {
+      if (filename_ext.compare(filename_ext_pos + 1, std::string::npos,
+                               "woz") == 0) {
+        disk->diskBrand = ClemensDisk::WOZ;
+      } else if (filename_ext.compare(filename_ext_pos + 1, std::string::npos,
+                                      "2mg") == 0) {
+        disk->diskBrand = ClemensDisk::IMG2;
+      }
+    }
+
+    struct stat fileStat;
+    if (stat(filename, &fileStat) != 0) {
+      disk->nib.disk_type = diskType;
+      disk->nib.is_double_sided = doubleSided;
+      isOk = createBlankDisk(&disk->nib);
+    } else {
+      switch (disk->diskBrand) {
+        case ClemensDisk::WOZ:
+          disk->dataWOZ.nib = &disk->nib;
+          isOk = loadWOZDisk(filename, &disk->dataWOZ, driveType);
+          break;
+        case ClemensDisk::IMG2:
+          disk->data2IMG.nib =  &disk->nib;
+          isOk = load2IMGDisk(filename, &disk->data2IMG, driveType);
+          break;
+      }
     }
   }
-  if (isOk) {
-    clemens_assign_disk(&machine_, driveType, &disk->nib);
-    disk->path = filename;
-  } else {
-    clemens_eject_disk(&machine_, driveType);
-    disk->path.clear();
+  if (isOk){
+    if (clemens_is_initialized_simple(&machine_)) {
+      if (filename != NULL && filename[0]) {
+        isOk = clemens_assign_disk(&machine_, driveType, &disk->nib);
+      } else {
+        clemens_eject_disk(&machine_, driveType, &disk->nib);
+      }
+    }
+    if (filename != NULL && filename[0]) {
+      disk->path = filename;
+    } else {
+      disk->path.clear();
+    }
   }
 
   return isOk;

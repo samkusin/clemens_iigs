@@ -178,6 +178,7 @@ void clem_iwm_reset(struct ClemensDeviceIWM* iwm);
  *
  * @param iwm
  * @param drive_type
+ * @param disk
  */
 void clem_iwm_insert_disk(struct ClemensDeviceIWM* iwm,
                           struct ClemensDrive* drive,
@@ -188,9 +189,11 @@ void clem_iwm_insert_disk(struct ClemensDeviceIWM* iwm,
  *
  * @param iwm
  * @param drive_type
+ * @param disk
  */
 void clem_iwm_eject_disk(struct ClemensDeviceIWM* iwm,
-                         struct ClemensDrive* drive);
+                         struct ClemensDrive* drive,
+                         struct ClemensNibbleDisk* disk);
 
 /**
  * @brief Executed frequently enough to emulate a IWM controller

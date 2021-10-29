@@ -279,12 +279,18 @@ void clem_iwm_insert_disk(
 
 void clem_iwm_eject_disk(
    struct ClemensDeviceIWM* iwm,
-   struct ClemensDrive* drive
+   struct ClemensDrive* drive,
+   struct ClemensNibbleDisk* disk
 ) {
+    if (drive->has_disk) {
+        memcpy(disk, &drive->disk, sizeof(drive->disk));
+        if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
+            drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_EJECTING;
+            drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_EJECTED;
+        }
+        drive->has_disk = false;
+    }
     memset(&drive->disk, 0, sizeof(drive->disk));
-    drive->has_disk = false;
-    // clear disk after timeout
-    // after timeout, reset drive state
 }
 
 struct ClemensDrive* _clem_iwm_select_drive(

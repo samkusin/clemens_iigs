@@ -28,6 +28,13 @@
 
 static uint8_t s_empty_ram[CLEM_IIGS_BANK_SIZE];
 
+static const char* s_drive_names[] = {
+    "ClemensDisk 3.5 D1",
+    "ClemensDisk 3.5 D2",
+    "ClemensDisk 5.25 D1",
+    "ClemensDisk 5.25 D2",
+};
+
 
 /*
  * The Clemens Emulator
@@ -342,7 +349,7 @@ void _clem_debug_memory_dump(
         }
         fclose(fp);
     } else {
-        printf("Failed to dump memory %s", filename);
+        CLEM_WARN("Failed to dump memory %s", filename);
     }
 }
 
@@ -925,6 +932,10 @@ void clemens_simple_init(
     _clem_init_instruction_map();
 }
 
+void clemens_debug_context(ClemensMachine* clem) {
+    clem_debug_context(clem);
+}
+
 #define CLEM_LOAD_HEX_STATE_BEGIN   '\0'
 #define CLEM_LOAD_HEX_STATE_ERROR   -1
 #define CLEM_LOAD_HEX_STATE_CR      '\r'
@@ -1149,6 +1160,9 @@ bool clemens_assign_disk(
     if (!disk) {
         return false;
     }
+    if (!clemens_is_initialized_simple(clem)) {
+        return false;
+    }
     /* filter out 'bad' disk/drive pairings before the IWM has a chance to flag
        them
     */
@@ -1163,15 +1177,26 @@ bool clemens_assign_disk(
     } else {
         return false;
     }
-
+    if (disk->disk_type != CLEM_DISK_TYPE_NONE) {
+        CLEM_LOG("%s inserting disk", s_drive_names[drive_type]);
+    }
     clem_iwm_insert_disk(&clem->mmio.dev_iwm, drive, disk);
     return true;
 }
 
-void clemens_eject_disk(ClemensMachine* clem, enum ClemensDriveType drive_type) {
+void clemens_eject_disk(
+    ClemensMachine* clem,
+    enum ClemensDriveType drive_type,
+    struct ClemensNibbleDisk* disk
+) {
     struct ClemensDrive* drive = clemens_drive_get(clem, drive_type);
     if (!drive) return;
-    clem_iwm_eject_disk(&clem->mmio.dev_iwm, drive);
+    if (!clemens_is_initialized_simple(clem)) return;
+
+    if (drive->disk.disk_type != CLEM_DISK_TYPE_NONE) {
+        CLEM_LOG("%s ejecting disk", s_drive_names[drive_type]);
+    }
+    clem_iwm_eject_disk(&clem->mmio.dev_iwm, drive, disk);
 }
 
 ClemensMonitor* clemens_get_monitor(
@@ -3478,7 +3503,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             cpu->enabled = false;
             break;
         default:
-            printf("Unknown IR = %x\n", IR);
+            CLEM_WARN("Unknown IR = %x\n", IR);
             assert(false);
             break;
     }
@@ -3498,8 +3523,6 @@ void clemens_emulate(ClemensMachine* clem) {
     struct ClemensMMIO* mmio = &clem->mmio;
     struct ClemensClock clock;
     uint32_t delta_mega2_cycles;
-
-    clem_debug_context(clem);
 
     if (!cpu->pins.resbIn) {
         /*  the reset interrupt overrides any other state
