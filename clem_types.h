@@ -6,25 +6,14 @@
 
 #include "clem_defs.h"
 #include "clem_disk.h"
+#include "clem_shared.h"
+
+typedef struct ClemensMachine ClemensMachine;
+typedef void (*LoggerFn)(int level, ClemensMachine* machine, const char* msg);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef uint64_t clem_clocks_time_t;
-typedef uint32_t clem_clocks_duration_t;
-
-typedef struct ClemensMachine ClemensMachine;
-
-typedef void (*LoggerFn)(int level, ClemensMachine* machine, const char* msg);
-
-
-#define CLEM_TIME_UNINITIALIZED         ((clem_clocks_time_t)(-1))
-
-struct ClemensClock {
-    clem_clocks_time_t ts;
-    clem_clocks_duration_t ref_step;
-};
 
 /* Typically used as parameters to MMIO functions that require context on how
    they were called (as part of a MMIO read or write operation)
@@ -583,12 +572,6 @@ typedef struct {
     unsigned frame_count;       /** --frame-- count (this can wrap around) */
     unsigned frame_stride;      /** each frame is this size */
 } ClemensAudio;
-
-typedef struct {
-    void (*io_read)(uint8_t* data, uint16_t adr, uint8_t flags);
-    void (*io_write)(uint8_t data, uint16_t adr, uint8_t flags);
-    uint32_t (*io_sync)(struct ClemensClock* clock);
-} ClemensCard;
 
 /**
  * @brief

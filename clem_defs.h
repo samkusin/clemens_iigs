@@ -88,7 +88,7 @@
 #define CLEM_65816_IRQB_VECTOR_LO_ADDR      (0xFFEE)
 #define CLEM_65816_IRQB_VECTOR_HI_ADDR      (0xFFEF)
 
-/** IRQ line masks */
+/** IRQ line masks (0xff000000 are reserved for slot IRQs*/
 #define CLEM_IRQ_VGC_SCAN_LINE              (0x00000010)
 #define CLEM_IRQ_VGC_BLANK                  (0x00000020)
 #define CLEM_IRQ_VGC_MASK                   (0x000000f0)

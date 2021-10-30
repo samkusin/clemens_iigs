@@ -551,13 +551,13 @@ static uint8_t _clem_mmio_read(
     struct ClemensClock ref_clock;
     uint8_t result = 0x00;
     uint8_t ioreg = addr & 0xff;
-    bool is_noop = (flags & CLEM_MEM_IO_READ_NO_OP) != 0;
+    bool is_noop = (flags & CLEM_OP_IO_READ_NO_OP) != 0;
 
     if (!is_noop) {
         ++mmio->dev_debug.ioreg_read_ctr[ioreg];
     }
 
-    if (!(flags & CLEM_MEM_IO_READ_NO_OP)) {
+    if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
         /* disk motor speed registers */
         *mega2_access = true;
     }
@@ -702,51 +702,51 @@ static uint8_t _clem_mmio_read(
             result = _clem_mmio_inttype_c046(mmio);
             break;
         case CLEM_MMIO_REG_CLRVBLINT:
-            if (!(flags & CLEM_MEM_IO_READ_NO_OP)) {
+            if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
                 _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_QSEC | CLEM_IRQ_VGC_BLANK);
             }
             break;
         case CLEM_MMIO_REG_TXTCLR:
-            if (!(flags & CLEM_MEM_IO_READ_NO_OP)) {
+            if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
                 clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_GRAPHICS_MODE);
             }
             break;
         case CLEM_MMIO_REG_TXTSET:
-            if (!(flags & CLEM_MEM_IO_READ_NO_OP)) {
+            if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
                 clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_GRAPHICS_MODE);
             }
             break;
         case CLEM_MMIO_REG_MIXCLR:
-            if (!(flags & CLEM_MEM_IO_READ_NO_OP)) {
+            if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
                 clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_MIXED_TEXT);
             }
             break;
         case CLEM_MMIO_REG_MIXSET:
-            if (!(flags & CLEM_MEM_IO_READ_NO_OP)) {
+            if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
                 clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_MIXED_TEXT);
             }
             break;
         case CLEM_MMIO_REG_TXTPAGE1:
-            if (!(flags & CLEM_MEM_IO_READ_NO_OP)) {
+            if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
                 _clem_mmio_memory_map(
                     mmio, mmio->mmap_register & ~CLEM_MEM_IO_MMAP_TXTPAGE2);
             }
             break;
         case CLEM_MMIO_REG_TXTPAGE2:
-            if (!(flags & CLEM_MEM_IO_READ_NO_OP)) {
+            if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
                 _clem_mmio_memory_map(
                     mmio, mmio->mmap_register | CLEM_MEM_IO_MMAP_TXTPAGE2);
             }
             break;
         case CLEM_MMIO_REG_LORES:
             /* implicitly clears hires */
-            if (!(flags & CLEM_MEM_IO_READ_NO_OP)) {
+            if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
                 clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_LORES);
             }
             break;
         case CLEM_MMIO_REG_HIRES:
             /* implicitly clears lores */
-            if (!(flags & CLEM_MEM_IO_READ_NO_OP)) {
+            if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
                 clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_HIRES);
             }
             break;
@@ -798,7 +798,7 @@ static uint8_t _clem_mmio_read(
         case CLEM_MMIO_REG_LC1_ROM_WP2:
         case CLEM_MMIO_REG_LC1_RAM_WE:
         case CLEM_MMIO_REG_LC1_RAM_WE2:
-            if (!(flags & CLEM_MEM_IO_READ_NO_OP)) {
+            if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
                 result = _clem_mmio_rw_bank_select(mmio, addr);
             }
             break;
@@ -847,7 +847,7 @@ static void _clem_mmio_write(
 ) {
     struct ClemensMMIO* mmio = &clem->mmio;
     struct ClemensClock ref_clock;
-    bool is_noop = (mem_flags & CLEM_MEM_IO_READ_NO_OP) != 0;
+    bool is_noop = (mem_flags & CLEM_OP_IO_READ_NO_OP) != 0;
     uint8_t ioreg;
 
     if (addr >= 0xC100) {
@@ -1702,11 +1702,12 @@ void clem_read(
     if (page->flags & CLEM_MEM_IO_MEMORY_MASK) {
         if (page->flags & CLEM_MEM_PAGE_IOADDR_FLAG) {
             *data = _clem_mmio_read(
-                clem, offset, read_only ? CLEM_MEM_IO_READ_NO_OP : 0, &mega2_access);
+                clem, offset, read_only ? CLEM_OP_IO_READ_NO_OP : 0, &mega2_access);
         } else if (page->flags & CLEM_MEM_PAGE_CARDMEM_FLAG) {
             if (page->bank_read == 0x00 && clem->card_slot[page->read]) {
                 (*clem->card_slot[page->read]->io_read)(
-                    data, offset, read_only ? CLEM_MEM_IO_READ_NO_OP : 0);
+                    data, offset, read_only ? CLEM_OP_IO_READ_NO_OP : 0,
+                    clem->card_slot[page->read]->context);
             } else if (clem->mmio.card_expansion_rom_index >= 0) {
                 *data = clem->card_slot_expansion_memory[(
                     clem->mmio.card_expansion_rom_index)][offset];
@@ -1782,7 +1783,7 @@ void clem_write(
         } else if (page->flags & CLEM_MEM_PAGE_CARDMEM_FLAG) {
             if (page->bank_write == 0x00 && clem->card_slot[page->write]) {
                 (*clem->card_slot[page->write]->io_write)(
-                    data, offset, mem_flags);
+                    data, offset, mem_flags, clem->card_slot[page->write]->context);
             } else {
                 //  Always ROM?
                 CLEM_ASSERT(false);

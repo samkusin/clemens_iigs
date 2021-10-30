@@ -193,7 +193,7 @@ uint8_t clem_vgc_read_switch(
     unsigned v_counter;
     unsigned h_counter;
 
-    if (!(flags & CLEM_MEM_IO_READ_NO_OP)) {
+    if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
         clem_vgc_sync(vgc, clock);
     }
     scan_time_ns = _clem_calc_ns_step_from_clocks(

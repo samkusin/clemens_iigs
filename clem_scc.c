@@ -48,7 +48,7 @@ uint8_t clem_scc_read_switch(
     uint8_t flags
 ) {
     uint8_t value = 0;
-    bool is_noop = (flags & CLEM_MEM_IO_READ_NO_OP) != 0;
+    bool is_noop = (flags & CLEM_OP_IO_READ_NO_OP) != 0;
     switch (ioreg) {
         case CLEM_MMIO_REG_SCC_B_CMD:
         case CLEM_MMIO_REG_SCC_A_CMD:

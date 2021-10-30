@@ -73,11 +73,6 @@
 //  Bits 24-31 deal with memory mapped features not covered above
 
 
-/** Flags for _clem_mmio_read */
-#define CLEM_MEM_IO_READ_NO_OP        0x01
-
-#define CLEM_IS_IO_READ_NO_OP(_flags_) (((_flags_) & CLEM_MEM_IO_READ_NO_OP) != 0)
-
 /**
  * IO Registers
  */

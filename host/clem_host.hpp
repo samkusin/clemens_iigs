@@ -9,7 +9,7 @@
 
 #include "cinek/fixedstack.hpp"
 #include "clem_host_utils.hpp"
-#include "contrib/mpack.h"
+#include "external/mpack.h"
 
 #include <cstdint>
 #include <vector>

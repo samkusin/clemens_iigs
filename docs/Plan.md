@@ -14,13 +14,10 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
-* Remove ClemensDrive dependencies on WOZ and 2IMG (ClemensNibbleDisk)
-  * Serializer changes with new ClemensNibbleDisk and has_disk field for
-    ClemensDrive
+* Fix serialization
 * Support DSK and PO, 2IMG files
   * 2IMG serialization
   * Allow PO loading from the 2IMG system (for .po files)
-* IWM 3.5" write support
 * Enable custom logic for card slot reads/writes since different cards map
   registers to their dedicated page instead of at $c0xx
 * AY8910 emulation for Mockingboard
@@ -66,6 +63,10 @@ This is a running todo list.
 
 ## DONE
 
+* Remove ClemensDrive dependencies on WOZ and 2IMG (ClemensNibbleDisk)
+  * Serializer changes with new ClemensNibbleDisk and has_disk field for
+    ClemensDrive
+* IWM 3.5" write support
 * Scan boot to slot 5 may not work vs direct boot to 5
 * GUI improvements
 * ProDOS 16 boot

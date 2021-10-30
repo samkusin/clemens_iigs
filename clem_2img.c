@@ -1,5 +1,5 @@
 #include "clem_2img.h"
-#include "contrib/cross_endian.h"
+#include "external/cross_endian.h"
 
 #include <string.h>
 #include <assert.h>

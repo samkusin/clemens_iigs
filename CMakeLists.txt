@@ -54,7 +54,7 @@ set(EMULATOR_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/emulator.c")
 
 set(CONTRIB_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/contrib/mpack.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/external/mpack.c"
     )
 
 add_library(clemens_65816 STATIC

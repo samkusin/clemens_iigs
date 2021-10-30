@@ -2,7 +2,7 @@
 #define CLEM_SERIALIZER_H
 
 #include "clem_types.h"
-#include "contrib/mpack.h"
+#include "external/mpack.h"
 
 #define CLEM_SERIALIZER_INVALID_RECORD      (UINT_MAX)
 

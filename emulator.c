@@ -3523,6 +3523,9 @@ void clemens_emulate(ClemensMachine* clem) {
     struct ClemensMMIO* mmio = &clem->mmio;
     struct ClemensClock clock;
     uint32_t delta_mega2_cycles;
+    uint32_t card_result;
+    uint32_t card_irqs;
+    unsigned i;
 
     if (!cpu->pins.resbIn) {
         /*  the reset interrupt overrides any other state
@@ -3640,6 +3643,15 @@ void clemens_emulate(ClemensMachine* clem) {
 
         clock.ts = clem->clocks_spent;
         clock.ref_step = clem->clocks_step_mega2;
+
+        card_irqs = 0;
+        for (i = 0; i < 7; ++i) {
+            if (clem->card_slot[i]) {
+                card_result = (*clem->card_slot[i]->io_sync)(
+                    &clock, clem->card_slot[i]->context);
+                if (card_result & 0x80000000) card_irqs |= (CLEM_IRQ_SLOT_1 << i);
+            }
+        }
 
         clem_vgc_sync(&mmio->vgc, &clock);
         clem_iwm_glu_sync(&mmio->dev_iwm, &clem->active_drives, &clock);
