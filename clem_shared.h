@@ -14,15 +14,6 @@ typedef uint32_t clem_clocks_duration_t;
 #define CLEM_OP_IO_READ_NO_OP        0x01
 #define CLEM_IS_IO_READ_NO_OP(_flags_) (((_flags_) & CLEM_OP_IO_READ_NO_OP) != 0)
 
-/** These are returned via io_sync and applied to the main IRQ line */
-#define CLEM_IRQ_SLOT_1                     (0x01000000)
-#define CLEM_IRQ_SLOT_2                     (0x02000000)
-#define CLEM_IRQ_SLOT_3                     (0x04000000)
-#define CLEM_IRQ_SLOT_4                     (0x08000000)
-#define CLEM_IRQ_SLOT_5                     (0x10000000)
-#define CLEM_IRQ_SLOT_6                     (0x20000000)
-#define CLEM_IRQ_SLOT_7                     (0x40000000)
-
 
 #ifdef __cplusplus
 extern "C" {

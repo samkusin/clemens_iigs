@@ -99,6 +99,15 @@
 #define CLEM_IRQ_ADB_MOUSE_SRQ              (0x00020000) /* IIgs Unsupported */
 #define CLEM_IRQ_ADB_DATA                   (0x00040000)
 #define CLEM_IRQ_ADB_MASK                   (0x000f0000)
+#define CLEM_IRQ_SLOT_1                     (0x01000000)
+#define CLEM_IRQ_SLOT_2                     (0x02000000)
+#define CLEM_IRQ_SLOT_3                     (0x04000000)
+#define CLEM_IRQ_SLOT_4                     (0x08000000)
+#define CLEM_IRQ_SLOT_5                     (0x10000000)
+#define CLEM_IRQ_SLOT_6                     (0x20000000)
+#define CLEM_IRQ_SLOT_7                     (0x40000000)
+#define CLEM_IRQ_ON                         (0x80000000) /* used by devices */
+
 
 /** Opcodes! */
 #define CLEM_OPC_ADC_IMM                    (0x69)

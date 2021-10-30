@@ -104,10 +104,12 @@ private:
   void emulationBreak();
   void resetDiagnostics();
   bool loadDisk(ClemensDriveType driveType, const char* filename);
-  void loadDisks();
+  void insertDisks();
   void ejectDisks();
   void loadBRAM();
   void saveBRAM();
+  void insertCards();
+  void ejectCards();
 
   void saveDiskMetadata(mpack_writer_t* writer, const ClemensDisk& disk);
   void loadDiskMetadata(mpack_reader_t* reader, ClemensDisk& disk);
@@ -156,6 +158,8 @@ private:
 
   std::array<struct ClemensDisk, 2> disks35_;
   std::array<struct ClemensDisk, 2> disks525_;
+
+  ClemensCard mockingboard_;
 
   float emulationRunTime_;
   float emulationSliceTimeLeft_;

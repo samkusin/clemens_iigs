@@ -83,4 +83,5 @@ target_link_libraries(clemens_65816_emulator PRIVATE clemens_65816)
 
 project_create_assets_target(clemens_65816_emulator)
 
+add_subdirectory(iocards)
 add_subdirectory(host)

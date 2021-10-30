@@ -7,7 +7,8 @@
 extern "C" {
 #endif
 
-void clem_card_mockingboard_register(ClemensCard* card);
+void clem_card_mockingboard_initialize(ClemensCard* card);
+void clem_card_mockingboard_uninitialize(ClemensCard* card);
 
 #ifdef __cplusplus
 }

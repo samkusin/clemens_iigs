@@ -3649,7 +3649,7 @@ void clemens_emulate(ClemensMachine* clem) {
             if (clem->card_slot[i]) {
                 card_result = (*clem->card_slot[i]->io_sync)(
                     &clock, clem->card_slot[i]->context);
-                if (card_result & 0x80000000) card_irqs |= (CLEM_IRQ_SLOT_1 << i);
+                if (card_result & CLEM_IRQ_ON) card_irqs |= (CLEM_IRQ_SLOT_1 << i);
             }
         }
 
@@ -3674,7 +3674,9 @@ void clemens_emulate(ClemensMachine* clem) {
             mmio->dev_adb.irq_line |
             mmio->dev_timer.irq_line |
             mmio->dev_audio.irq_line |
-            mmio->vgc.irq_line);
+            mmio->vgc.irq_line |
+            card_irqs
+        );
         clem_iwm_speed_disk_gate(clem);
 
         cpu->pins.irqbIn = mmio->irq_line == 0;

@@ -31,6 +31,8 @@
 #include <inttypes.h>
 #include <sys/stat.h>
 
+#include "iocards/mockingboard.h"
+
 namespace {
   constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
   constexpr float kMinDebugHistoryHeight = 256;
@@ -1604,6 +1606,8 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
                   slab_.allocate(2048 * 7),
                   fpiBankCount);
 
+      insertCards();
+      insertDisks();
       loadBRAM();
 
       ClemensAudioMixBuffer mix_buffer;
@@ -1613,7 +1617,7 @@ bool ClemensHost::createMachine(const char* filename, MachineType machineType)
       mix_buffer.data = (uint8_t*)(
         slab_.allocate(mix_buffer.frame_count * mix_buffer.stride));
       clemens_assign_audio_mix_buffer(&machine_, &mix_buffer);
-      loadDisks();
+
       success = true;
     } break;
     case MachineType::Simple128K: {
@@ -1663,6 +1667,7 @@ void ClemensHost::destroyMachine()
   emulationBreak();
   if (machineType_ == MachineType::Apple2GS) {
     ejectDisks();
+    ejectCards();
   }
   clemens_debug_context(NULL);
   memset(&machine_, 0, sizeof(ClemensMachine));
@@ -1988,9 +1993,24 @@ void ClemensHost::dumpMemory(unsigned bank, const char* filename)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// Card Management
+
+void ClemensHost::insertCards()
+{
+  clem_card_mockingboard_initialize(&mockingboard_);
+  machine_.card_slot[4] = &mockingboard_;
+}
+
+void ClemensHost::ejectCards()
+{
+  machine_.card_slot[4] = NULL;
+  clem_card_mockingboard_uninitialize(&mockingboard_);
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // Disk Management
 
-void ClemensHost::loadDisks()
+void ClemensHost::insertDisks()
 {
   clemens_assign_disk(&machine_, kClemensDrive_5_25_D1, &disks525_[0].nib);
   clemens_assign_disk(&machine_, kClemensDrive_5_25_D2, &disks525_[1].nib);
