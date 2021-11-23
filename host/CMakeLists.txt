@@ -6,6 +6,27 @@ project(clements_iigs LANGUAGES C CXX)
 # build imgui
 # build app
 
+# TODO: make header-only version when ready
+set(CKAUDIO_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/core.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/types.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/context.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/core.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/mathops.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/mathops.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/mixer.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/queue.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/queue.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wincoreaudio.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/winmixer.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wintime.c")
+
+add_library(ckaudio STATIC ${CKAUDIO_SOURCES})
+
+target_include_directories(ckaudio
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+
+
 set(SOKOL_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/sokol/sokol_gfx.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/sokol/sokol_app.h"
@@ -51,7 +72,8 @@ target_link_libraries(clemens_iigs
     PRIVATE
         clemens_65816
         clemens_65816_serializer
-        clemens_65816_iocards)
+        clemens_65816_iocards
+        ckaudio)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(clemens_iigs PRIVATE -Wall -Wextra -pedantic)
