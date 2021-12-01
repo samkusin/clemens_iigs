@@ -405,7 +405,7 @@ static DWORD __stdcall ckaudio_win32_worker(LPVOID context_opaque) {
                                             AUDCLNT_STREAMFLAGS_EVENTCALLBACK |
                                                 AUDCLNT_STREAMFLAGS_NOPERSIST,
                                             CKAUDIO_WIN32_DESIRED_LATENCY_MS *
-                                                1000,
+                                                10000,  /* 100 ns units */
                                             0, endpoint_format, NULL);
             if (SUCCEEDED(hr)) {
                 worker->device_format.frame_size = endpoint_format->nBlockAlign;
@@ -561,6 +561,8 @@ ckaudio_int_start_worker(struct CKAudioWorker *worker,
 
     worker->thread_handle =
         CreateThread(NULL, 0, ckaudio_win32_worker, worker, 0, NULL);
+
+    SetThreadPriority(worker->thread_handle, THREAD_PRIORITY_HIGHEST);
 
     strncpy(notify_handler.type, "ready", sizeof(notify_handler.type));
 

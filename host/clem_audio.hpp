@@ -13,6 +13,7 @@ public:
   ~ClemensAudioDevice();
 
   unsigned getAudioFrequency() const;
+  unsigned getBufferStride() const;
 
   void start();
   void stop();
@@ -20,10 +21,16 @@ public:
 
 private:
   static uint32_t mixAudio(CKAudioBuffer *audioBuffer, CKAudioTimePoint *timepoint, void *ctx);
+  static uint32_t mixClemensAudio(CKAudioBuffer *audioBuffer, CKAudioTimePoint *timepoint, void *ctx);
   CKAudioMixer *mixer_;
   CKAudioDataFormat dataFormat_;
 
-  std::vector<uint8_t> queuedFrames_;
+  uint8_t* queuedFrameBuffer_;
+  uint32_t queuedFrameHead_;
+  uint32_t queuedFrameTail_;
+  uint32_t queuedFrameLimit_;
+  uint32_t queuedFrameStride_;
+  uint32_t queuedPreroll_;
 };
 
 #endif

@@ -20,7 +20,9 @@
 
 */
 
-#define CKAUDIO_MIXER_ACTION_TYPE_DIRTY 0x80000000
+static inline float _ckaudio_api_to_scalar_volume(uint32_t api_volume) {
+    return api_volume * 0.01f;
+}
 
 /* [in:channels] | [in:format_enum] | [out:channels] | [out:format_enum] */
 #define CKAUDIO_MIXER_INT_PCM_1_TO_FLOAT_2 0x01010202
@@ -28,8 +30,8 @@
 #define CKAUDIO_MIXER_INT_FLOAT_1_TO_FLOAT_2 0x01020202
 #define CKAUDIO_MIXER_INT_FLOAT_2_TO_FLOAT_2 0x02020202
 
-uint32_t _ckaudio_mixer_get_out_in_xform_id(CKAudioDataFormat *out,
-                                            CKAudioDataFormat *in) {
+static uint32_t _ckaudio_mixer_get_out_in_xform_id(CKAudioDataFormat *out,
+                                                   CKAudioDataFormat *in) {
     unsigned tmp;
     tmp = (out->buffer_format & 0xff);
     tmp |= (out->num_channels & 0xff) << 8;
@@ -55,6 +57,8 @@ enum CKAudioMixerTrackState {
 
 struct CKAudioMixerTrackAction {
     CKAudioBuffer *attached_buffer;
+    CKAudioReadyCallback callback;
+    void* callback_cb;
     uint32_t type;
     union CKAudioMixerParam params[8];
 };
@@ -92,29 +96,8 @@ typedef struct CKAudioMixerT {
     uint64_t render_count;
 } CKAudioMixer;
 
-/*
-#define CKAUDIO_MIXER_ACTION_LIMIT 16
-
-struct CKAudioMixerAction *_ckaudio_int_allocate_action(CKAudioMixer *mixer) {
-    struct CKAudioMixerAction *head = mixer->free_action_list;
-    struct CKAudioMixerAction *node = head;
-    if (node->next == head) {
-        return NULL;
-    }
-    head->next = node->next;
-    memset(node, 0, sizeof(*node));
-    return node;
-}
-    int i;
-
-    mixer->free_action_list = ckaudio_allocator_typed_calloc(
-        &g_ckaudio_context, struct CKAudioMixerAction,
-        CKAUDIO_MIXER_ACTION_LIMIT + 1);
-    for (i = 0; i < CKAUDIO_MIXER_ACTION_LIMIT; ++i) {
-        mixer->free_action_list[i].next = &mixer->free_action_list[i + 1];
-    }
-
-*/
+static uint32_t _ckaudio_mixer_render_waveform(uint32_t conv_id,
+    CKAudioBuffer* in, float volume, CKAudioBuffer *out);
 
 static void _ckaudio_mixer_commit_staging_tracks(CKAudioMixer *mixer);
 
@@ -222,6 +205,27 @@ void ckaudio_mixer_set_track_action_buffer(CKAudioMixer *mixer,
     action->dirty = 1;
 }
 
+uint32_t ckaudio_mixer_render_waveform(CKAudioBuffer* out, CKAudioBuffer* in,
+                                   uint32_t volume) {
+    return _ckaudio_mixer_render_waveform(_ckaudio_mixer_get_out_in_xform_id(
+        &out->data_format, &in->data_format), in,
+        _ckaudio_api_to_scalar_volume(volume), out);
+}
+
+void ckaudio_mixer_set_track_callback(CKAudioMixer *mixer,
+                                      uint32_t track_id,
+                                      CKAudioReadyCallback callback,
+                                      void* cb_ctx) {
+    struct CKAudioMixerStagingAction *action;
+    if (track_id >= mixer->track_count) {
+        return;
+    }
+    action = &mixer->staging_actions[track_id];
+    action->data.callback = callback;
+    action->data.callback_cb = cb_ctx;
+    action->dirty = 1;
+}
+
 static void _ckaudio_mixer_commit_staging_tracks(CKAudioMixer *mixer) {
     int i;
     for (i = 0; i < mixer->track_count; ++i) {
@@ -240,7 +244,7 @@ static void _ckaudio_mixer_commit_staging_tracks(CKAudioMixer *mixer) {
                 track->action[0].state = kCKAudioMixerTrackStateBegin;
             }
             track->volume = action->volume;
-            memset(action, 0, sizeof(*action));
+            action->dirty = 0;
         }
     }
 }
@@ -301,6 +305,8 @@ _ckaudio_mixer_track_begin_action(struct CKAudioMixerTrackLiveAction *action,
             action->scratch[0].u32 = _ckaudio_mixer_get_out_in_xform_id(
                 &out->data_format, &action->data.attached_buffer->data_format);
         }
+        break;
+    case CKAUDIO_MIXER_ACTION_TYPE_STREAM:
         break;
     }
 
@@ -385,27 +391,32 @@ _ckaudio_mixer_track_sine_tone(struct CKAudioMixerTrackLiveAction *action,
     action->scratch[0].f = tone_theta;
 }
 
-static void _ckaudio_mixer_track_waveform_pcm_2_float_2(
-    struct CKAudioMixerTrackLiveAction *action, float dt, float volume,
+static uint32_t _ckaudio_mixer_render_waveform_pcm_2_float_2(
+    CKAudioBuffer* in, float volume,
     CKAudioBuffer *out) {
     unsigned frame_idx;
     unsigned frame_size = out->data_format.frame_size;
     float in_frame_ctr;
     float in_frame_delta;
     unsigned in_frame_size =
-        action->data.attached_buffer->data_format.frame_size;
+        in->data_format.frame_size;
     uint8_t *raw_dest = (uint8_t *)(out->data);
-    uint8_t *raw_src = (uint8_t *)(action->data.attached_buffer->data);
+    uint8_t *raw_src = (uint8_t *)(in->data);
     float *frame;
     uint16_t *frame_src;
+    unsigned frame_limit = out->frame_limit;
     float v;
 
     in_frame_delta =
-        ((float)action->data.attached_buffer->data_format.frequency /
+        ((float)in->data_format.frequency /
          out->data_format.frequency);
 
+    if (frame_limit > in->frame_limit) {
+        frame_limit = in->frame_limit;
+    }
+
     in_frame_ctr = 0.0f;
-    for (frame_idx = 0; frame_idx < out->frame_limit; ++frame_idx) {
+    for (frame_idx = 0; frame_idx < frame_limit; ++frame_idx) {
         frame = (float *)raw_dest;
         frame_src =
             (uint16_t *)(raw_src + (unsigned)in_frame_ctr * in_frame_size);
@@ -418,27 +429,50 @@ static void _ckaudio_mixer_track_waveform_pcm_2_float_2(
         in_frame_ctr += in_frame_delta;
         raw_dest += frame_size;
     }
+    return frame_limit;
 }
 
-static void
-_ckaudio_mixer_track_waveform(struct CKAudioMixerTrackLiveAction *action,
-                              float dt, float volume, CKAudioBuffer *out) {
+static uint32_t _ckaudio_mixer_render_waveform(uint32_t conv_id,
+    CKAudioBuffer* in, float volume, CKAudioBuffer *out) {
 
-    switch (action->scratch[0].u32) {
+    switch (conv_id) {
     case CKAUDIO_MIXER_INT_PCM_1_TO_FLOAT_2:
         break;
     case CKAUDIO_MIXER_INT_PCM_2_TO_FLOAT_2:
-        _ckaudio_mixer_track_waveform_pcm_2_float_2(action, dt, volume, out);
-        break;
+        return _ckaudio_mixer_render_waveform_pcm_2_float_2(in, volume, out);
     case CKAUDIO_MIXER_INT_FLOAT_1_TO_FLOAT_2:
         break;
     case CKAUDIO_MIXER_INT_FLOAT_2_TO_FLOAT_2:
         break;
     }
+    return 0;
+}
+
+
+static inline void
+_ckaudio_mixer_track_waveform(struct CKAudioMixerTrackLiveAction *action,
+                              float dt, float volume, CKAudioBuffer *out) {
+    _ckaudio_mixer_render_waveform(action->scratch[0].u32,
+        action->data.attached_buffer, volume, out);
+}
+
+static void
+_ckaudio_mixer_track_stream(struct CKAudioMixerTrackLiveAction *action,
+                            CKAudioTimePoint *timepoint, float dt,
+                            float volume, CKAudioBuffer *out) {
+    if (!action->data.callback) {
+        return;
+    }
+
+    (*action->data.callback)(out, timepoint, action->data.callback_cb);
+
+    _ckaudio_mixer_render_waveform(action->scratch[0].u32,
+        action->data.attached_buffer, volume, out);
 }
 
 static void _ckaudio_mixer_track_action(struct CKAudioMixerTrack *track,
-                                        unsigned action_index, float dt,
+                                        unsigned action_index,
+                                        CKAudioTimePoint *timepoint, float dt,
                                         CKAudioBuffer *out) {
     struct CKAudioMixerTrackLiveAction *action = &track->action[action_index];
 
@@ -449,20 +483,27 @@ static void _ckaudio_mixer_track_action(struct CKAudioMixerTrack *track,
         /* TODO: attack, decay and release */
         switch (action->data.type) {
         case CKAUDIO_MIXER_ACTION_TYPE_SINE_TONE:
-            _ckaudio_mixer_track_sine_tone(action, dt, track->volume * 0.01f,
+            _ckaudio_mixer_track_sine_tone(action, dt,
+                                           _ckaudio_api_to_scalar_volume(track->volume),
                                            out);
             break;
         case CKAUDIO_MIXER_ACTION_TYPE_SQUARE_TONE:
-            _ckaudio_mixer_track_square_tone(action, dt, track->volume * 0.01f,
+            _ckaudio_mixer_track_square_tone(action, dt,
+                                             _ckaudio_api_to_scalar_volume(track->volume),
                                              out);
             break;
         case CKAUDIO_MIXER_ACTION_TYPE_WAVEFORM:
             if (action->data.attached_buffer) {
-                _ckaudio_mixer_track_waveform(action, dt, track->volume * 0.01f,
+                _ckaudio_mixer_track_waveform(action, dt,
+                                              _ckaudio_api_to_scalar_volume(track->volume),
                                               out);
             }
             break;
-
+        case CKAUDIO_MIXER_ACTION_TYPE_STREAM:
+            _ckaudio_mixer_track_stream(action, timepoint,
+                                        dt, _ckaudio_api_to_scalar_volume(track->volume),
+                                        out);
+            break;
         default:
             break;
         }
@@ -477,7 +518,6 @@ uint32_t ckaudio_mixer_render(CKAudioMixer *mixer, CKAudioBuffer *out,
     int track_id;
 
     ckaudio_mixer_platform_lock(mixer->platform);
-
     dt =
         mixer->render_count > 0
             ? ckaudio_timepoint_deltaf(timepoint, &mixer->last_update_timepoint)
@@ -487,8 +527,8 @@ uint32_t ckaudio_mixer_render(CKAudioMixer *mixer, CKAudioBuffer *out,
 
     for (track_id = 0; track_id < mixer->track_count; ++track_id) {
         track = &mixer->tracks[track_id];
-        _ckaudio_mixer_track_action(track, 0, dt, out);
-        _ckaudio_mixer_track_action(track, 1, dt, out);
+        _ckaudio_mixer_track_action(track, 0, timepoint, dt, out);
+        _ckaudio_mixer_track_action(track, 1, timepoint, dt, out);
     }
     memcpy(&mixer->last_update_timepoint, timepoint,
            sizeof(mixer->last_update_timepoint));

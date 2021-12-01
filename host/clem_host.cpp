@@ -142,13 +142,9 @@ ClemensHost::ClemensHost()
 
     displayProvider_ = std::make_unique<ClemensDisplayProvider>();
     display_ = std::make_unique<ClemensDisplay>(*displayProvider_);
-    audio_ = std::make_unique<ClemensAudioDevice>();
-    audio_->start();
 }
 
 ClemensHost::~ClemensHost() {
-    audio_->stop();
-
     for (auto &disk : disks525_) {
         free(disk.nib.bits_data);
     }
@@ -1663,12 +1659,16 @@ bool ClemensHost::createMachine(const char *filename, MachineType machineType) {
         insertDisks();
         loadBRAM();
 
+        audio_ = std::make_unique<ClemensAudioDevice>();
+        audio_->start();
+
         ClemensAudioMixBuffer mix_buffer;
         mix_buffer.frames_per_second = audio_->getAudioFrequency();
-        mix_buffer.frame_count = mix_buffer.frames_per_second / 20;
-        mix_buffer.stride = 8; //   2 channels, 16-bits per channel
+        mix_buffer.stride = audio_->getBufferStride(); //   2 channels, 16-bits per channel
+        mix_buffer.frame_count = mix_buffer.frames_per_second / 10;
         mix_buffer.data = (uint8_t *)(slab_.allocate(mix_buffer.frame_count *
-                                                     mix_buffer.stride));
+            mix_buffer.stride));
+
         clemens_assign_audio_mix_buffer(&machine_, &mix_buffer);
 
         success = true;
@@ -1720,6 +1720,8 @@ void ClemensHost::destroyMachine() {
     }
     emulationBreak();
     if (machineType_ == MachineType::Apple2GS) {
+        audio_->stop();
+        audio_ = nullptr;
         ejectDisks();
         ejectCards();
     }

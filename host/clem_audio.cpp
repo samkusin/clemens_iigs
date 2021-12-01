@@ -8,16 +8,18 @@ static void *allocateLocal(void *user_ctx, size_t sz) { return malloc(sz); }
 static void freeLocal(void *user_ctx, void *data) { free(data); }
 
 ClemensAudioDevice::ClemensAudioDevice() :
-  mixer_(NULL) {
+  mixer_(NULL),
+  queuedFrameBuffer_(nullptr),
+  queuedFrameHead_(0),
+  queuedFrameTail_(0),
+  queuedFrameLimit_(0),
+  queuedFrameStride_(0) {
 
   CKAudioAllocator allocator;
   allocator.allocate = &allocateLocal;
   allocator.free = &freeLocal;
   allocator.user_ctx = this;
   ckaudio_init(&allocator);
-
-  //  kind of magic - we really aren't going to need a half second buffer
-  queuedFrames_.reserve(8 * 24000);
 }
 
 ClemensAudioDevice::~ClemensAudioDevice() {
@@ -30,60 +32,97 @@ ClemensAudioDevice::~ClemensAudioDevice() {
 void ClemensAudioDevice::start() {
   mixer_ = ckaudio_mixer_create();
   ckaudio_start(&ClemensAudioDevice::mixAudio, this);
+
   //  TODO: updating our device format should go into an event handler that
   //  traps events from the CKAudioCore/Mixer (i.e what happens if a device
   //  is switched while the system is started.
   //  THAT IS A TODO for the CKAudio System
   ckaudio_get_data_format(&dataFormat_);
+
+  //  data will always be 16-bit PCM stereo
+  queuedFrameStride_ = 4;
+  queuedFrameLimit_ = dataFormat_.frequency / 10;
+  queuedFrameHead_ = 0;
+  queuedFrameTail_ = 0;
+  queuedPreroll_ = 0;
+  queuedFrameBuffer_ = new uint8_t[queuedFrameLimit_ * queuedFrameStride_];
+
+  ckaudio_mixer_set_track_action(mixer_, 0, CKAUDIO_MIXER_ACTION_TYPE_STREAM);
+  ckaudio_mixer_set_track_volume(mixer_, 0, 75);
+  ckaudio_mixer_set_track_callback(mixer_, 0, &ClemensAudioDevice::mixClemensAudio, this);
 }
 
 void ClemensAudioDevice::stop() {
   ckaudio_stop();
-  ckaudio_mixer_destroy(mixer_);
-  mixer_ = nullptr;
+  if (mixer_) {
+    ckaudio_mixer_destroy(mixer_);
+    delete[] queuedFrameBuffer_;
+    queuedFrameBuffer_ = nullptr;
+    mixer_ = nullptr;
+  }
 }
 
 unsigned ClemensAudioDevice::getAudioFrequency() const { return dataFormat_.frequency; }
+unsigned ClemensAudioDevice::getBufferStride() const { return queuedFrameStride_; }
 
 unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float deltaTime) {
-  //  TODO, get frequency from emulator as a param to queue or in ClemensAudio (probably that)
-  uint32_t framesToWrite = std::min(audio.frame_count, (uint32_t)(deltaTime * 48000));
-
+  //  update will mutex mixAudio and the streaming callbacks
+  unsigned consumedCount = audio.frame_count;
   ckaudio_mixer_begin_update(mixer_);
+  {
+    unsigned availFramesCount = queuedFrameLimit_ - queuedFrameTail_;
+    if (consumedCount > availFramesCount) {
+      consumedCount = availFramesCount;
+    }
 
-  std::copy(audio.data + audio.frame_start * audio.frame_stride,
-            audio.data + (audio.frame_start + framesToWrite) * audio.frame_stride,
-            std::back_inserter(queuedFrames_));
-
+    if (queuedFrameHead_ > 0) {
+      if (queuedFrameHead_ != queuedFrameTail_) {
+        // free up space used (up to the head)
+        memmove(queuedFrameBuffer_,
+                queuedFrameBuffer_ + queuedFrameHead_ * queuedFrameStride_,
+                queuedFrameStride_ * (queuedFrameTail_ - queuedFrameHead_));
+      }
+      queuedFrameTail_ = queuedFrameHead_;
+      queuedFrameHead_ = 0;
+    }
+    if (consumedCount > 0) {
+      memcpy(queuedFrameBuffer_ + queuedFrameTail_ * queuedFrameStride_,
+            audio.data + audio.frame_start * audio.frame_stride,
+            consumedCount * queuedFrameStride_);
+      queuedFrameTail_ += consumedCount;
+    }
+  }
   ckaudio_mixer_end_update(mixer_);
-  return audio.frame_count;
+  return consumedCount;
 }
 
 uint32_t ClemensAudioDevice::mixAudio(CKAudioBuffer *audioBuffer, CKAudioTimePoint *timepoint,
                                       void *ctx) {
   auto *audio = reinterpret_cast<ClemensAudioDevice *>(ctx);
-  const uint8_t* rawIn = audio->queuedFrames_.data();
-  uint8_t *rawOut = (uint8_t *)(audioBuffer->data);
   uint32_t frameCount = ckaudio_mixer_render(audio->mixer_, audioBuffer, timepoint);
-  uint32_t queuedFramesRendered = 0;
-  uint32_t queuedFramesLimit = std::min(uint32_t(audio->queuedFrames_.size()), frameCount);
+  return frameCount;
+}
 
-  //  this is pretty crude - what if the input buffer has a different frequency?
-  //  need to implement proper streaming support into the mixer, so the mixer can
-  //  ask for data, and the mixer will convert it accordingly into its own
-  //  hardware format and sample rate.
-  for (; queuedFramesRendered < queuedFramesLimit; ++queuedFramesRendered) {
-    float* frameOut = (float *)rawOut;
-    const uint16_t* frameIn = (const uint16_t*)rawIn;
-    frameOut[0] += (frameIn[0] / 32767.0f) - 1.0f;
-    frameOut[1] += (frameIn[1] / 32767.0f) - 1.0f;
-    rawOut += audioBuffer->data_format.frame_size;
-    rawIn += 8;
+uint32_t ClemensAudioDevice::mixClemensAudio(CKAudioBuffer *audioBuffer,
+                                             CKAudioTimePoint *timepoint,
+                                             void *ctx) {
+  auto *audio = reinterpret_cast<ClemensAudioDevice *>(ctx);
+  if (audio->queuedPreroll_ < audio->queuedFrameLimit_ / 2) {
+    audio->queuedPreroll_ = audio->queuedFrameTail_ - audio->queuedFrameHead_;
+    return 0;
   }
 
-  audio->queuedFrames_.erase(
-    audio->queuedFrames_.begin(),
-    audio->queuedFrames_.begin() + queuedFramesLimit);
-
-  return frameCount;
+  CKAudioBuffer streamBuffer;
+  streamBuffer.data = audio->queuedFrameBuffer_ + audio->queuedFrameHead_ * audio->queuedFrameStride_;
+  streamBuffer.frame_limit = audio->queuedFrameTail_ - audio->queuedFrameHead_;
+  streamBuffer.ref_count = 0;
+  streamBuffer.data_format.buffer_format = kCKAudioBufferFormatPCM;
+  streamBuffer.data_format.frame_size = audio->queuedFrameStride_;
+  streamBuffer.data_format.num_channels = 2;
+  streamBuffer.data_format.frequency = audio->dataFormat_.frequency;
+  if (audioBuffer->frame_limit > streamBuffer.frame_limit) {
+    printf("ST!");
+  }
+  audio->queuedFrameHead_ += ckaudio_mixer_render_waveform(audioBuffer, &streamBuffer, 100);
+  return std::min(audioBuffer->frame_limit, streamBuffer.frame_limit);
 }

@@ -50,14 +50,13 @@ extern "C"
   void ckaudio_mixer_destroy(CKAudioMixer *mixer);
 
   /**
- * @brief
+ * @brief Locks the mix engine, executing staging actions for the next mix frame
  *
  * @param mixer
  */
   void ckaudio_mixer_begin_update(CKAudioMixer *mixer);
-
   /**
- * @brief
+ * @brief Releases the mixer lock at the end of a sync frame
  *
  * @param mixer
  */
@@ -130,6 +129,17 @@ extern "C"
                                              unsigned track_id,
                                              uint32_t parameter_type);
   /**
+   * @brief
+   *
+   * @param mixer
+   * @param callback_index
+   * @param callback
+   */
+  void ckaudio_mixer_set_track_callback(CKAudioMixer *mixer,
+                                        unsigned track_id,
+                                        CKAudioReadyCallback callback,
+                                        void* cb_ctx);
+  /**
  * @brief Attach a buffer to the action
  *
  * If the buffer was attached with a refernce count other than 0, then the
@@ -150,7 +160,16 @@ extern "C"
   void ckaudio_mixer_set_track_action_buffer(CKAudioMixer *mixer,
                                              unsigned track_id,
                                              CKAudioBuffer *buffer);
-
+  /**
+   * @brief Render audio from one buffer (and format) to another
+   *
+   * @param out
+   * @param in
+   * @param volume
+   * @return uint32_t Number of frames rendered from input
+   */
+  uint32_t ckaudio_mixer_render_waveform(CKAudioBuffer* out, CKAudioBuffer* in,
+                                         uint32_t volume);
   /**
  * @brief
  *
