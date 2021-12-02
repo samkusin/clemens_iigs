@@ -21,6 +21,10 @@ extern "C"
 
   void ckaudio_term();
 
+  void ckaudio_lock();
+
+  void ckaudio_unlock();
+
   void ckaudio_get_data_format(CKAudioDataFormat *out);
 
   /**
@@ -50,17 +54,11 @@ extern "C"
   void ckaudio_mixer_destroy(CKAudioMixer *mixer);
 
   /**
- * @brief Locks the mix engine, executing staging actions for the next mix frame
+ * @brief
  *
  * @param mixer
  */
-  void ckaudio_mixer_begin_update(CKAudioMixer *mixer);
-  /**
- * @brief Releases the mixer lock at the end of a sync frame
- *
- * @param mixer
- */
-  void ckaudio_mixer_end_update(CKAudioMixer *mixer);
+  void ckaudio_mixer_update(CKAudioMixer *mixer);
   /**
  * @brief Renders mixed audio data into a buffer.
  *

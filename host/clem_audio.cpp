@@ -41,7 +41,7 @@ void ClemensAudioDevice::start() {
 
   //  data will always be 16-bit PCM stereo
   queuedFrameStride_ = 4;
-  queuedFrameLimit_ = dataFormat_.frequency / 10;
+  queuedFrameLimit_ = dataFormat_.frequency * 5;
   queuedFrameHead_ = 0;
   queuedFrameTail_ = 0;
   queuedPreroll_ = 0;
@@ -68,7 +68,8 @@ unsigned ClemensAudioDevice::getBufferStride() const { return queuedFrameStride_
 unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float deltaTime) {
   //  update will mutex mixAudio and the streaming callbacks
   unsigned consumedCount = audio.frame_count;
-  ckaudio_mixer_begin_update(mixer_);
+  ckaudio_lock();
+  ckaudio_mixer_update(mixer_);
   {
     unsigned availFramesCount = queuedFrameLimit_ - queuedFrameTail_;
     if (consumedCount > availFramesCount) {
@@ -81,8 +82,10 @@ unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float deltaTime) {
         memmove(queuedFrameBuffer_,
                 queuedFrameBuffer_ + queuedFrameHead_ * queuedFrameStride_,
                 queuedFrameStride_ * (queuedFrameTail_ - queuedFrameHead_));
+        queuedFrameTail_ = queuedFrameHead_;
+      } else {
+        queuedFrameTail_ = 0;
       }
-      queuedFrameTail_ = queuedFrameHead_;
       queuedFrameHead_ = 0;
     }
     if (consumedCount > 0) {
@@ -92,7 +95,7 @@ unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float deltaTime) {
       queuedFrameTail_ += consumedCount;
     }
   }
-  ckaudio_mixer_end_update(mixer_);
+  ckaudio_unlock();
   return consumedCount;
 }
 
@@ -107,7 +110,7 @@ uint32_t ClemensAudioDevice::mixClemensAudio(CKAudioBuffer *audioBuffer,
                                              CKAudioTimePoint *timepoint,
                                              void *ctx) {
   auto *audio = reinterpret_cast<ClemensAudioDevice *>(ctx);
-  if (audio->queuedPreroll_ < audio->queuedFrameLimit_ / 2) {
+  if (audio->queuedPreroll_ < 4800) {
     audio->queuedPreroll_ = audio->queuedFrameTail_ - audio->queuedFrameHead_;
     return 0;
   }

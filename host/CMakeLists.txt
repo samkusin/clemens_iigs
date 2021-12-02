@@ -18,7 +18,6 @@ set(CKAUDIO_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/queue.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/queue.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wincoreaudio.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/winmixer.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wintime.c")
 
 add_library(ckaudio STATIC ${CKAUDIO_SOURCES})

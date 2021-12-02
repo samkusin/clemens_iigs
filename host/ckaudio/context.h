@@ -51,16 +51,6 @@ extern inline void ckaudio_allocator_free(CKAudioContext *ctx, void *p) {
     ctx->allocator.free(ctx->allocator.user_ctx, p);
 }
 
-struct CKAudioMixerPlatform *
-ckaudio_mixer_platform_create(CKAudioContext *context);
-
-void ckaudio_mixer_platform_destroy(CKAudioContext *context,
-                                    struct CKAudioMixerPlatform *platform);
-
-void ckaudio_mixer_platform_lock(struct CKAudioMixerPlatform *platform);
-
-void ckaudio_mixer_platform_unlock(struct CKAudioMixerPlatform *platform);
-
 /**
  * @brief Allows data init of a buffer struct (so it can be used internally)
  *

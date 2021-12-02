@@ -106,7 +106,6 @@ CKAudioMixer *ckaudio_mixer_create() {
         ckaudio_allocator_typed_calloc(&g_ckaudio_context, CKAudioMixer, 1);
     int i;
 
-    mixer->platform = ckaudio_mixer_platform_create(&g_ckaudio_context);
     mixer->track_count = CKAUDIO_MIXER_TRACK_LIMIT;
     mixer->tracks = ckaudio_allocator_typed_calloc(
         &g_ckaudio_context, struct CKAudioMixerTrack, mixer->track_count);
@@ -249,16 +248,11 @@ static void _ckaudio_mixer_commit_staging_tracks(CKAudioMixer *mixer) {
     }
 }
 
-void ckaudio_mixer_begin_update(CKAudioMixer *mixer) {
+void ckaudio_mixer_update(CKAudioMixer *mixer) {
     /* The ONE time the mixer locks its mutex on the application's thread.
        The app must call end_update as soon as possible to unlock the mix
        thread */
-    ckaudio_mixer_platform_lock(mixer->platform);
     _ckaudio_mixer_commit_staging_tracks(mixer);
-}
-
-void ckaudio_mixer_end_update(CKAudioMixer *mixer) {
-    ckaudio_mixer_platform_unlock(mixer->platform);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -517,7 +511,6 @@ uint32_t ckaudio_mixer_render(CKAudioMixer *mixer, CKAudioBuffer *out,
     float dt;
     int track_id;
 
-    ckaudio_mixer_platform_lock(mixer->platform);
     dt =
         mixer->render_count > 0
             ? ckaudio_timepoint_deltaf(timepoint, &mixer->last_update_timepoint)
@@ -533,6 +526,5 @@ uint32_t ckaudio_mixer_render(CKAudioMixer *mixer, CKAudioBuffer *out,
     memcpy(&mixer->last_update_timepoint, timepoint,
            sizeof(mixer->last_update_timepoint));
     ++mixer->render_count;
-    ckaudio_mixer_platform_unlock(mixer->platform);
     return render_cnt;
 }

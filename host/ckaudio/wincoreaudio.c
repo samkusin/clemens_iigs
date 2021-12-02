@@ -170,6 +170,7 @@ struct CKAudioWorker {
        of using a CKAudioWin32Worker struct with a CKAudioWorker platform
        agnostic member as the first member. */
     HANDLE thread_handle;
+    CRITICAL_SECTION render_crit_sec;
 };
 
 static struct CKAudioWorker s_audio_worker;
@@ -340,6 +341,14 @@ static bool ckaudio_win32_worker_event_callback(struct CKAudioEvent *event,
     return true;
 }
 
+void ckaudio_win32_lock_worker(struct CKAudioWorker *worker) {
+    EnterCriticalSection(&worker->render_crit_sec);
+}
+
+void ckaudio_win32_unlock_worker(struct CKAudioWorker *worker) {
+    LeaveCriticalSection(&worker->render_crit_sec);
+}
+
 static DWORD __stdcall ckaudio_win32_worker(LPVOID context_opaque) {
     struct CKAudioWorker *worker = (struct CKAudioWorker *)context_opaque;
     IMMDeviceEnumerator *device_enumerator = NULL;
@@ -402,7 +411,7 @@ static DWORD __stdcall ckaudio_win32_worker(LPVOID context_opaque) {
                 worker->device_format.buffer_format = kCKAudioBufferFormatFloat;
             }
             hr = client->lpVtbl->Initialize(client, AUDCLNT_SHAREMODE_SHARED,
-                                            AUDCLNT_STREAMFLAGS_EVENTCALLBACK |
+                                            /*AUDCLNT_STREAMFLAGS_EVENTCALLBACK | */
                                                 AUDCLNT_STREAMFLAGS_NOPERSIST,
                                             CKAUDIO_WIN32_DESIRED_LATENCY_MS *
                                                 10000,  /* 100 ns units */
@@ -431,6 +440,7 @@ static DWORD __stdcall ckaudio_win32_worker(LPVOID context_opaque) {
                     AUDCLNT_BUFFERFLAGS_SILENT);
             }
             if (SUCCEEDED(hr)) {
+                /*
                 device_ready_event = CreateEvent(NULL, FALSE, FALSE, NULL);
                 if (device_ready_event != NULL) {
                     client->lpVtbl->SetEventHandle(client, device_ready_event);
@@ -439,6 +449,12 @@ static DWORD __stdcall ckaudio_win32_worker(LPVOID context_opaque) {
                         worker_state.state =
                             kCKAudioWin32WorkerDeviceClientReady;
                     }
+                }
+                */
+                hr = client->lpVtbl->Start(client);
+                if (SUCCEEDED(hr)) {
+                    worker_state.state =
+                            kCKAudioWin32WorkerDeviceClientReady;
                 }
             }
         }
@@ -458,9 +474,18 @@ static DWORD __stdcall ckaudio_win32_worker(LPVOID context_opaque) {
     }
     /* This simple loop performs most of the work on this worker */
     while (worker_state.state == kCKAudioWin32WorkerDeviceClientReady) {
-        hr = WaitForMultipleObjects(2, wait_event_handles, FALSE, 1000);
+        //hr = WaitForMultipleObjects(2, wait_event_handles, FALSE, 1000);
+        hr = WaitForSingleObject(wait_event_handles[0], CKAUDIO_WIN32_DESIRED_LATENCY_MS / 2);
         switch (hr) {
         case WAIT_TIMEOUT:
+            ckaudio_win32_lock_worker(worker);
+            /* core audio mixer waiting is available for writing */
+            if (!ckaudio_win32_worker_render(worker, &worker->device_format,
+                                             client, render_client,
+                                             render_buffer_size)) {
+                worker_state.state = kCKAudioWin32WorkerDeviceClientFailed;
+            }
+            ckaudio_win32_unlock_worker(worker);
             /* audio is not being processed through the output mixer? */
             break;
         case WAIT_OBJECT_0:
@@ -470,12 +495,14 @@ static DWORD __stdcall ckaudio_win32_worker(LPVOID context_opaque) {
                 &worker_state);
             break;
         case WAIT_OBJECT_0 + 1:
+            ckaudio_win32_lock_worker(worker);
             /* core audio mixer waiting is available for writing */
             if (!ckaudio_win32_worker_render(worker, &worker->device_format,
                                              client, render_client,
                                              render_buffer_size)) {
                 worker_state.state = kCKAudioWin32WorkerDeviceClientFailed;
             }
+            ckaudio_win32_unlock_worker(worker);
             break;
         case WAIT_FAILED:
             worker_state.state = kCKAudioWin32WorkerDeviceClientFailed;
@@ -539,6 +566,8 @@ static void ckaudio_int_term_worker(struct CKAudioWorker *worker) {
     ckaudio_worker_queue_term(&worker->notify_queue);
     ckaudio_worker_queue_term(&worker->event_queue);
 
+    DeleteCriticalSection(&worker->render_crit_sec);
+
     memset(worker, 0, sizeof(*worker));
 }
 
@@ -558,7 +587,7 @@ ckaudio_int_start_worker(struct CKAudioWorker *worker,
                               CKAUDIO_API_WORKER_EVENT_LIMIT);
     ckaudio_worker_queue_init(&worker->notify_queue,
                               CKAUDIO_API_WORKER_EVENT_LIMIT);
-
+    InitializeCriticalSection(&worker->render_crit_sec);
     worker->thread_handle =
         CreateThread(NULL, 0, ckaudio_win32_worker, worker, 0, NULL);
 
@@ -641,15 +670,18 @@ void ckaudio_start(CKAudioReadyCallback audio_ready_cb, void *user_ctx) {
     //  TODO: create worker objects
     g_ckaudio_context.worker =
         ckaudio_int_start_worker(&s_audio_worker, audio_ready_cb, user_ctx);
-
-    //  TODO: start the worker thread!
 }
 
 void ckaudio_stop() {
-    struct CKAudioWorker *worker = g_ckaudio_context.worker;
-
-    //  TODO: stop the worker thread!
     g_ckaudio_context.worker = ckaudio_int_stop_worker(&s_audio_worker);
+}
+
+void ckaudio_lock() {
+    ckaudio_win32_lock_worker(g_ckaudio_context.worker);
+}
+
+void ckaudio_unlock() {
+    ckaudio_win32_unlock_worker(g_ckaudio_context.worker);
 }
 
 void ckaudio_get_data_format(CKAudioDataFormat *out) {
