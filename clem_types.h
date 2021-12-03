@@ -158,6 +158,9 @@ struct ClemensDeviceAudio {
     uint8_t volume;             /**< 0 - 15 */
     bool a2_speaker;            /**< the c030 switch */
     bool a2_speaker_tense;      /**< the a2 speaker state tense, relax */
+    int32_t a2_speaker_frame_count;
+    int32_t a2_speaker_frame_threshold;
+    int16_t a2_speaker_level;
 
     /* host supplied mix buffer */
     struct ClemensAudioMixBuffer mix_buffer;

@@ -1665,7 +1665,7 @@ bool ClemensHost::createMachine(const char *filename, MachineType machineType) {
         ClemensAudioMixBuffer mix_buffer;
         mix_buffer.frames_per_second = audio_->getAudioFrequency();
         mix_buffer.stride = audio_->getBufferStride(); //   2 channels, 16-bits per channel
-        mix_buffer.frame_count = mix_buffer.frames_per_second / 10;
+        mix_buffer.frame_count = mix_buffer.frames_per_second / 4;
         mix_buffer.data = (uint8_t *)(slab_.allocate(mix_buffer.frame_count *
             mix_buffer.stride));
 

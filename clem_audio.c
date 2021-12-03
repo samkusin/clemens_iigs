@@ -51,6 +51,9 @@ void clem_sound_reset(struct ClemensDeviceAudio* glu) {
 
     glu->a2_speaker = false;
     glu->a2_speaker_tense = false;
+    glu->a2_speaker_frame_count = -1;
+    glu->a2_speaker_frame_threshold = glu->mix_buffer.frames_per_second / 20;
+    glu->a2_speaker_level = 0;
 
     /* indicates IRQB line, so no interrupt */;
     glu->doc_reg[0xe0] = 0x80;
@@ -109,6 +112,7 @@ void clem_sound_glu_sync(
     struct ClemensClock* clocks
 ) {
     clem_clocks_duration_t dt_clocks = clocks->ts - glu->ts_last_frame;
+
     if (glu->dt_mix_sample > 0) {
         unsigned delta_frames = (glu->dt_mix_frame / glu->dt_mix_sample);
         if (delta_frames > 0) {
@@ -117,24 +121,32 @@ void clem_sound_glu_sync(
                 unsigned frame_index = (glu->mix_frame_index + i) % glu->mix_buffer.frame_count;
                 uint16_t* samples = (uint16_t*)(&mix_out[frame_index * glu->mix_buffer.stride]);
                 /* test tone support */
-                samples[0] = 32767;
-                samples[1] = 32767;
-
                 if (glu->tone_frame_delta > 0) {
                     _clem_sound_do_tone(glu, samples);
                 }
+                if (glu->a2_speaker_frame_count > 0) {
+                    glu->a2_speaker_frame_count += delta_frames;
+                }
+                if (glu->a2_speaker_frame_count > glu->a2_speaker_frame_threshold) {
+                    glu->a2_speaker_frame_count = -1;
+                    glu->a2_speaker_level = 0;
+                }
                 if (glu->a2_speaker) {
                     /* click! - two speaker pulses = 1 complete wave */
+                    glu->a2_speaker_frame_count = 0;
                     if (!glu->a2_speaker_tense) {
-                        samples[0] = 32767 + (uint16_t)(24576 * glu->volume/15);
-                        samples[1] = 32767 + (uint16_t)(24576 * glu->volume/15);
+                        glu->a2_speaker_level = 24576;
                     } else {
-                        samples[0] = 32767 - (uint16_t)(24576 * glu->volume/15);
-                        samples[1] = 32767 - (uint16_t)(24576 * glu->volume/15);
+                        glu->a2_speaker_level = -24576;
                     }
                     glu->a2_speaker_tense = !glu->a2_speaker_tense;
                     glu->a2_speaker = false;
                 }
+
+                samples[0] = 32767 + (uint16_t)(
+                    (int32_t)glu->a2_speaker_level * glu->volume/15);
+                samples[1] = 32767 + (uint16_t)(
+                    (int32_t)glu->a2_speaker_level * glu->volume/15);
             }
             glu->mix_frame_index = (glu->mix_frame_index + delta_frames) % (
                 glu->mix_buffer.frame_count);
