@@ -31,8 +31,6 @@ private:
   uint32_t queuedFrameLimit_;
   uint32_t queuedFrameStride_;
   uint32_t queuedPreroll_;
-
-  float tone_theta_;
 };
 
 #endif

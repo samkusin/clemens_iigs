@@ -1,8 +1,8 @@
 #include "clem_audio.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cstdlib>
-#include <cmath>
 
 static void *allocateLocal(void *user_ctx, size_t sz) { return malloc(sz); }
 
@@ -42,12 +42,11 @@ void ClemensAudioDevice::start() {
 
   //  data will always be 16-bit PCM stereo
   queuedFrameStride_ = 4;
-  queuedFrameLimit_ = dataFormat_.frequency * 5;
+  queuedFrameLimit_ = dataFormat_.frequency / 2;
   queuedFrameHead_ = 0;
   queuedFrameTail_ = 0;
   queuedPreroll_ = 0;
   queuedFrameBuffer_ = new uint8_t[queuedFrameLimit_ * queuedFrameStride_];
-  tone_theta_ = 0.0f;
 
   ckaudio_mixer_set_track_action(mixer_, 0, CKAUDIO_MIXER_ACTION_TYPE_STREAM);
   ckaudio_mixer_set_track_volume(mixer_, 0, 75);
@@ -68,37 +67,75 @@ unsigned ClemensAudioDevice::getAudioFrequency() const { return dataFormat_.freq
 unsigned ClemensAudioDevice::getBufferStride() const { return queuedFrameStride_; }
 
 unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float deltaTime) {
-  //  update will mutex mixAudio and the streaming callbacks
-  unsigned consumedCount = audio.frame_count;
+  if (!audio.frame_count) return 0;
+
+  //  the audio data layout of our queue must be the same as the data coming
+  //  in from the emulated device.  conversion between formats occurs during
+  //  the actual mix.
+  assert( audio.frame_stride == queuedFrameStride_);
+
+  //  update will mutex mixAudio, which is necessary when running the mixer
+  //  callbacks in the core audio thread.
   ckaudio_lock();
   ckaudio_mixer_update(mixer_);
-  {
-    unsigned availFramesCount = queuedFrameLimit_ - queuedFrameTail_;
-    if (consumedCount > availFramesCount) {
-      consumedCount = availFramesCount;
-    }
 
-    if (queuedFrameHead_ > 0) {
-      if (queuedFrameHead_ != queuedFrameTail_) {
-        // free up space used (up to the head)
-        memmove(queuedFrameBuffer_,
-                queuedFrameBuffer_ + queuedFrameHead_ * queuedFrameStride_,
-                queuedFrameStride_ * (queuedFrameTail_ - queuedFrameHead_));
-        queuedFrameTail_ = queuedFrameHead_;
-      } else {
-        queuedFrameTail_ = 0;
-      }
-      queuedFrameHead_ = 0;
+  //  the input comes from a ring buffer
+  uint32_t audioInHead = audio.frame_start;
+  uint32_t audioInTail = (audio.frame_start + audio.frame_count) % audio.frame_total;
+  uint32_t audioInEnd = audio.frame_total;
+  uint32_t audioInAvailable = audio.frame_count;
+  uint32_t audioOutAvailable = queuedFrameLimit_ - queuedFrameTail_;
+  uint32_t audioInUsed = 0;
+
+  if (audioInAvailable > audioOutAvailable && queuedFrameHead_ > 0) {
+    //  adjust audioOut queue so that all frames *already* mixed are removed
+    //  which will free up some space
+    if (queuedFrameHead_ != queuedFrameTail_) {
+      memmove(queuedFrameBuffer_,
+              queuedFrameBuffer_ + (queuedFrameHead_ * queuedFrameStride_),
+              (queuedFrameTail_ - queuedFrameHead_) * queuedFrameStride_);
+      queuedFrameTail_ -= queuedFrameHead_;
+    } else {
+      queuedFrameTail_ = 0;
     }
-    if (consumedCount > 0) {
-      memcpy(queuedFrameBuffer_ + queuedFrameTail_ * queuedFrameStride_,
-            audio.data + audio.frame_start * audio.frame_stride,
-            consumedCount * queuedFrameStride_);
-      queuedFrameTail_ += consumedCount;
-    }
+    queuedFrameHead_ = 0;
+    audioOutAvailable = queuedFrameTail_ - queuedFrameLimit_;
   }
+  if (audioInAvailable > audioOutAvailable)  {
+    //  copy only the amount we can to the output - so we don't have to
+    //  bounds check against our queued output buffer when copying data.
+    audioInAvailable = audioOutAvailable;
+  }
+
+  //  copy occurs from at most two windows in the input (re: ring buffer), to
+  //  the single output window.
+  uint8_t* audioOut = queuedFrameBuffer_ + queuedFrameTail_ * queuedFrameStride_;
+  uint8_t* audioIn = audio.data + audioInHead * audio.frame_stride;
+
+  uint32_t audioInCount;
+  if (audioInHead + audioInAvailable > audioInEnd) {
+    audioInCount = audioInEnd - audioInHead;
+    memcpy(audioOut, audioIn, audioInCount * audio.frame_stride);
+    queuedFrameTail_ += audioInCount;
+    audioOut = queuedFrameBuffer_ + queuedFrameTail_ * queuedFrameStride_;
+    audioIn = audio.data;
+    audioInAvailable -= audioInCount;
+    audioInUsed += audioInCount;
+    audioInHead = 0;
+  }
+  audioInCount = std::min(audioInAvailable, audioInTail - audioInHead);
+
+  memcpy(audioOut, audioIn, audioInCount * audio.frame_stride);
+  queuedFrameTail_ += audioInCount;
+  audioInAvailable -= audioInCount;
+  audioInUsed += audioInCount;
+  assert(audioInAvailable == 0);
+
+  //printf("{%u:%u  %u:%u} ", audio.frame_count, audioInUsed, queuedFrameHead_, queuedFrameTail_);
+
   ckaudio_unlock();
-  return consumedCount;
+
+  return audioInUsed;
 }
 
 uint32_t ClemensAudioDevice::mixAudio(CKAudioBuffer *audioBuffer, CKAudioTimePoint *timepoint,
@@ -112,24 +149,10 @@ uint32_t ClemensAudioDevice::mixClemensAudio(CKAudioBuffer *audioBuffer,
                                              CKAudioTimePoint *timepoint,
                                              void *ctx) {
   auto *audio = reinterpret_cast<ClemensAudioDevice *>(ctx);
-  if (audio->queuedPreroll_ < 4800) {
+  if (audio->queuedPreroll_ < 4800 /*audio->dataFormat_.frequency / 8 */) {
     audio->queuedPreroll_ = audio->queuedFrameTail_ - audio->queuedFrameHead_;
     return 0;
   }
-  constexpr float kPi2 = 6.28318531f;
-  const float dt_theta = (300.0f *  kPi2)/audioBuffer->data_format.frequency;
-  uint8_t* rawOut = (uint8_t*)audioBuffer->data;
-  for (uint32_t i = 0; i < audioBuffer->frame_limit; ++i) {
-    float* out = (float*)rawOut;
-    out[0] = sinf(audio->tone_theta_) * 0.75f;
-    out[1] = out[0];
-    rawOut += audioBuffer->data_format.frame_size;
-    audio->tone_theta_ += dt_theta;
-    if (audio->tone_theta_ >= kPi2) {
-      audio->tone_theta_ -= kPi2;
-    }
-  }
-  /*
   CKAudioBuffer streamBuffer;
   streamBuffer.data = audio->queuedFrameBuffer_ + audio->queuedFrameHead_ * audio->queuedFrameStride_;
   streamBuffer.frame_limit = audio->queuedFrameTail_ - audio->queuedFrameHead_;
@@ -141,8 +164,7 @@ uint32_t ClemensAudioDevice::mixClemensAudio(CKAudioBuffer *audioBuffer,
   if (audioBuffer->frame_limit > streamBuffer.frame_limit) {
     printf("ST!");
   }
-  audio->queuedFrameHead_ += ckaudio_mixer_render_waveform(audioBuffer, &streamBuffer, 100);
-  return std::min(audioBuffer->frame_limit, streamBuffer.frame_limit);
-*/
+  uint32_t renderedCount = ckaudio_mixer_render_waveform(audioBuffer, &streamBuffer, 100);
+  audio->queuedFrameHead_ += renderedCount;
   return audioBuffer->frame_limit;
 }

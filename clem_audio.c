@@ -84,9 +84,9 @@ void clem_sound_consume_frames(
         consumed = glu->mix_frame_index;
     }
     if (consumed < glu->mix_frame_index) {
-        memmove(glu->mix_buffer.data,
+        memcpy(glu->mix_buffer.data,
                 glu->mix_buffer.data + consumed * glu->mix_buffer.stride,
-                consumed * glu->mix_buffer.stride);
+                (glu->mix_frame_index - consumed) * glu->mix_buffer.stride);
     }
     glu->mix_frame_index -= consumed;
 }
