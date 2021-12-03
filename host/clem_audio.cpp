@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cmath>
 
 static void *allocateLocal(void *user_ctx, size_t sz) { return malloc(sz); }
 
@@ -46,6 +47,7 @@ void ClemensAudioDevice::start() {
   queuedFrameTail_ = 0;
   queuedPreroll_ = 0;
   queuedFrameBuffer_ = new uint8_t[queuedFrameLimit_ * queuedFrameStride_];
+  tone_theta_ = 0.0f;
 
   ckaudio_mixer_set_track_action(mixer_, 0, CKAUDIO_MIXER_ACTION_TYPE_STREAM);
   ckaudio_mixer_set_track_volume(mixer_, 0, 75);
@@ -114,7 +116,20 @@ uint32_t ClemensAudioDevice::mixClemensAudio(CKAudioBuffer *audioBuffer,
     audio->queuedPreroll_ = audio->queuedFrameTail_ - audio->queuedFrameHead_;
     return 0;
   }
-
+  constexpr float kPi2 = 6.28318531f;
+  const float dt_theta = (300.0f *  kPi2)/audioBuffer->data_format.frequency;
+  uint8_t* rawOut = (uint8_t*)audioBuffer->data;
+  for (uint32_t i = 0; i < audioBuffer->frame_limit; ++i) {
+    float* out = (float*)rawOut;
+    out[0] = sinf(audio->tone_theta_) * 0.75f;
+    out[1] = out[0];
+    rawOut += audioBuffer->data_format.frame_size;
+    audio->tone_theta_ += dt_theta;
+    if (audio->tone_theta_ >= kPi2) {
+      audio->tone_theta_ -= kPi2;
+    }
+  }
+  /*
   CKAudioBuffer streamBuffer;
   streamBuffer.data = audio->queuedFrameBuffer_ + audio->queuedFrameHead_ * audio->queuedFrameStride_;
   streamBuffer.frame_limit = audio->queuedFrameTail_ - audio->queuedFrameHead_;
@@ -128,4 +143,6 @@ uint32_t ClemensAudioDevice::mixClemensAudio(CKAudioBuffer *audioBuffer,
   }
   audio->queuedFrameHead_ += ckaudio_mixer_render_waveform(audioBuffer, &streamBuffer, 100);
   return std::min(audioBuffer->frame_limit, streamBuffer.frame_limit);
+*/
+  return audioBuffer->frame_limit;
 }
