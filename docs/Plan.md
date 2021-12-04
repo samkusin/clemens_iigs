@@ -14,12 +14,11 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
+* NMI support for Mockingboard right channel (or just use the IRQB)
 * Add trace debugging when executing a specific address (PBR:PC)
 * Support DSK and PO, 2IMG files
   * 2IMG serialization
   * Allow PO loading from the 2IMG system (for .po files)
-* Enable custom logic for card slot reads/writes since different cards map
-  registers to their dedicated page instead of at $c0xx
 * AY8910 emulation for Mockingboard
 * Ensoniq 5503 emulation
   * http://www.buchty.net/ensoniq/5503.html
@@ -63,6 +62,8 @@ This is a running todo list.
 
 ## DONE
 
+* Enable custom logic for card slot reads/writes since different cards map
+  registers to their dedicated page instead of at $c0xx
 * Remove ClemensDrive dependencies on WOZ and 2IMG (ClemensNibbleDisk)
   * Serializer changes with new ClemensNibbleDisk and has_disk field for
     ClemensDrive

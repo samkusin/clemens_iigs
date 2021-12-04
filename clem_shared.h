@@ -11,8 +11,11 @@ typedef uint32_t clem_clocks_duration_t;
 /** All mmio memory operations can have this option - both onboard and
  *  card operations
  */
-#define CLEM_OP_IO_READ_NO_OP        0x01
+#define CLEM_OP_IO_READ_NO_OP       0x01
 #define CLEM_IS_IO_READ_NO_OP(_flags_) (((_flags_) & CLEM_OP_IO_READ_NO_OP) != 0)
+
+/* MUST be the same as CLEM_IRQ_ON in clem_defs.h */
+#define CLEM_CARD_IRQ               0x80000000
 
 
 #ifdef __cplusplus
@@ -32,6 +35,7 @@ struct ClemensClock {
 
 typedef struct {
     void* context;
+    void (*io_reset)(struct ClemensClock* clock, void* context);
     void (*io_read)(uint8_t* data, uint16_t adr, uint8_t flags, void* context);
     void (*io_write)(uint8_t data, uint16_t adr, uint8_t flags, void* context);
     uint32_t (*io_sync)(struct ClemensClock* clock, void* context);

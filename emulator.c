@@ -3596,6 +3596,19 @@ void clemens_emulate(ClemensMachine* clem) {
                        0x00, CLEM_MEM_FLAG_PROGRAM);
         cpu->regs.PC = (uint16_t)(tmp_datahi << 8) | tmp_data;
 
+        if (!clem->mmio_bypass) {
+            /* extension cards reset handling */
+            clem_iwm_speed_disk_gate(clem);
+            clock.ts = clem->clocks_spent;
+            clock.ref_step = clem->clocks_step_mega2;
+            for (i = 0; i < 7; ++i) {
+                if (clem->card_slot[i]) {
+                    clem->card_slot[i]->io_reset(
+                        &clock, clem->card_slot[i]->context);
+                }
+            }
+            clem_iwm_speed_disk_gate(clem);
+        }
         cpu->state_type = kClemensCPUStateType_Execute;
         return;
     } else if (cpu->state_type == kClemensCPUStateType_IRQ) {
