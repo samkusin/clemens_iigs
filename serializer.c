@@ -14,6 +14,7 @@ union ClemensSerializerVariant {
     uint32_t u32;
     int32_t i32;
     uint16_t u16;
+    int16_t i16;
     uint8_t u8;
     bool b;
 };
@@ -54,6 +55,9 @@ union ClemensSerializerVariant {
 
 #define CLEM_SERIALIZER_RECORD_INT32(_struct_, _name_) \
     CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeInt32, _name_)
+
+#define CLEM_SERIALIZER_RECORD_INT16(_struct_, _name_) \
+    CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeInt16, _name_)
 
 #define CLEM_SERIALIZER_RECORD_FLOAT(_struct_, _name_) \
     CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeFloat, _name_)
@@ -205,6 +209,9 @@ struct ClemensSerializerRecord kAudio[] = {
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceAudio, volume),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceAudio, a2_speaker),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceAudio, a2_speaker_tense),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceAudio, a2_speaker_frame_count),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceAudio, a2_speaker_frame_threshold),
+    CLEM_SERIALIZER_RECORD_INT16(struct ClemensDeviceAudio, a2_speaker_level),
     CLEM_SERIALIZER_RECORD_CUSTOM(struct ClemensDeviceAudio, mix_buffer,
         struct ClemensAudioMixBuffer, CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceAudio, ts_last_frame),
@@ -410,6 +417,11 @@ unsigned clemens_serialize_record(
             variant.u16 = *(uint16_t *)(data_adr + record->offset);
             mpack_write_u16(writer, variant.u16);
             sz = sizeof(uint16_t);
+            break;
+        case kClemensSerializerTypeInt16:
+            variant.i16 = *(int16_t *)(data_adr + record->offset);
+            mpack_write_i16(writer, variant.i16);
+            sz = sizeof(int16_t);
             break;
         case kClemensSerializerTypeUInt32:
             variant.u32 = *(uint32_t *)(data_adr + record->offset);
@@ -638,6 +650,11 @@ unsigned clemens_unserialize_record(
             variant.u16 = mpack_expect_u16(reader);
             *(uint16_t *)(data_adr + record->offset) = variant.u16;
             sz = sizeof(uint16_t);
+            break;
+        case kClemensSerializerTypeInt16:
+            variant.i16 = mpack_expect_i16(reader);
+            *(int16_t *)(data_adr + record->offset) = variant.i16;
+            sz = sizeof(int16_t);
             break;
         case kClemensSerializerTypeUInt32:
             variant.u32 = mpack_expect_u32(reader);

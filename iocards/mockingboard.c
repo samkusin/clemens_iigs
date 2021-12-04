@@ -5,12 +5,12 @@
 
 /*
   References:
-  - AY-3-8910 Datasheet
-  - 6522 MOS Datasheet
-  - Programming to AY-3-8910 sound chip
-    - https://www.vdsteenoven.com/aquarius/psgprog.html
   - Programming IO primer for the A2 Mockingboard
       https://www.apple2.org.za/gswv/a2zine/Docs/Mockingboard_MiniManual.html
+  - Programming to AY-3-8910 sound chip
+    - https://www.vdsteenoven.com/aquarius/psgprog.html
+  - AY-3-8910 Datasheet
+  - 6522 MOS Datasheet
   - Resources from
       https://wiki.reactivemicro.com/Mockingboard
 */
@@ -29,6 +29,28 @@ struct ClemensVIA6522 {
 };
 
 /* The Mockingboard Device here is a 6 channel (2 chip) version
+
+   Below describes the AY-3-8910 implementation
+
+   Each PSG has 3 Square Wave Tone Generators (TG)
+    Tone frequency is a 12-bit value that combines 'coarse' and 'fine' registers
+   Each PSG has 1 Noise Generator (NG)
+    Frequency is a 5-bit value
+    Each square wave crest has a pseudo-random varying amplitide
+
+   TG[A,B,C] + NG are mixed separately (A + NG, B + NG, C + NG)
+    => A, B, C
+    => The outputs are modified based on the Mixer settings (i.e. noise on
+       select channels, tone on select channels, neither, either, or)
+
+   Each channel (A, B, C) has an amplitude that is controlled *either*
+    by a scalar or the current envelope
+
+   Envelope Generation
+    Envelope wave has a 16-bit period (coarse + fine registers)
+    Envelope wave has a shape (square, triangle, sawtooth, etc)
+
+
 */
 typedef struct {
   struct ClemensVIA6522 via[2];

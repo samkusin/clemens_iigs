@@ -1701,9 +1701,9 @@ bool ClemensHost::createMachine(const char *filename, MachineType machineType) {
 
         simpleMachineIO_ = SimpleMachineIO{};
     } break;
-
-        machineType_ = machineType;
     }
+
+    machineType_ = machineType;
 
     clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
 
