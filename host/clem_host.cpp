@@ -126,7 +126,7 @@ ClemensHost::ClemensHost()
 
     for (auto &disk : disks525_) {
         auto maxDiskDataSize = calculateMaxDiskDataSize(CLEM_DISK_TYPE_5_25);
-        disk.nib.disk_type = CLEM_DISK_TYPE_NONE;
+        disk.nib.disk_type = CLEM_DISK_TYPE_5_25;
         disk.nib.bits_data = (uint8_t *)malloc(maxDiskDataSize);
         disk.nib.bits_data_end = disk.nib.bits_data + maxDiskDataSize;
         disk.diskBrand = ClemensDisk::None;
@@ -134,7 +134,7 @@ ClemensHost::ClemensHost()
 
     for (auto &disk : disks35_) {
         auto maxDiskDataSize = calculateMaxDiskDataSize(CLEM_DISK_TYPE_3_5);
-        disk.nib.disk_type = CLEM_DISK_TYPE_NONE;
+        disk.nib.disk_type = CLEM_DISK_TYPE_3_5;
         disk.nib.bits_data = (uint8_t *)malloc(maxDiskDataSize);
         disk.nib.bits_data_end = disk.nib.bits_data + maxDiskDataSize;
         disk.diskBrand = ClemensDisk::None;

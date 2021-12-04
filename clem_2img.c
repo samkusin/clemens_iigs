@@ -517,5 +517,5 @@ bool clem_2img_nibblize_data(
     }
 
 
-    return false;
+    return true;
 }

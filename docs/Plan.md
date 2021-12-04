@@ -14,7 +14,6 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
-* Fix serialization
 * Add trace debugging when executing a specific address (PBR:PC)
 * Support DSK and PO, 2IMG files
   * 2IMG serialization
