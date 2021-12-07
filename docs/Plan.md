@@ -16,6 +16,10 @@ This is a running todo list.
 
 * NMI support for Mockingboard right channel (or just use the IRQB)
 * Add trace debugging when executing a specific address (PBR:PC)
+* ProDOS 16 system disk boot end to end
+  * May prioritize VGC, super hi-res at this point
+  * May involve additional 2mg image support
+  * Once done, move onto Mockingboard
 * Support DSK and PO, 2IMG files
   * 2IMG serialization
   * Allow PO loading from the 2IMG system (for .po files)
