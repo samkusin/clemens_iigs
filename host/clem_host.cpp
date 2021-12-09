@@ -1146,6 +1146,8 @@ bool ClemensHost::parseCommand(const char *buffer) {
             return parseCommandSave(end);
         } else if (!strncasecmp(start, ".disk", end - start)) {
             return parseCommandDisk(end);
+        } else if (!strncasecmp(start, ".disksave", end - start)) {
+            return parseCommandDiskSave(end);
         } else if (!strncasecmp(start, "step", end - start) ||
                    !strncasecmp(start, "s", end - start)) {
             return parseCommandStep(end);
@@ -1276,6 +1278,44 @@ bool ClemensHost::parseCommandDisk(const char *line) {
         }
 
         return loadDisk(driveType, end);
+    });
+}
+
+bool ClemensHost::parseCommandDiskSave(const char *line) {
+    const char *start = trimCommand(line);
+    if (!start) {
+        saveClemensNibbleDisk(kClemensDrive_5_25_D1);
+        saveClemensNibbleDisk(kClemensDrive_5_25_D2);
+        saveClemensNibbleDisk(kClemensDrive_3_5_D1);
+        saveClemensNibbleDisk(kClemensDrive_3_5_D2);
+        return true;
+    }
+
+    return parseCommandToken(start, [this](const char *start, const char *end) {
+        char slot[32];
+        strncpy(slot, start, std::min(sizeof(slot) - 1, size_t(end - start)));
+
+        ClemensDriveType driveType = kClemensDrive_Invalid;
+        if (slot[1] == '.') {
+            if (slot[0] == '5') {
+                if (slot[2] == '1')
+                    driveType = kClemensDrive_3_5_D1;
+                else if (slot[2] == '2')
+                    driveType = kClemensDrive_3_5_D2;
+            } else if (slot[0] == '6') {
+                if (slot[2] == '1')
+                    driveType = kClemensDrive_5_25_D1;
+                else if (slot[2] == '2')
+                    driveType = kClemensDrive_5_25_D2;
+            }
+        }
+        if (driveType == kClemensDrive_Invalid) {
+            CLEM_HOST_COUT.format(
+                "Command requires a <slot>.<drive> parameter");
+            return false;
+        }
+
+        return saveClemensNibbleDisk(driveType);
     });
 }
 
@@ -2209,6 +2249,40 @@ bool ClemensHost::loadWOZDisk(const char *filename, struct ClemensWOZDisk *woz,
     return true;
 }
 
+void ClemensHost::release2IMGDisk(struct Clemens2IMGDisk *disk) {
+    if (disk->image_buffer) {
+        free(disk->image_buffer);
+        disk->image_buffer = NULL;
+    }
+    memset(disk, 0, sizeof(*disk));
+}
+
+bool ClemensHost::load2IMGDisk(const char *filename,
+                               struct Clemens2IMGDisk *disk,
+                               ClemensDriveType driveType) {
+    ClemensNibbleDisk *nib = disk->nib;
+    release2IMGDisk(disk);
+    disk->nib = nib;
+
+    std::ifstream dskFile(filename, std::ios::binary | std::ios::ate);
+    if (dskFile.is_open()) {
+        unsigned sz = unsigned(dskFile.tellg());
+        uint8_t *image_buffer = (uint8_t *)malloc(sz);
+        dskFile.seekg(0, std::ios::beg);
+        dskFile.read((char *)image_buffer, sz);
+        dskFile.close();
+        if (clem_2img_parse_header(disk, image_buffer, image_buffer + sz)) {
+            //  output parsed metadata in log
+            if (clem_2img_nibblize_data(disk)) {
+                return true;
+            }
+            printf("load2IMGDisk: nibbilization pass failed.\n");
+        }
+    }
+
+    return false;
+}
+
 bool ClemensHost::createBlankDisk(struct ClemensNibbleDisk *disk) {
     //  This method creates a very basic nibblized disk with many assumptions.
     //  Use real hardware if you want to experiment with copy protection, etc
@@ -2283,36 +2357,129 @@ bool ClemensHost::createBlankDisk(struct ClemensNibbleDisk *disk) {
     return true;
 }
 
-void ClemensHost::release2IMGDisk(struct Clemens2IMGDisk *disk) {
-    if (disk->image_buffer) {
-        free(disk->image_buffer);
-        disk->image_buffer = NULL;
+static char g_bin_to_hex[16] = {
+    '0', '1', '2', '3', '4', '5', '6', '7',
+    '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+};
+
+bool ClemensHost::saveClemensNibbleDisk(ClemensDriveType driveType) {
+
+    if (!clemens_is_initialized_simple(&machine_)) {
+        return false;
     }
-    memset(disk, 0, sizeof(*disk));
-}
+    std::string path;
+    std::string drive_name;
+    switch (driveType) {
+        case kClemensDrive_5_25_D1:
+            path = disks525_[0].path + ".cle";
+            drive_name = "S6.D1";
+            break;
+        case kClemensDrive_5_25_D2:
+            path = disks525_[1].path + ".cle";
+            drive_name = "S6.D2";
+            break;
+        case kClemensDrive_3_5_D1:
+            path = disks35_[0].path + ".cle";
+            drive_name = "S5.D1";
+            break;
+        case kClemensDrive_3_5_D2:
+            path = disks35_[1].path + ".cle";
+            drive_name = "S5.D2";
+            break;
+        default:
+            return false;
+    }
+    const ClemensDrive* drive = clemens_drive_get(&machine_, driveType);
+    if (!drive->has_disk) {
+        CLEM_HOST_COUT.format("%s: no disk found", drive_name.c_str());
+        return false;
+    }
 
-bool ClemensHost::load2IMGDisk(const char *filename,
-                               struct Clemens2IMGDisk *disk,
-                               ClemensDriveType driveType) {
-    ClemensNibbleDisk *nib = disk->nib;
-    release2IMGDisk(disk);
-    disk->nib = nib;
+    const ClemensNibbleDisk* disk = &drive->disk;
+    mpack_writer_t writer;
 
-    std::ifstream dskFile(filename, std::ios::binary | std::ios::ate);
-    if (dskFile.is_open()) {
-        unsigned sz = unsigned(dskFile.tellg());
-        uint8_t *image_buffer = (uint8_t *)malloc(sz);
-        dskFile.seekg(0, std::ios::beg);
-        dskFile.read((char *)image_buffer, sz);
-        dskFile.close();
-        if (clem_2img_parse_header(disk, image_buffer, image_buffer + sz)) {
-            //  output parsed metadata in log
-            if (clem_2img_nibblize_data(disk)) {
-                return true;
+    mpack_writer_init_filename(&writer, path.c_str());
+    mpack_build_map(&writer);
+    mpack_write_cstr(&writer, "disk_type");
+    switch (disk->disk_type) {
+        case CLEM_DISK_TYPE_NONE:
+            mpack_write_cstr(&writer, "NONE");
+            break;
+        case CLEM_DISK_TYPE_5_25:
+            mpack_write_cstr(&writer, "5.25");
+            break;
+        case CLEM_DISK_TYPE_3_5:
+            mpack_write_cstr(&writer, "3.5");
+            break;
+        default:
+            mpack_write_cstr(&writer, "UNKNOWN");
+            break;
+    }
+    mpack_write_cstr(&writer, "bit_timing_ns");
+    mpack_write_u32(&writer, disk->bit_timing_ns);
+    mpack_write_cstr(&writer, "is_write_projected");
+    mpack_write_bool(&writer, disk->is_write_protected);
+    mpack_write_cstr(&writer, "is_double_sided");
+    mpack_write_bool(&writer, disk->is_double_sided);
+
+    mpack_write_cstr(&writer, "tracks");
+    mpack_build_array(&writer);
+
+    const uint8_t* bits_data = disk->bits_data;
+    for (unsigned i = 0; i < CLEM_DISK_LIMIT_QTR_TRACKS; ++i) {
+        //  Track #, Side #
+        //  Binary Blob
+        unsigned track_index = disk->meta_track_map[i];
+        if (track_index == 0xff) continue;
+        mpack_build_map(&writer);
+        {
+            mpack_write_cstr(&writer, "track");
+            mpack_write_u32(&writer, i);
+            if (disk->is_double_sided) {
+                mpack_write_cstr(&writer, "side");
+                mpack_write_u8(&writer, (track_index % 2) + 1);
             }
-            printf("load2IMGDisk: nibbilization pass failed.\n");
+            mpack_write_cstr(&writer, "byte_offset");
+            mpack_write_u32(&writer, disk->track_byte_offset[track_index]);
+            mpack_write_cstr(&writer, "byte_count");
+            mpack_write_u32(&writer, disk->track_byte_count[track_index]);
+            mpack_write_cstr(&writer, "bits_count");
+            mpack_write_u32(&writer, disk->track_bits_count[track_index]);
+            mpack_write_cstr(&writer, "initialized");
+            mpack_write_u8(&writer, disk->track_initialized[track_index]);
+
+            mpack_write_cstr(&writer, "blob");
+            mpack_build_array(&writer);
+            unsigned byte_count = disk->track_byte_count[track_index];
+            //  include space between bytes (or newline or terminator)
+            char blob_hex[16 * 3];
+            const uint8_t* bytes_data = disk->bits_data + disk->track_byte_offset[track_index];
+            for (unsigned j = 0, k = 0; j < byte_count; ++j) {
+                char* byte_hex = &blob_hex[k * 3];
+                byte_hex[0] = g_bin_to_hex[bytes_data[j] >> 4];
+                byte_hex[1] = g_bin_to_hex[bytes_data[j] & 0xf];
+                if (((j + 1) % 16) == 0 || j + 1 == byte_count) {
+                    byte_hex[2] = '\0';
+                    mpack_write_cstr(&writer, blob_hex);
+                    k = 0;
+                } else {
+                    byte_hex[2] = ' ';
+                    ++k;
+                }
+            }
+            mpack_complete_array(&writer);
         }
+        mpack_complete_map(&writer);
     }
 
-    return false;
+    mpack_complete_array(&writer);
+
+    mpack_complete_map(&writer);
+
+    mpack_writer_destroy(&writer);
+
+    CLEM_HOST_COUT.format("{}: {} saved", drive_name.c_str(), path.c_str());
+
+    return true;
+
 }

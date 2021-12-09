@@ -110,6 +110,23 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"SUB_FWR_FF482A":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"SUB_FWR_FF482A",
+"Value":14749575,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "SUB_GET_SLOTSEL":{
 "DataDescriptor":{
 "Length":1,
@@ -1479,6 +1496,7 @@
 "216147":256,
 "221236":256,
 "221238":304,
+"221286":304,
 "226857":11796739,
 "226964":3145984,
 "227596":304,
@@ -1550,6 +1568,7 @@
 "214975":"Carry set, skip startup on this drive",
 "214977":"Reset disk-switched flag?",
 "214993":"What is this?",
+"215029":"eject?",
 "215042":"Step inward and get direction",
 "215050":"expected to be 0, otherwise some kind of error",
 "215052":"Step outwards (lower tracks, and side 0 head.)",
@@ -2507,6 +2526,18 @@
 
 "213316":{
 "Text":"This section retries track format if errors were detected.",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"215042":{
+"Text":"Detect if this drive supports some commands?  Could this be validating if the drive is a \u0027dumb\u0027 drive?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"214888":{
+"Text":"Likely this routine will verify a disk with a valid track/sector 0 header is available",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -5605,6 +5636,13 @@
 "213361":{
 "Label":"try_next_track",
 "Value":16728433,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215279":{
+"Label":"eject_disk",
+"Value":16730351,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},

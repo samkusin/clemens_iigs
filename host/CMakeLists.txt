@@ -103,6 +103,4 @@ else()
     message(WARNING "Unsupported compiler")
 endif()
 
-
-
 project_create_assets_target(clemens_iigs)

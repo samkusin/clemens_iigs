@@ -58,6 +58,8 @@ private:
                     ClemensDriveType driveType);
   void release2IMGDisk(struct Clemens2IMGDisk* disk);
 
+  bool saveClemensNibbleDisk(ClemensDriveType driveType);
+
 private:
   struct ClemensDisk;
 
@@ -72,6 +74,7 @@ private:
   bool parseCommandLoad(const char* line);
   bool parseCommandSave(const char* line);
   bool parseCommandDisk(const char* line);
+  bool parseCommandDiskSave(const char* line);
   bool parseCommandDebugStatus(const char* line);
   bool parseCommandStep(const char* line);
   bool parseCommandStepOver(const char* line);
@@ -99,6 +102,7 @@ private:
   void resetMachine();
   bool saveState(const char* filename);
   bool loadState(const char* filename);
+
   void stepMachine(int stepCount);
   bool emulationRun(unsigned target);
   void emulationBreak();

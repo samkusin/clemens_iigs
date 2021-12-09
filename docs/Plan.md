@@ -14,7 +14,6 @@ https://apple2.org.za/gswv/a2zine/GS.WorldView/Resources/DOS.3.3.ANATOMY/BOOT.PR
 
 This is a running todo list.
 
-* NMI support for Mockingboard right channel (or just use the IRQB)
 * Add trace debugging when executing a specific address (PBR:PC)
 * ProDOS 16 system disk boot end to end
   * May prioritize VGC, super hi-res at this point

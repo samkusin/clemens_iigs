@@ -83,5 +83,13 @@ target_link_libraries(clemens_65816_emulator PRIVATE clemens_65816)
 
 project_create_assets_target(clemens_65816_emulator)
 
+add_executable(clemens_mpack_format
+    "${CMAKE_CURRENT_SOURCE_DIR}/external/mpack.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_mpack_format.c")
+
+target_include_directories(clemens_mpack_format
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+
+
 add_subdirectory(iocards)
 add_subdirectory(host)

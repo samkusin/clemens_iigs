@@ -40,9 +40,10 @@
                             consistent.  let's choose 500
 
    Sector
-     65     Self Sync (GAP 2)
+     54     Self Sync (GAP 2)
                             13 strings of 4 10-bit self-syncs (13 * 5) =
-                            42 10-bit bytes, or 65 8-bit bytes
+                            42 10-bit bytes, or 54 8-bit bytes
+
      1      FF              Padding
      3      D5 AA 96        Address Prologue
      5      xx xx xx xx xx  Address Header
@@ -51,21 +52,38 @@
      3      D5 AA AD        Data Prologue
      1      xx              Logical Sector
      699    xx xx xx xx ..  Data Body
-     3      xx xx xx        6-2 encoded checksum
+        Note - this equates to 512 8-bit bytes + 12 8-bit "tag" header bytes
+        that are apparently unused on the IIgs (and are assumed to be bytes with
+        a value of 0 for ProDOS and GS/OS - custom formatting is not supported
+        unless using WOZ disks)
+        Ciderpress mentions 'tag' bytes but doesn't document their purpose
+        Resource below imply that the IIgs doesn't used these bytes (but the
+        ROM requires that they are there.)
+        http://dmweb.free.fr/?q=node/1601
+        https://www.bigmessowires.com/floppy-emu/ (comments)
+
+     4      xx xx xx xx     6-2 encoded checksum
      2      DE AA           Data Epilogue
      3      FF              Padding (not for the last sector)
 
-    = 788 bytes per sector
-    = 785 bytes for the last sector
-    + 400 for the track
+    = 721 bytes per sector base
+    = 789 bytes per sector 1 - last-1
+    = 786 bytes per last sector
+    = 1721 bytes per first sector
 
  */
-#define CLEM_DISK_35_BYTES_PER_SECTOR        788
-#define CLEM_DISK_35_BYTES_PER_LAST_SECTOR   785
-#define CLEM_DISK_35_BYTES_TRACK_GAP_1       768
+#define CLEM_DISK_35_BYTES_TRACK_GAP_1       1000
+#define CLEM_DISK_35_BYTES_TRACK_GAP_2       54
+#define CLEM_DISK_35_BYTES_PER_SECTOR_BASE   721
+#define CLEM_DISK_35_BYTES_PER_FIRST_SECTOR \
+    (CLEM_DISK_35_BYTES_PER_SECTOR_BASE + CLEM_DISK_35_BYTES_TRACK_GAP_1 + 3)
+#define CLEM_DISK_35_BYTES_PER_SECTOR       \
+    (CLEM_DISK_35_BYTES_PER_SECTOR_BASE + CLEM_DISK_35_BYTES_TRACK_GAP_2 + 3)
+#define CLEM_DISK_35_BYTES_PER_LAST_SECTOR  \
+    (CLEM_DISK_35_BYTES_PER_SECTOR_BASE + CLEM_DISK_35_BYTES_TRACK_GAP_2)
 #define CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(_sectors_) ( \
-    CLEM_DISK_35_BYTES_TRACK_GAP_1 + CLEM_DISK_35_BYTES_PER_LAST_SECTOR + \
-    (((_sectors_) - 1) * CLEM_DISK_35_BYTES_PER_SECTOR))
+    1 + CLEM_DISK_35_BYTES_PER_FIRST_SECTOR + CLEM_DISK_35_BYTES_PER_LAST_SECTOR + \
+    (((_sectors_) - 2) * CLEM_DISK_35_BYTES_PER_SECTOR))
 
 
 #ifdef __cplusplus

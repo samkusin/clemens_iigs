@@ -161,9 +161,9 @@ uint32_t ClemensAudioDevice::mixClemensAudio(CKAudioBuffer *audioBuffer,
   streamBuffer.data_format.frame_size = audio->queuedFrameStride_;
   streamBuffer.data_format.num_channels = 2;
   streamBuffer.data_format.frequency = audio->dataFormat_.frequency;
-  if (audioBuffer->frame_limit > streamBuffer.frame_limit) {
-    printf("ST!");
-  }
+  //if (audioBuffer->frame_limit > streamBuffer.frame_limit) {
+  //  printf("ST!");
+  //}
   uint32_t renderedCount = ckaudio_mixer_render_waveform(audioBuffer, &streamBuffer, 100);
   audio->queuedFrameHead_ += renderedCount;
   return audioBuffer->frame_limit;
