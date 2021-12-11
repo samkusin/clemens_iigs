@@ -163,6 +163,17 @@ static const char* s_drive_names[] = {
 #define CLEM_CPU_I_RTI_LOG(_clem_cpu_, _adr_, _bank_)
 #endif
 
+static inline void _opcode_instruction_define_mvn(
+    struct ClemensInstruction* instr,
+    uint8_t opcode,
+    uint8_t dest,
+    uint8_t src
+) {
+    instr->desc = &sOpcodeDescriptions[opcode];
+    instr->opc_8 = false;
+    instr->value = src;
+    instr->bank = dest;
+}
 
 static inline void _opcode_instruction_define(
     struct ClemensInstruction* instr,
@@ -302,6 +313,9 @@ static void _opcode_print(
             break;
         case kClemensCPUAddrMode_Stack_Relative_Indirect_Y:
             snprintf(operand, sizeof(operand), "(%02X, S), Y", inst->value);
+            break;
+        case kClemensCPUAddrMode_MoveBlock:
+            snprintf(operand, sizeof(operand), "s:%02X, d:%02X", inst->value & 0xff, inst->bank);
             break;
     }
 
@@ -2494,6 +2508,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             if (cpu->regs.A != 0xffff) {
                 tmp_pc = cpu->regs.PC;  // repeat
             }
+            cpu->regs.DBR = tmp_bnk1;
+            _opcode_instruction_define_mvn(&opc_inst, IR, tmp_bnk1, tmp_bnk0);
             break;
         case CLEM_OPC_MVP:
             //  copy X -> Y, decrementing X, Y, decrement C
@@ -2513,6 +2529,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             if (cpu->regs.A != 0xffff) {
                 tmp_pc = cpu->regs.PC;  // repeat
             }
+            cpu->regs.DBR = tmp_bnk1;
+            _opcode_instruction_define_mvn(&opc_inst, IR, tmp_bnk1, tmp_bnk0);
             break;
         case CLEM_OPC_NOP:
             _clem_cycle(clem, 1);

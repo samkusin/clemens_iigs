@@ -2399,7 +2399,7 @@ bool ClemensHost::saveClemensNibbleDisk(ClemensDriveType driveType) {
     mpack_writer_t writer;
 
     mpack_writer_init_filename(&writer, path.c_str());
-    mpack_build_map(&writer);
+    mpack_start_map(&writer, 5);
     mpack_write_cstr(&writer, "disk_type");
     switch (disk->disk_type) {
         case CLEM_DISK_TYPE_NONE:
@@ -2423,7 +2423,12 @@ bool ClemensHost::saveClemensNibbleDisk(ClemensDriveType driveType) {
     mpack_write_bool(&writer, disk->is_double_sided);
 
     mpack_write_cstr(&writer, "tracks");
-    mpack_build_array(&writer);
+
+    unsigned cnt = 0;
+    for (unsigned i = 0; i < CLEM_DISK_LIMIT_QTR_TRACKS; ++i) {
+        if (disk->meta_track_map[i] != 0xff) ++cnt;
+    }
+    mpack_start_array(&writer, cnt);
 
     const uint8_t* bits_data = disk->bits_data;
     for (unsigned i = 0; i < CLEM_DISK_LIMIT_QTR_TRACKS; ++i) {
@@ -2431,13 +2436,16 @@ bool ClemensHost::saveClemensNibbleDisk(ClemensDriveType driveType) {
         //  Binary Blob
         unsigned track_index = disk->meta_track_map[i];
         if (track_index == 0xff) continue;
-        mpack_build_map(&writer);
+        mpack_start_map(&writer, 7);
         {
             mpack_write_cstr(&writer, "track");
             mpack_write_u32(&writer, i);
             if (disk->is_double_sided) {
                 mpack_write_cstr(&writer, "side");
                 mpack_write_u8(&writer, (track_index % 2) + 1);
+            } else {
+                mpack_write_cstr(&writer, "side");
+                mpack_write_u8(&writer, 1);
             }
             mpack_write_cstr(&writer, "byte_offset");
             mpack_write_u32(&writer, disk->track_byte_offset[track_index]);
@@ -2449,8 +2457,11 @@ bool ClemensHost::saveClemensNibbleDisk(ClemensDriveType driveType) {
             mpack_write_u8(&writer, disk->track_initialized[track_index]);
 
             mpack_write_cstr(&writer, "blob");
-            mpack_build_array(&writer);
+
             unsigned byte_count = disk->track_byte_count[track_index];
+            cnt = byte_count / 16;
+            if (byte_count % 16) ++cnt;
+            mpack_start_array(&writer, cnt);
             //  include space between bytes (or newline or terminator)
             char blob_hex[16 * 3];
             const uint8_t* bytes_data = disk->bits_data + disk->track_byte_offset[track_index];
@@ -2467,15 +2478,13 @@ bool ClemensHost::saveClemensNibbleDisk(ClemensDriveType driveType) {
                     ++k;
                 }
             }
-            mpack_complete_array(&writer);
+            mpack_finish_array(&writer);
         }
-        mpack_complete_map(&writer);
+        mpack_finish_map(&writer);
     }
 
-    mpack_complete_array(&writer);
-
-    mpack_complete_map(&writer);
-
+    mpack_finish_array(&writer);
+    mpack_finish_map(&writer);
     mpack_writer_destroy(&writer);
 
     CLEM_HOST_COUT.format("{}: {} saved", drive_name.c_str(), path.c_str());

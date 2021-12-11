@@ -29,7 +29,7 @@
 
    Track (counts are 8-bit bytes)
     1       FF              Padding
-    1000    Self Sync (GAP 1)
+    500-1000    Self Sync (GAP 1)
                             4 10-bit bytes * 200 = 800 10-bit bytes, or
                             1000 8-bit byte
                             Bytes Self Sync (GAP 1)
@@ -40,14 +40,16 @@
                             consistent.  let's choose 500
 
    Sector
-     54     Self Sync (GAP 2)
-                            13 strings of 4 10-bit self-syncs (13 * 5) =
-                            42 10-bit bytes, or 54 8-bit bytes
+     53     Self Sync (GAP 2)
+                            13 strings of 4 10-bit self-syncs =
+                            53 8-bit bytes, or 42 10-bit bytes
 
      1      FF              Padding
      3      D5 AA 96        Address Prologue
      5      xx xx xx xx xx  Address Header
      2      D5 AA           Address Epilogue
+     1      FF              Padding
+     5      Self Sync       1 4 10-bit self-sync (5 bytes)
      1      FF              Padding
      3      D5 AA AD        Data Prologue
      1      xx              Logical Sector
@@ -64,26 +66,10 @@
 
      4      xx xx xx xx     6-2 encoded checksum
      2      DE AA           Data Epilogue
-     3      FF              Padding (not for the last sector)
+     1      FF              Padding
 
-    = 721 bytes per sector base
-    = 789 bytes per sector 1 - last-1
-    = 786 bytes per last sector
-    = 1721 bytes per first sector
-
+    = 780 bytes per sector base
  */
-#define CLEM_DISK_35_BYTES_TRACK_GAP_1       1000
-#define CLEM_DISK_35_BYTES_TRACK_GAP_2       54
-#define CLEM_DISK_35_BYTES_PER_SECTOR_BASE   721
-#define CLEM_DISK_35_BYTES_PER_FIRST_SECTOR \
-    (CLEM_DISK_35_BYTES_PER_SECTOR_BASE + CLEM_DISK_35_BYTES_TRACK_GAP_1 + 3)
-#define CLEM_DISK_35_BYTES_PER_SECTOR       \
-    (CLEM_DISK_35_BYTES_PER_SECTOR_BASE + CLEM_DISK_35_BYTES_TRACK_GAP_2 + 3)
-#define CLEM_DISK_35_BYTES_PER_LAST_SECTOR  \
-    (CLEM_DISK_35_BYTES_PER_SECTOR_BASE + CLEM_DISK_35_BYTES_TRACK_GAP_2)
-#define CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(_sectors_) ( \
-    1 + CLEM_DISK_35_BYTES_PER_FIRST_SECTOR + CLEM_DISK_35_BYTES_PER_LAST_SECTOR + \
-    (((_sectors_) - 2) * CLEM_DISK_35_BYTES_PER_SECTOR))
 
 
 #ifdef __cplusplus
@@ -92,6 +78,25 @@ extern "C" {
 
 extern unsigned g_clem_max_sectors_per_region_35[CLEM_DISK_35_NUM_REGIONS];
 extern unsigned g_clem_track_start_per_region_35[CLEM_DISK_35_NUM_REGIONS + 1];
+
+#ifdef __cplusplus
+}
+#endif
+
+
+#define CLEM_DISK_35_BYTES_TRACK_GAP_1       500
+#define CLEM_DISK_35_BYTES_TRACK_GAP_2       53
+#define CLEM_DISK_35_BYTES_PER_SECTOR_BASE   728
+#define CLEM_DISK_35_BYTES_PER_SECTOR       \
+    (CLEM_DISK_35_BYTES_PER_SECTOR_BASE + CLEM_DISK_35_BYTES_TRACK_GAP_2)
+#define CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(_sectors_) ( \
+    1 + (CLEM_DISK_35_BYTES_TRACK_GAP_1 - CLEM_DISK_35_BYTES_TRACK_GAP_2) + \
+    ((_sectors_) * CLEM_DISK_35_BYTES_PER_SECTOR))
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * @brief Represents a nibbilized disk from a WOZ or 2IMG compliant image

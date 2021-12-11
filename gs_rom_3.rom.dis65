@@ -144,6 +144,23 @@
 "Type":"ExternalAddr",
 "LabelAnno":"None"},
 
+"SYM_0F51":{
+"DataDescriptor":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"",
+"HasWidth":false,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"SYM_0F51",
+"Value":14749521,
+"Source":"Project",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
 "SYM_BOOT_E10FB6":{
 "DataDescriptor":{
 "Length":1,
@@ -799,6 +816,16 @@
 "Low":182305,
 "High":182305,
 "Hint":"Code"},
+
+{
+"Low":197017,
+"High":197017,
+"Hint":"Code"},
+
+{
+"Low":212118,
+"High":212181,
+"Hint":"InlineData"},
 
 {
 "Low":212574,
@@ -1491,6 +1518,7 @@
 "134740":304,
 "182305":3145984,
 "195764":304,
+"197017":304,
 "212574":256,
 "213453":3145984,
 "216147":256,
@@ -1539,9 +1567,14 @@
 "212016":"Setting 5.25\" mode",
 "212574":"==5 on startup with default BRAM",
 "212976":"Sector header read OK",
+"213075":"side",
+"213080":"track",
+"213117":"sector",
 "213367":"80 tracks?",
 "213369":"format next track",
 "213443":"Sector number",
+"213445":"1 FF byte",
+"213455":"200 strings",
 "213461":"4 10-bit self-sync bytes",
 "213464":"check handshake",
 "213469":"write data onto latch",
@@ -1561,6 +1594,7 @@
 "214804":"Read the IWM status",
 "214810":"Wait for it to be disabled",
 "214816":"This will switch to IWM set mode (likely to $0f)",
+"214831":"retry count",
 "214839":"Carry clear if no error",
 "214841":"Retry count",
 "214844":"error!",
@@ -1583,6 +1617,15 @@
 "216214":"==#$DE",
 "216224":"==#$AA",
 "216274":"Read state",
+"216311":"d5 aa ad",
+"216319":"read sector in data block",
+"216324":"decode 6-2",
+"216328":"check against our target sector",
+"216346":"decode 6-2",
+"216370":"decode 6-2",
+"217335":"512 byte data sector",
+"217339":"this seems to always be 0 (512 bytes)",
+"217345":"524 byte data sector",
 "218640":"read data mode",
 "218652":"80 half tracks",
 "218687":"read data from disk",
@@ -1613,6 +1656,7 @@
 "221381":"If 0, then scan",
 "221385":"On boot, this seems to be 0",
 "221438":"failure point",
+"221448":"can\u0027t be 00 (we actually loaded something!)",
 "221463":"$00,$01 = slot address (i.e $C500)",
 "226816":"TBD - A=$fb at this time, so storing $fbfb?",
 "226826":"Storing vectors into bank $e1 used during initialization?",
@@ -2009,7 +2053,7 @@
 "BackgroundColor":0},
 
 "212574":{
-"Text":"Appears to be the jump point from FF/3E5A after a redirect from the $E1 jump table... Continues some initial IWM/disk access on startup",
+"Text":"Once the 3.5\" drive is ready, dispatch the operation here.",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},
@@ -2538,6 +2582,36 @@
 
 "214888":{
 "Text":"Likely this routine will verify a disk with a valid track/sector 0 header is available",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"212938":{
+"Text":"Maybe this loads the track 0/sector data",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"213075":{
+"Text":"This code will check track,sector,side for our target track+sector\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"216299":{
+"Text":"Find data prologue and validate the data sector is the one we want\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"212118":{
+"Text":"Start of GCR 6-2 xlate to byte table",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"212182":{
+"Text":"End GCR 6n2 xlate table",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -5340,7 +5414,7 @@
 "LabelAnno":"None"},
 
 "211968":{
-"Label":"SUB_IWM_35_ENUM_DRIVES",
+"Label":"SUB_IWM_35_DISK_OP",
 "Value":16727040,
 "Source":"User",
 "Type":"GlobalAddr",
@@ -5438,7 +5512,7 @@
 "LabelAnno":"None"},
 
 "216143":{
-"Label":"SUB_PRODOS_35_SECTOR_READ",
+"Label":"SUB_PRODOS_35_SECTOR_READ_HDR_2",
 "Value":16731215,
 "Source":"User",
 "Type":"GlobalAddr",
@@ -5645,6 +5719,97 @@
 "Value":16730351,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"212982":{
+"Label":"continue",
+"Value":16728054,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"213037":{
+"Label":"retry_sector_find",
+"Value":16728109,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"216336":{
+"Label":"is_sector_ok",
+"Value":16731408,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"216511":{
+"Label":"error",
+"Value":16731583,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"215948":{
+"Label":"TBL_ENCODE_GCR_6_2_0",
+"Value":16731020,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"216012":{
+"Label":"TBL_ENCODE_GCR_6_2_1",
+"Value":16731084,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"216076":{
+"Label":"TBL_ENCODE_GCR_6_2_2",
+"Value":16731148,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"216499":{
+"Label":"error_1",
+"Value":16731571,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"216503":{
+"Label":"error_2",
+"Value":16731575,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"216505":{
+"Label":"error_3",
+"Value":16731577,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"212570":{
+"Label":"SUB_IWM_35_DISK_OP_DISPATCH",
+"Value":16727642,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"216281":{
+"Label":"SUB_IWM_35_LOAD_SECTOR_DATA",
+"Value":16731353,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"217323":{
+"Label":"SUB_IWM_35_COPY_DATA_TO_BUF",
+"Value":16732395,
+"Source":"User",
+"Type":"GlobalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -5689,6 +5854,144 @@
 "182305":{
 "Length":1,
 "Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212103":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212104":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212105":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212106":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212107":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212108":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212109":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212110":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212111":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212112":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212113":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212114":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212115":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212116":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212117":{
+"Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212118":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212126":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212134":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212142":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212150":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212158":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212166":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"212174":{
+"Length":8,
+"Format":"Dense",
 "SubFormat":"None",
 "SymbolRef":null},
 
@@ -5773,6 +6076,150 @@
 "213453":{
 "Length":1,
 "Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"215948":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"215956":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"215964":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"215972":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"215980":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"215988":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"215996":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216004":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216012":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216020":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216028":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216036":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216044":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216052":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216060":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216068":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216076":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216084":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216092":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216100":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216108":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216116":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216124":{
+"Length":8,
+"Format":"Dense",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"216132":{
+"Length":8,
+"Format":"Dense",
 "SubFormat":"None",
 "SymbolRef":null},
 

@@ -51,11 +51,10 @@ struct Clemens2IMGDisk {
 };
 
 struct ClemensNibEncoder {
-    uint8_t* cur;
+    uint8_t* begin;
     uint8_t* end;
     unsigned bit_index;
     unsigned bit_index_end;
-    unsigned overflow_cnt;
 };
 
 

@@ -375,7 +375,7 @@ static uint8_t _clem_mmio_vgc_irq_c023_get(struct ClemensMMIO* mmio) {
    http://www.1000bit.it/support/manuali/apple/technotes/iigs/tn.iigs.030.html
 */
 static inline uint8_t _clem_mmio_statereg_c068(struct ClemensMMIO* mmio) {
-     uint8_t value = 0x00;
+    uint8_t value = 0x00;
     if (mmio->mmap_register & CLEM_MEM_IO_MMAP_ALTZPLC) {
         value |= 0x80;
     }
