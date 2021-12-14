@@ -1803,12 +1803,14 @@ bool ClemensHost::saveState(const char *filename) {
     mpack_write_bin(&writer, (char *)clemens_rtc_get_bram(&machine_, NULL),
                     CLEM_RTC_BRAM_SIZE);
     mpack_write_cstr(&writer, "disks");
-    mpack_build_array(&writer);
-    saveDiskMetadata(&writer, disks525_[0]);
-    saveDiskMetadata(&writer, disks525_[1]);
-    saveDiskMetadata(&writer, disks35_[0]);
-    saveDiskMetadata(&writer, disks35_[1]);
-    mpack_complete_array(&writer);
+    {
+        mpack_start_array(&writer, 4);
+        saveDiskMetadata(&writer, disks525_[0]);
+        saveDiskMetadata(&writer, disks525_[1]);
+        saveDiskMetadata(&writer, disks35_[0]);
+        saveDiskMetadata(&writer, disks35_[1]);
+        mpack_finish_array(&writer);
+    }
     mpack_complete_map(&writer);
     mpack_writer_destroy(&writer);
     return true;
@@ -1821,12 +1823,14 @@ uint8_t *ClemensHost::unserializeAllocate(unsigned sz, void *context) {
 
 bool ClemensHost::loadState(const char *filename) {
     if (!clemens_is_initialized_simple(&machine_)) {
-        //  power on and load state
+        //  TODO: power on and load state
+        return false;
     }
     char str[256];
     mpack_reader_t reader;
     mpack_reader_init_filename(&reader, filename);
     mpack_expect_map(&reader);
+    //  "machine"
     mpack_expect_cstr(&reader, str, sizeof(str));
     if (!clemens_unserialize_machine(&reader, &machine_,
                                      &ClemensHost::unserializeAllocate, this)) {
@@ -1834,6 +1838,7 @@ bool ClemensHost::loadState(const char *filename) {
         mpack_reader_destroy(&reader);
         return false;
     }
+    // "bram"
     mpack_expect_cstr(&reader, str, sizeof(str));
     if (mpack_expect_bin(&reader) == CLEM_RTC_BRAM_SIZE) {
         mpack_read_bytes(&reader, (char *)machine_.mmio.dev_rtc.bram,
@@ -1841,18 +1846,18 @@ bool ClemensHost::loadState(const char *filename) {
     }
     mpack_done_bin(&reader);
     clemens_rtc_set_bram_dirty(&machine_);
-
+    //  "disks"
     //  load woz filenames - the actual images have already been
     //  unserialized inside clemens_unserialize_machine
     mpack_expect_cstr(&reader, str, sizeof(str));
-    mpack_expect_array(&reader);
-
-    loadDiskMetadata(&reader, disks525_[0]);
-    loadDiskMetadata(&reader, disks525_[1]);
-    loadDiskMetadata(&reader, disks35_[0]);
-    loadDiskMetadata(&reader, disks35_[1]);
-
-    mpack_done_array(&reader);
+    {
+        mpack_expect_array(&reader);
+        loadDiskMetadata(&reader, disks525_[0]);
+        loadDiskMetadata(&reader, disks525_[1]);
+        loadDiskMetadata(&reader, disks35_[0]);
+        loadDiskMetadata(&reader, disks35_[1]);
+        mpack_done_array(&reader);
+    }
     mpack_done_map(&reader);
     mpack_reader_destroy(&reader);
 
@@ -2149,6 +2154,9 @@ bool ClemensHost::loadDisk(ClemensDriveType driveType, const char *filename) {
             if (filename_ext.compare(filename_ext_pos + 1, std::string::npos,
                                      "woz") == 0) {
                 disk->diskBrand = ClemensDisk::WOZ;
+            } else if (filename_ext.compare(filename_ext_pos + 1,
+                                            std::string::npos, "2mg") == 0) {
+                disk->diskBrand = ClemensDisk::IMG2;
             } else if (filename_ext.compare(filename_ext_pos + 1,
                                             std::string::npos, "2mg") == 0) {
                 disk->diskBrand = ClemensDisk::IMG2;
