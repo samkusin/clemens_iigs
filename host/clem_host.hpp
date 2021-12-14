@@ -145,13 +145,13 @@ private:
   ClemensMemoryPageMap simpleDirectPageMap_;
 
   struct ClemensDisk {
-    enum Brand {
+    enum ContainerType {
       None,
       WOZ,
       IMG2
     };
     std::string path;
-    Brand diskBrand;
+    ContainerType diskContainerType;
     //  preallocated nibble memory buffer
     ClemensNibbleDisk nib;
     union {

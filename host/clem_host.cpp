@@ -75,7 +75,7 @@ unsigned calculateMaxDiskDataSize(unsigned int disk_type) {
     unsigned trackDataSize = 0;
     switch (disk_type) {
     case CLEM_DISK_TYPE_5_25:
-        trackDataSize = 40 * 13 * 512;
+        trackDataSize = 40 * CLEM_DISK_525_BYTES_PER_TRACK;
         break;
     case CLEM_DISK_TYPE_3_5:
         trackDataSize = 160 * CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(12);
@@ -129,7 +129,7 @@ ClemensHost::ClemensHost()
         disk.nib.disk_type = CLEM_DISK_TYPE_5_25;
         disk.nib.bits_data = (uint8_t *)malloc(maxDiskDataSize);
         disk.nib.bits_data_end = disk.nib.bits_data + maxDiskDataSize;
-        disk.diskBrand = ClemensDisk::None;
+        disk.diskContainerType = ClemensDisk::None;
     }
 
     for (auto &disk : disks35_) {
@@ -137,7 +137,7 @@ ClemensHost::ClemensHost()
         disk.nib.disk_type = CLEM_DISK_TYPE_3_5;
         disk.nib.bits_data = (uint8_t *)malloc(maxDiskDataSize);
         disk.nib.bits_data_end = disk.nib.bits_data + maxDiskDataSize;
-        disk.diskBrand = ClemensDisk::None;
+        disk.diskContainerType = ClemensDisk::None;
     }
 
     displayProvider_ = std::make_unique<ClemensDisplayProvider>();
@@ -1895,7 +1895,7 @@ void ClemensHost::saveDiskMetadata(mpack_writer_t *writer,
     mpack_write_cstr(writer, "path");
     mpack_write_cstr(writer, disk.path.c_str());
     mpack_write_cstr(writer, "brand");
-    switch (disk.diskBrand) {
+    switch (disk.diskContainerType) {
     case ClemensDisk::None:
         mpack_write_str(writer, "none", 4);
         break;
@@ -1916,39 +1916,52 @@ void ClemensHost::saveDiskMetadata(mpack_writer_t *writer,
                         sizeof(disk.dataWOZ.creator));
         break;
     case ClemensDisk::IMG2:
-        mpack_write_str(writer, "2img", 4);
+        mpack_write_str(writer, "2IMG", 4);
         mpack_write_cstr(writer, "creator");
         mpack_write_str(writer, disk.data2IMG.creator, 4);
         mpack_write_cstr(writer, "version");
-        mpack_write_u32(writer, disk.data2IMG.version);
+        mpack_write_u16(writer, disk.data2IMG.version);
         mpack_write_cstr(writer, "format");
         mpack_write_u32(writer, disk.data2IMG.format);
         mpack_write_cstr(writer, "dos_volume");
         mpack_write_u32(writer, disk.data2IMG.dos_volume);
         mpack_write_cstr(writer, "block_count");
         mpack_write_u32(writer, disk.data2IMG.block_count);
-        mpack_write_cstr(writer, "comment");
-        if (disk.data2IMG.comment) {
-            mpack_write_str(writer, disk.data2IMG.comment,
-                            disk.data2IMG.comment_end - disk.data2IMG.comment);
-        } else {
-            mpack_write_nil(writer);
-        }
+
+        //  write the backing buffer first, so that creator and other data
+        //  objects embedded in the backing buffer can be serialized
+        mpack_write_cstr(writer, "image_buffer");
+        mpack_write_bin(writer, (char *)disk.data2IMG.image_buffer,
+                        disk.data2IMG.image_buffer_length);
+        mpack_write_cstr(writer, "image_buffer_offset");
+        mpack_write_u32(writer, disk.data2IMG.image_data_offset);
         mpack_write_cstr(writer, "creator_data");
-        if (disk.data2IMG.creator_data) {
-            mpack_write_bin(writer, (char *)disk.data2IMG.creator_data,
-                            disk.data2IMG.creator_data_end -
-                                disk.data2IMG.creator_data);
-        } else {
-            mpack_write_nil(writer);
-        }
+        mpack_write_u32(writer, disk.data2IMG.creator_data - (char *)disk.data2IMG.image_buffer);
+        mpack_write_cstr(writer, "creator_data_size");
+        mpack_write_u32(writer, disk.data2IMG.creator_data_end - disk.data2IMG.creator_data);
+        mpack_write_cstr(writer, "comment");
+        mpack_write_u32(writer, disk.data2IMG.comment - (char *)disk.data2IMG.image_buffer);
+        mpack_write_cstr(writer, "comment_size");
+        mpack_write_u32(writer, disk.data2IMG.comment_end - disk.data2IMG.comment);
+        mpack_write_cstr(writer, "data");
+        mpack_write_u32(writer, disk.data2IMG.data - disk.data2IMG.image_buffer);
+        mpack_write_cstr(writer, "data_size");
+        mpack_write_u32(writer, disk.data2IMG.data_end - disk.data2IMG.data);
+        mpack_write_cstr(writer, "is_write_protected");
+        mpack_write_bool(writer, disk.data2IMG.is_write_protected);
+        mpack_write_cstr(writer, "is_nibblized");
+        mpack_write_bool(writer, disk.data2IMG.is_nibblized);
         break;
     }
     mpack_complete_map(writer);
 }
 
 void ClemensHost::loadDiskMetadata(mpack_reader_t *reader, ClemensDisk &disk) {
+    if (disk.diskContainerType == ClemensDisk::IMG2) {
+        release2IMGDisk(&disk.data2IMG);
+    }
     char value[1024];
+
     mpack_expect_map(reader);
     mpack_expect_cstr_match(reader, "path");
     mpack_expect_cstr(reader, value, sizeof(value));
@@ -1956,15 +1969,15 @@ void ClemensHost::loadDiskMetadata(mpack_reader_t *reader, ClemensDisk &disk) {
     mpack_expect_cstr_match(reader, "brand");
     mpack_expect_str_buf(reader, value, 4);
     if (!strncasecmp(value, "none", 4)) {
-        disk.diskBrand = ClemensDisk::None;
+        disk.diskContainerType = ClemensDisk::None;
     } else if (!strncasecmp(value, "woz2", 4)) {
-        disk.diskBrand = ClemensDisk::WOZ;
-    } else if (!strncasecmp(value, "2img", 4)) {
-        disk.diskBrand = ClemensDisk::IMG2;
+        disk.diskContainerType = ClemensDisk::WOZ;
+    } else if (!strncmp(value, "2IMG", 4)) {
+        disk.diskContainerType = ClemensDisk::IMG2;
     } else {
-        disk.diskBrand = ClemensDisk::None;
+        disk.diskContainerType = ClemensDisk::None;
     }
-    switch (disk.diskBrand) {
+    switch (disk.diskContainerType) {
     case ClemensDisk::None:
         break;
     case ClemensDisk::WOZ:
@@ -1982,8 +1995,62 @@ void ClemensHost::loadDiskMetadata(mpack_reader_t *reader, ClemensDisk &disk) {
         mpack_expect_str_buf(reader, disk.dataWOZ.creator,
                              sizeof(disk.dataWOZ.creator));
         break;
-    case ClemensDisk::IMG2:
-        break;
+    case ClemensDisk::IMG2: {
+        unsigned offset;
+        unsigned size;
+
+        mpack_expect_cstr_match(reader, "creator");
+        mpack_expect_cstr(reader, disk.data2IMG.creator, sizeof(disk.data2IMG.creator));
+        mpack_expect_cstr_match(reader, "version");
+        disk.data2IMG.version = mpack_expect_u16(reader);
+        mpack_expect_cstr_match(reader, "format");
+        disk.data2IMG.format = mpack_expect_u32(reader);
+        mpack_expect_cstr_match(reader, "dos_volume");
+        disk.data2IMG.dos_volume = mpack_expect_u32(reader);
+        mpack_expect_cstr_match(reader, "block_count");
+        disk.data2IMG.block_count = mpack_expect_u32(reader);
+
+        //  read the backing buffer first, so that creator and other data
+        //  objects embedded in the backing buffer can be identified
+        mpack_expect_cstr_match(reader, "image_buffer");
+        mpack_tag_t tag = mpack_peek_tag(reader);
+        if (tag.type != mpack_type_bin) {
+            disk.diskContainerType = ClemensDisk::None;
+            break;
+        }
+        size = tag.v.l;
+        disk.data2IMG.image_buffer = (uint8_t*)malloc(size);
+        mpack_expect_bin_size_buf(reader, (char *)disk.data2IMG.image_buffer, size);
+        disk.data2IMG.image_buffer_length = size;
+        mpack_expect_cstr_match(reader, "image_data_offset");
+        disk.data2IMG.image_data_offset = mpack_expect_u32(reader);
+
+        mpack_expect_cstr_match(reader, "creator_data");
+        offset = mpack_expect_u32(reader);
+        mpack_expect_cstr_match(reader, "creator_data_size");
+        size = mpack_expect_u32(reader);
+        disk.data2IMG.creator_data = (char *)disk.data2IMG.image_buffer + offset;
+        disk.data2IMG.creator_data_end = disk.data2IMG.creator_data + size;
+
+        mpack_expect_cstr_match(reader, "comment");
+        offset = mpack_expect_u32(reader);
+        mpack_expect_cstr_match(reader, "comment_size");
+        size = mpack_expect_u32(reader);
+        disk.data2IMG.comment = (char *)disk.data2IMG.image_buffer + offset;
+        disk.data2IMG.comment_end = disk.data2IMG.comment + size;
+
+        mpack_expect_cstr_match(reader, "data");
+        offset = mpack_expect_u32(reader);
+        mpack_expect_cstr_match(reader, "data_size");
+        size = mpack_expect_u32(reader);
+        disk.data2IMG.data = disk.data2IMG.image_buffer + offset;
+        disk.data2IMG.data_end = disk.data2IMG.data + size;
+
+        mpack_expect_cstr_match(reader, "is_write_protected");
+        disk.data2IMG.is_write_protected = mpack_expect_bool(reader);
+        mpack_expect_cstr_match(reader, "is_nibblized");
+        disk.data2IMG.is_nibblized = mpack_expect_bool(reader);
+    }   break;
     }
 
     mpack_done_map(reader);
@@ -2141,7 +2208,7 @@ bool ClemensHost::loadDisk(ClemensDriveType driveType, const char *filename) {
     if (!disk)
         return false;
 
-    disk->diskBrand = ClemensDisk::None;
+    disk->diskContainerType = ClemensDisk::None;
 
     bool isOk = true;
     if (filename != NULL && filename[0]) {
@@ -2153,13 +2220,19 @@ bool ClemensHost::loadDisk(ClemensDriveType driveType, const char *filename) {
         if (filename_ext_pos != std::string::npos) {
             if (filename_ext.compare(filename_ext_pos + 1, std::string::npos,
                                      "woz") == 0) {
-                disk->diskBrand = ClemensDisk::WOZ;
+                disk->diskContainerType = ClemensDisk::WOZ;
             } else if (filename_ext.compare(filename_ext_pos + 1,
                                             std::string::npos, "2mg") == 0) {
-                disk->diskBrand = ClemensDisk::IMG2;
+                disk->diskContainerType = ClemensDisk::IMG2;
             } else if (filename_ext.compare(filename_ext_pos + 1,
-                                            std::string::npos, "2mg") == 0) {
-                disk->diskBrand = ClemensDisk::IMG2;
+                                            std::string::npos, "po") == 0) {
+                disk->diskContainerType = ClemensDisk::IMG2;
+            } else if (filename_ext.compare(filename_ext_pos + 1,
+                                            std::string::npos, "do") == 0) {
+                disk->diskContainerType = ClemensDisk::IMG2;
+            } else if (filename_ext.compare(filename_ext_pos + 1,
+                                            std::string::npos, "dsk") == 0) {
+                disk->diskContainerType = ClemensDisk::IMG2;
             }
         }
 
@@ -2169,7 +2242,7 @@ bool ClemensHost::loadDisk(ClemensDriveType driveType, const char *filename) {
             disk->nib.is_double_sided = doubleSided;
             isOk = createBlankDisk(&disk->nib);
         } else {
-            switch (disk->diskBrand) {
+            switch (disk->diskContainerType) {
             case ClemensDisk::WOZ:
                 disk->dataWOZ.nib = &disk->nib;
                 isOk = loadWOZDisk(filename, &disk->dataWOZ, driveType);
@@ -2272,20 +2345,44 @@ bool ClemensHost::load2IMGDisk(const char *filename,
     release2IMGDisk(disk);
     disk->nib = nib;
 
-    std::ifstream dskFile(filename, std::ios::binary | std::ios::ate);
+    //  using the filename extension, parse the input file and then
+    std::string pathname = filename;
+    std::ifstream dskFile(pathname, std::ios::binary | std::ios::ate);
+    bool header_parsed = false;
     if (dskFile.is_open()) {
         unsigned sz = unsigned(dskFile.tellg());
         uint8_t *image_buffer = (uint8_t *)malloc(sz);
         dskFile.seekg(0, std::ios::beg);
         dskFile.read((char *)image_buffer, sz);
         dskFile.close();
-        if (clem_2img_parse_header(disk, image_buffer, image_buffer + sz)) {
-            //  output parsed metadata in log
-            if (clem_2img_nibblize_data(disk)) {
-                return true;
-            }
-            printf("load2IMGDisk: nibbilization pass failed.\n");
+
+        std::string filetype;
+        auto pathExtensionPos = pathname.find_last_of('.');
+        if (pathExtensionPos != std::string::npos) {
+            filetype = pathname.substr(pathExtensionPos);
+        } else {
+            filetype = ".2mg";
         }
+
+        if (filetype == ".2mg") {
+            header_parsed = clem_2img_parse_header(disk, image_buffer, image_buffer + sz);
+        } else if (filetype == ".po") {
+            header_parsed = clem_2img_generate_header(
+                disk, CLEM_2IMG_FORMAT_PRODOS, image_buffer, image_buffer + sz);
+        } else if (filetype == ".do" || filetype == ".dsk") {
+            header_parsed = clem_2img_generate_header(
+                disk, CLEM_2IMG_FORMAT_DOS, image_buffer, image_buffer + sz);
+        }
+    }
+    if (header_parsed) {
+        if (clem_2img_nibblize_data(disk)) {
+            printf("load2IMGDisk: successfully nibbilized %s.\n", pathname.c_str());
+            return true;
+        } else {
+            printf("load2IMGDisk: nibbilization pass on %s failed.\n", pathname.c_str());
+        }
+    } else {
+        printf("load2IMGDisk: no valid disk data found for %s.\n", pathname.c_str());
     }
 
     return false;
@@ -2306,7 +2403,7 @@ bool ClemensHost::createBlankDisk(struct ClemensNibbleDisk *disk) {
         disk->bit_timing_ns = 4000;
         disk->track_count = 35;
 
-        max_track_size_bytes = 0x0d * 512;
+        max_track_size_bytes = CLEM_DISK_525_BYTES_PER_TRACK;
         for (unsigned i = 0; i < CLEM_DISK_LIMIT_QTR_TRACKS; ++i) {
             if ((i % 4) == 0 || (i % 4) == 1) {
                 disk->meta_track_map[i] = (i / 4);
@@ -2407,7 +2504,7 @@ bool ClemensHost::saveClemensNibbleDisk(ClemensDriveType driveType) {
     mpack_writer_t writer;
 
     mpack_writer_init_filename(&writer, path.c_str());
-    mpack_start_map(&writer, 5);
+    mpack_start_map(&writer, 6);
     mpack_write_cstr(&writer, "disk_type");
     switch (disk->disk_type) {
         case CLEM_DISK_TYPE_NONE:
@@ -2430,49 +2527,47 @@ bool ClemensHost::saveClemensNibbleDisk(ClemensDriveType driveType) {
     mpack_write_cstr(&writer, "is_double_sided");
     mpack_write_bool(&writer, disk->is_double_sided);
 
-    mpack_write_cstr(&writer, "tracks");
+    mpack_write_cstr(&writer, "meta_track_map");
 
-    unsigned cnt = 0;
+    mpack_start_array(&writer, CLEM_DISK_LIMIT_QTR_TRACKS);
     for (unsigned i = 0; i < CLEM_DISK_LIMIT_QTR_TRACKS; ++i) {
-        if (disk->meta_track_map[i] != 0xff) ++cnt;
+        mpack_write_u8(&writer, disk->meta_track_map[i]);
     }
-    mpack_start_array(&writer, cnt);
+    mpack_finish_array(&writer);
 
+    mpack_write_cstr(&writer, "tracks");
+    mpack_start_array(&writer, disk->track_count);
     const uint8_t* bits_data = disk->bits_data;
-    for (unsigned i = 0; i < CLEM_DISK_LIMIT_QTR_TRACKS; ++i) {
-        //  Track #, Side #
-        //  Binary Blob
-        unsigned track_index = disk->meta_track_map[i];
-        if (track_index == 0xff) continue;
+    for (unsigned i = 0; i < disk->track_count; ++i) {
         mpack_start_map(&writer, 7);
         {
             mpack_write_cstr(&writer, "track");
             mpack_write_u32(&writer, i);
             if (disk->is_double_sided) {
                 mpack_write_cstr(&writer, "side");
-                mpack_write_u8(&writer, (track_index % 2) + 1);
+                mpack_write_u8(&writer, (i % 2) + 1);
             } else {
                 mpack_write_cstr(&writer, "side");
                 mpack_write_u8(&writer, 1);
             }
             mpack_write_cstr(&writer, "byte_offset");
-            mpack_write_u32(&writer, disk->track_byte_offset[track_index]);
+            mpack_write_u32(&writer, disk->track_byte_offset[i]);
             mpack_write_cstr(&writer, "byte_count");
-            mpack_write_u32(&writer, disk->track_byte_count[track_index]);
+            mpack_write_u32(&writer, disk->track_byte_count[i]);
             mpack_write_cstr(&writer, "bits_count");
-            mpack_write_u32(&writer, disk->track_bits_count[track_index]);
+            mpack_write_u32(&writer, disk->track_bits_count[i]);
             mpack_write_cstr(&writer, "initialized");
-            mpack_write_u8(&writer, disk->track_initialized[track_index]);
+            mpack_write_u8(&writer, disk->track_initialized[i]);
 
             mpack_write_cstr(&writer, "blob");
 
-            unsigned byte_count = disk->track_byte_count[track_index];
-            cnt = byte_count / 16;
+            unsigned byte_count = disk->track_byte_count[i];
+            unsigned cnt = byte_count / 16;
             if (byte_count % 16) ++cnt;
             mpack_start_array(&writer, cnt);
             //  include space between bytes (or newline or terminator)
             char blob_hex[16 * 3];
-            const uint8_t* bytes_data = disk->bits_data + disk->track_byte_offset[track_index];
+            const uint8_t* bytes_data = disk->bits_data + disk->track_byte_offset[i];
             for (unsigned j = 0, k = 0; j < byte_count; ++j) {
                 char* byte_hex = &blob_hex[k * 3];
                 byte_hex[0] = g_bin_to_hex[bytes_data[j] >> 4];

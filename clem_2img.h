@@ -14,9 +14,9 @@
 
 #include "clem_disk.h"
 
-#define CLEM_2IMG_FORMAT_DOS            0
-#define CLEM_2IMG_FORMAT_PRODOS         1
-#define CLEM_2IMG_FORMAT_RAW            2
+#define CLEM_2IMG_FORMAT_DOS            0U
+#define CLEM_2IMG_FORMAT_PRODOS         1U
+#define CLEM_2IMG_FORMAT_RAW            2U
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,8 +42,8 @@ struct Clemens2IMGDisk {
     uint8_t* data;
     uint8_t* data_end;
     uint8_t* image_buffer;      /**< Backing memory buffer owned by caller */
+    uint32_t image_buffer_length; /**< Length of the original memory buffer */
     uint32_t image_data_offset; /**< Offset to original track data */
-    uint32_t image_data_length; /**< Length of the original track data */
     bool is_write_protected;    /**< Write protected image */
     bool is_nibblized;          /**< See the clem_2img_nibblize_data call */
 
@@ -56,7 +56,6 @@ struct ClemensNibEncoder {
     unsigned bit_index;
     unsigned bit_index_end;
 };
-
 
 /**
  * @brief Obtains information from a 2IMG disk image used for processing
@@ -71,6 +70,26 @@ struct ClemensNibEncoder {
  * @return false
  */
 bool clem_2img_parse_header(struct Clemens2IMGDisk* disk,
+                            uint8_t* image,
+                            uint8_t* image_end);
+
+/**
+ * @brief Generates a 2IMG disk container from either ProDOS or DOS images.
+ *
+ * Once running a compliant disk image through this function successfully, it
+ * should be possible to build a 2IMG file from the result.  It will be
+ * possible to also call clem_2img_nibblize_data to retrieve the nibble format
+ * data.
+ *
+ * @param disk
+ * @param format See CLEM_2IMG_FORMAT_XXX
+ * @param image Logical sectors based on the sector format
+ * @param image_end End of the raw post-nibblized logical sector input buffer
+ * @return true
+ * @return false
+ */
+bool clem_2img_generate_header(struct Clemens2IMGDisk* disk,
+                            uint32_t format,
                             uint8_t* image,
                             uint8_t* image_end);
 
