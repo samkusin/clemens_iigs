@@ -302,6 +302,7 @@ struct ClemensSerializerRecord kMMIO[] = {
     CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_scc, struct ClemensDeviceSCC, kSCC),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, mmap_register),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, last_data_address),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, emulator_detect),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensMMIO, new_video_c029),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensMMIO, speed_c036),
     CLEM_SERIALIZER_RECORD_UINT64(struct ClemensMMIO, mega2_cycles),

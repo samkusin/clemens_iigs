@@ -101,10 +101,10 @@
 #define CLEM_MMIO_REG_STDZP             0x08
 /** Write to enable aux bank Page 0, Page 1 and LC */
 #define CLEM_MMIO_REG_ALTZP             0x09
-/** Write to enable peripheral ROM for C300 */
-#define CLEM_MMIO_REG_SLOTC3ROM         0x0A
 /** Write to enable internal ROM for C300 */
-#define CLEM_MMIO_REG_INTC3ROM          0x0B
+#define CLEM_MMIO_REG_INTC3ROM          0x0A
+/** Write to enable peripheral ROM for C300 */
+#define CLEM_MMIO_REG_SLOTC3ROM         0x0B
 /** Write Switches for toggling 80 column mode display */
 #define CLEM_MMIO_REG_80COLUMN_OFF      0x0C
 #define CLEM_MMIO_REG_80COLUMN_ON       0x0D
@@ -219,6 +219,8 @@
 #define CLEM_MMIO_REG_DIAG_INTTYPE      0x46
 /** Clears some MEGA2 based interrupts */
 #define CLEM_MMIO_REG_CLRVBLINT         0x47
+/** The emulator test function as defined via CLEM_MMIO_EMULATOR_DETECT_XXX */
+#define CLEM_MMIO_REG_EMULATOR          0x4f
 /** R/W Display graphics mode - will be mixed if correct flags are set */
 #define CLEM_MMIO_REG_TXTCLR            0x50
 /** R/W Display text mode only */
@@ -339,3 +341,11 @@
 /** Timer (internal, C023 partial) device flags */
 #define CLEM_MMIO_TIMER_1SEC_ENABLED    0x00000040
 #define CLEM_MMIO_TIMER_QSEC_ENABLED    0x00000100
+
+/** Used for emulator detection at c04f
+ * Apple II Technical Notes #201 (IIgs)
+ * Identifying Emulators
+ */
+#define CLEM_MMIO_EMULATOR_DETECT_IDLE    0
+#define CLEM_MMIO_EMULATOR_DETECT_START   1
+#define CLEM_MMIO_EMULATOR_DETECT_VERSION 2

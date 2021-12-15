@@ -334,6 +334,7 @@ struct ClemensMMIO {
     /* Registers that do not fall easily within a device struct */
     uint32_t mmap_register;     // memory map flags- CLEM_MEM_IO_MMAP_
     uint32_t last_data_address; // used for c08x switches
+    uint32_t emulator_detect;   // used for the c04f emulator test (state)
     uint8_t new_video_c029;     // see kClemensMMIONewVideo_xxx
     uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
 

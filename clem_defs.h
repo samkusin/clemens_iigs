@@ -1,6 +1,10 @@
 #ifndef CLEMENS_DEFS_H
 #define CLEMENS_DEFS_H
 
+/* The emulator ID as defined when reading c04f */
+#define CLEM_EMULATOR_ID                    0xce
+#define CLEM_EMULATOR_VER                   0x01
+
 /** A bit confusing... used for calculating our system clock.  These values
  *  are relative to each other.
  *

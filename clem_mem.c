@@ -706,6 +706,15 @@ static uint8_t _clem_mmio_read(
                 _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_QSEC | CLEM_IRQ_VGC_BLANK);
             }
             break;
+        case CLEM_MMIO_REG_EMULATOR:
+            if (mmio->emulator_detect == CLEM_MMIO_EMULATOR_DETECT_START) {
+                result = CLEM_EMULATOR_ID;
+                mmio->emulator_detect = CLEM_MMIO_EMULATOR_DETECT_VERSION;
+            } else if (mmio->emulator_detect == CLEM_MMIO_EMULATOR_DETECT_VERSION) {
+                result = CLEM_EMULATOR_VER;
+                mmio->emulator_detect =CLEM_MMIO_EMULATOR_DETECT_IDLE;
+            }
+            break;
         case CLEM_MMIO_REG_TXTCLR:
             if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
                 clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_GRAPHICS_MODE);
@@ -994,6 +1003,9 @@ static void _clem_mmio_write(
         case CLEM_MMIO_REG_CLRVBLINT:
             _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_QSEC | CLEM_IRQ_VGC_BLANK);
             break;
+        case CLEM_MMIO_REG_EMULATOR:
+            mmio->emulator_detect = CLEM_MMIO_EMULATOR_DETECT_START;
+            break;;
         case CLEM_MMIO_REG_TXTCLR:
             clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_GRAPHICS_MODE);
             break;
@@ -1674,6 +1686,7 @@ void _clem_mmio_init(
     mmio->card_expansion_rom_index = -1;
     mmio->last_data_address = 0xffffffff;
     mmio->bank_page_map = bank_page_map;
+    mmio->emulator_detect = CLEM_MMIO_EMULATOR_DETECT_IDLE;
 
     _clem_mmio_init_page_maps(mmio,
                               CLEM_MEM_IO_MMAP_NSHADOW_SHGR |
