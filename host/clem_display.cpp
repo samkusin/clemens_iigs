@@ -985,6 +985,15 @@ void ClemensDisplay::renderHiresGraphicsTexture(
   sg_draw(0, 6, 1);
 }
 
+void ClemensDisplay::renderSuperHiresGraphics(
+  const ClemensVideo& video,
+  const uint8_t* memory
+) {
+  //  render - do this next to render placeholder data
+  //  phase 0 = simple purple scanline
+  //  phase 1 = use
+}
+
 
 auto ClemensDisplay::createVertexParams(
   float virtualDimX,

@@ -8,8 +8,8 @@
 #define CLEM_VGC_80COLUMN_TEXT     0x00000004
 #define CLEM_VGC_LORES             0x00000010
 #define CLEM_VGC_HIRES             0x00000020
-#define CLEM_VGC_SUPER_HIRES       0x00000040
 #define CLEM_VGC_RESOLUTION_MASK   0x000000F0
+#define CLEM_VGC_SUPER_HIRES       0x00000100
 #define CLEM_VGC_ALTCHARSET        0x00010000
 #define CLEM_VGC_MONOCHROME        0x00020000
 #define CLEM_VGC_PAL               0x00040000
@@ -51,6 +51,8 @@ void clem_vgc_write_switch(struct ClemensVGC* vgc,
                           uint8_t ioreg,
                           uint8_t value);
 
+void clem_vgc_shgr_scanline(struct ClemensScanline* scanline,
+                            uint8_t* dest, const uint8_t* src_bank);
 
 #ifdef __cplusplus
 }

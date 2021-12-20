@@ -14,6 +14,7 @@ This is a running todo list.
   * C029 Bits 7 and 6 (Super Hires and Bank 01 memory layout)
   * Per scanline information to display color fill/320 vs 4 color 640
 * VGC Interrupt Support
+* Double Lores Mode (should be simple given how clem_display.cpp is written)
 * Verify Mega II Interrupts work
 * Clean up ADB support (Mouse)
 * SCC Support

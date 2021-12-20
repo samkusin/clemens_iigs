@@ -162,7 +162,27 @@ static inline void _clem_mmio_newvideo_c029_set(
         }
         setflags ^= CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT;
     }
+    if (setflags & CLEM_MMIO_NEWVIDEO_SUPERHIRES_ENABLE) {
+        if (value & CLEM_MMIO_NEWVIDEO_SUPERHIRES_ENABLE) {
+            clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_SUPER_HIRES);
+        } else {
+            clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_SUPER_HIRES);
+        }
+        CLEM_LOG("clem_mem: c029 super hires = %u",
+                 (value & CLEM_MMIO_NEWVIDEO_SUPERHIRES_ENABLE) != 0);
+        setflags ^= CLEM_MMIO_NEWVIDEO_SUPERHIRES_ENABLE;
+    }
+    /* TODO: what happens if this is set with super hires turned off,
+             this behvaior is assumed when in super-hires mode by
+             implementation
+    */
+    if (setflags & CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY) {
+        CLEM_LOG("clem_mem: c029 linearize 0x2000-0x9fff bank 01 = %u",
+                 (value & CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY) != 0);
+        setflags ^= CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY;
+    }
     CLEM_ASSERT(setflags == 0);
+    mmio->new_video_c029 = value & 0x1e;
 }
 
 static void _clem_mmio_slotrom_select_c02d(

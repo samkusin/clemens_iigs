@@ -268,6 +268,8 @@ void ClemensHost::frame(int width, int height, float deltaTime) {
             } else if (machine_.mmio.vgc.mode_flags & CLEM_VGC_LORES) {
                 display_->renderLoresGraphics(video,
                                               machine_.mega2_bank_map[0]);
+            } else if (video.format == kClemensVideoFormat_Super_Hires) {
+                display_->renderSuperHiresGraphics(video, machine_.mega2_bank_map[1]);
             }
         }
         display_->finish(screenUVs);

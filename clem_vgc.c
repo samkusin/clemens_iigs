@@ -14,6 +14,12 @@
 
 #define CLEM_VGC_VSYNC_TIME_NS  (1e9/60)
 
+#define CLEM_VGC_SCANLINE_CONTROL_640_MODE          (0x80)
+#define CLEM_VGC_SCANLINE_CONTROL_INTERRUPT         (0x40)
+#define CLEM_VGC_SCANLINE_COLORFILL_MODE            (0x20)
+#define CLEM_VGC_SCANLINE_PALETTE_INDEX_MASK        (0x0f)
+
+
 void clem_vgc_reset(struct ClemensVGC* vgc) {
     /* setup scanline maps for all of the different modes */
     ClemensVideo* video;
@@ -34,16 +40,16 @@ void clem_vgc_reset(struct ClemensVGC* vgc) {
     line = &vgc->text_1_scanlines[0];
     offset = 0x400;
     for (row = 0; row < 8; ++row, ++line) {
-        line[0].offset = offset;            line[0].meta = 0;
-        line[8].offset = offset + 40;       line[8].meta = 0;
-        line[16].offset = offset + 80;      line[16].meta = 0;
+        line[0].offset = offset;            line[0].control = 0;
+        line[8].offset = offset + 40;       line[8].control = 0;
+        line[16].offset = offset + 80;      line[16].control = 0;
         offset += 128;
     }
     line = &vgc->text_2_scanlines[0];
     for (row = 0; row < 8; ++row, ++line) {
-        line[0].offset = offset;            line[0].meta = 0;
-        line[8].offset = offset + 40;       line[8].meta = 0;
-        line[16].offset = offset + 80;      line[16].meta = 0;
+        line[0].offset = offset;            line[0].control = 0;
+        line[8].offset = offset + 40;       line[8].control = 0;
+        line[16].offset = offset + 80;      line[16].control = 0;
         offset += 128;
     }
     /*  hgr page 1 $2000-$3FFF, page 2 = $4000-$5FFF
@@ -56,39 +62,39 @@ void clem_vgc_reset(struct ClemensVGC* vgc) {
     offset = 0x2000;
     for (row = 0; row < 8; ++row) {
         line[0 + row * 8].offset = offset + row * 128;
-        line[0 + row * 8].meta = 0;
+        line[0 + row * 8].control = 0;
         line[64 + row * 8].offset = (offset + 0x28) + row * 128;
-        line[64 + row * 8].meta = 0;
+        line[64 + row * 8].control = 0;
         line[128 + row * 8].offset = (offset + 0x50) + row * 128;
-        line[128 + row * 8].meta = 0;
+        line[128 + row * 8].control = 0;
     }
     for (row = 0; row < 24; ++row) {
         for (inner = 1; inner < 8; ++inner) {
             line[row * 8 + inner].offset = line[row * 8 + (inner - 1)].offset + 0x400;
-            line[row * 8 + inner].meta = 0;
+            line[row * 8 + inner].control = 0;
         }
     }
     line = &vgc->hgr_2_scanlines[0];
     offset = 0x4000;
     for (row = 0; row < 8; ++row) {
         line[0 + row * 8].offset = offset + row * 128;
-        line[0 + row * 8].meta = 0;
+        line[0 + row * 8].control = 0;
         line[64 + row * 8].offset = (offset + 0x28) + row * 128;
-        line[64 + row * 8].meta = 0;
+        line[64 + row * 8].control = 0;
         line[128 + row * 8].offset = (offset + 0x50) + row * 128;
-        line[128 + row * 8].meta = 0;
+        line[128 + row * 8].control = 0;
     }
     for (row = 0; row < 24; ++row) {
         for (inner = 1; inner < 8; ++inner) {
             line[row * 8 + inner].offset = line[row * 8 + (inner - 1)].offset + 0x400;
-            line[row * 8 + inner].meta = 0;
+            line[row * 8 + inner].control = 0;
         }
     }
     line = &vgc->shgr_scanlines[0];
     offset = 0x2000;
     for (row = 0; row < 200; ++row, ++line) {
         line->offset = offset;
-        line->meta = 0;         /* this is the scanline control register */
+        line->control = 0;
         offset += 160;
     }
 }
@@ -235,5 +241,54 @@ void clem_vgc_write_switch(
         default:
             CLEM_UNIMPLEMENTED("vgc: write %02x : %02x ", ioreg, value);
             break;
+    }
+}
+
+static void _clem_vgc_shgr_320_scanline(
+    struct ClemensScanline* scanline, uint8_t* dest,
+    const uint8_t* src
+) {
+    uint8_t* out = dest;
+    unsigned i;
+    for (i = 0; i < 320; ++i) {
+        /* TODO! 4 bits per pixel, 2 bits per pixel based on 320/640 mode */
+        out[0] = 0xff;
+        out[1] = 0x00;
+        out[2] = 0xff;
+        out[3] = 0xff;
+        out += 4;
+        out[0] = 0xff;
+        out[1] = 0x00;
+        out[2] = 0xff;
+        out[3] = 0xff;
+        out += 4;
+    }
+}
+
+static void _clem_vgc_shgr_640_scanline(
+    struct ClemensScanline* scanline, uint8_t* dest,
+    const uint8_t* src
+) {
+    uint8_t* out = dest;
+    unsigned i;
+    for (i = 0; i < 640; ++i) {
+        /* TODO! 4 bits per pixel, 2 bits per pixel based on 320/640 mode */
+        out[0] = 0xff;
+        out[1] = 0x00;
+        out[2] = 0xff;
+        out[3] = 0xff;
+        out += 4;
+    }
+}
+
+
+void clem_vgc_shgr_scanline(struct ClemensScanline* scanline, uint8_t* dest,
+                            const uint8_t* src_bank) {
+    uint8_t* out = dest;
+    unsigned i;
+    if (scanline->control & CLEM_VGC_SCANLINE_CONTROL_640_MODE) {
+        _clem_vgc_shgr_640_scanline(scanline, dest, src_bank + scanline->offset);
+    } else {
+        _clem_vgc_shgr_320_scanline(scanline, dest, src_bank + scanline->offset);
     }
 }

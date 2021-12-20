@@ -1254,6 +1254,21 @@ ClemensVideo* clemens_get_text_video(
     return video;
 }
 
+void _clem_build_rgba_palettes(ClemensVideo* video, uint8_t* e1_bank) {
+    /* 4 bits per channel -> 8 bits
+       byte 0 - green:blue, byte 1 - none:red nibbles
+    */
+    uint8_t* src = e1_bank + 0x9e00;
+    unsigned i;
+    for (i = 0; i < 256; ++i, src += 2) {
+        video->rgba[i] =
+            (src[1] & 0x0f) |
+            ((uint32_t)(src[0] & 0xf0) << 8) |
+            ((uint32_t)(src[0] & 0x0f) << 16) |
+            (0xff000000);
+    }
+}
+
 ClemensVideo* clemens_get_graphics_video(
     ClemensVideo* video,
     ClemensMachine* clem
@@ -1261,7 +1276,13 @@ ClemensVideo* clemens_get_graphics_video(
     struct ClemensVGC* vgc = &clem->mmio.vgc;
     bool use_page_2 = (clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
                       !(clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE);
-    if (vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE) {
+    if (vgc->mode_flags & CLEM_VGC_SUPER_HIRES) {
+        video->format = kClemensVideoFormat_Super_Hires;
+        video->scanline_count = 200;
+        video->scanline_byte_cnt = 160;
+        video->scanlines = vgc->shgr_scanlines;
+        _clem_build_rgba_palettes(video, clem->mega2_bank_map[1]);
+    } else if (vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE) {
         video->scanline_start = 0;
         if (vgc->mode_flags & CLEM_VGC_HIRES) {
             if ((vgc->mode_flags & CLEM_VGC_DBLHIRES_MASK) == CLEM_VGC_DBLHIRES_MASK) {

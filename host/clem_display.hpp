@@ -70,6 +70,7 @@ public:
   void renderHiresGraphics(const ClemensVideo& video, const uint8_t* memory);
   void renderDoubleHiresGraphics(const ClemensVideo& video,
                                  const uint8_t* main, const uint8_t* aux);
+  void renderSuperHiresGraphics(const ClemensVideo& video, const uint8_t* memory);
 
   // Returns the color texture for the display for rendering
   sg_image getScreenTarget() const { return screenTarget_; }

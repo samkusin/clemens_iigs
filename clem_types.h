@@ -232,7 +232,7 @@ struct ClemensDeviceDebugger {
  */
 struct ClemensScanline {
     unsigned offset;
-    unsigned meta;
+    unsigned control;           /**< Used for IIgs scanline control */
 };
 
 struct ClemensVGC {
@@ -545,6 +545,7 @@ enum ClemensVideoFormat {
     kClemensVideoFormat_Hires,
     kClemensVideoFormat_Double_Lores,
     kClemensVideoFormat_Double_Hires,
+    kClemensVideoFormat_Super_Hires,
     kClemensVideoFormat_Count
 };
 
@@ -558,6 +559,7 @@ typedef struct {
     int scanline_start;
     int scanline_count;
     enum ClemensVideoFormat format;
+    uint32_t rgba[256];         /**< Superhires palette data (16 x 16) rgba */
 } ClemensVideo;
 
 typedef struct {

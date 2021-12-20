@@ -327,6 +327,9 @@
 
 /** New video (C029) bitflag defines */
 #define CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT  0x01
+#define CLEM_MMIO_NEWVIDEO_DBLHIRES_MONO      0x20
+#define CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY   0x40
+#define CLEM_MMIO_NEWVIDEO_SUPERHIRES_ENABLE  0x80
 
 /** Speed register (C036) bitflag defines */
 #define CLEM_MMIO_SPEED_DISK_FLAGS      0x0f
