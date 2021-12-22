@@ -308,6 +308,16 @@ static inline void _clem_opc_push_reg_816(
     _cpu_sp_dec(cpu);
 }
 
+static inline void _clem_opc_push_reg_8(
+    ClemensMachine* clem,
+    uint8_t data
+) {
+    struct Clemens65C816* cpu = &clem->cpu;
+    _clem_cycle(clem, 1);
+    clem_write(clem, data, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
+    _cpu_sp_dec(cpu);
+}
+
 static inline void _clem_opc_pull_reg_816(
     ClemensMachine* clem,
     uint16_t* data,
@@ -1051,12 +1061,9 @@ static inline void _clem_irq_brk_setup(
     */
     struct Clemens65C816* cpu = &clem->cpu;
     if (!cpu->pins.emulation) {
-        _cpu_sp_dec(cpu);
-        clem_write(clem, (uint8_t)cpu->regs.PBR, cpu->regs.S + 1, 0x00,
-                    CLEM_MEM_FLAG_DATA);
+        _clem_opc_push_reg_8(clem, cpu->regs.PBR);
     }
-    _cpu_sp_dec2(cpu);
-    _clem_write_16(clem, pc, cpu->regs.S + 1, 0x00);
+    _clem_opc_push_reg_816(clem, pc, false);
 
     if (clem->cpu.pins.emulation && is_brk) {
         clem->cpu.regs.P |= kClemensCPUStatus_EmulatedBrk;
@@ -1084,11 +1091,9 @@ static inline uint16_t _clem_irq_brk_return(
     struct Clemens65C816* cpu = &clem->cpu;
 
     _clem_opc_pull_status(clem);
-    _clem_read_16(clem, &tmp_addr, cpu->regs.S + 1, 0x00, CLEM_MEM_FLAG_DATA);
-    _cpu_sp_inc2(cpu);
+    _clem_opc_pull_reg_816(clem, &tmp_addr, false);
     if (!cpu->pins.emulation) {
-        clem_read(clem, &tmp_bnk0, cpu->regs.S + 1, 0x00, CLEM_MEM_FLAG_DATA);
-        _cpu_sp_inc(cpu);
+        _clem_opc_pull_reg_8(clem, &tmp_bnk0);
         cpu->regs.PBR = tmp_bnk0;
     }
     return tmp_addr;

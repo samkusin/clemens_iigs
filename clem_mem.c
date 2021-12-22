@@ -1352,7 +1352,7 @@ static void _clem_mmio_memory_map(
             page_B00->flags |= CLEM_MEM_PAGE_IOADDR_FLAG;
             page_B01->flags |= CLEM_MEM_PAGE_IOADDR_FLAG;
             for (page_idx = 0xC1; page_idx < 0xC8; ++page_idx) {
-                unsigned slot_idx = ((page_idx - 1) & 0xf) >> 4;
+                unsigned slot_idx = ((page_idx - 1) & 0xf);
                 /* INTCXROM from IIgs specific status reg takes precedence */
                 bool intcx_page = !(memory_flags & CLEM_MEM_IO_MMAP_CXROM) || !(
                     memory_flags & (CLEM_MEM_IO_MMAP_C1ROM << slot_idx));
@@ -1394,7 +1394,7 @@ static void _clem_mmio_memory_map(
         //  e0, e1 isn't affected by shadowing
         if (remap_flags & CLEM_MEM_IO_MMAP_CROM) {
             for (page_idx = 0xC1; page_idx < 0xC8; ++page_idx) {
-                unsigned slot_idx = ((page_idx - 1) & 0xf) >> 4;
+                unsigned slot_idx = ((page_idx - 1) & 0xf);
                 bool intcx_page = !(memory_flags & CLEM_MEM_IO_MMAP_CXROM) || !(
                     memory_flags & (CLEM_MEM_IO_MMAP_C1ROM << slot_idx));
                 page_BE0 = &page_map_BE0->pages[page_idx];

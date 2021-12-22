@@ -63,7 +63,7 @@ struct FormatView {
 
 char clemens_is_mmio_card_rom(const ClemensMMIO &mmio, unsigned slot) {
     assert(slot > 0);
-    if ((mmio.mmap_register & CLEM_MEM_IO_MMAP_CXROM) ||
+    if ((mmio.mmap_register & CLEM_MEM_IO_MMAP_CXROM) &&
         (mmio.mmap_register & (CLEM_MEM_IO_MMAP_C1ROM << (slot - 1)))) {
         return 'C';
     } else {

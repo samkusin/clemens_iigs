@@ -1841,7 +1841,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             tmp_addr = tmp_pc + (int16_t)tmp_value;
             _clem_cycle(clem, 1);
             tmp_pc = tmp_addr;
-            _opcode_instruction_define(&opc_inst, IR, tmp_addr, false);
+            _opcode_instruction_define(&opc_inst, IR, tmp_value, false);
             break;
         case CLEM_OPC_BVC:
             _clem_read_pba(clem, &tmp_data, &tmp_pc);
