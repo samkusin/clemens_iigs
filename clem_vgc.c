@@ -19,6 +19,14 @@
 #define CLEM_VGC_SCANLINE_COLORFILL_MODE            (0x20)
 #define CLEM_VGC_SCANLINE_PALETTE_INDEX_MASK        (0x0f)
 
+static inline void _clem_vgc_set_scanline_int(struct ClemensVGC* vgc, bool enable) {
+    if (enable) {
+        vgc->irq_line |= CLEM_IRQ_VGC_SCAN_LINE;
+    } else {
+        vgc->irq_line &= ~CLEM_IRQ_VGC_SCAN_LINE;
+    }
+}
+
 
 void clem_vgc_reset(struct ClemensVGC* vgc) {
     /* setup scanline maps for all of the different modes */
@@ -30,6 +38,7 @@ void clem_vgc_reset(struct ClemensVGC* vgc) {
     vgc->mode_flags = CLEM_VGC_INIT;
     vgc->text_fg_color = CLEM_VGC_COLOR_WHITE;
     vgc->text_bg_color = CLEM_VGC_COLOR_MEDIUM_BLUE;
+    vgc->scanline_irq_enable = false;
 
     /*  text page 1 $0400-$07FF, page 2 = $0800-$0BFF
 
@@ -140,6 +149,13 @@ uint8_t clem_vgc_get_region(struct ClemensVGC* vgc) {
     return result;
 }
 
+void clem_vgc_scanline_enable_int(struct ClemensVGC* vgc, bool enable) {
+    vgc->scanline_irq_enable = enable;
+    if (!enable) {
+        _clem_vgc_set_scanline_int(vgc, false);
+    }
+}
+
 
 void clem_vgc_sync(
     struct ClemensVGC* vgc,
@@ -169,6 +185,9 @@ void clem_vgc_sync(
         if (scanline_ns > CLEM_VGC_HORIZ_SCAN_TIME_NS) {
             vgc->dt_scanline = _clem_calc_clocks_step_from_ns(
                 CLEM_VGC_HORIZ_SCAN_TIME_NS - vgc->dt_scanline, clock->ref_step);
+            if (vgc->scanline_irq_enable) {
+                _clem_vgc_set_scanline_int(vgc, true);
+            }
         }
         frame_ns = _clem_calc_ns_step_from_clocks(
             clock->ts - vgc->ts_scanline_0, clock->ref_step);
@@ -238,6 +257,11 @@ void clem_vgc_write_switch(
     uint8_t value
 ) {
     switch (ioreg) {
+        case CLEM_MMIO_REG_RTC_VGC_SCANINT:
+            if (value & 0x20) {
+                _clem_vgc_set_scanline_int(vgc, false);
+            }
+            break;
         default:
             CLEM_UNIMPLEMENTED("vgc: write %02x : %02x ", ioreg, value);
             break;

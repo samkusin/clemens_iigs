@@ -254,6 +254,8 @@ struct ClemensVGC {
     unsigned text_bg_color;
     unsigned text_language;
 
+    bool scanline_irq_enable;
+
     uint32_t irq_line;          /**< IRQ flags passed to machine */
 };
 

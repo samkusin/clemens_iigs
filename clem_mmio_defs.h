@@ -181,7 +181,7 @@
 /** Write Disk access 3.5" */
 #define CLEM_MMIO_REG_DISK_INTERFACE    0x31
 /** Write Scan interrupts (VGC, RTC) clear  */
-#define CLEM_MMIO_REG_RTC_SCANINT       0x32
+#define CLEM_MMIO_REG_RTC_VGC_SCANINT       0x32
 /** Real time clock data register */
 #define CLEM_MMIO_REG_RTC_DATA          0x33
 /** Real time clock + border colorl joint register */

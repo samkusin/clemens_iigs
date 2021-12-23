@@ -33,6 +33,8 @@ void clem_vgc_reset(struct ClemensVGC* vgc);
 
 void clem_vgc_sync(struct ClemensVGC* vgc, struct ClemensClock* clock);
 
+void clem_vgc_scanline_enable_int(struct ClemensVGC* vgc, bool enable);
+
 void clem_vgc_set_mode(struct ClemensVGC* vgc, unsigned mode_flags);
 void clem_vgc_clear_mode(struct ClemensVGC* vgc, unsigned mode_flags);
 void clem_vgc_set_text_colors(struct ClemensVGC* vgc, unsigned fg_color,
