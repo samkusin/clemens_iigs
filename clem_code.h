@@ -1052,6 +1052,37 @@ static inline void _clem_branch(
     *pc = tmp_addr;
 }
 
+static inline uint16_t _clem_read_interrupt_vector( ClemensMachine* clem,
+    uint16_t lo,
+    uint16_t hi
+) {
+     /* Tech Note # 68
+        http://www.1000bit.it/support/manuali/apple/technotes/iigs/tn.iigs.068.html
+
+        Note: Interrupt vectors are always pulled from ROM regardless of
+        whether or not the language card soft-switches have ROM enabled,
+        providing that the I/O shadowing for banks $00/01 is enabled
+        -- which it always is when running Apple IIGS or Apple II system
+        software
+    */
+    uint16_t tmp_addr;
+    uint8_t tmp_data;
+    uint8_t src_bank;
+
+    if (clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_NIOLC) {
+        /* this should map to RAM and override language card bank mapping */
+        src_bank = 0x00;
+    } else {
+        /* grab the vector from ROM always */
+        src_bank = 0xff;
+    }
+    clem_read(clem, &tmp_data, lo, src_bank, CLEM_MEM_FLAG_PROGRAM);
+    tmp_addr = tmp_data;
+    clem_read(clem, &tmp_data, hi, src_bank, CLEM_MEM_FLAG_PROGRAM);
+
+    return ((uint16_t)tmp_data << 8) | tmp_addr;
+}
+
 static inline void _clem_irq_brk_setup(
     ClemensMachine* clem,
     uint16_t pc,

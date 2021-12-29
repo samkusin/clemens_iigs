@@ -3477,27 +3477,22 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
 
         //  interrupt opcodes (RESET is handled separately)
         case CLEM_OPC_BRK:
-            //  ignore irq disable
+            //  BRK ignores irq disable
             _clem_read_pba(clem, &tmp_data, &tmp_pc);
             CLEM_CPU_I_INTR_LOG(cpu, "BRK");
             tmp_value = tmp_data;
             _clem_irq_brk_setup(clem, tmp_pc, true);
 
+
             if (cpu->pins.emulation) {
-                clem_read(clem, &tmp_data, CLEM_6502_IRQBRK_VECTOR_LO_ADDR, 0x00,
-                       CLEM_MEM_FLAG_PROGRAM);
-                tmp_addr = tmp_data;
-                clem_read(clem, &tmp_data, CLEM_6502_IRQBRK_VECTOR_HI_ADDR,
-                       0x00, CLEM_MEM_FLAG_PROGRAM);
-                tmp_pc = ((uint16_t)tmp_data << 8) | tmp_addr;
+                tmp_pc = _clem_read_interrupt_vector(clem,
+                    CLEM_6502_IRQBRK_VECTOR_LO_ADDR,
+                    CLEM_6502_IRQBRK_VECTOR_HI_ADDR);
             } else {
                 cpu->regs.PBR = 0x00;
-                clem_read(clem, &tmp_data, CLEM_65816_BRK_VECTOR_LO_ADDR, 0x00,
-                       CLEM_MEM_FLAG_PROGRAM);
-                tmp_addr = tmp_data;
-                clem_read(clem, &tmp_data, CLEM_65816_BRK_VECTOR_HI_ADDR,
-                       0x00, CLEM_MEM_FLAG_PROGRAM);
-                tmp_pc = ((uint16_t)tmp_data << 8) | tmp_addr;
+                tmp_pc = _clem_read_interrupt_vector(clem,
+                    CLEM_65816_BRK_VECTOR_LO_ADDR,
+                    CLEM_65816_BRK_VECTOR_HI_ADDR);
             }
             _opcode_instruction_define(&opc_inst, IR, tmp_value, true);
             break;
@@ -3509,20 +3504,14 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             _clem_irq_brk_setup(clem, tmp_pc, true);
 
             if (cpu->pins.emulation) {
-                clem_read(clem, &tmp_data, CLEM_6502_COP_VECTOR_LO_ADDR, 0x00,
-                       CLEM_MEM_FLAG_PROGRAM);
-                tmp_addr = tmp_data;
-                clem_read(clem, &tmp_data, CLEM_6502_COP_VECTOR_HI_ADDR,
-                       0x00, CLEM_MEM_FLAG_PROGRAM);
-                tmp_pc = ((uint16_t)tmp_data << 8) | tmp_addr;
+                tmp_pc = _clem_read_interrupt_vector(clem,
+                    CLEM_6502_COP_VECTOR_LO_ADDR,
+                    CLEM_6502_COP_VECTOR_LO_ADDR);
             } else {
                 cpu->regs.PBR = 0x00;
-                clem_read(clem, &tmp_data, CLEM_65816_COP_VECTOR_LO_ADDR, 0x00,
-                       CLEM_MEM_FLAG_PROGRAM);
-                tmp_addr = tmp_data;
-                clem_read(clem, &tmp_data, CLEM_65816_COP_VECTOR_HI_ADDR,
-                       0x00, CLEM_MEM_FLAG_PROGRAM);
-                tmp_pc = ((uint16_t)tmp_data << 8) | tmp_addr;
+                tmp_pc = _clem_read_interrupt_vector(clem,
+                    CLEM_65816_COP_VECTOR_LO_ADDR,
+                    CLEM_65816_COP_VECTOR_HI_ADDR);
             }
             _opcode_instruction_define(&opc_inst, IR, tmp_value, true);
             break;
@@ -3630,12 +3619,9 @@ void clemens_emulate(ClemensMachine* clem) {
         _cpu_sp_dec(cpu);
 
         // vector pull low signal while the PC is being loaded
-        clem_read(clem, &tmp_data, CLEM_6502_RESET_VECTOR_LO_ADDR, 0x00,
-                       CLEM_MEM_FLAG_PROGRAM);
-        clem_read(clem, &tmp_datahi, CLEM_6502_RESET_VECTOR_HI_ADDR,
-                       0x00, CLEM_MEM_FLAG_PROGRAM);
-        cpu->regs.PC = (uint16_t)(tmp_datahi << 8) | tmp_data;
-
+        cpu->regs.PC = _clem_read_interrupt_vector(clem,
+            CLEM_6502_RESET_VECTOR_LO_ADDR,
+            CLEM_6502_RESET_VECTOR_HI_ADDR);
         if (!clem->mmio_bypass) {
             /* extension cards reset handling */
             clem_iwm_speed_disk_gate(clem);
@@ -3661,18 +3647,15 @@ void clemens_emulate(ClemensMachine* clem) {
         _clem_cycle(clem, 2);
         _clem_irq_brk_setup(clem, cpu->regs.PC, false);
         if (cpu->pins.emulation) {
-            // vector pull low signal while the PC is being loaded
-            clem_read(clem, &tmp_data, CLEM_6502_IRQBRK_VECTOR_LO_ADDR, 0x00,
-                        CLEM_MEM_FLAG_PROGRAM);
-            clem_read(clem, &tmp_datahi, CLEM_6502_IRQBRK_VECTOR_HI_ADDR,
-                        0x00, CLEM_MEM_FLAG_PROGRAM);
+            cpu->regs.PC = _clem_read_interrupt_vector(clem,
+                CLEM_6502_IRQBRK_VECTOR_LO_ADDR,
+                CLEM_6502_IRQBRK_VECTOR_HI_ADDR);
         } else {
-            clem_read(clem, &tmp_data, CLEM_65816_IRQB_VECTOR_LO_ADDR, 0x00,
-                        CLEM_MEM_FLAG_PROGRAM);
-            clem_read(clem, &tmp_datahi, CLEM_65816_IRQB_VECTOR_HI_ADDR,
-                        0x00, CLEM_MEM_FLAG_PROGRAM);
+            cpu->regs.PBR = 0x00;
+            cpu->regs.PC = _clem_read_interrupt_vector(clem,
+                CLEM_65816_IRQB_VECTOR_LO_ADDR,
+                CLEM_65816_IRQB_VECTOR_HI_ADDR);
         }
-        cpu->regs.PC = (uint16_t)(tmp_datahi << 8) | tmp_data;
         cpu->state_type = kClemensCPUStateType_Execute;
         return;
     }
