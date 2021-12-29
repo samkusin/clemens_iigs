@@ -38,15 +38,22 @@
 #define CLEM_IWM_SYNC_DISK_FRAME_NS_FAST    250
 #define CLEM_IWM_DRIVE_RANDOM_BYTES         64
 
+/* NTSC scanlines start at counter 7 and end at 198 (192 lines)
+   VBL begins at 199 (scanline 192)
+   see technote 39, 40 and clem_vgc.c for links
+*/
 #define CLEM_VGC_HORIZ_SCAN_TIME_NS         63700
 #define CLEM_VGC_NTSC_SCANLINE_COUNT        262
 #define CLEM_VGC_NTSC_SCAN_TIME_NS          (CLEM_VGC_HORIZ_SCAN_TIME_NS * \
                                              CLEM_VGC_NTSC_SCANLINE_COUNT)
-#define CLEM_VGC_VBL_NTSC_UPPER_BOUND       198
-#define CLEM_VGC_VBL_NTSC_LOWER_BOUND       (CLEM_VGC_NTSC_SCANLINE_COUNT-1)
+#define CLEM_VGC_VBL_NTSC_LOWER_BOUND       199
+#define CLEM_VGC_VBL_NTSC_UPPER_BOUND       (CLEM_VGC_NTSC_SCANLINE_COUNT-1)
 #define CLEM_VGC_PAL_SCANLINE_COUNT         312
 #define CLEM_VGC_PAL_SCAN_TIME_NS           (CLEM_VGC_HORIZ_SCAN_TIME_NS * \
                                              CLEM_VGC_PAL_SCAN_TIME_NS)
+
+#define CLEM_VGC_FIRST_VISIBLE_SCANLINE_CNTR 7
+
 
 #define CLEM_RTC_BRAM_SIZE                  256
 

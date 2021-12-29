@@ -2714,7 +2714,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             break;
         case CLEM_OPC_PHP:
             _clem_cycle(clem, 1);
-            _clem_opc_push_status(clem);
+            _clem_opc_push_status(clem, false);
             break;
         case CLEM_OPC_PHX:
             _clem_opc_push_reg_816(clem, cpu->regs.X, x_status);
@@ -3546,7 +3546,8 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             assert(false);
             break;
     }
-
+    cpu->regs.PPBR = opc_pbr;
+    cpu->regs.PPC = opc_addr;
     cpu->regs.PC = tmp_pc;
 
     if (clem->debug_flags) {
@@ -3698,14 +3699,14 @@ void clemens_emulate(ClemensMachine* clem) {
 
         card_irqs = 0;
         for (i = 0; i < 7; ++i) {
-            if (clem->card_slot[i]) {
-                card_result = (*clem->card_slot[i]->io_sync)(
-                    &clock, clem->card_slot[i]->context);
-                if (card_result & CLEM_IRQ_ON) card_irqs |= (CLEM_IRQ_SLOT_1 << i);
-            }
+            if (!clem->card_slot[i]) continue;
+            card_result = (*clem->card_slot[i]->io_sync)(
+                &clock, clem->card_slot[i]->context);
+            if (card_result & CLEM_IRQ_ON) card_irqs |= (CLEM_IRQ_SLOT_1 << i);
         }
 
-        clem_vgc_sync(&mmio->vgc, &clock);
+        clem_vgc_sync(&mmio->vgc, &clock, clem->mega2_bank_map[0],
+                      clem->mega2_bank_map[1]);
         clem_iwm_glu_sync(&mmio->dev_iwm, &clem->active_drives, &clock);
         clem_scc_glu_sync(&mmio->dev_scc, &clock);
         clem_sound_glu_sync(&mmio->dev_audio, &clock);

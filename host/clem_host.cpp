@@ -525,6 +525,14 @@ void ClemensHost::frame(int width, int height, float deltaTime) {
             snprintf(label, sizeof(label), "Y   = %04X", cpuRegsNext.Y);
             ImGui::TableNextColumn();
             ImGui::Selectable(label, cpuRegsNext.Y != cpuRegsSaved_.Y);
+            ImGui::TableNextRow();
+            snprintf(label, sizeof(label), "PPC = %04X", cpuRegsNext.PPC);
+            ImGui::TableNextColumn();
+            ImGui::Selectable(label, cpuRegsNext.PPC != cpuRegsSaved_.PPC);
+            ImGui::TableNextRow();
+            snprintf(label, sizeof(label), "PPBR= %02X", cpuRegsNext.PPBR);
+            ImGui::TableNextColumn();
+            ImGui::Selectable(label, cpuRegsNext.PPBR != cpuRegsSaved_.PPBR);
         }
         ImGui::EndTable();
         ImGui::SameLine();

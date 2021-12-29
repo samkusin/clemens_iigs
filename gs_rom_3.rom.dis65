@@ -813,6 +813,11 @@
 "Hint":"Code"},
 
 {
+"Low":176044,
+"High":176044,
+"Hint":"Code"},
+
+{
 "Low":182305,
 "High":182305,
 "Hint":"Code"},
@@ -1500,7 +1505,12 @@
 {
 "Low":262087,
 "High":262087,
-"Hint":"Code"}],
+"Hint":"Code"},
+
+{
+"Low":262126,
+"High":262127,
+"Hint":"InlineData"}],
 "StatusFlagOverrides":{
 "456":304,
 "494":304,
@@ -1728,6 +1738,10 @@
 "244772":"Set border color",
 "244778":"Resets chargen to english and NTSC",
 "244783":"Set text display + NTSC/PAL switches",
+"244888":"Native Mode IRQBRK",
+"244890":"loads saved status flags",
+"244892":"isolate BRK",
+"244894":"Effectively moves the BRK bit to bit 7 (overflow.)",
 "244900":"Check SCC interrupt status",
 "244977":"goto FF/BA18, which just sets the carry flag?",
 "244982":"and this branch is never taken as a result of above",
@@ -5810,6 +5824,27 @@
 "Value":16732395,
 "Source":"User",
 "Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"262126":{
+"Label":"V_65816_IRQ",
+"Value":16777198,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"244896":{
+"Label":"is_native_irq",
+"Value":16759968,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"245014":{
+"Label":"is_brk",
+"Value":16760086,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -6683,6 +6718,12 @@
 
 "260869":{
 "Length":1,
+"Format":"NumericLE",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"262126":{
+"Length":2,
 "Format":"NumericLE",
 "SubFormat":"None",
 "SymbolRef":null},

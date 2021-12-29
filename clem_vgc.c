@@ -14,10 +14,6 @@
 
 #define CLEM_VGC_VSYNC_TIME_NS  (1e9/60)
 
-#define CLEM_VGC_SCANLINE_CONTROL_640_MODE          (0x80)
-#define CLEM_VGC_SCANLINE_CONTROL_INTERRUPT         (0x40)
-#define CLEM_VGC_SCANLINE_COLORFILL_MODE            (0x20)
-#define CLEM_VGC_SCANLINE_PALETTE_INDEX_MASK        (0x0f)
 
 static inline void _clem_vgc_set_scanline_int(struct ClemensVGC* vgc, bool enable) {
     if (enable) {
@@ -25,6 +21,27 @@ static inline void _clem_vgc_set_scanline_int(struct ClemensVGC* vgc, bool enabl
     } else {
         vgc->irq_line &= ~CLEM_IRQ_VGC_SCAN_LINE;
     }
+}
+
+static inline unsigned _clem_vgc_calc_v_counter(unsigned frame_ns) {
+    return (frame_ns / CLEM_VGC_HORIZ_SCAN_TIME_NS) & 0x1ff;    /* 9 bits */
+}
+
+static inline unsigned _clem_vgc_calc_h_counter(unsigned scanline_ns) {
+    return (scanline_ns / 980) & 0x7f;  /* 7 bits */
+}
+
+
+static bool _clem_vgc_is_scanline_int_enabled(const uint8_t* mega2_e1,
+                                              unsigned v_counter) {
+    if (v_counter >= CLEM_VGC_FIRST_VISIBLE_SCANLINE_CNTR) {
+        v_counter -= CLEM_VGC_FIRST_VISIBLE_SCANLINE_CNTR;
+        if (v_counter < CLEM_VGC_SHGR_SCANLINE_COUNT) {
+            return (mega2_e1[0x9d00 + v_counter] &
+                    CLEM_VGC_SCANLINE_CONTROL_INTERRUPT) != 0;
+        }
+    }
+    return false;
 }
 
 
@@ -39,6 +56,7 @@ void clem_vgc_reset(struct ClemensVGC* vgc) {
     vgc->text_fg_color = CLEM_VGC_COLOR_WHITE;
     vgc->text_bg_color = CLEM_VGC_COLOR_MEDIUM_BLUE;
     vgc->scanline_irq_enable = false;
+    vgc->vbl_started = false;
 
     /*  text page 1 $0400-$07FF, page 2 = $0800-$0BFF
 
@@ -117,6 +135,9 @@ void clem_vgc_set_mode(struct ClemensVGC* vgc, unsigned mode_flags) {
 
 void clem_vgc_clear_mode(struct ClemensVGC* vgc, unsigned mode_flags) {
     vgc->mode_flags &= ~mode_flags;
+    if (mode_flags & CLEM_VGC_ENABLE_VBL_IRQ) {
+        vgc->irq_line &= ~CLEM_IRQ_VGC_BLANK;
+    }
 }
 
 void clem_vgc_set_text_colors(
@@ -159,7 +180,9 @@ void clem_vgc_scanline_enable_int(struct ClemensVGC* vgc, bool enable) {
 
 void clem_vgc_sync(
     struct ClemensVGC* vgc,
-    struct ClemensClock* clock
+    struct ClemensClock* clock,
+    const uint8_t* mega2_bank0,
+    const uint8_t* mega2_bank1
 ) {
     /* TODO: VBL detection depends on NTSC/PAL switch
                 @ specific time within a scan until end of scan
@@ -179,27 +202,34 @@ void clem_vgc_sync(
         vgc->dt_scanline = 0;
         vgc->mode_flags &= ~CLEM_VGC_INIT;
     } else {
+        frame_ns = _clem_calc_ns_step_from_clocks(
+            clock->ts - vgc->ts_scanline_0, clock->ref_step);
+        v_counter = _clem_vgc_calc_v_counter(frame_ns);
+
         vgc->dt_scanline += (clock->ts - vgc->ts_last_frame);
         scanline_ns = _clem_calc_ns_step_from_clocks(
             vgc->dt_scanline, clock->ref_step);
         if (scanline_ns > CLEM_VGC_HORIZ_SCAN_TIME_NS) {
             vgc->dt_scanline = _clem_calc_clocks_step_from_ns(
-                CLEM_VGC_HORIZ_SCAN_TIME_NS - vgc->dt_scanline, clock->ref_step);
-            if (vgc->scanline_irq_enable) {
-                _clem_vgc_set_scanline_int(vgc, true);
+                scanline_ns - CLEM_VGC_HORIZ_SCAN_TIME_NS, clock->ref_step);
+            if (vgc->scanline_irq_enable && (vgc->mode_flags & CLEM_VGC_SUPER_HIRES)) {
+                if (_clem_vgc_is_scanline_int_enabled(mega2_bank1, v_counter)) {
+                    _clem_vgc_set_scanline_int(vgc, true);
+                }
             }
         }
-        frame_ns = _clem_calc_ns_step_from_clocks(
-            clock->ts - vgc->ts_scanline_0, clock->ref_step);
-        v_counter = frame_ns / CLEM_VGC_HORIZ_SCAN_TIME_NS;
-        if (vgc->mode_flags & CLEM_VGC_ENABLE_VBL_IRQ) {
-            if (v_counter >= CLEM_VGC_VBL_NTSC_UPPER_BOUND) {
+
+        // todo: vbl only once per VBL frame
+        if (v_counter >= CLEM_VGC_VBL_NTSC_LOWER_BOUND && !vgc->vbl_started) {
+            if (vgc->mode_flags & CLEM_VGC_ENABLE_VBL_IRQ) {
                 vgc->irq_line |= CLEM_IRQ_VGC_BLANK;
             }
+            vgc->vbl_started = true;
         }
         if (frame_ns >= CLEM_VGC_NTSC_SCAN_TIME_NS) {
             vgc->ts_scanline_0 = clock->ts - _clem_calc_clocks_step_from_ns(
                 CLEM_VGC_NTSC_SCAN_TIME_NS - frame_ns, clock->ref_step);
+            vgc->vbl_started = false;
         }
 
     }
@@ -218,20 +248,17 @@ uint8_t clem_vgc_read_switch(
     unsigned v_counter;
     unsigned h_counter;
 
-    if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
-        clem_vgc_sync(vgc, clock);
-    }
     scan_time_ns = _clem_calc_ns_step_from_clocks(
         clock->ts - vgc->ts_scanline_0, clock->ref_step);
     /* 65 cycles per horizontal scanline, 980 ns per horizontal count = 63.7us*/
-    v_counter = scan_time_ns / CLEM_VGC_HORIZ_SCAN_TIME_NS;
-    h_counter = _clem_calc_ns_step_from_clocks(
-        vgc->dt_scanline, clock->ref_step) / 980;
+    v_counter = _clem_vgc_calc_v_counter(scan_time_ns);
+    h_counter = _clem_vgc_calc_v_counter(
+        _clem_calc_ns_step_from_clocks(vgc->dt_scanline, clock->ref_step));
 
     switch (ioreg) {
         case CLEM_MMIO_REG_VBLBAR:
             /* IIgs sets bit 7 if scanline is within vertical blank region */
-            if (v_counter >= CLEM_VGC_VBL_NTSC_UPPER_BOUND) {
+            if (v_counter >= CLEM_VGC_VBL_NTSC_LOWER_BOUND) {
                 result |= 0x80;
             }
             break;
@@ -258,7 +285,7 @@ void clem_vgc_write_switch(
 ) {
     switch (ioreg) {
         case CLEM_MMIO_REG_RTC_VGC_SCANINT:
-            if (value & 0x20) {
+            if (!(value & 0x20)) {
                 _clem_vgc_set_scanline_int(vgc, false);
             }
             break;

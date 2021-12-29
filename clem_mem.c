@@ -182,7 +182,7 @@ static inline void _clem_mmio_newvideo_c029_set(
         setflags ^= CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY;
     }
     CLEM_ASSERT(setflags == 0);
-    mmio->new_video_c029 = value & 0x1e;
+    mmio->new_video_c029 = value & ~0x1e;   /* bits 1-4 are not used */
 }
 
 static void _clem_mmio_slotrom_select_c02d(

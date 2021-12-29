@@ -108,10 +108,12 @@ struct ClemensSerializerRecord kCPURegs[] = {
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, D),
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, S),
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, PC),
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, PPC),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, IR),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, P),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, DBR),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, PBR),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, PPBR),
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 
@@ -135,6 +137,8 @@ struct ClemensSerializerRecord kVGC[] = {
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, text_fg_color),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, text_bg_color),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, text_language),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensVGC, scanline_irq_enable),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensVGC, vbl_started),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, irq_line),
     CLEM_SERIALIZER_RECORD_EMPTY()
 };

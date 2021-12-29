@@ -19,6 +19,11 @@
 #define CLEM_VGC_DBLHIRES_MASK     0x00200025
 #define CLEM_VGC_INIT              0x80000000
 
+#define CLEM_VGC_SCANLINE_CONTROL_640_MODE          (0x80)
+#define CLEM_VGC_SCANLINE_CONTROL_INTERRUPT         (0x40)
+#define CLEM_VGC_SCANLINE_COLORFILL_MODE            (0x20)
+#define CLEM_VGC_SCANLINE_PALETTE_INDEX_MASK        (0x0f)
+
 /**
  * Video Interface
  * These functions emulate the various peripherals (internal and external)
@@ -31,7 +36,8 @@ extern "C" {
 
 void clem_vgc_reset(struct ClemensVGC* vgc);
 
-void clem_vgc_sync(struct ClemensVGC* vgc, struct ClemensClock* clock);
+void clem_vgc_sync(struct ClemensVGC* vgc, struct ClemensClock* clock,
+                   const uint8_t* mega2_bank0, const uint8_t* mega2_bank1);
 
 void clem_vgc_scanline_enable_int(struct ClemensVGC* vgc, bool enable);
 

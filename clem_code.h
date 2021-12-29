@@ -347,9 +347,19 @@ static inline void _clem_opc_pull_reg_8(
 }
 
 static inline void _clem_opc_push_status(
-    ClemensMachine* clem
+    ClemensMachine* clem,
+    bool is_irq
 ) {
-    clem_write(clem, clem->cpu.regs.P, clem->cpu.regs.S, 0x00, CLEM_MEM_FLAG_DATA);
+    uint8_t tmp_p = clem->cpu.regs.P;
+    if (clem->cpu.pins.emulation) {
+        if (is_irq) {
+            tmp_p &= ~kClemensCPUStatus_EmulatedBrk;
+        } else {
+            tmp_p |= kClemensCPUStatus_Index;
+        }
+        tmp_p |= kClemensCPUStatus_MemoryAccumulator;
+    }
+    clem_write(clem, tmp_p, clem->cpu.regs.S, 0x00, CLEM_MEM_FLAG_DATA);
     _cpu_sp_dec(&clem->cpu);
 }
 
@@ -1064,12 +1074,7 @@ static inline void _clem_irq_brk_setup(
         _clem_opc_push_reg_8(clem, cpu->regs.PBR);
     }
     _clem_opc_push_reg_816(clem, pc, false);
-
-    if (clem->cpu.pins.emulation && is_brk) {
-        clem->cpu.regs.P |= kClemensCPUStatus_EmulatedBrk;
-    }
-
-    _clem_opc_push_status(clem);
+    _clem_opc_push_status(clem, !is_brk);
     //  65816 always disables decimal mode on interrupts, even in emulation
     cpu->regs.P &= ~kClemensCPUStatus_Decimal;
     cpu->regs.P |= kClemensCPUStatus_IRQDisable;

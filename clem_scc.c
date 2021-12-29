@@ -39,7 +39,7 @@ void clem_scc_write_switch(
 
             break;
     }
-    CLEM_LOG("clem_scc: %02X <- %02X", ioreg, value);
+    //CLEM_LOG("clem_scc: %02X <- %02X", ioreg, value);
 }
 
 uint8_t clem_scc_read_switch(
@@ -57,8 +57,8 @@ uint8_t clem_scc_read_switch(
         case CLEM_MMIO_REG_SCC_A_DATA:
             break;
     }
-    if (!is_noop) {
-        CLEM_LOG("clem_scc: %02X -> %02X", ioreg, value);
-    }
+    //if (!is_noop) {
+    //    CLEM_LOG("clem_scc: %02X -> %02X", ioreg, value);
+    //}
     return value;
 }

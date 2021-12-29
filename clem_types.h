@@ -247,7 +247,6 @@ struct ClemensVGC {
     clem_clocks_time_t ts_scanline_0;
     clem_clocks_duration_t dt_scanline;
 
-
     /* amalgom of possible display modes */
     unsigned mode_flags;
     unsigned text_fg_color;
@@ -255,6 +254,7 @@ struct ClemensVGC {
     unsigned text_language;
 
     bool scanline_irq_enable;
+    bool vbl_started;           /**< Limits VBL IRQ */
 
     uint32_t irq_line;          /**< IRQ flags passed to machine */
 };
@@ -484,10 +484,12 @@ struct ClemensCPURegs {
     uint16_t D;                         // Direct
     uint16_t S;                         // Stack
     uint16_t PC;                        // Program Counter
+    uint16_t PPC;                       // Previous PC
     uint8_t IR;                         // Instruction Register
     uint8_t P;                          // Processor Status
     uint8_t DBR;                        // Data Bank (Memory)
     uint8_t PBR;                        // Program Bank (Memory)
+    uint8_t PPBR;                       // Previous PBR
 };
 
 struct ClemensCPUPins {
