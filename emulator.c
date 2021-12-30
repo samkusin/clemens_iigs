@@ -2277,8 +2277,7 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
                 tmp_eaddr = tmp_addr + cpu->regs.X;
             }
             _clem_cycle(clem, 1);
-            _clem_read_16(clem, &tmp_eaddr, tmp_eaddr, cpu->regs.PBR, CLEM_MEM_FLAG_DATA);
-            tmp_pc = tmp_eaddr;
+            _clem_read_16(clem, &tmp_pc, tmp_eaddr, cpu->regs.PBR, CLEM_MEM_FLAG_DATA);
             _opcode_instruction_define(&opc_inst, IR, tmp_addr, x_status);
             break;
         case CLEM_OPC_JMP_ABSL:
@@ -3405,10 +3404,9 @@ void cpu_execute(struct Clemens65C816* cpu, ClemensMachine* clem) {
             } else {
                 tmp_eaddr = tmp_addr + cpu->regs.X;
             }
-            _clem_read_16(clem, &tmp_eaddr, tmp_addr, cpu->regs.PBR, CLEM_MEM_FLAG_DATA);
-            _opcode_instruction_define(&opc_inst, IR, tmp_addr, x_status);
+            _clem_read_16(clem, &tmp_pc, tmp_eaddr, cpu->regs.PBR, CLEM_MEM_FLAG_DATA);
             CLEM_CPU_I_JSR_LOG(cpu, tmp_eaddr);
-            tmp_pc = tmp_eaddr;
+            _opcode_instruction_define(&opc_inst, IR, tmp_addr, x_status);
             break;
         case CLEM_OPC_RTS:
             //  Stack [PCH, PCL]
