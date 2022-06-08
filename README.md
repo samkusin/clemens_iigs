@@ -87,7 +87,7 @@ Documentation to come.
 
 ## Author's Note
 
-This project is not entirely novel as there are finished emulator projects like KEGS and MAME.  I doubt Clemens will ever achieve parity with those projects.  Given the relative popularity of other equivalent classic home computer systems (C64, Amiga) and the IIgs software library, it's even unclear how many will find
+This project is not entirely novel as there are finished emulator projects like KEGS and MAME.  I doubt Clemens will ever achieve parity with those projects.  Given the relative popularity of other equivalent classic home computer systems (C64, Amiga) and the IIgs software library, it's unclear whether this emulator will ever see genuine usage.
 
 I've open-sourced this project for exposure.  I doubt external contributions will be useful until I complete a few more core systems (Ensoniq audio, super-hires and smartport being the big ones.)
 
