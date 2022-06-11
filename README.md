@@ -2,7 +2,7 @@
 
 ![Boot Sequence Demo](https://samirsinha.com/images/sample-iigs-boot.gif)
 
-The Clemens Apple IIgs emulator project is a personal attempt to write a modern functional editor for the 65816 CPU based computer system from the late 1980s by Apple Computer, Inc.
+The Clemens Apple IIgs emulator project is a personal attempt to write a modern functional emulator for the 65816 CPU based computer system from the late 1980s by Apple Computer, Inc.
 
 ## Summary
 
@@ -10,7 +10,7 @@ The current state of the project is a IMGUI (Dear ImGui) debugger front end runn
 
 My goal is to provide a solid Apple IIgs backend + debugger for ambitious developers who want to write a modern frontend.
 
-The emulator backend is written in C.  The `host` front-end is written in C++ with a few header
+The emulator backend is written in C.  The `host` front-end is written in C++ with a few header only libraries for boilerplate rendering, I/O, GUI.
 
 ### Disk types supported as of Version 0.2
 
