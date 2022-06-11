@@ -1,5 +1,7 @@
 # Clemens IIGS
 
+![Boot Sequence Demo](https://samirsinha.com/images/sample-iigs-boot.gif)
+
 The Clemens Apple IIgs emulator project is a personal attempt to write a modern functional editor for the 65816 CPU based computer system from the late 1980s by Apple Computer, Inc.
 
 ## Summary
