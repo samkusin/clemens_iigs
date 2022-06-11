@@ -21,7 +21,7 @@ The emulator backend is written in C.  The `host` front-end is written in C++ wi
 
 * Disk II copy protected image boot
 * Apple II speaker
-* Prodos 16 system boot
+* Prodos 16 system boot (until the GUI)
 * Hi-res and Double Hi-res graphics
 * 80-column
 * IRQ/BRK/RESET interrupts
@@ -43,8 +43,9 @@ These are essential IIgs features that will be worked on.  This cannot be consid
 These are features that make Clemens an option for casual users.
 
 * Smartport (hard drive emulation)
+* Fast disk support - when disk is on, emulator runs at fastest possible speed
 * Mockingboard
-* 8mhz mode (Transwarp)
+* 8mhz mode Transwarp-like mode
 * A user-friendly front-end
 * There are others
 
