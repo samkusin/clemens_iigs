@@ -33,6 +33,7 @@ These are essential IIgs features that will be worked on.  This cannot be consid
 
 * Super Hi-Res
 * Ensoniq Audio
+* Monochrome Display
 * Serial Communication
 * Extended character set text page
 * Joystick emulation
