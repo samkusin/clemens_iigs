@@ -174,6 +174,10 @@ extern "C"
  */
   void ckaudio_timepoint_init();
 
+  void ckaudio_timepoint_make_null(CKAudioTimePoint *tp);
+
+  bool ckaudio_timepoint_is_null(CKAudioTimePoint *tp);
+
   /**
  * @brief
  *
