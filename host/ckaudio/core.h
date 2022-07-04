@@ -40,139 +40,16 @@ extern "C"
  */
   CKAudioBuffer *ckaudio_buffer_create(uint32_t duration_ms,
                                        const CKAudioDataFormat *data_format);
-  /**
- * @brief Creates the audio mixer engine
- *
- * @return CKAudioMixer*
- */
-  CKAudioMixer *ckaudio_mixer_create();
-  /**
- * @brief
- *
- * @param mixer
- */
-  void ckaudio_mixer_destroy(CKAudioMixer *mixer);
 
-  /**
- * @brief
- *
- * @param mixer
- */
-  void ckaudio_mixer_update(CKAudioMixer *mixer);
-  /**
- * @brief Renders mixed audio data into a buffer.
- *
- * This can be used to feed the audio core for realtime playback
- *
- * @param mixer
- * @param buffer
- * @param timepoint
- * @return uint32_t
- */
-  uint32_t ckaudio_mixer_render(CKAudioMixer *mixer, CKAudioBuffer *buffer,
-                                CKAudioTimePoint *timepoint);
-  /**
- * @brief Set the track volume used by actions when rendering audio
- *
- * @param mixer
- * @param volume 0-100 where 100 is full amplitude
- */
-  void ckaudio_mixer_set_track_volume(CKAudioMixer *mixer, unsigned track_id,
-                                      uint32_t volume);
-  /**
- * @brief
- *
- * @param mixer
- * @param track_id
- * @return uint32_t
- */
-  uint32_t ckaudio_mixer_get_track_volume(CKAudioMixer *mixer, unsigned track_id);
-  /**
- * @brief
- *
- * @param mixer
- * @param track_id
- * @param action_type
- */
-  void ckaudio_mixer_set_track_action(CKAudioMixer *mixer, unsigned track_id,
-                                      uint32_t action_type);
-  /**
- * @brief
- *
- * @param mixer
- * @param track_id
- * @return uint32_t
- */
-  uint32_t ckaudio_mixer_get_track_action(CKAudioMixer *mixer, unsigned track_id);
-  /**
- * @brief
- *
- * @param mixer
- * @param track_id
- * @param parameter_type
- * @param value
- */
-  void ckaudio_mixer_set_track_action_param(CKAudioMixer *mixer,
-                                            unsigned track_id,
-                                            uint32_t parameter_type, float value);
-  /**
- * @brief
- *
- * @param mixer
- * @param track_id
- * @param parameter_type
- * @return float
- */
-  float ckaudio_mixer_get_track_action_param(CKAudioMixer *mixer,
-                                             unsigned track_id,
-                                             uint32_t parameter_type);
-  /**
-   * @brief
-   *
-   * @param mixer
-   * @param callback_index
-   * @param callback
-   */
-  void ckaudio_mixer_set_track_callback(CKAudioMixer *mixer,
-                                        unsigned track_id,
-                                        CKAudioReadyCallback callback,
-                                        void* cb_ctx);
-  /**
- * @brief Attach a buffer to the action
- *
- * If the buffer was attached with a refernce count other than 0, then the
- * caller owns the buffer.  Otherwise ownership is passed to mixer, which will
- * issue the destroy buffer event once the action is finished.
- *
- * In either case, once passed to the mixer, the caller cannot modify the
- * buffer until the mixer is stopped, or the buffer refcount has returned to the
- * value it was initialzed at (i.e. the mixer is done with it.)  This is why
- * there is no getter (the application should keep a pointer to it.)
- *
- * TODO: Mixer events may allow for modification as needed.
- *
- * @param mixer
- * @param track_id
- * @param buffer
- */
-  void ckaudio_mixer_set_track_action_buffer(CKAudioMixer *mixer,
-                                             unsigned track_id,
-                                             CKAudioBuffer *buffer);
-  /**
-   * @brief Render audio from one buffer (and format) to another
-   *
-   * @param out
-   * @param in
-   * @param volume
-   * @return uint32_t Number of frames rendered from input
-   */
-  uint32_t ckaudio_mixer_render_waveform(CKAudioBuffer* out, CKAudioBuffer* in,
-                                         uint32_t volume);
   /**
  * @brief
  *
  */
   void ckaudio_timepoint_init();
+
+  void ckaudio_timepoint_make_null(CKAudioTimePoint *tp);
+
+  bool ckaudio_timepoint_is_null(CKAudioTimePoint *tp);
 
   /**
  * @brief

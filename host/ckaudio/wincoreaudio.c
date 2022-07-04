@@ -310,6 +310,8 @@ static bool ckaudio_win32_worker_render(struct CKAudioWorker *worker,
         client->lpVtbl->GetCurrentPadding(client, &queued_frame_count);
         avail_out_frame_count = render_buffer_size - queued_frame_count;
         frames_output += xfer_frame_count;
+        //  client has no more data, so render silence
+        if (xfer_frame_count == 0) break;
     } // end while
     if (avail_out_frame_count > 0) {
         hr = render_client->lpVtbl->GetBuffer(render_client,

@@ -21,16 +21,17 @@ public:
 
 private:
   static uint32_t mixAudio(CKAudioBuffer *audioBuffer, CKAudioTimePoint *timepoint, void *ctx);
-  static uint32_t mixClemensAudio(CKAudioBuffer *audioBuffer, CKAudioTimePoint *timepoint, void *ctx);
-  CKAudioMixer *mixer_;
+
+  uint32_t mixClemensAudio(CKAudioBuffer *outBuffer, uint32_t outFramesAvailable);
+
   CKAudioDataFormat dataFormat_;
+  CKAudioTimePoint lastTimepoint_;
 
   uint8_t* queuedFrameBuffer_;
   uint32_t queuedFrameHead_;
   uint32_t queuedFrameTail_;
   uint32_t queuedFrameLimit_;
   uint32_t queuedFrameStride_;
-  uint32_t queuedPreroll_;
 };
 
 #endif

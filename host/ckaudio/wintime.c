@@ -9,6 +9,16 @@ void ckaudio_timepoint_init() {
     QueryPerformanceFrequency(&s_counter_frequency);
 }
 
+void ckaudio_timepoint_make_null(CKAudioTimePoint *tp) { memset(tp->data, 0xff, sizeof(tp->data)); }
+
+bool ckaudio_timepoint_is_null(CKAudioTimePoint *tp) {
+  for (unsigned i = 0; i < sizeof(tp->data); ++i) {
+    if (tp->data[i] != 0xff)
+      return false;
+  }
+  return true;
+}
+
 void ckaudio_timepoint_now(CKAudioTimePoint *tp) {
     LARGE_INTEGER counter;
 
