@@ -32,8 +32,6 @@ uses the memory I/O and sync pattern common to other Clemens MMIO subsystems.
   * RS0-RS3 allow access to the above registers plus some additional 6522
     specific functions
     * Interrupts
-    *
-
 
 
 ### Clemens Integration
@@ -42,3 +40,17 @@ uses the memory I/O and sync pattern common to other Clemens MMIO subsystems.
 * io_write will apply output to the synth engine
 * io_read ???
 
+
+### Host Integration
+
+See `iocards/mockingboard.c` for the full implementation.
+
+#### Investigation TODOs
+
+* Figure out how frequency synth changes occur - likely on a clock that won't
+  sync with the emulator's framerate
+* Since we don't want to lose synth updates between emulator frames before the
+  host audio system requests data for playback, we'll need to render audio
+  on the fly
+* The Mockingboard interface queues commands and executes them when the host
+  or emulated Clemens machine needs to access the current state
