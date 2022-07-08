@@ -13,7 +13,8 @@
     https://www.princeton.edu/~mae412/HANDOUTS/Datasheets/6522.pdf
     https://github.com/deater/dos33fsprogs/blob/master/asm_routines/mockingboard_a.s
   - Resources from
-      https://wiki.reactivemicro.com/Mockingboard
+      https://wiki.reactivemicro.com/Mockingboard including the schematic which
+      has been very helpful interpreting how the VIA communicates with the AY3
 */
 
 #define CLEM_VIA_6522_PORT_B 0x00
@@ -88,13 +89,45 @@ struct ClemensAY38913 {
   uint8_t enable;
   uint8_t envelope_shape;
 
-  /* a 32-bit instruction queue */
+  /* instruction queue */
   uint32_t queue[CLEM_AY3_QUEUE_SIZE];
+  clem_clocks_time_t queue_ts[CLEM_AY3_QUEUE_SIZE];
+  clem_clocks_duration_t ref_step;
   uint32_t queue_tail;
+
+  /* bus counter to detect bdir changes */
+  uint8_t bus_control;
 };
 
+static void _ay3_reset(struct ClemensAY38913 *psg, struct ClemensClock *clock) {
+  memset(psg, 0, sizeof(*psg));
+  psg->bus_control = 0x00;
+  psg->ref_step = clock->ref_step;
+}
+
+/*
+    Queues commands for audio rendering via clem_ay3_render(...).  Fortunately
+    the AY3 here doesn't deal with port output - just taking commands.
+    For debugging and possible register reads, we keep a record of current
+    register values as well.
+ */
 static void _ay3_update(struct ClemensAY38913 *psg, uint8_t *bus,
-                        uint8_t *bus_dir) {}
+                        uint8_t *bus_control, clem_clocks_duration_t dt_step) {
+  uint8_t bctl = *bus_control & 0x1;
+  uint8_t bdir = *bus_control & 0x2;
+  /* This maps to the b_reset pin on a AY3-8913 and implies that it'll always
+     equal 1 unless we're resetting the AY3.  */
+  uint8_t bc2 = *bus_control & 0x4;
+
+  if (*bus_control == psg->bus_control) {
+    return;
+  }
+
+  CLEM_LOG("AY3: bc2=%c bctl=%c bdir=%c", bc2 ? '1' : '0', bctl ? '1' : '0',
+           bdir ? '1' : '0');
+
+  psg->bus_control = *bus_control;
+}
 
 /**
  * @brief
@@ -174,7 +207,7 @@ typedef struct {
   struct ClemensAY38913 ay3[2];
   uint8_t via_ay3_bus[2];
   uint8_t via_ay3_bus_control[2];
-  clem_clocks_time_t last_clocks_time; /* 1mhz (MEGAII) clock */
+  struct ClemensClock last_clocks;
 } ClemensMockingboardContext;
 
 static ClemensMockingboardContext s_context;
@@ -265,29 +298,32 @@ static void io_reset(struct ClemensClock *clock, void *context) {
   ClemensMockingboardContext *board = (ClemensMockingboardContext *)context;
   memset(&board->via[0], 0, sizeof(struct ClemensVIA6522));
   memset(&board->via[1], 0, sizeof(struct ClemensVIA6522));
-  memset(&board->ay3[0], 0, sizeof(struct ClemensAY38913));
-  memset(&board->ay3[1], 0, sizeof(struct ClemensAY38913));
-  board->last_clocks_time = clock->ts;
+  _ay3_reset(&board->ay3[0], clock);
+  _ay3_reset(&board->ay3[1], clock);
+  memcpy(&board->last_clocks, clock, sizeof(board->last_clocks));
+  board->via_ay3_bus[0] = 0x00;
+  board->via_ay3_bus_control[0] = 0x00;
+  board->via_ay3_bus_control[1] = 0x00;
 }
 
 static uint32_t io_sync(struct ClemensClock *clock, void *context) {
   ClemensMockingboardContext *board = (ClemensMockingboardContext *)context;
-  clem_clocks_duration_t dt_clocks = clock->ts - s_context.last_clocks_time;
+  clem_clocks_duration_t dt_clocks = clock->ts - s_context.last_clocks.ts;
   clem_clocks_duration_t dt_spent = 0;
 
   while (dt_spent < dt_clocks) {
     _clem_via_update_state(&board->via[0], &board->via_ay3_bus[0],
                            &board->via_ay3_bus_control[0]);
     _ay3_update(&board->ay3[0], &board->via_ay3_bus[0],
-                &board->via_ay3_bus_control[0]);
+                &board->via_ay3_bus_control[0], clock->ref_step);
     _clem_via_update_state(&board->via[1], &board->via_ay3_bus[1],
                            &board->via_ay3_bus_control[1]);
     _ay3_update(&board->ay3[1], &board->via_ay3_bus[1],
-                &board->via_ay3_bus_control[1]);
+                &board->via_ay3_bus_control[1], clock->ref_step);
     dt_spent += clock->ref_step;
   }
 
-  board->last_clocks_time = clock->ts;
+  memcpy(&board->last_clocks, clock, sizeof(board->last_clocks));
 
   return (board->via[0].ifr || board->via[1].ifr) ? CLEM_CARD_IRQ : 0;
 }
@@ -312,10 +348,10 @@ static void io_read(uint8_t *data, uint16_t addr, uint8_t flags,
     break;
   case CLEM_VIA_6522_REG_DATA + CLEM_VIA_6522_PORT_B:
     //  See Section 2.1 of the W65C22 specification (and the Rockwell Port A+B
-    //  section) on how IRB is read vs IRA. Bascially output pin values are read
-    //  from ORB.  Latching is kinda fake here since we're running step by step
-    //  vs concurrently.  I don't think this is problem - especially since
-    //  the mockingboard doesn't really do VIA port input. :)
+    //  section) on how IRB is read vs IRA. Bascially output pin values are
+    //  read from ORB.  Latching is kinda fake here since we're running step
+    //  by step vs concurrently.  I don't think this is problem - especially
+    //  since the mockingboard doesn't really do VIA port input. :)
     *data = (via->data[CLEM_VIA_6522_PORT_B] &
              via->data_dir[CLEM_VIA_6522_PORT_B]) |
             (via->data_in[CLEM_VIA_6522_PORT_B] &
