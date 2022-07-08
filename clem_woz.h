@@ -16,61 +16,62 @@
 
 #include <stdint.h>
 
-#define CLEM_WOZ_INVALID_DATA       (-1)
+#define CLEM_WOZ_INVALID_DATA (-1)
 
-#define CLEM_WOZ_CHUNK_INFO         0
-#define CLEM_WOZ_CHUNK_TMAP         1
-#define CLEM_WOZ_CHUNK_TRKS         2
-#define CLEM_WOZ_CHUNK_WRIT         3
-#define CLEM_WOZ_CHUNK_META         4
-#define CLEM_WOZ_CHUNK_UNKNOWN      5
-#define CLEM_WOZ_CHUNK_FINISHED     (unsigned)(-1)
+#define CLEM_WOZ_CHUNK_INFO 0
+#define CLEM_WOZ_CHUNK_TMAP 1
+#define CLEM_WOZ_CHUNK_TRKS 2
+#define CLEM_WOZ_CHUNK_WRIT 3
+#define CLEM_WOZ_CHUNK_META 4
+#define CLEM_WOZ_CHUNK_UNKNOWN 5
+#define CLEM_WOZ_CHUNK_FINISHED (unsigned)(-1)
 
-#define CLEM_WOZ_DISK_5_25          1
-#define CLEM_WOZ_DISK_3_5           2
+#define CLEM_WOZ_DISK_5_25 1
+#define CLEM_WOZ_DISK_3_5 2
 
-#define CLEM_WOZ_BOOT_UNDEFINED     0
-#define CLEM_WOZ_BOOT_5_25_16       1
-#define CLEM_WOZ_BOOT_5_25_13       2
-#define CLEM_WOZ_BOOT_5_25_MULTI    3
+#define CLEM_WOZ_BOOT_UNDEFINED 0
+#define CLEM_WOZ_BOOT_5_25_16 1
+#define CLEM_WOZ_BOOT_5_25_13 2
+#define CLEM_WOZ_BOOT_5_25_MULTI 3
 
-#define CLEM_WOZ_SUPPORT_UNKNOWN    0x0000
-#define CLEM_WOZ_SUPPORT_A2         0x0001
-#define CLEM_WOZ_SUPPORT_A2_PLUS    0x0002
-#define CLEM_WOZ_SUPPORT_A2_E       0x0004
-#define CLEM_WOZ_SUPPORT_A2_C       0x0008
-#define CLEM_WOZ_SUPPORT_A2_EE      0x0010
-#define CLEM_WOZ_SUPPORT_A2_GS      0x0020
-#define CLEM_WOZ_SUPPORT_A2_C_PLUS  0x0040
+#define CLEM_WOZ_SUPPORT_UNKNOWN 0x0000
+#define CLEM_WOZ_SUPPORT_A2 0x0001
+#define CLEM_WOZ_SUPPORT_A2_PLUS 0x0002
+#define CLEM_WOZ_SUPPORT_A2_E 0x0004
+#define CLEM_WOZ_SUPPORT_A2_C 0x0008
+#define CLEM_WOZ_SUPPORT_A2_EE 0x0010
+#define CLEM_WOZ_SUPPORT_A2_GS 0x0020
+#define CLEM_WOZ_SUPPORT_A2_C_PLUS 0x0040
 
-#define CLEM_WOZ_IMAGE_DOUBLE_SIDED     0x10000000
-#define CLEM_WOZ_IMAGE_CLEANED          0x20000000
-#define CLEM_WOZ_IMAGE_SYNCHRONIZED     0x40000000
-#define CLEM_WOZ_IMAGE_WRITE_PROTECT    0x80000000
+#define CLEM_WOZ_IMAGE_DOUBLE_SIDED 0x10000000
+#define CLEM_WOZ_IMAGE_CLEANED 0x20000000
+#define CLEM_WOZ_IMAGE_SYNCHRONIZED 0x40000000
+#define CLEM_WOZ_IMAGE_WRITE_PROTECT 0x80000000
 
-#define CLEM_WOZ_OFFSET_TRACK_DATA  1536
-
+#define CLEM_WOZ_OFFSET_TRACK_DATA_V1 256
+#define CLEM_WOZ_OFFSET_TRACK_DATA_V2 1536
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct ClemensWOZChunkHeader {
-    size_t data_size;
-    unsigned type;
+  size_t data_size;
+  unsigned type;
 };
 
 struct ClemensWOZDisk {
-    unsigned disk_type;
-    unsigned boot_type;
-    unsigned flags;                     /* CLEM_WOZ_SUPPORT, CLEM_WOZ_IMAGE */
-    unsigned required_ram_kb;
-    unsigned max_track_size_bytes;
+  unsigned disk_type;
+  unsigned boot_type;
+  unsigned flags; /* CLEM_WOZ_SUPPORT, CLEM_WOZ_IMAGE */
+  unsigned required_ram_kb;
+  unsigned max_track_size_bytes;
+  unsigned version;
 
-    /* Extra data not necessary for the backend */
-    char creator[32];
+  /* Extra data not necessary for the backend */
+  char creator[32];
 
-    struct ClemensNibbleDisk* nib;
+  struct ClemensNibbleDisk *nib;
 };
 
 /*
@@ -98,29 +99,32 @@ struct ClemensWOZDisk {
     the clemens emulator, or an incomplete/invalid image.
  */
 
-const uint8_t* clem_woz_check_header(const uint8_t* data, size_t data_sz);
+const uint8_t *clem_woz_check_header(const uint8_t *data, size_t data_sz);
 
-const uint8_t* clem_woz_parse_chunk_header(struct ClemensWOZChunkHeader* header,
-                                           const uint8_t* data, size_t data_sz);
+const uint8_t *clem_woz_parse_chunk_header(struct ClemensWOZChunkHeader *header,
+                                           const uint8_t *data, size_t data_sz);
 
-const uint8_t* clem_woz_parse_info_chunk(struct ClemensWOZDisk* disk,
-    const struct ClemensWOZChunkHeader* header,
-    const uint8_t* data, size_t data_sz);
+const uint8_t *
+clem_woz_parse_info_chunk(struct ClemensWOZDisk *disk,
+                          const struct ClemensWOZChunkHeader *header,
+                          const uint8_t *data, size_t data_sz);
 
-const uint8_t* clem_woz_parse_tmap_chunk(struct ClemensWOZDisk* disk,
-    const struct ClemensWOZChunkHeader* header,
-    const uint8_t* data, size_t data_sz);
+const uint8_t *
+clem_woz_parse_tmap_chunk(struct ClemensWOZDisk *disk,
+                          const struct ClemensWOZChunkHeader *header,
+                          const uint8_t *data, size_t data_sz);
 
-const uint8_t* clem_woz_parse_trks_chunk(struct ClemensWOZDisk* disk,
-    const struct ClemensWOZChunkHeader* header,
-    const uint8_t* data, size_t data_sz);
+const uint8_t *
+clem_woz_parse_trks_chunk(struct ClemensWOZDisk *disk,
+                          const struct ClemensWOZChunkHeader *header,
+                          const uint8_t *data, size_t data_sz);
 
 // uint8_t* clem_woz_parse_writ_chunk(uint8_t* data, size_t data_sz);
 
-const uint8_t* clem_woz_parse_meta_chunk(struct ClemensWOZDisk* disk,
-    const struct ClemensWOZChunkHeader* header,
-    const uint8_t* data, size_t data_sz);
-
+const uint8_t *
+clem_woz_parse_meta_chunk(struct ClemensWOZDisk *disk,
+                          const struct ClemensWOZChunkHeader *header,
+                          const uint8_t *data, size_t data_sz);
 
 #ifdef __cplusplus
 }
