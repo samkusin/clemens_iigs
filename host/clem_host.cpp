@@ -63,8 +63,7 @@ struct FormatView {
 
 char clemens_is_mmio_card_rom(const ClemensMMIO &mmio, unsigned slot) {
   assert(slot > 0);
-  if ((mmio.mmap_register & CLEM_MEM_IO_MMAP_CXROM) &&
-      (mmio.mmap_register & (CLEM_MEM_IO_MMAP_C1ROM << (slot - 1)))) {
+  if ((mmio.mmap_register & (CLEM_MEM_IO_MMAP_C1ROM << (slot - 1)))) {
     return 'C';
   } else {
     return 'I';
@@ -516,14 +515,6 @@ void ClemensHost::frame(int width, int height, float deltaTime) {
       snprintf(label, sizeof(label), "Y   = %04X", cpuRegsNext.Y);
       ImGui::TableNextColumn();
       ImGui::Selectable(label, cpuRegsNext.Y != cpuRegsSaved_.Y);
-      ImGui::TableNextRow();
-      snprintf(label, sizeof(label), "PPC = %04X", cpuRegsNext.PPC);
-      ImGui::TableNextColumn();
-      ImGui::Selectable(label, cpuRegsNext.PPC != cpuRegsSaved_.PPC);
-      ImGui::TableNextRow();
-      snprintf(label, sizeof(label), "PPBR= %02X", cpuRegsNext.PPBR);
-      ImGui::TableNextColumn();
-      ImGui::Selectable(label, cpuRegsNext.PPBR != cpuRegsSaved_.PPBR);
     }
     ImGui::EndTable();
     ImGui::SameLine();
@@ -2129,11 +2120,11 @@ void ClemensHost::dumpMemory(unsigned bank, const char *filename) {
 
 void ClemensHost::insertCards() {
   clem_card_mockingboard_initialize(&mockingboard_);
-  machine_.card_slot[4] = &mockingboard_;
+  machine_.card_slot[3] = &mockingboard_;
 }
 
 void ClemensHost::ejectCards() {
-  machine_.card_slot[4] = NULL;
+  machine_.card_slot[3] = NULL;
   clem_card_mockingboard_uninitialize(&mockingboard_);
 }
 

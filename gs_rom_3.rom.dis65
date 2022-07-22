@@ -1,6 +1,6 @@
 ﻿### 6502bench SourceGen dis65 v1.0 ###
 {
-"_ContentVersion":4,
+"_ContentVersion":5,
 "FileDataLength":262144,
 "FileDataCrc32":-562176215,
 "ProjectProps":{
@@ -724,19 +724,31 @@
 
 "AddressMap":[{
 "Offset":0,
-"Addr":16515072},
+"Addr":16515072,
+"Length":-1024,
+"PreLabel":"",
+"IsRelative":false},
 
 {
 "Offset":247040,
-"Addr":50432},
+"Addr":50432,
+"Length":-1024,
+"PreLabel":"",
+"IsRelative":false},
 
 {
 "Offset":247296,
-"Addr":50688},
+"Addr":50688,
+"Length":-1024,
+"PreLabel":"",
+"IsRelative":false},
 
 {
 "Offset":247550,
-"Addr":16762622}],
+"Addr":16762622,
+"Length":-1024,
+"PreLabel":"",
+"IsRelative":false}],
 "TypeHints":[{
 "Low":0,
 "High":0,
@@ -2012,7 +2024,7 @@
 "BackgroundColor":0},
 
 "260578":{
-"Text":"Scan from slot 7 to slot 5 for card ROM\r\n",
+"Text":"Scan from slot 7 to slot 4 for card ROM\r\n",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},

@@ -376,12 +376,6 @@
 #define CLEM_OPC_XBA (0xEB)
 #define CLEM_OPC_XCE (0xFB)
 
-/* Attempt to mimic VDA and VPA per memory access */
-#define CLEM_MEM_FLAG_OPCODE_FETCH (0x3)
-#define CLEM_MEM_FLAG_DATA (0x2)
-#define CLEM_MEM_FLAG_PROGRAM (0x1)
-#define CLEM_MEM_FLAG_NULL (0x0)
-
 #define CLEM_UTIL_set16_lo(_v16_, _v8_) (((_v16_)&0xff00) | ((_v8_)&0xff))
 
 #define CLEM_UTIL_CROSSED_PAGE_BOUNDARY(_adr0_, _adr1_)                        \

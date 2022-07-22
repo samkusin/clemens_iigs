@@ -108,12 +108,10 @@ struct ClemensSerializerRecord kCPURegs[] = {
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, D),
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, S),
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, PC),
-    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, PPC),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, IR),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, P),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, DBR),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, PBR),
-    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, PPBR),
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 

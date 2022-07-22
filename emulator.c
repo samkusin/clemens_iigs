@@ -28,6 +28,8 @@
 
 static uint8_t s_empty_ram[CLEM_IIGS_BANK_SIZE];
 
+static struct ClemensOpcodeDesc sOpcodeDescriptions[256];
+
 static const char *s_drive_names[] = {
     "ClemensDisk 3.5 D1",
     "ClemensDisk 3.5 D2",
@@ -1064,8 +1066,13 @@ unsigned clemens_out_hex_data_body(ClemensMachine *clem, char *hex,
                                    unsigned adr) {
   unsigned byte_amt = out_hex_byte_limit >> 1; /* 2 digits per byte */
   unsigned byte_idx;
-  const uint8_t *memory = clem->fpi_bank_map[bank & 0xff];
   unsigned chksum = 0;
+  const uint8_t *memory;
+  if (bank == 0xe0 || bank == 0xe1) {
+    memory = clem->mega2_bank_map[bank & 0x1];
+  } else {
+    memory = clem->fpi_bank_map[bank & 0xff];
+  }
 
   if (!memory)
     return UINT_MAX;
@@ -3458,8 +3465,6 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
     assert(false);
     break;
   }
-  cpu->regs.PPBR = opc_pbr;
-  cpu->regs.PPC = opc_addr;
   cpu->regs.PC = tmp_pc;
 
   if (clem->debug_flags) {
@@ -3478,6 +3483,10 @@ void clemens_emulate(ClemensMachine *clem) {
   uint32_t card_result;
   uint32_t card_irqs;
   unsigned i;
+
+#if CLEM_DIAGNOSTIC_DEBUG
+  struct ClemensDiagnosticData diagnostic;
+#endif
 
   if (!cpu->pins.resbIn) {
     /*  the reset interrupt overrides any other state
@@ -3577,9 +3586,17 @@ void clemens_emulate(ClemensMachine *clem) {
     cpu->state_type = kClemensCPUStateType_Execute;
     return;
   }
+
+#if CLEM_DIAGNOSTIC_DEBUG
+  diagnostic.PC = cpu->regs.PC;
+  diagnostic.PBR = cpu->regs.PBR;
+#endif
   cpu_execute(cpu, clem);
 
   if (!clem->mmio_bypass) {
+  #if CLEM_DIAGNOSTIC_DEBUG
+    clem->mmio.diagnostic = &diagnostic;
+  #endif
     clem_iwm_speed_disk_gate(clem);
 
     //  1 mega2 cycle = 1023 nanoseconds

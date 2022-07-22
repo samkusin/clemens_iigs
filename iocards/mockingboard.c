@@ -328,12 +328,18 @@ static uint32_t io_sync(struct ClemensClock *clock, void *context) {
   return (board->via[0].ifr || board->via[1].ifr) ? CLEM_CARD_IRQ : 0;
 }
 
-static void io_read(uint8_t *data, uint16_t addr, uint8_t flags,
+static void io_read(uint8_t *data, uint8_t addr, uint8_t flags,
                     void *context) {
   unsigned reg;
   uint8_t tmp;
-  struct ClemensVIA6522 *via =
-      _mmio_via_addr_parse((uint8_t)(addr & 0xff), &reg);
+  struct ClemensVIA6522 *via;
+
+  if (!(flags & CLEM_OP_IO_DEVSEL)) {
+    *data = 0;
+    return;
+  }
+
+  via = _mmio_via_addr_parse(addr, &reg);
 
   switch (reg) {
   case CLEM_VIA_6522_PORT_A_ALT:
@@ -397,11 +403,14 @@ static void io_read(uint8_t *data, uint16_t addr, uint8_t flags,
   }
 }
 
-static void io_write(uint8_t data, uint16_t addr, uint8_t flags,
+static void io_write(uint8_t data, uint8_t addr, uint8_t flags,
                      void *context) {
   unsigned reg;
-  struct ClemensVIA6522 *via =
-      _mmio_via_addr_parse((uint8_t)(addr & 0xff), &reg);
+  struct ClemensVIA6522 *via;
+
+  if (!(flags & CLEM_OP_IO_DEVSEL)) return;
+
+  via = _mmio_via_addr_parse(addr, &reg);
 
   switch (reg) {
   case CLEM_VIA_6522_PORT_A_ALT:
