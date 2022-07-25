@@ -3415,16 +3415,15 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
     _clem_read_pba(clem, &tmp_data, &tmp_pc);
     CLEM_CPU_I_INTR_LOG(cpu, "BRK");
     tmp_value = tmp_data;
-    _clem_irq_brk_setup(clem, tmp_pc, true);
-
     if (cpu->pins.emulation) {
-      tmp_pc =
-          _clem_read_interrupt_vector(clem, CLEM_6502_IRQBRK_VECTOR_LO_ADDR,
-                                      CLEM_6502_IRQBRK_VECTOR_HI_ADDR);
+      _clem_irq_brk_setup(clem, &cpu->regs.PBR, &tmp_pc,
+                          CLEM_6502_IRQBRK_VECTOR_LO_ADDR,
+                          CLEM_6502_IRQBRK_VECTOR_HI_ADDR, true);
+
     } else {
-      cpu->regs.PBR = 0x00;
-      tmp_pc = _clem_read_interrupt_vector(clem, CLEM_65816_BRK_VECTOR_LO_ADDR,
-                                           CLEM_65816_BRK_VECTOR_HI_ADDR);
+      _clem_irq_brk_setup(clem, &cpu->regs.PBR, &tmp_pc,
+                          CLEM_65816_BRK_VECTOR_LO_ADDR,
+                          CLEM_65816_BRK_VECTOR_HI_ADDR, true);
     }
     _opcode_instruction_define(&opc_inst, IR, tmp_value, true);
     break;
@@ -3433,15 +3432,15 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
     _clem_read_pba(clem, &tmp_data, &tmp_pc);
     CLEM_CPU_I_INTR_LOG(cpu, "COP");
     tmp_value = tmp_data;
-    _clem_irq_brk_setup(clem, tmp_pc, true);
-
     if (cpu->pins.emulation) {
-      tmp_pc = _clem_read_interrupt_vector(clem, CLEM_6502_COP_VECTOR_LO_ADDR,
-                                           CLEM_6502_COP_VECTOR_LO_ADDR);
+      _clem_irq_brk_setup(clem, &cpu->regs.PBR, &tmp_pc,
+                          CLEM_6502_COP_VECTOR_LO_ADDR,
+                          CLEM_6502_COP_VECTOR_LO_ADDR, true);
+
     } else {
-      cpu->regs.PBR = 0x00;
-      tmp_pc = _clem_read_interrupt_vector(clem, CLEM_65816_COP_VECTOR_LO_ADDR,
-                                           CLEM_65816_COP_VECTOR_HI_ADDR);
+      _clem_irq_brk_setup(clem, &cpu->regs.PBR, &tmp_pc,
+                          CLEM_65816_COP_VECTOR_LO_ADDR,
+                          CLEM_65816_COP_VECTOR_HI_ADDR, true);
     }
     _opcode_instruction_define(&opc_inst, IR, tmp_value, true);
     break;
@@ -3482,6 +3481,7 @@ void clemens_emulate(ClemensMachine *clem) {
   uint32_t delta_mega2_cycles;
   uint32_t card_result;
   uint32_t card_irqs;
+  uint32_t card_nmis;
   unsigned i;
 
 #if CLEM_DIAGNOSTIC_DEBUG
@@ -3565,24 +3565,33 @@ void clemens_emulate(ClemensMachine *clem) {
     }
     cpu->state_type = kClemensCPUStateType_Execute;
     return;
-  } else if (cpu->state_type == kClemensCPUStateType_IRQ) {
+  } else if (cpu->state_type == kClemensCPUStateType_IRQ ||
+             cpu->state_type == kClemensCPUStateType_NMI) {
     uint8_t tmp_data;
     uint8_t tmp_datahi;
+    uint8_t vlo, vhi;
+    if (cpu->pins.emulation) {
+      vlo = cpu->state_type == kClemensCPUStateType_NMI
+                ? CLEM_6502_NMI_VECTOR_LO_ADDR
+                : CLEM_6502_IRQBRK_VECTOR_LO_ADDR;
+      vhi = cpu->state_type == kClemensCPUStateType_NMI
+                ? CLEM_6502_NMI_VECTOR_HI_ADDR
+                : CLEM_6502_IRQBRK_VECTOR_HI_ADDR;
+    } else {
+      vlo = cpu->state_type == kClemensCPUStateType_NMI
+                ? CLEM_65816_NMI_VECTOR_LO_ADDR
+                : CLEM_65816_IRQB_VECTOR_LO_ADDR;
+      vhi = cpu->state_type == kClemensCPUStateType_NMI
+                ? CLEM_65816_NMI_VECTOR_LO_ADDR
+                : CLEM_65816_IRQB_VECTOR_HI_ADDR;
+    }
+
     /* +2 cycles of 'internal ops'
        +3/4 cycles for stack operations
         2 cycles vector pull to PC
     */
     _clem_cycle(clem, 2);
-    _clem_irq_brk_setup(clem, cpu->regs.PC, false);
-    if (cpu->pins.emulation) {
-      cpu->regs.PC =
-          _clem_read_interrupt_vector(clem, CLEM_6502_IRQBRK_VECTOR_LO_ADDR,
-                                      CLEM_6502_IRQBRK_VECTOR_HI_ADDR);
-    } else {
-      cpu->regs.PBR = 0x00;
-      cpu->regs.PC = _clem_read_interrupt_vector(
-          clem, CLEM_65816_IRQB_VECTOR_LO_ADDR, CLEM_65816_IRQB_VECTOR_HI_ADDR);
-    }
+    _clem_irq_brk_setup(clem, &cpu->regs.PBR, &cpu->regs.PC, vlo, vhi, false);
     cpu->state_type = kClemensCPUStateType_Execute;
     return;
   }
@@ -3594,9 +3603,9 @@ void clemens_emulate(ClemensMachine *clem) {
   cpu_execute(cpu, clem);
 
   if (!clem->mmio_bypass) {
-  #if CLEM_DIAGNOSTIC_DEBUG
+#if CLEM_DIAGNOSTIC_DEBUG
     clem->mmio.diagnostic = &diagnostic;
-  #endif
+#endif
     clem_iwm_speed_disk_gate(clem);
 
     //  1 mega2 cycle = 1023 nanoseconds
@@ -3616,14 +3625,17 @@ void clemens_emulate(ClemensMachine *clem) {
     clock.ts = clem->clocks_spent;
     clock.ref_step = clem->clocks_step_mega2;
 
+    card_nmis = 0;
     card_irqs = 0;
     for (i = 0; i < 7; ++i) {
       if (!clem->card_slot[i])
         continue;
       card_result =
           (*clem->card_slot[i]->io_sync)(&clock, clem->card_slot[i]->context);
-      if (card_result & CLEM_IRQ_ON)
+      if (card_result & CLEM_CARD_IRQ)
         card_irqs |= (CLEM_IRQ_SLOT_1 << i);
+      if (card_result & CLEM_CARD_NMI)
+        card_nmis |= (1 << i);
     }
 
     clem_vgc_sync(&mmio->vgc, &clock, clem->mega2_bank_map[0],
@@ -3647,9 +3659,11 @@ void clemens_emulate(ClemensMachine *clem) {
     mmio->irq_line =
         (mmio->dev_adb.irq_line | mmio->dev_timer.irq_line |
          mmio->dev_audio.irq_line | mmio->vgc.irq_line | card_irqs);
+    mmio->nmi_line = card_nmis;
     clem_iwm_speed_disk_gate(clem);
 
     cpu->pins.irqbIn = mmio->irq_line == 0;
+    cpu->pins.nmibIn = mmio->nmi_line == 0;
   }
 
   /* IRQB low triggers an interrupt next frame */
@@ -3657,5 +3671,9 @@ void clemens_emulate(ClemensMachine *clem) {
     if (!(cpu->regs.P & kClemensCPUStatus_IRQDisable)) {
       cpu->state_type = kClemensCPUStateType_IRQ;
     }
+  }
+  /* NMIB overrides IRQB settings and ignores IRQ disable */
+  if (!cpu->pins.nmibIn) {
+    cpu->state_type = kClemensCPUStateType_NMI;
   }
 }

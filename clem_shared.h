@@ -25,9 +25,9 @@ typedef uint32_t clem_clocks_duration_t;
 #define CLEM_MEM_FLAG_PROGRAM (0x1)
 #define CLEM_MEM_FLAG_NULL (0x0)
 
-#define CLEM_OP_IO_DEVSEL     0x80
+#define CLEM_OP_IO_DEVSEL 0x80
 
-/* MUST be the same as CLEM_IRQ_ON in clem_defs.h */
+#define CLEM_CARD_NMI 0x40000000
 #define CLEM_CARD_IRQ 0x80000000
 
 /* Some basic shared debugging defines */
