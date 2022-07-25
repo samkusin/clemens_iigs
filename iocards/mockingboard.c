@@ -46,6 +46,24 @@
 
 #define CLEM_AY3_QUEUE_SIZE 256
 
+#define CLEM_AY3_REG_A_TONE_PERIOD_FINE 0x00
+#define CLEM_AY3_REG_A_TONE_PERIOD_COARSE 0x01
+#define CLEM_AY3_REG_B_TONE_PERIOD_FINE 0x02
+#define CLEM_AY3_REG_B_TONE_PERIOD_COARSE 0x03
+#define CLEM_AY3_REG_C_TONE_PERIOD_FINE 0x04
+#define CLEM_AY3_REG_C_TONE_PERIOD_COARSE 0x05
+#define CLEM_AY3_REG_NOISE_PERIOD 0x06
+#define CLEM_AY3_REG_ENABLE 0x07
+#define CLEM_AY3_REG_A_AMPLITUDE 0x0a
+#define CLEM_AY3_REG_B_AMPLITUDE 0x0b
+#define CLEM_AY3_REG_C_AMPLITUDE 0x0c
+#define CLEM_AY3_REG_ENVELOPE_COARSE 0x0d
+#define CLEM_AY3_REG_ENVELOPE_FINE 0x0e
+#define CLEM_AY3_REG_ENVELOPE_SHAPE 0x0f
+#define CLEM_AY3_REG_IO_A 0x10
+#define CLEM_AY3_REG_IO_B 0x11
+
+
 // TODO: other interrupts
 
 enum ClemensVIA6522TimerStatus {
@@ -97,12 +115,107 @@ struct ClemensAY38913 {
 
   /* bus counter to detect bdir changes */
   uint8_t bus_control;
+  /* Current register ID latched for read/write */
+  uint8_t reg_latch;
 };
 
-static void _ay3_reset(struct ClemensAY38913 *psg, struct ClemensClock *clock) {
+static void _ay3_reset(struct ClemensAY38913 *psg, clem_clocks_duration_t ref_step) {
   memset(psg, 0, sizeof(*psg));
   psg->bus_control = 0x00;
-  psg->ref_step = clock->ref_step;
+  psg->ref_step = ref_step;
+}
+
+static uint8_t _ay3_get(struct ClemensAY38913* psg) {
+  switch (psg->reg_latch) {
+    case CLEM_AY3_REG_A_TONE_PERIOD_COARSE:
+      return (uint8_t)(psg->channel_tone_period[0] & 0xff);
+    case CLEM_AY3_REG_A_TONE_PERIOD_FINE:
+      return (psg->channel_tone_period[0] >> 8) & 0xff;
+    case CLEM_AY3_REG_B_TONE_PERIOD_COARSE:
+      return psg->channel_tone_period[1] & 0xff;
+    case CLEM_AY3_REG_B_TONE_PERIOD_FINE:
+      return (psg->channel_tone_period[1] >> 8) & 0xff;
+    case CLEM_AY3_REG_C_TONE_PERIOD_COARSE:
+      return psg->channel_tone_period[2] & 0xff;
+    case CLEM_AY3_REG_C_TONE_PERIOD_FINE:
+      return (psg->channel_tone_period[2] >> 8) & 0xff;
+    case CLEM_AY3_REG_NOISE_PERIOD:
+      return psg->noise_period;
+    case CLEM_AY3_REG_ENABLE:
+      return psg->enable;
+    case CLEM_AY3_REG_A_AMPLITUDE:
+      return psg->channel_amplitude[0];
+    case CLEM_AY3_REG_B_AMPLITUDE:
+      return psg->channel_amplitude[1];
+    case CLEM_AY3_REG_C_AMPLITUDE:
+      return psg->channel_amplitude[2];
+    case CLEM_AY3_REG_ENVELOPE_COARSE:
+      return (uint8_t)(psg->envelope_period & 0xff);
+    case CLEM_AY3_REG_ENVELOPE_FINE:
+      return (uint8_t)(psg->envelope_period >> 8);
+    case CLEM_AY3_REG_ENVELOPE_SHAPE:
+      return psg->envelope_shape;
+    default:
+      break;
+  }
+  return 0;
+}
+
+static void _ay3_set(struct ClemensAY38913* psg, uint8_t data) {
+  switch (psg->reg_latch) {
+    case CLEM_AY3_REG_A_TONE_PERIOD_COARSE:
+      psg->channel_tone_period[0] &= ~0xff00;
+      psg->channel_tone_period[0] |= data;
+      break;
+    case CLEM_AY3_REG_A_TONE_PERIOD_FINE:
+      psg->channel_tone_period[0] &= ~0x00ff;
+      psg->channel_tone_period[0] |= ((uint16_t)data  << 8);
+      break;
+    case CLEM_AY3_REG_B_TONE_PERIOD_COARSE:
+      psg->channel_tone_period[1] &= ~0xff00;
+      psg->channel_tone_period[1] |= data;
+      break;
+    case CLEM_AY3_REG_B_TONE_PERIOD_FINE:
+      psg->channel_tone_period[1] &= ~0x00ff;
+      psg->channel_tone_period[1] |= ((uint16_t)data << 8);
+      break;
+    case CLEM_AY3_REG_C_TONE_PERIOD_COARSE:
+      psg->channel_tone_period[2] &= ~0xff00;
+      psg->channel_tone_period[2] |= data;
+      break;
+    case CLEM_AY3_REG_C_TONE_PERIOD_FINE:
+      psg->channel_tone_period[2] &= ~0x00ff;
+      psg->channel_tone_period[2] |= ((uint16_t)data << 8);
+      break;
+    case CLEM_AY3_REG_NOISE_PERIOD:
+      psg->noise_period = data;;
+      break;
+    case CLEM_AY3_REG_ENABLE:
+      psg->enable = data;
+      break;
+    case CLEM_AY3_REG_A_AMPLITUDE:
+      psg->channel_amplitude[0] = data;
+      break;
+    case CLEM_AY3_REG_B_AMPLITUDE:
+      psg->channel_amplitude[1] = data;
+      break;
+    case CLEM_AY3_REG_C_AMPLITUDE:
+      psg->channel_amplitude[2] = data;
+      break;
+    case CLEM_AY3_REG_ENVELOPE_COARSE:
+      psg->envelope_period &= ~0xff00;
+      psg->envelope_period |= data;
+      break;
+    case CLEM_AY3_REG_ENVELOPE_FINE:
+      psg->envelope_period &= ~0x00ff;
+      psg->envelope_period |= ((uint16_t)data << 8);
+      break;
+    case CLEM_AY3_REG_ENVELOPE_SHAPE:
+      psg->envelope_shape = data;
+      break;
+    default:
+      break;
+  }
 }
 
 /*
@@ -113,18 +226,37 @@ static void _ay3_reset(struct ClemensAY38913 *psg, struct ClemensClock *clock) {
  */
 static void _ay3_update(struct ClemensAY38913 *psg, uint8_t *bus,
                         uint8_t *bus_control, clem_clocks_duration_t dt_step) {
-  uint8_t bctl = *bus_control & 0x1;
+  uint8_t bc1 = *bus_control & 0x1;
   uint8_t bdir = *bus_control & 0x2;
-  /* This maps to the b_reset pin on a AY3-8913 and implies that it'll always
-     equal 1 unless we're resetting the AY3.  */
-  uint8_t bc2 = *bus_control & 0x4;
+  uint8_t reset_b = *bus_control & 0x4;
 
   if (*bus_control == psg->bus_control) {
     return;
   }
+  if (!reset_b) {
+    _ay3_reset(psg, psg->ref_step);
+    return;
+  }
 
-  CLEM_LOG("AY3: bc2=%c bctl=%c bdir=%c", bc2 ? '1' : '0', bctl ? '1' : '0',
-           bdir ? '1' : '0');
+  CLEM_LOG("AY3: reset_b=%c bdir=%c bc1=%c", reset_b ? '1' : '0', bdir ? '1' : '0', bc1 ? '1' : '0');
+
+  switch (*bus_control & 0x3) {
+  case 0x3:
+    /* LATCH_ADDRESS */
+    psg->reg_latch = *bus;
+    break;
+  case 0x1:
+    /* READ FROM PSG */
+    *bus = _ay3_get(psg);
+    break;
+  case 0x2:
+    /* WRITE TO PSG */
+    _ay3_set(psg, *bus);
+    break;
+  default:
+    /* INACTIVE */
+    break;
+  }
 
   psg->bus_control = *bus_control;
 }
@@ -173,10 +305,11 @@ struct ClemensVIA6522 {
   Envelope wave has a 16-bit period (coarse + fine registers)
   Envelope wave has a shape (square, triangle, sawtooth, etc)
 
- 6522 -> AY3 communication
+ 6522 <-> AY3 communication
     a.) Instigated by register ORA, ORB writes
     b.) 6522.PortA -> AY3 Bus
     c.) 6522.PortB[0:2] -> AY3 Bus Control
+    d.) Allow reads of AY3 registers (for mb-audit validation)
 
  6522 functions
     a.) DDRA, DDRB offers control of which port pins map to inputs vs outputs
@@ -298,8 +431,8 @@ static void io_reset(struct ClemensClock *clock, void *context) {
   ClemensMockingboardContext *board = (ClemensMockingboardContext *)context;
   memset(&board->via[0], 0, sizeof(struct ClemensVIA6522));
   memset(&board->via[1], 0, sizeof(struct ClemensVIA6522));
-  _ay3_reset(&board->ay3[0], clock);
-  _ay3_reset(&board->ay3[1], clock);
+  _ay3_reset(&board->ay3[0], clock->ref_step);
+  _ay3_reset(&board->ay3[1], clock->ref_step);
   memcpy(&board->last_clocks, clock, sizeof(board->last_clocks));
   board->via_ay3_bus[0] = 0x00;
   board->via_ay3_bus_control[0] = 0x00;
@@ -384,10 +517,14 @@ static void io_read(uint8_t *data, uint8_t addr, uint8_t flags,
     *data = (uint8_t)((via->timer2[1] & 0xff00) >> 8);
     break;
   case CLEM_VIA_6522_REG_SR:
-    CLEM_UNIMPLEMENTED("6522 VIA SR read (%x)", addr);
+    if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
+      CLEM_UNIMPLEMENTED("6522 VIA SR read (%x)", addr);
+    }
     break;
   case CLEM_VIA_6522_REG_PCR:
-    CLEM_UNIMPLEMENTED("6522 VIA PCR read (%x)", addr);
+    if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
+      CLEM_UNIMPLEMENTED("6522 VIA PCR read (%x)", addr);
+    }
     break;
   case CLEM_VIA_6522_REG_ACR:
     *data = via->acr;
@@ -450,10 +587,10 @@ static void io_write(uint8_t data, uint8_t addr, uint8_t flags,
     via->timer2_status = kClemensVIA6522TimerStatus_LoadCounter;
     break;
   case CLEM_VIA_6522_REG_SR:
-    CLEM_UNIMPLEMENTED("6522 VIA SR write (%x)", addr);
+    CLEM_WARN("6522 VIA SR write (%x)", addr);
     break;
   case CLEM_VIA_6522_REG_PCR:
-    CLEM_UNIMPLEMENTED("6522 VIA PCR write (%x)", addr);
+    CLEM_WARN("6522 VIA PCR write (%x)", addr);
     break;
   case CLEM_VIA_6522_REG_ACR:
     via->acr = data;
