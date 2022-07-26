@@ -853,7 +853,7 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor,
   for (idx = 0; idx < 7; ++idx) {
     machine->card_slot[idx] = NULL;
     machine->card_slot_expansion_memory[idx] =
-        (((uint8_t *)slotExpansionROM) + (idx * 256));
+        (((uint8_t *)slotExpansionROM) + (idx * 2048));
   }
 
   machine->mmio_bypass = false;

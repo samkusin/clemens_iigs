@@ -725,7 +725,7 @@ uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm,
                              struct ClemensClock *clock, uint8_t ioreg,
                              uint8_t flags) {
   uint8_t result = 0x00;
-  bool is_noop = (flags & CLEM_OP_IO_READ_NO_OP) != 0;
+  bool is_noop = (flags & CLEM_OP_IO_NO_OP) != 0;
 
   switch (ioreg) {
   case CLEM_MMIO_REG_DISK_INTERFACE:

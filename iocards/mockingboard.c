@@ -63,7 +63,6 @@
 #define CLEM_AY3_REG_IO_A 0x10
 #define CLEM_AY3_REG_IO_B 0x11
 
-
 // TODO: other interrupts
 
 enum ClemensVIA6522TimerStatus {
@@ -119,102 +118,104 @@ struct ClemensAY38913 {
   uint8_t reg_latch;
 };
 
-static void _ay3_reset(struct ClemensAY38913 *psg, clem_clocks_duration_t ref_step) {
+static void _ay3_reset(struct ClemensAY38913 *psg,
+                       clem_clocks_duration_t ref_step) {
   memset(psg, 0, sizeof(*psg));
   psg->bus_control = 0x00;
   psg->ref_step = ref_step;
 }
 
-static uint8_t _ay3_get(struct ClemensAY38913* psg) {
+static uint8_t _ay3_get(struct ClemensAY38913 *psg) {
   switch (psg->reg_latch) {
-    case CLEM_AY3_REG_A_TONE_PERIOD_COARSE:
-      return (uint8_t)(psg->channel_tone_period[0] & 0xff);
-    case CLEM_AY3_REG_A_TONE_PERIOD_FINE:
-      return (psg->channel_tone_period[0] >> 8) & 0xff;
-    case CLEM_AY3_REG_B_TONE_PERIOD_COARSE:
-      return psg->channel_tone_period[1] & 0xff;
-    case CLEM_AY3_REG_B_TONE_PERIOD_FINE:
-      return (psg->channel_tone_period[1] >> 8) & 0xff;
-    case CLEM_AY3_REG_C_TONE_PERIOD_COARSE:
-      return psg->channel_tone_period[2] & 0xff;
-    case CLEM_AY3_REG_C_TONE_PERIOD_FINE:
-      return (psg->channel_tone_period[2] >> 8) & 0xff;
-    case CLEM_AY3_REG_NOISE_PERIOD:
-      return psg->noise_period;
-    case CLEM_AY3_REG_ENABLE:
-      return psg->enable;
-    case CLEM_AY3_REG_A_AMPLITUDE:
-      return psg->channel_amplitude[0];
-    case CLEM_AY3_REG_B_AMPLITUDE:
-      return psg->channel_amplitude[1];
-    case CLEM_AY3_REG_C_AMPLITUDE:
-      return psg->channel_amplitude[2];
-    case CLEM_AY3_REG_ENVELOPE_COARSE:
-      return (uint8_t)(psg->envelope_period & 0xff);
-    case CLEM_AY3_REG_ENVELOPE_FINE:
-      return (uint8_t)(psg->envelope_period >> 8);
-    case CLEM_AY3_REG_ENVELOPE_SHAPE:
-      return psg->envelope_shape;
-    default:
-      break;
+  case CLEM_AY3_REG_A_TONE_PERIOD_COARSE:
+    return (uint8_t)(psg->channel_tone_period[0] & 0xff);
+  case CLEM_AY3_REG_A_TONE_PERIOD_FINE:
+    return (psg->channel_tone_period[0] >> 8) & 0xff;
+  case CLEM_AY3_REG_B_TONE_PERIOD_COARSE:
+    return psg->channel_tone_period[1] & 0xff;
+  case CLEM_AY3_REG_B_TONE_PERIOD_FINE:
+    return (psg->channel_tone_period[1] >> 8) & 0xff;
+  case CLEM_AY3_REG_C_TONE_PERIOD_COARSE:
+    return psg->channel_tone_period[2] & 0xff;
+  case CLEM_AY3_REG_C_TONE_PERIOD_FINE:
+    return (psg->channel_tone_period[2] >> 8) & 0xff;
+  case CLEM_AY3_REG_NOISE_PERIOD:
+    return psg->noise_period;
+  case CLEM_AY3_REG_ENABLE:
+    return psg->enable;
+  case CLEM_AY3_REG_A_AMPLITUDE:
+    return psg->channel_amplitude[0];
+  case CLEM_AY3_REG_B_AMPLITUDE:
+    return psg->channel_amplitude[1];
+  case CLEM_AY3_REG_C_AMPLITUDE:
+    return psg->channel_amplitude[2];
+  case CLEM_AY3_REG_ENVELOPE_COARSE:
+    return (uint8_t)(psg->envelope_period & 0xff);
+  case CLEM_AY3_REG_ENVELOPE_FINE:
+    return (uint8_t)(psg->envelope_period >> 8);
+  case CLEM_AY3_REG_ENVELOPE_SHAPE:
+    return psg->envelope_shape;
+  default:
+    break;
   }
   return 0;
 }
 
-static void _ay3_set(struct ClemensAY38913* psg, uint8_t data) {
+static void _ay3_set(struct ClemensAY38913 *psg, uint8_t data) {
   switch (psg->reg_latch) {
-    case CLEM_AY3_REG_A_TONE_PERIOD_COARSE:
-      psg->channel_tone_period[0] &= ~0xff00;
-      psg->channel_tone_period[0] |= data;
-      break;
-    case CLEM_AY3_REG_A_TONE_PERIOD_FINE:
-      psg->channel_tone_period[0] &= ~0x00ff;
-      psg->channel_tone_period[0] |= ((uint16_t)data  << 8);
-      break;
-    case CLEM_AY3_REG_B_TONE_PERIOD_COARSE:
-      psg->channel_tone_period[1] &= ~0xff00;
-      psg->channel_tone_period[1] |= data;
-      break;
-    case CLEM_AY3_REG_B_TONE_PERIOD_FINE:
-      psg->channel_tone_period[1] &= ~0x00ff;
-      psg->channel_tone_period[1] |= ((uint16_t)data << 8);
-      break;
-    case CLEM_AY3_REG_C_TONE_PERIOD_COARSE:
-      psg->channel_tone_period[2] &= ~0xff00;
-      psg->channel_tone_period[2] |= data;
-      break;
-    case CLEM_AY3_REG_C_TONE_PERIOD_FINE:
-      psg->channel_tone_period[2] &= ~0x00ff;
-      psg->channel_tone_period[2] |= ((uint16_t)data << 8);
-      break;
-    case CLEM_AY3_REG_NOISE_PERIOD:
-      psg->noise_period = data;;
-      break;
-    case CLEM_AY3_REG_ENABLE:
-      psg->enable = data;
-      break;
-    case CLEM_AY3_REG_A_AMPLITUDE:
-      psg->channel_amplitude[0] = data;
-      break;
-    case CLEM_AY3_REG_B_AMPLITUDE:
-      psg->channel_amplitude[1] = data;
-      break;
-    case CLEM_AY3_REG_C_AMPLITUDE:
-      psg->channel_amplitude[2] = data;
-      break;
-    case CLEM_AY3_REG_ENVELOPE_COARSE:
-      psg->envelope_period &= ~0xff00;
-      psg->envelope_period |= data;
-      break;
-    case CLEM_AY3_REG_ENVELOPE_FINE:
-      psg->envelope_period &= ~0x00ff;
-      psg->envelope_period |= ((uint16_t)data << 8);
-      break;
-    case CLEM_AY3_REG_ENVELOPE_SHAPE:
-      psg->envelope_shape = data;
-      break;
-    default:
-      break;
+  case CLEM_AY3_REG_A_TONE_PERIOD_COARSE:
+    psg->channel_tone_period[0] &= ~0xff00;
+    psg->channel_tone_period[0] |= data;
+    break;
+  case CLEM_AY3_REG_A_TONE_PERIOD_FINE:
+    psg->channel_tone_period[0] &= ~0x00ff;
+    psg->channel_tone_period[0] |= ((uint16_t)data << 8);
+    break;
+  case CLEM_AY3_REG_B_TONE_PERIOD_COARSE:
+    psg->channel_tone_period[1] &= ~0xff00;
+    psg->channel_tone_period[1] |= data;
+    break;
+  case CLEM_AY3_REG_B_TONE_PERIOD_FINE:
+    psg->channel_tone_period[1] &= ~0x00ff;
+    psg->channel_tone_period[1] |= ((uint16_t)data << 8);
+    break;
+  case CLEM_AY3_REG_C_TONE_PERIOD_COARSE:
+    psg->channel_tone_period[2] &= ~0xff00;
+    psg->channel_tone_period[2] |= data;
+    break;
+  case CLEM_AY3_REG_C_TONE_PERIOD_FINE:
+    psg->channel_tone_period[2] &= ~0x00ff;
+    psg->channel_tone_period[2] |= ((uint16_t)data << 8);
+    break;
+  case CLEM_AY3_REG_NOISE_PERIOD:
+    psg->noise_period = data;
+    ;
+    break;
+  case CLEM_AY3_REG_ENABLE:
+    psg->enable = data;
+    break;
+  case CLEM_AY3_REG_A_AMPLITUDE:
+    psg->channel_amplitude[0] = data;
+    break;
+  case CLEM_AY3_REG_B_AMPLITUDE:
+    psg->channel_amplitude[1] = data;
+    break;
+  case CLEM_AY3_REG_C_AMPLITUDE:
+    psg->channel_amplitude[2] = data;
+    break;
+  case CLEM_AY3_REG_ENVELOPE_COARSE:
+    psg->envelope_period &= ~0xff00;
+    psg->envelope_period |= data;
+    break;
+  case CLEM_AY3_REG_ENVELOPE_FINE:
+    psg->envelope_period &= ~0x00ff;
+    psg->envelope_period |= ((uint16_t)data << 8);
+    break;
+  case CLEM_AY3_REG_ENVELOPE_SHAPE:
+    psg->envelope_shape = data;
+    break;
+  default:
+    break;
   }
 }
 
@@ -238,7 +239,8 @@ static void _ay3_update(struct ClemensAY38913 *psg, uint8_t *bus,
     return;
   }
 
-  CLEM_LOG("AY3: reset_b=%c bdir=%c bc1=%c", reset_b ? '1' : '0', bdir ? '1' : '0', bc1 ? '1' : '0');
+  CLEM_LOG("AY3: reset_b=%c bdir=%c bc1=%c", reset_b ? '1' : '0',
+           bdir ? '1' : '0', bc1 ? '1' : '0');
 
   switch (*bus_control & 0x3) {
   case 0x3:
@@ -351,6 +353,11 @@ static inline struct ClemensVIA6522 *_mmio_via_addr_parse(uint8_t ioreg,
   return &s_context.via[(ioreg & 0x80) >> 7]; /* chip select */
 }
 
+static inline bool _mmio_via_irq_active(struct ClemensVIA6522 *via) {
+  uint8_t tmp = (via->ier & via->ifr) & 0x7f;
+  return tmp != 0;
+}
+
 /* The 6522 VIA update deals mainly with timer state updates
  */
 
@@ -390,9 +397,7 @@ void _clem_via_update_state(struct ClemensVIA6522 *via, uint8_t *port_a,
   }
   if (via->timer1[1] == 0) {
     if (via->timer1_status == kClemensVIA6522TimerStatus_Active) {
-      if (via->ier & CLEM_VIA_6522_IER_TIMER1) {
-        via->ifr |= CLEM_VIA_6522_IER_TIMER1;
-      }
+      via->ifr |= CLEM_VIA_6522_IER_TIMER1;
       if ((timer1_mode & 0x40) == CLEM_VIA_6522_TIMER1_ONESHOT) {
         via->timer1_status = kClemensVIA6522TimerStatus_Inactive;
       }
@@ -410,9 +415,7 @@ void _clem_via_update_state(struct ClemensVIA6522 *via, uint8_t *port_a,
   }
   if (via->timer2[1] == 0) {
     if (via->timer2_status == kClemensVIA6522TimerStatus_Active) {
-      if (via->ier & CLEM_VIA_6522_IER_TIMER2) {
-        via->ifr |= CLEM_VIA_6522_IER_TIMER2;
-      }
+      via->ifr |= CLEM_VIA_6522_IER_TIMER2;
       if ((timer2_mode & 0x20) == CLEM_VIA_6522_TIMER2_ONESHOT) {
         via->timer1_status = kClemensVIA6522TimerStatus_Inactive;
       }
@@ -458,13 +461,15 @@ static uint32_t io_sync(struct ClemensClock *clock, void *context) {
 
   memcpy(&board->last_clocks, clock, sizeof(board->last_clocks));
 
-  return (board->via[0].ifr || board->via[1].ifr) ? CLEM_CARD_IRQ : 0;
+  return (_mmio_via_irq_active(&board->via[0]) ||
+          _mmio_via_irq_active(&board->via[1]))
+             ? CLEM_CARD_IRQ
+             : 0;
 }
 
-static void io_read(uint8_t *data, uint8_t addr, uint8_t flags,
-                    void *context) {
+static void io_read(struct ClemensClock *clock, uint8_t *data, uint8_t addr,
+                    uint8_t flags, void *context) {
   unsigned reg;
-  uint8_t tmp;
   struct ClemensVIA6522 *via;
 
   if (!(flags & CLEM_OP_IO_DEVSEL)) {
@@ -517,12 +522,12 @@ static void io_read(uint8_t *data, uint8_t addr, uint8_t flags,
     *data = (uint8_t)((via->timer2[1] & 0xff00) >> 8);
     break;
   case CLEM_VIA_6522_REG_SR:
-    if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
+    if (!(flags & CLEM_OP_IO_NO_OP)) {
       CLEM_UNIMPLEMENTED("6522 VIA SR read (%x)", addr);
     }
     break;
   case CLEM_VIA_6522_REG_PCR:
-    if (!(flags & CLEM_OP_IO_READ_NO_OP)) {
+    if (!(flags & CLEM_OP_IO_NO_OP)) {
       CLEM_UNIMPLEMENTED("6522 VIA PCR read (%x)", addr);
     }
     break;
@@ -534,18 +539,18 @@ static void io_read(uint8_t *data, uint8_t addr, uint8_t flags,
     break;
   case CLEM_VIA_6522_REG_IRQ_IFR:
     // if interrupt disabled, do not return equivalent flag status
-    tmp = (via->ier & via->ifr) & 0x7f;
-    *data = (tmp ? 0x80 : 0x00) | tmp;
+    *data = (_mmio_via_irq_active(via) ? 0x80 : 0x00) | (via->ifr & 0x7f);
     break;
   }
 }
 
-static void io_write(uint8_t data, uint8_t addr, uint8_t flags,
-                     void *context) {
-  unsigned reg;
+static void io_write(struct ClemensClock *clock, uint8_t data, uint8_t addr,
+                     uint8_t flags, void *context) {
   struct ClemensVIA6522 *via;
+  unsigned reg;
 
-  if (!(flags & CLEM_OP_IO_DEVSEL)) return;
+  if (!(flags & CLEM_OP_IO_DEVSEL))
+    return;
 
   via = _mmio_via_addr_parse(addr, &reg);
 
@@ -565,13 +570,13 @@ static void io_write(uint8_t data, uint8_t addr, uint8_t flags,
     break;
   case CLEM_VIA_6522_REG_TIMER1LL:
   case CLEM_VIA_6522_REG_TIMER1CL:
-    via->timer1[0] = (via->timer1[0] & ~0xff00) | data;
+    via->timer1[0] = (via->timer1[0] & 0xff00) | data;
     break;
   case CLEM_VIA_6522_REG_TIMER1LH:
-    via->timer1[0] = (via->timer1[0] & ~0x00ff) | (uint16_t)(data << 8);
+    via->timer1[0] = (via->timer1[0] & 0x00ff) | ((uint16_t)(data) << 8);
     break;
   case CLEM_VIA_6522_REG_TIMER1CH:
-    via->timer1[0] = (via->timer1[0] & ~0x00ff) | (uint16_t)(data << 8);
+    via->timer1[0] = (via->timer1[0] & 0x00ff) | ((uint16_t)(data) << 8);
     via->ifr &= ~CLEM_VIA_6522_IER_TIMER1; // clear interrupt on write
     via->timer1_status = kClemensVIA6522TimerStatus_LoadCounter;
     break;
@@ -582,7 +587,7 @@ static void io_write(uint8_t data, uint8_t addr, uint8_t flags,
     // technically there is no timer 2 high byte latch, but since there are no
     // timer 2 latch registers, the contents of this latch doesn't matter as
     // the actual timer 2 counter is updated in io_sync
-    via->timer2[0] = (via->timer2[0] & ~0x00ff) | (uint16_t)(data << 8);
+    via->timer2[0] = (via->timer2[0] & 0x00ff) | ((uint16_t)(data) << 8);
     via->ifr &= ~CLEM_VIA_6522_IER_TIMER2;
     via->timer2_status = kClemensVIA6522TimerStatus_LoadCounter;
     break;
@@ -598,16 +603,13 @@ static void io_write(uint8_t data, uint8_t addr, uint8_t flags,
   case CLEM_VIA_6522_REG_IRQ_IER:
     // if disabling interrupts, IRQs will be cleared in io_sync()
     if (data & 0x80) {
-      via->ier |= data;
+      via->ier |= (data & 0x7f);
     } else {
       via->ier &= ~data;
     }
     break;
   case CLEM_VIA_6522_REG_IRQ_IFR:
-    if (data & 0x80) {
-      // clears interrupts set - the IRQs are determined in io_sync (bit 7)
-      via->ifr &= ~(data & 0x7f);
-    }
+    via->ifr &= ~(data & 0x7f);
     break;
   }
 }
