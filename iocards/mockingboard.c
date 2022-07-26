@@ -16,6 +16,9 @@
       https://wiki.reactivemicro.com/Mockingboard including the schematic which
       has been very helpful interpreting how the VIA communicates with the AY3
 */
+/* MB-AUDIT LOG
+  from $38AC onwards test failure 21:00:00
+*/
 
 #define CLEM_VIA_6522_PORT_B 0x00
 #define CLEM_VIA_6522_PORT_A 0x01
@@ -283,6 +286,7 @@ struct ClemensVIA6522 {
 
   enum ClemensVIA6522TimerStatus timer1_status;
   enum ClemensVIA6522TimerStatus timer2_status;
+  bool timer1_wraparound;
 };
 
 /* The Mockingboard Device here is a 6 channel (2 chip) version
@@ -380,44 +384,48 @@ void _clem_via_update_state(struct ClemensVIA6522 *via, uint8_t *port_a,
   *port_b |=
       (via->data[CLEM_VIA_6522_PORT_B] & via->data_dir[CLEM_VIA_6522_PORT_B]);
 
-  // Timer 1 vs 2 subtle difference in one-shot mode, on timer 1 wraparound,
-  // the counter is reloaded from the timer 1 latches.  For timer 2, this is
-  // not the case.
-  //
   // PB7 toggling not supported (unneeded)
+
+  // Timer 1 operation:
   if (via->timer1_status == kClemensVIA6522TimerStatus_LoadCounter) {
     via->timer1[1] = via->timer1[0];
-    via->timer1_status = kClemensVIA6522TimerStatus_Active;
+    if (via->timer1_wraparound) {
+      if ((timer1_mode & 0x40) == CLEM_VIA_6522_TIMER1_ONESHOT) {
+        via->timer1_status = kClemensVIA6522TimerStatus_Inactive;
+      } else if ((timer1_mode & 0x40) == CLEM_VIA_6522_TIMER1_FREERUN) {
+        via->timer1_status = kClemensVIA6522TimerStatus_Active;
+      }
+    } else {
+      via->timer1_status = kClemensVIA6522TimerStatus_Active;
+    }
+    via->timer1_wraparound = false;
   } else {
     --via->timer1[1];
     if (via->timer1[1] == 0xffff) {
-      // Here is the counter reload from latch per wraparound
-      via->timer1[1] = via->timer1[0];
-    }
-  }
-  if (via->timer1[1] == 0) {
-    if (via->timer1_status == kClemensVIA6522TimerStatus_Active) {
-      via->ifr |= CLEM_VIA_6522_IER_TIMER1;
-      if ((timer1_mode & 0x40) == CLEM_VIA_6522_TIMER1_ONESHOT) {
-        via->timer1_status = kClemensVIA6522TimerStatus_Inactive;
+      via->timer1_wraparound = true;
+      if (via->timer1_status == kClemensVIA6522TimerStatus_Active) {
+        via->ifr |= CLEM_VIA_6522_IER_TIMER1;
       }
+      via->timer1_status = kClemensVIA6522TimerStatus_LoadCounter;
     }
   }
 
   // PB6 pulse updated counter not supported (timer 2 pulse mode)
+  // The T2 one-shot continues decrementing (no latch reload) once fired
   if (via->timer2_status == kClemensVIA6522TimerStatus_LoadCounter) {
     via->timer2[1] = via->timer2[0];
     via->timer2_status = kClemensVIA6522TimerStatus_Active;
   } else {
-    if ((timer2_mode & 0x20) == CLEM_VIA_6522_TIMER2_ONESHOT) {
-      --via->timer2[1];
-    }
-  }
-  if (via->timer2[1] == 0) {
-    if (via->timer2_status == kClemensVIA6522TimerStatus_Active) {
-      via->ifr |= CLEM_VIA_6522_IER_TIMER2;
+    --via->timer2[1];
+    if (via->timer2[1] == 0xffff) {
+      if (via->timer2_status == kClemensVIA6522TimerStatus_Active) {
+        via->ifr |= CLEM_VIA_6522_IER_TIMER2;
+      }
       if ((timer2_mode & 0x20) == CLEM_VIA_6522_TIMER2_ONESHOT) {
-        via->timer1_status = kClemensVIA6522TimerStatus_Inactive;
+        via->timer2_status = kClemensVIA6522TimerStatus_Inactive;
+      } else if ((timer2_mode & 0x20) == CLEM_VIA_6522_TIMER2_PB6) {
+        CLEM_ASSERT(false);
+        via->timer2_status = kClemensVIA6522TimerStatus_Active;
       }
     }
   }
@@ -506,7 +514,9 @@ static void io_read(struct ClemensClock *clock, uint8_t *data, uint8_t addr,
     break;
   case CLEM_VIA_6522_REG_TIMER1CL:
     *data = (uint8_t)(via->timer1[1] & 0x00ff);
-    via->ifr &= ~CLEM_VIA_6522_IER_TIMER1; // clear timer 1 interrupt
+    if (!(flags & CLEM_OP_IO_NO_OP)) {
+      via->ifr &= ~CLEM_VIA_6522_IER_TIMER1; // clear timer 1 interrupt
+    }
     break;
   case CLEM_VIA_6522_REG_TIMER1LH:
     *data = (uint8_t)((via->timer1[0] & 0xff00) >> 8);
@@ -516,7 +526,9 @@ static void io_read(struct ClemensClock *clock, uint8_t *data, uint8_t addr,
     break;
   case CLEM_VIA_6522_REG_TIMER2CL:
     *data = (uint8_t)(via->timer2[1] & 0x00ff);
-    via->ifr &= ~CLEM_VIA_6522_IER_TIMER2;
+    if (!(flags & CLEM_OP_IO_NO_OP)) {
+      via->ifr &= ~CLEM_VIA_6522_IER_TIMER2;
+    }
     break;
   case CLEM_VIA_6522_REG_TIMER2CH:
     *data = (uint8_t)((via->timer2[1] & 0xff00) >> 8);
@@ -528,7 +540,7 @@ static void io_read(struct ClemensClock *clock, uint8_t *data, uint8_t addr,
     break;
   case CLEM_VIA_6522_REG_PCR:
     if (!(flags & CLEM_OP_IO_NO_OP)) {
-      CLEM_UNIMPLEMENTED("6522 VIA PCR read (%x)", addr);
+      CLEM_WARN("6522 VIA PCR read (%x)", addr);
     }
     break;
   case CLEM_VIA_6522_REG_ACR:
@@ -574,11 +586,16 @@ static void io_write(struct ClemensClock *clock, uint8_t data, uint8_t addr,
     break;
   case CLEM_VIA_6522_REG_TIMER1LH:
     via->timer1[0] = (via->timer1[0] & 0x00ff) | ((uint16_t)(data) << 8);
+    /* The 6522 datasheets conflict on this - the commodore 6522 datasheet
+       (2-54) and mb-audit state the timer interrupt flag is cleared on writes
+       to the high order latch - but the rockwell datasheet omits this fact. */
+    via->ifr &= ~CLEM_VIA_6522_IER_TIMER1;
     break;
   case CLEM_VIA_6522_REG_TIMER1CH:
     via->timer1[0] = (via->timer1[0] & 0x00ff) | ((uint16_t)(data) << 8);
-    via->ifr &= ~CLEM_VIA_6522_IER_TIMER1; // clear interrupt on write
+    via->ifr &= ~CLEM_VIA_6522_IER_TIMER1;
     via->timer1_status = kClemensVIA6522TimerStatus_LoadCounter;
+    via->timer1_wraparound = false;
     break;
   case CLEM_VIA_6522_REG_TIMER2CL:
     via->timer2[0] = (via->timer2[0] & 0xff00) | data;

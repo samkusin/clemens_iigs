@@ -68,6 +68,13 @@ static const char *s_drive_names[] = {
  *  - interrupts are checked per time-slice,
  *      - if triggered, set the CPU state accordingly
  *      - ???
+ *
+ * References
+ * ----------
+ * Numerous
+ * For the 65816, the WDC documentation and cycle counts from
+ *  http://www.brutaldeluxe.fr/documentation/cortland/v7%2065SC816%20opcodes%20Cycle%20by%20cycle%20listing.pdf
+ *  which were instrumental to handling the various timing quirks
  */
 
 #define CLEM_I_PRINT_STATS(_clem_)                                             \
@@ -3056,7 +3063,8 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
   case CLEM_OPC_STA_DP_INDIRECT_IDY:
     _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0,
                                     false);
-    _clem_io_write_cycle(clem);
+
+    _clem_io_read_cycle(clem, tmp_addr, cpu->regs.Y, cpu->regs.DBR);
     _clem_write_indexed_816(clem, cpu->regs.A, tmp_addr, cpu->regs.Y,
                             cpu->regs.DBR, m_status, x_status);
     _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);

@@ -129,12 +129,16 @@ static inline void _clem_cycle(ClemensMachine *clem, uint32_t cycle_count) {
   clem->cpu.cycles_spent += cycle_count;
 }
 
-static inline void _clem_io_write_cycle(ClemensMachine *clem) {
+static inline void _clem_io_read_cycle(ClemensMachine *clem, uint16_t addr, uint16_t idx, uint8_t bank) {
   /* special rules for IO cycles called out here but decision to call
      determined by the caller (to minimize conditional logic)
      x = 0, crossing page boundaries on index, or write
   */
-  _clem_cycle(clem, 1);
+  uint8_t offset = (uint8_t)(addr & 0xff);
+  uint8_t tmp_data;
+  // read from DBR,AAH.AAL+YL per WDC 65816 spec
+  addr = (addr & 0xff00) | (uint8_t)(offset + (idx & 0xff));
+  clem_read(clem, &tmp_data, addr, bank, CLEM_MEM_FLAG_BUS_IO);
 }
 
 static inline void _clem_next_dbr(ClemensMachine *clem, uint8_t *next_dbr,

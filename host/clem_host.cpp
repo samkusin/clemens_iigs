@@ -169,6 +169,7 @@ void ClemensHost::emulatorLog(int log_level, ClemensMachine *machine,
   fputs(msg, stdout);
   fputc('\n', stdout);
   if (log_level == CLEM_DEBUG_LOG_UNIMPL) {
+    // TODO: display some informative message to the debugger
     host->emulationBreak();
   }
 }

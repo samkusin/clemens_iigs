@@ -14,6 +14,7 @@ typedef uint32_t clem_clocks_duration_t;
 #define CLEM_TIME_UNINITIALIZED ((clem_clocks_time_t)(-1))
 
 /* Attempt to mimic VDA and VPA per memory access */
+#define CLEM_MEM_FLAG_BUS_IO (0x4)
 #define CLEM_MEM_FLAG_OPCODE_FETCH (0x3)
 #define CLEM_MEM_FLAG_DATA (0x2)
 #define CLEM_MEM_FLAG_PROGRAM (0x1)
