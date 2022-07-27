@@ -17,7 +17,7 @@
       has been very helpful interpreting how the VIA communicates with the AY3
 */
 /* MB-AUDIT LOG
-  from $38AC onwards test failure 21:00:00
+   Retry reset test as the reset functionality may not be working
 */
 
 #define CLEM_VIA_6522_PORT_B 0x00
@@ -57,14 +57,14 @@
 #define CLEM_AY3_REG_C_TONE_PERIOD_COARSE 0x05
 #define CLEM_AY3_REG_NOISE_PERIOD 0x06
 #define CLEM_AY3_REG_ENABLE 0x07
-#define CLEM_AY3_REG_A_AMPLITUDE 0x0a
-#define CLEM_AY3_REG_B_AMPLITUDE 0x0b
-#define CLEM_AY3_REG_C_AMPLITUDE 0x0c
-#define CLEM_AY3_REG_ENVELOPE_COARSE 0x0d
-#define CLEM_AY3_REG_ENVELOPE_FINE 0x0e
-#define CLEM_AY3_REG_ENVELOPE_SHAPE 0x0f
-#define CLEM_AY3_REG_IO_A 0x10
-#define CLEM_AY3_REG_IO_B 0x11
+#define CLEM_AY3_REG_A_AMPLITUDE 0x08
+#define CLEM_AY3_REG_B_AMPLITUDE 0x09
+#define CLEM_AY3_REG_C_AMPLITUDE 0x0a
+#define CLEM_AY3_REG_ENVELOPE_COARSE 0x0b
+#define CLEM_AY3_REG_ENVELOPE_FINE 0x0c
+#define CLEM_AY3_REG_ENVELOPE_SHAPE 0x0d
+#define CLEM_AY3_REG_IO_A 0x0e
+#define CLEM_AY3_REG_IO_B 0x0f
 
 // TODO: other interrupts
 
@@ -130,17 +130,17 @@ static void _ay3_reset(struct ClemensAY38913 *psg,
 
 static uint8_t _ay3_get(struct ClemensAY38913 *psg) {
   switch (psg->reg_latch) {
-  case CLEM_AY3_REG_A_TONE_PERIOD_COARSE:
-    return (uint8_t)(psg->channel_tone_period[0] & 0xff);
   case CLEM_AY3_REG_A_TONE_PERIOD_FINE:
+    return psg->channel_tone_period[0] & 0xff;
+  case CLEM_AY3_REG_A_TONE_PERIOD_COARSE:
     return (psg->channel_tone_period[0] >> 8) & 0xff;
-  case CLEM_AY3_REG_B_TONE_PERIOD_COARSE:
-    return psg->channel_tone_period[1] & 0xff;
   case CLEM_AY3_REG_B_TONE_PERIOD_FINE:
+    return psg->channel_tone_period[1] & 0xff;
+  case CLEM_AY3_REG_B_TONE_PERIOD_COARSE:
     return (psg->channel_tone_period[1] >> 8) & 0xff;
-  case CLEM_AY3_REG_C_TONE_PERIOD_COARSE:
-    return psg->channel_tone_period[2] & 0xff;
   case CLEM_AY3_REG_C_TONE_PERIOD_FINE:
+    return psg->channel_tone_period[2] & 0xff;
+  case CLEM_AY3_REG_C_TONE_PERIOD_COARSE:
     return (psg->channel_tone_period[2] >> 8) & 0xff;
   case CLEM_AY3_REG_NOISE_PERIOD:
     return psg->noise_period;
@@ -152,9 +152,9 @@ static uint8_t _ay3_get(struct ClemensAY38913 *psg) {
     return psg->channel_amplitude[1];
   case CLEM_AY3_REG_C_AMPLITUDE:
     return psg->channel_amplitude[2];
-  case CLEM_AY3_REG_ENVELOPE_COARSE:
-    return (uint8_t)(psg->envelope_period & 0xff);
   case CLEM_AY3_REG_ENVELOPE_FINE:
+    return (uint8_t)(psg->envelope_period & 0xff);
+  case CLEM_AY3_REG_ENVELOPE_COARSE:
     return (uint8_t)(psg->envelope_period >> 8);
   case CLEM_AY3_REG_ENVELOPE_SHAPE:
     return psg->envelope_shape;
@@ -167,32 +167,31 @@ static uint8_t _ay3_get(struct ClemensAY38913 *psg) {
 static void _ay3_set(struct ClemensAY38913 *psg, uint8_t data) {
   switch (psg->reg_latch) {
   case CLEM_AY3_REG_A_TONE_PERIOD_COARSE:
-    psg->channel_tone_period[0] &= ~0xff00;
-    psg->channel_tone_period[0] |= data;
+    psg->channel_tone_period[0] &= 0x00ff;
+    psg->channel_tone_period[0] |= ((uint16_t) data << 8);
     break;
   case CLEM_AY3_REG_A_TONE_PERIOD_FINE:
-    psg->channel_tone_period[0] &= ~0x00ff;
-    psg->channel_tone_period[0] |= ((uint16_t)data << 8);
+    psg->channel_tone_period[0] &= 0xff00;
+    psg->channel_tone_period[0] |= data;
     break;
   case CLEM_AY3_REG_B_TONE_PERIOD_COARSE:
-    psg->channel_tone_period[1] &= ~0xff00;
-    psg->channel_tone_period[1] |= data;
+    psg->channel_tone_period[1] &= 0x00ff;
+    psg->channel_tone_period[1] |= ((uint16_t) data << 8);
     break;
   case CLEM_AY3_REG_B_TONE_PERIOD_FINE:
-    psg->channel_tone_period[1] &= ~0x00ff;
-    psg->channel_tone_period[1] |= ((uint16_t)data << 8);
+    psg->channel_tone_period[1] &= 0xff00;
+    psg->channel_tone_period[1] |= data;
     break;
   case CLEM_AY3_REG_C_TONE_PERIOD_COARSE:
-    psg->channel_tone_period[2] &= ~0xff00;
-    psg->channel_tone_period[2] |= data;
+    psg->channel_tone_period[2] &= 0x00ff;
+    psg->channel_tone_period[2] |= ((uint16_t) data << 8);
     break;
   case CLEM_AY3_REG_C_TONE_PERIOD_FINE:
-    psg->channel_tone_period[2] &= ~0x00ff;
-    psg->channel_tone_period[2] |= ((uint16_t)data << 8);
+    psg->channel_tone_period[2] &= 0xff00;
+    psg->channel_tone_period[2] |= data;
     break;
   case CLEM_AY3_REG_NOISE_PERIOD:
     psg->noise_period = data;
-    ;
     break;
   case CLEM_AY3_REG_ENABLE:
     psg->enable = data;
@@ -207,12 +206,12 @@ static void _ay3_set(struct ClemensAY38913 *psg, uint8_t data) {
     psg->channel_amplitude[2] = data;
     break;
   case CLEM_AY3_REG_ENVELOPE_COARSE:
-    psg->envelope_period &= ~0xff00;
-    psg->envelope_period |= data;
+    psg->envelope_period &= 0x00ff;
+    psg->envelope_period |= ((uint16_t)data << 8);
     break;
   case CLEM_AY3_REG_ENVELOPE_FINE:
-    psg->envelope_period &= ~0x00ff;
-    psg->envelope_period |= ((uint16_t)data << 8);
+    psg->envelope_period &= 0xff00;
+    psg->envelope_period |= data;
     break;
   case CLEM_AY3_REG_ENVELOPE_SHAPE:
     psg->envelope_shape = data;
