@@ -102,6 +102,7 @@ enum ClemensVIA6522TimerStatus {
  */
 
 struct ClemensAY38913 {
+  /* register reflection */
   uint16_t channel_tone_period[3];
   uint16_t envelope_period;
   uint8_t channel_amplitude[3];
@@ -109,12 +110,17 @@ struct ClemensAY38913 {
   uint8_t enable;
   uint8_t envelope_shape;
 
-  /* instruction queue */
+  /* rendering event queue built by application writes to the AY3 for this
+     window - consumed by clem_card_ay3_render(...).  times are offsets from
+     the render_slice_start_ts.
+
+     queue items are combination of register + value*/
   uint32_t queue[CLEM_AY3_QUEUE_SIZE];
-  clem_clocks_time_t queue_ts[CLEM_AY3_QUEUE_SIZE];
-  clem_clocks_duration_t ref_step;
+  clem_clocks_duration_t queue_time[CLEM_AY3_QUEUE_SIZE];
   uint32_t queue_tail;
 
+  /* reference time step per tick (set at mega2 reference step) */
+  clem_clocks_duration_t ref_step;
   /* bus counter to detect bdir changes */
   uint8_t bus_control;
   /* Current register ID latched for read/write */
@@ -126,6 +132,35 @@ static void _ay3_reset(struct ClemensAY38913 *psg,
   memset(psg, 0, sizeof(*psg));
   psg->bus_control = 0x00;
   psg->ref_step = ref_step;
+}
+
+unsigned _ay3_render(struct ClemensAY38913 *psg,
+                     clem_clocks_duration_t duration, unsigned channel,
+                     float *out, unsigned out_limit, unsigned samples_per_frame,
+                     unsigned samples_per_second) {
+
+  float render_window_secs =
+      clem_calc_ns_step_from_clocks(duration, CLEM_CLOCKS_MEGA2_CYCLE) * 1e-9f;
+  float sample_dt = 1.0f / samples_per_second;
+  unsigned sample_count = 0;
+
+  float render_t;
+  for (render_t = 0.0f;
+       render_t < render_window_secs && sample_count < out_limit;
+       render_t += sample_dt, out += samples_per_frame) {
+    float mag = out[channel];
+    mag += 0.0f;
+    if (mag > 1.0f)
+      mag = 1.0f;
+    else if (mag < -1.0f)
+      mag = -1.0f;
+    out[channel] = mag;
+    sample_count++;
+  }
+
+  //  TODO: consume events until end of time window
+  psg->queue_tail = 0;
+  return sample_count;
 }
 
 static uint8_t _ay3_get(struct ClemensAY38913 *psg) {
@@ -168,7 +203,7 @@ static void _ay3_set(struct ClemensAY38913 *psg, uint8_t data) {
   switch (psg->reg_latch) {
   case CLEM_AY3_REG_A_TONE_PERIOD_COARSE:
     psg->channel_tone_period[0] &= 0x00ff;
-    psg->channel_tone_period[0] |= ((uint16_t) data << 8);
+    psg->channel_tone_period[0] |= ((uint16_t)data << 8);
     break;
   case CLEM_AY3_REG_A_TONE_PERIOD_FINE:
     psg->channel_tone_period[0] &= 0xff00;
@@ -176,7 +211,7 @@ static void _ay3_set(struct ClemensAY38913 *psg, uint8_t data) {
     break;
   case CLEM_AY3_REG_B_TONE_PERIOD_COARSE:
     psg->channel_tone_period[1] &= 0x00ff;
-    psg->channel_tone_period[1] |= ((uint16_t) data << 8);
+    psg->channel_tone_period[1] |= ((uint16_t)data << 8);
     break;
   case CLEM_AY3_REG_B_TONE_PERIOD_FINE:
     psg->channel_tone_period[1] &= 0xff00;
@@ -184,7 +219,7 @@ static void _ay3_set(struct ClemensAY38913 *psg, uint8_t data) {
     break;
   case CLEM_AY3_REG_C_TONE_PERIOD_COARSE:
     psg->channel_tone_period[2] &= 0x00ff;
-    psg->channel_tone_period[2] |= ((uint16_t) data << 8);
+    psg->channel_tone_period[2] |= ((uint16_t)data << 8);
     break;
   case CLEM_AY3_REG_C_TONE_PERIOD_FINE:
     psg->channel_tone_period[2] &= 0xff00;
@@ -228,12 +263,13 @@ static void _ay3_set(struct ClemensAY38913 *psg, uint8_t data) {
     register values as well.
  */
 static void _ay3_update(struct ClemensAY38913 *psg, uint8_t *bus,
-                        uint8_t *bus_control, clem_clocks_duration_t dt_step) {
+                        uint8_t *bus_control,
+                        clem_clocks_duration_t render_slice_dt) {
   uint8_t bc1 = *bus_control & 0x1;
   uint8_t bdir = *bus_control & 0x2;
   uint8_t reset_b = *bus_control & 0x4;
-
-  if (*bus_control == psg->bus_control) {
+  uint32_t queue_event = 0;
+  if (*bus_control != psg->bus_control) {
     return;
   }
   if (!reset_b) {
@@ -241,8 +277,8 @@ static void _ay3_update(struct ClemensAY38913 *psg, uint8_t *bus,
     return;
   }
 
-  CLEM_LOG("AY3: reset_b=%c bdir=%c bc1=%c", reset_b ? '1' : '0',
-           bdir ? '1' : '0', bc1 ? '1' : '0');
+  // CLEM_LOG("AY3: reset_b=%c bdir=%c bc1=%c", reset_b ? '1' : '0',
+  //          bdir ? '1' : '0', bc1 ? '1' : '0');
 
   switch (*bus_control & 0x3) {
   case 0x3:
@@ -256,10 +292,21 @@ static void _ay3_update(struct ClemensAY38913 *psg, uint8_t *bus,
   case 0x2:
     /* WRITE TO PSG */
     _ay3_set(psg, *bus);
+    queue_event = 0x80000000 | ((uint16_t)psg->reg_latch << 8) | *bus;
     break;
   default:
     /* INACTIVE */
     break;
+  }
+
+  if (queue_event) {
+    if (psg->queue_tail < CLEM_AY3_QUEUE_SIZE) {
+      psg->queue[psg->queue_tail] = queue_event;
+      psg->queue_time[psg->queue_tail] = render_slice_dt;
+      psg->queue_tail++;
+    } else {
+      CLEM_WARN("ay3_update: lost synth event (%08x)", queue_event);
+    }
   }
 
   psg->bus_control = *bus_control;
@@ -345,6 +392,8 @@ typedef struct {
   struct ClemensAY38913 ay3[2];
   uint8_t via_ay3_bus[2];
   uint8_t via_ay3_bus_control[2];
+  /* timestamp within current render window */
+  clem_clocks_duration_t ay3_render_slice_duration;
   struct ClemensClock last_clocks;
 } ClemensMockingboardContext;
 
@@ -458,12 +507,15 @@ static uint32_t io_sync(struct ClemensClock *clock, void *context) {
     _clem_via_update_state(&board->via[0], &board->via_ay3_bus[0],
                            &board->via_ay3_bus_control[0]);
     _ay3_update(&board->ay3[0], &board->via_ay3_bus[0],
-                &board->via_ay3_bus_control[0], clock->ref_step);
+                &board->via_ay3_bus_control[0],
+                board->ay3_render_slice_duration);
     _clem_via_update_state(&board->via[1], &board->via_ay3_bus[1],
                            &board->via_ay3_bus_control[1]);
     _ay3_update(&board->ay3[1], &board->via_ay3_bus[1],
-                &board->via_ay3_bus_control[1], clock->ref_step);
+                &board->via_ay3_bus_control[1],
+                board->ay3_render_slice_duration);
     dt_spent += clock->ref_step;
+    board->ay3_render_slice_duration += clock->ref_step;
   }
 
   memcpy(&board->last_clocks, clock, sizeof(board->last_clocks));
@@ -640,4 +692,29 @@ void clem_card_mockingboard_initialize(ClemensCard *card) {
 
 void clem_card_mockingboard_uninitialize(ClemensCard *card) {
   memset(card, 0, sizeof(ClemensCard));
+}
+
+unsigned clem_card_ay3_render(ClemensCard *card, float *samples_out,
+                              unsigned sample_limit, unsigned samples_per_frame,
+                              unsigned samples_per_second) {
+  ClemensMockingboardContext *context =
+      (ClemensMockingboardContext *)card->context;
+  unsigned lcount = _ay3_render(
+      &context->ay3[0], context->ay3_render_slice_duration, 0, samples_out,
+      sample_limit, samples_per_frame, samples_per_second);
+  unsigned rcount = _ay3_render(
+      &context->ay3[1], context->ay3_render_slice_duration, 1, samples_out,
+      sample_limit, samples_per_frame, samples_per_second);
+  if (lcount < rcount) {
+    for (; lcount < rcount; ++lcount) {
+      samples_out[lcount << 1] = 0.0f;
+    }
+
+  } else {
+    for (; rcount < lcount; ++rcount) {
+      samples_out[(rcount << 1) + 1] = 0.0f;
+    }
+  }
+  context->ay3_render_slice_duration = 0;
+  return rcount;
 }

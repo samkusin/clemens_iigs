@@ -1,5 +1,5 @@
 #include "clem_audio.hpp"
-
+#include "iocards/mockingboard.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
@@ -11,16 +11,12 @@ static void freeLocal(void *user_ctx, void *data) { free(data); }
 //  TODO: optimize when needed per platform
 
 static void _op_pcm_unsigned_to_float(float *vo, uint16_t v0) {
-    *vo = v0 / 32767.0f - 1.0f;
+  *vo = v0 / 32767.0f - 1.0f;
 }
 
-
-ClemensAudioDevice::ClemensAudioDevice() :
-  queuedFrameBuffer_(nullptr),
-  queuedFrameHead_(0),
-  queuedFrameTail_(0),
-  queuedFrameLimit_(0),
-  queuedFrameStride_(0) {
+ClemensAudioDevice::ClemensAudioDevice()
+    : queuedFrameBuffer_(nullptr), queuedFrameHead_(0), queuedFrameTail_(0),
+      queuedFrameLimit_(0), queuedFrameStride_(0) {
 
   CKAudioAllocator allocator;
   allocator.allocate = &allocateLocal;
@@ -29,9 +25,7 @@ ClemensAudioDevice::ClemensAudioDevice() :
   ckaudio_init(&allocator);
 }
 
-ClemensAudioDevice::~ClemensAudioDevice() {
-  ckaudio_term();
-}
+ClemensAudioDevice::~ClemensAudioDevice() { ckaudio_term(); }
 
 void ClemensAudioDevice::start() {
   ckaudio_timepoint_make_null(&lastTimepoint_);
@@ -57,16 +51,21 @@ void ClemensAudioDevice::stop() {
   queuedFrameBuffer_ = nullptr;
 }
 
-unsigned ClemensAudioDevice::getAudioFrequency() const { return dataFormat_.frequency; }
-unsigned ClemensAudioDevice::getBufferStride() const { return queuedFrameStride_; }
+unsigned ClemensAudioDevice::getAudioFrequency() const {
+  return dataFormat_.frequency;
+}
+unsigned ClemensAudioDevice::getBufferStride() const {
+  return queuedFrameStride_;
+}
 
 unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float deltaTime) {
-  if (!audio.frame_count) return 0;
+  if (!audio.frame_count)
+    return 0;
 
   //  the audio data layout of our queue must be the same as the data coming
   //  in from the emulated device.  conversion between formats occurs during
   //  the actual mix.
-  assert( audio.frame_stride == queuedFrameStride_);
+  assert(audio.frame_stride == queuedFrameStride_);
 
   //  update will mutex mixAudio, which is necessary when running the mixer
   //  callbacks in the core audio thread.
@@ -74,7 +73,8 @@ unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float deltaTime) {
 
   //  the input comes from a ring buffer
   uint32_t audioInHead = audio.frame_start;
-  uint32_t audioInTail = (audio.frame_start + audio.frame_count) % audio.frame_total;
+  uint32_t audioInTail =
+      (audio.frame_start + audio.frame_count) % audio.frame_total;
   uint32_t audioInEnd = audio.frame_total;
   uint32_t audioInAvailable = audio.frame_count;
   uint32_t audioOutAvailable = queuedFrameLimit_ - queuedFrameTail_;
@@ -94,7 +94,7 @@ unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float deltaTime) {
     queuedFrameHead_ = 0;
     audioOutAvailable = queuedFrameTail_ - queuedFrameLimit_;
   }
-  if (audioInAvailable > audioOutAvailable)  {
+  if (audioInAvailable > audioOutAvailable) {
     //  copy only the amount we can to the output - so we don't have to
     //  bounds check against our queued output buffer when copying data.
     audioInAvailable = audioOutAvailable;
@@ -102,8 +102,9 @@ unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float deltaTime) {
 
   //  copy occurs from at most two windows in the input (re: ring buffer), to
   //  the single output window.
-  uint8_t* audioOut = queuedFrameBuffer_ + queuedFrameTail_ * queuedFrameStride_;
-  uint8_t* audioIn = audio.data + audioInHead * audio.frame_stride;
+  uint8_t *audioOut =
+      queuedFrameBuffer_ + queuedFrameTail_ * queuedFrameStride_;
+  uint8_t *audioIn = audio.data + audioInHead * audio.frame_stride;
 
   uint32_t audioInCount;
   if (audioInHead + audioInAvailable > audioInEnd) {
@@ -124,17 +125,18 @@ unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float deltaTime) {
   audioInUsed += audioInCount;
   assert(audioInAvailable == 0);
 
-  //printf("{%u:%u  %u:%u} ", audio.frame_count, audioInUsed, queuedFrameHead_, queuedFrameTail_);
+  // printf("{%u:%u  %u:%u} ", audio.frame_count, audioInUsed, queuedFrameHead_,
+  // queuedFrameTail_);
 
   ckaudio_unlock();
 
   return audioInUsed;
 }
 
-
-uint32_t ClemensAudioDevice::mixClemensAudio(CKAudioBuffer *outBuffer, uint32_t outFramesAvailable) {
-  //  clemens generates an output mix == to the hardware mixer to avoid having to
-  //  upsample here.
+uint32_t ClemensAudioDevice::mixClemensAudio(CKAudioBuffer *outBuffer,
+                                             uint32_t outFramesAvailable) {
+  //  clemens generates an output mix == to the hardware mixer to avoid having
+  //  to upsample here.
   if (outBuffer->data_format.frequency != dataFormat_.frequency) {
     return 0;
   }
@@ -143,32 +145,36 @@ uint32_t ClemensAudioDevice::mixClemensAudio(CKAudioBuffer *outBuffer, uint32_t 
     return 0;
   }
   auto frameLimit = std::min(queuedAvailable, outFramesAvailable);
-  auto* outData = reinterpret_cast<uint8_t*>(outBuffer->data);
-  const auto* inData = queuedFrameBuffer_ + queuedFrameHead_ * queuedFrameStride_;
+  auto *outData = reinterpret_cast<uint8_t *>(outBuffer->data);
+  const auto *inData =
+      queuedFrameBuffer_ + queuedFrameHead_ * queuedFrameStride_;
   switch (outBuffer->data_format.buffer_format) {
-    case kCKAudioBufferFormatFloat:
-      for (uint32_t frameIndex = 0; frameIndex < frameLimit; ++frameIndex) {
-        auto* pcmFrame = reinterpret_cast<const uint16_t*>(inData);
-        auto* f32Frame = reinterpret_cast<float*>(outData);
-        _op_pcm_unsigned_to_float(&f32Frame[0], pcmFrame[0]);
-        _op_pcm_unsigned_to_float(&f32Frame[1], pcmFrame[1]);
-        inData += queuedFrameStride_;
-        outData += outBuffer->data_format.frame_size;
-      }
+  case kCKAudioBufferFormatFloat:
+    for (uint32_t frameIndex = 0; frameIndex < frameLimit; ++frameIndex) {
+      auto *pcmFrame = reinterpret_cast<const uint16_t *>(inData);
+      auto *f32Frame = reinterpret_cast<float *>(outData);
+      _op_pcm_unsigned_to_float(&f32Frame[0], pcmFrame[0]);
+      _op_pcm_unsigned_to_float(&f32Frame[1], pcmFrame[1]);
+      inData += queuedFrameStride_;
+      outData += outBuffer->data_format.frame_size;
+    }
     break;
-    default:
-      frameLimit = 0;
-      break;
+  default:
+    frameLimit = 0;
+    break;
   }
   queuedFrameHead_ += frameLimit;
   return frameLimit;
 }
 
-static uint32_t mixSilenceF32Stereo(CKAudioBuffer* buffer, uint32_t frameStart) {
+static uint32_t mixSilenceF32Stereo(CKAudioBuffer *buffer,
+                                    uint32_t frameStart) {
   uint32_t frameIndex;
-  uint8_t* output = (uint8_t*)buffer->data + buffer->data_format.frame_size * frameStart;
-  for (frameIndex = frameStart; frameIndex < buffer->frame_limit; ++frameIndex) {
-    float* f32out = (float *)output;
+  uint8_t *output =
+      (uint8_t *)buffer->data + buffer->data_format.frame_size * frameStart;
+  for (frameIndex = frameStart; frameIndex < buffer->frame_limit;
+       ++frameIndex) {
+    float *f32out = (float *)output;
     f32out[0] = 0.0f;
     f32out[1] = 0.0f;
     output += buffer->data_format.frame_size;
@@ -176,12 +182,17 @@ static uint32_t mixSilenceF32Stereo(CKAudioBuffer* buffer, uint32_t frameStart) 
   return frameIndex;
 }
 
-uint32_t ClemensAudioDevice::mixAudio(CKAudioBuffer *audioBuffer, CKAudioTimePoint *timepoint,
-                                      void *ctx) {
+uint32_t ClemensAudioDevice::mixAudio(CKAudioBuffer *audioBuffer,
+                                      CKAudioTimePoint *timepoint, void *ctx) {
   auto *audio = reinterpret_cast<ClemensAudioDevice *>(ctx);
   float dt_per_sample = 1.0f / audioBuffer->data_format.frequency;
 
-  uint32_t frameIndex = audio->mixClemensAudio(audioBuffer, audioBuffer->frame_limit);
+  uint32_t frameIndex =
+      audio->mixClemensAudio(audioBuffer, audioBuffer->frame_limit);
+  //  TODO: obtain mix from mockingboard ay3 into a 2 channel floating point PCM
+  //        buffer and then mix into the audioBuffer.
+  //        The floating point PCM buffer should be as big as frameIndex to keep
+  //        in sync with the clemens machine's audio output?
   /*
   switch (audioBuffer->data_format.buffer_format) {
     case kCKAudioBufferFormatFloat:

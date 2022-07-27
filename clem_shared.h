@@ -13,6 +13,19 @@ typedef uint32_t clem_clocks_duration_t;
 
 #define CLEM_TIME_UNINITIALIZED ((clem_clocks_time_t)(-1))
 
+/** A bit confusing... used for calculating our system clock.  These values
+ *  are relative to each other.
+ *
+ *  The clocks per mega2 cycle value will always be the largest.
+ *
+ *  If you divide the CLEM_CLOCKS_MEGA2_CYCLE by the CLEM_CLOCKS_FAST_CYCLE
+ *  the value will be the effective maximum clock speed in Mhz of the CPU.
+ */
+#define CLEM_CLOCKS_FAST_CYCLE 1023
+#define CLEM_CLOCKS_MEGA2_CYCLE 2864
+#define CLEM_MEGA2_CYCLE_NS 978
+#define CLEM_MEGA2_CYCLES_PER_SECOND 1023000
+
 /* Attempt to mimic VDA and VPA per memory access */
 #define CLEM_MEM_FLAG_BUS_IO (0x4)
 #define CLEM_MEM_FLAG_OPCODE_FETCH (0x3)
@@ -53,6 +66,28 @@ struct ClemensClock {
   clem_clocks_time_t ts;
   clem_clocks_duration_t ref_step;
 };
+
+extern inline double clem_calc_secs_from_clocks(struct ClemensClock *clock) {
+  return (CLEM_MEGA2_CYCLE_NS * (uint64_t)(clock->ts / clock->ref_step)) *
+         1.0e-9;
+}
+
+/* BEWARE - these macros act on sub second time intervals (per frame deltas.)
+   Do not use these utilities to calculate values over long time intervals
+*/
+extern inline uint32_t
+clem_calc_ns_step_from_clocks(clem_clocks_duration_t clocks_step,
+                              clem_clocks_duration_t clocks_step_reference) {
+  return (uint32_t)(CLEM_MEGA2_CYCLE_NS * (uint64_t)clocks_step /
+                    clocks_step_reference);
+}
+
+extern inline clem_clocks_duration_t
+clem_calc_clocks_step_from_ns(unsigned ns,
+                              clem_clocks_duration_t clocks_step_reference) {
+  return (clem_clocks_duration_t)(ns * clocks_step_reference) /
+         (CLEM_MEGA2_CYCLE_NS);
+}
 
 typedef struct {
   void *context;

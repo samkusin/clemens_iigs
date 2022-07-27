@@ -7,22 +7,9 @@
 #define CLEM_EMULATOR_ID 0xce
 #define CLEM_EMULATOR_VER 0x01
 
-/** A bit confusing... used for calculating our system clock.  These values
- *  are relative to each other.
- *
- *  The clocks per mega2 cycle value will always be the largest.
- *
- *  If you divide the CLEM_CLOCKS_MEGA2_CYCLE by the CLEM_CLOCKS_FAST_CYCLE
- *  the value will be the effective maximum clock speed in Mhz of the CPU.
- */
-#define CLEM_CLOCKS_FAST_CYCLE 1023
-#define CLEM_CLOCKS_MEGA2_CYCLE 2864
-
-#define CLEM_MEGA2_CYCLES_PER_SECOND 1023000
 #define CLEM_MEGA2_CYCLES_PER_60TH (CLEM_MEGA2_CYCLES_PER_SECOND / 60)
 #define CLEM_MEGA2_TIMER_1SEC_US 1000000
 #define CLEM_MEGA2_TIMER_QSEC_US 266667
-#define CLEM_MEGA2_CYCLE_NS 978
 
 #define CLEM_1SEC_NS 1000000000
 #define CLEM_1MS_NS 1000000

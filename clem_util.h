@@ -56,24 +56,6 @@ static inline uint8_t *_clem_get_memory_bank(ClemensMachine *clem, uint8_t bank,
   return clem->fpi_bank_map[bank];
 }
 
-static inline uint32_t
-_clem_calc_ns_step_from_clocks(clem_clocks_duration_t clocks_step,
-                               clem_clocks_duration_t clocks_step_reference) {
-  return (uint32_t)(CLEM_MEGA2_CYCLE_NS * (uint64_t)clocks_step /
-                    clocks_step_reference);
-}
-
-static inline double _clem_calc_secs_from_clocks(struct ClemensClock *clock) {
-  return (CLEM_MEGA2_CYCLE_NS * (clock->ts / clock->ref_step)) * 1.0e-9;
-}
-
-static inline clem_clocks_duration_t
-_clem_calc_clocks_step_from_ns(unsigned ns,
-                               clem_clocks_duration_t clocks_step_reference) {
-  return (clem_clocks_duration_t)(ns * clocks_step_reference) /
-         (CLEM_MEGA2_CYCLE_NS);
-}
-
 static inline uint32_t _clem_calc_cycles_diff(uint32_t cycles_a,
                                               uint32_t cycles_b) {
   uint32_t diff = cycles_b - cycles_a;

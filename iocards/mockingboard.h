@@ -21,6 +21,9 @@ extern "C" {
 
 void clem_card_mockingboard_initialize(ClemensCard *card);
 void clem_card_mockingboard_uninitialize(ClemensCard *card);
+unsigned clem_card_ay3_render(ClemensCard *card, float *samples_out,
+                              unsigned sample_limit, unsigned samples_per_frame,
+                              unsigned samples_per_second);
 
 #ifdef __cplusplus
 }
