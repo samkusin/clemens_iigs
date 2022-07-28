@@ -52,7 +52,7 @@ void clem_sound_reset(struct ClemensDeviceAudio *glu) {
   glu->a2_speaker_tense = false;
   glu->a2_speaker_frame_count = -1;
   glu->a2_speaker_frame_threshold = glu->mix_buffer.frames_per_second / 20;
-  glu->a2_speaker_level = 0;
+  glu->a2_speaker_level = 0.0f;
 
   /* indicates IRQB line, so no interrupt */;
   glu->doc_reg[0xe0] = 0x80;
@@ -93,10 +93,10 @@ void clem_sound_consume_frames(struct ClemensDeviceAudio *glu,
   glu->mix_frame_index -= consumed;
 }
 
-void _clem_sound_do_tone(struct ClemensDeviceAudio *glu, uint16_t *samples) {
+void _clem_sound_do_tone(struct ClemensDeviceAudio *glu, float *samples) {
   float mag = sinf(glu->tone_theta);
-  samples[0] = (uint16_t)((mag + 1.0f) * 32767);
-  samples[1] = (uint16_t)((mag + 1.0f) * 32767);
+  samples[0] = mag;
+  samples[1] = mag;
   glu->tone_theta += glu->tone_frame_delta;
   if (glu->tone_theta >= CLEM_PI_2) {
     glu->tone_theta -= CLEM_PI_2;
@@ -107,6 +107,8 @@ void clem_sound_glu_sync(struct ClemensDeviceAudio *glu,
                          struct ClemensClock *clocks) {
   clem_clocks_duration_t dt_clocks = clocks->ts - glu->ts_last_frame;
 
+  glu->dt_mix_frame += dt_clocks;
+
   if (glu->dt_mix_sample > 0) {
     unsigned delta_frames = (glu->dt_mix_frame / glu->dt_mix_sample);
     if (delta_frames > 0) {
@@ -114,8 +116,8 @@ void clem_sound_glu_sync(struct ClemensDeviceAudio *glu,
       for (unsigned i = 0; i < delta_frames; ++i) {
         unsigned frame_index =
             (glu->mix_frame_index + i) % glu->mix_buffer.frame_count;
-        uint16_t *samples =
-            (uint16_t *)(&mix_out[frame_index * glu->mix_buffer.stride]);
+        float *samples =
+            (float *)(&mix_out[frame_index * glu->mix_buffer.stride]);
         /* test tone support */
         if (glu->tone_frame_delta > 0) {
           _clem_sound_do_tone(glu, samples);
@@ -125,35 +127,31 @@ void clem_sound_glu_sync(struct ClemensDeviceAudio *glu,
         }
         if (glu->a2_speaker_frame_count > glu->a2_speaker_frame_threshold) {
           glu->a2_speaker_frame_count = -1;
-          glu->a2_speaker_level = 0;
+          glu->a2_speaker_level = 0.0f;
         }
         if (glu->a2_speaker) {
           /* click! - two speaker pulses = 1 complete wave */
           glu->a2_speaker_frame_count = 0;
           if (!glu->a2_speaker_tense) {
-            glu->a2_speaker_level = 24576;
+            glu->a2_speaker_level = 0.75f;
           } else {
-            glu->a2_speaker_level = -24576;
+            glu->a2_speaker_level = -0.75f;
           }
           glu->a2_speaker_tense = !glu->a2_speaker_tense;
           glu->a2_speaker = false;
         }
 
-        samples[0] = 32767 + (uint16_t)((int32_t)glu->a2_speaker_level *
-                                        glu->volume / 15);
-        samples[1] = 32767 + (uint16_t)((int32_t)glu->a2_speaker_level *
-                                        glu->volume / 15);
+        samples[0] = glu->a2_speaker_level * glu->volume / 15;
+        samples[1] = samples[0];
       }
       glu->mix_frame_index =
           (glu->mix_frame_index + delta_frames) % (glu->mix_buffer.frame_count);
       glu->dt_mix_frame = glu->dt_mix_frame % glu->dt_mix_sample;
-
 #if CLEM_AUDIO_DIAGNOSTICS
       glu->diag_delta_frames += delta_frames;
 #endif
     }
   }
-  glu->dt_mix_frame += dt_clocks;
 
 #if CLEM_AUDIO_DIAGNOSTICS
   glu->diag_dt_ns += clem_calc_ns_step_from_clocks(dt_clocks, clocks->ref_step);

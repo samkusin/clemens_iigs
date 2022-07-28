@@ -269,8 +269,15 @@ void ClemensHost::frame(int width, int height, float deltaTime) {
 
     ClemensAudio audio;
     if (emulationRan && clemens_get_audio(&audio, &machine_)) {
+      float *audio_frame_head = reinterpret_cast<float *>(
+          audio.data + audio.frame_start * audio.frame_stride);
+      clem_card_ay3_render(&mockingboard_, audio_frame_head, audio.frame_count,
+                           audio.frame_stride / sizeof(float),
+                           audio_->getAudioFrequency());
       unsigned consumedFrames = audio_->queue(audio, deltaTime);
-      clemens_audio_next_frame(&machine_, consumedFrames);
+      //  consume the entire buffer even if we haven't caught up - real time
+      //  audio.
+      clemens_audio_next_frame(&machine_, audio.frame_count);
       diagnostics_.audioFrames += consumedFrames;
     }
 
@@ -1674,7 +1681,7 @@ bool ClemensHost::createMachine(const char *filename, MachineType machineType) {
     ClemensAudioMixBuffer mix_buffer;
     mix_buffer.frames_per_second = audio_->getAudioFrequency();
     mix_buffer.stride =
-        audio_->getBufferStride(); //   2 channels, 16-bits per channel
+        audio_->getBufferStride(); //   2 channels, float per channel
     mix_buffer.frame_count = mix_buffer.frames_per_second / 4;
     mix_buffer.data =
         (uint8_t *)(slab_.allocate(mix_buffer.frame_count * mix_buffer.stride));

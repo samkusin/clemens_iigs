@@ -1,5 +1,4 @@
 #include "clem_audio.hpp"
-#include "iocards/mockingboard.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
@@ -9,10 +8,6 @@ static void *allocateLocal(void *user_ctx, size_t sz) { return malloc(sz); }
 static void freeLocal(void *user_ctx, void *data) { free(data); }
 
 //  TODO: optimize when needed per platform
-
-static void _op_pcm_unsigned_to_float(float *vo, uint16_t v0) {
-  *vo = v0 / 32767.0f - 1.0f;
-}
 
 ClemensAudioDevice::ClemensAudioDevice()
     : queuedFrameBuffer_(nullptr), queuedFrameHead_(0), queuedFrameTail_(0),
@@ -37,8 +32,8 @@ void ClemensAudioDevice::start() {
   //  THAT IS A TODO for the CKAudio System
   ckaudio_get_data_format(&dataFormat_);
 
-  //  data will always be 16-bit PCM stereo
-  queuedFrameStride_ = 4;
+  //  data is 2 channel 32-bit float
+  queuedFrameStride_ = 2 * sizeof(float);
   queuedFrameLimit_ = dataFormat_.frequency / 2;
   queuedFrameHead_ = 0;
   queuedFrameTail_ = 0;
@@ -151,10 +146,10 @@ uint32_t ClemensAudioDevice::mixClemensAudio(CKAudioBuffer *outBuffer,
   switch (outBuffer->data_format.buffer_format) {
   case kCKAudioBufferFormatFloat:
     for (uint32_t frameIndex = 0; frameIndex < frameLimit; ++frameIndex) {
-      auto *pcmFrame = reinterpret_cast<const uint16_t *>(inData);
+      auto *pcmFrame = reinterpret_cast<const float *>(inData);
       auto *f32Frame = reinterpret_cast<float *>(outData);
-      _op_pcm_unsigned_to_float(&f32Frame[0], pcmFrame[0]);
-      _op_pcm_unsigned_to_float(&f32Frame[1], pcmFrame[1]);
+      f32Frame[0] = pcmFrame[0];
+      f32Frame[1] = pcmFrame[1];
       inData += queuedFrameStride_;
       outData += outBuffer->data_format.frame_size;
     }
@@ -189,10 +184,6 @@ uint32_t ClemensAudioDevice::mixAudio(CKAudioBuffer *audioBuffer,
 
   uint32_t frameIndex =
       audio->mixClemensAudio(audioBuffer, audioBuffer->frame_limit);
-  //  TODO: obtain mix from mockingboard ay3 into a 2 channel floating point PCM
-  //        buffer and then mix into the audioBuffer.
-  //        The floating point PCM buffer should be as big as frameIndex to keep
-  //        in sync with the clemens machine's audio output?
   /*
   switch (audioBuffer->data_format.buffer_format) {
     case kCKAudioBufferFormatFloat:

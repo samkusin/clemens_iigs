@@ -231,7 +231,7 @@ struct ClemensSerializerRecord kAudio[] = {
                                  a2_speaker_frame_count),
     CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceAudio,
                                  a2_speaker_frame_threshold),
-    CLEM_SERIALIZER_RECORD_INT16(struct ClemensDeviceAudio, a2_speaker_level),
+    CLEM_SERIALIZER_RECORD_FLOAT(struct ClemensDeviceAudio, a2_speaker_level),
     CLEM_SERIALIZER_RECORD_CUSTOM(
         struct ClemensDeviceAudio, mix_buffer, struct ClemensAudioMixBuffer,
         CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER),
