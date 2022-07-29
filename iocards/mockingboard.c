@@ -125,7 +125,14 @@ struct ClemensAY38913 {
   uint8_t bus_control;
   /* Current register ID latched for read/write */
   uint8_t reg_latch;
+
+  /* mixer settings and state */
+
 };
+
+static void _ay3_mix_event(struct ClemensAY38913 *psg, uint32_t event) {
+
+}
 
 static void _ay3_reset(struct ClemensAY38913 *psg,
                        clem_clocks_duration_t ref_step) {
@@ -147,17 +154,26 @@ unsigned _ay3_render(struct ClemensAY38913 *psg,
     sample_dt * 1e9f, CLEM_CLOCKS_MEGA2_CYCLE);
   clem_clocks_duration_t render_ts = 0;
   float render_t;
+  uint32_t queue_index = 0;
 
   for (render_t = 0.0f;
        render_t < render_window_secs && sample_count < out_limit;
        render_t += sample_dt, out += samples_per_frame) {
-    float mag = out[channel];
-    mag += 0.0f;
-    if (mag > 1.0f)
-      mag = 1.0f;
-    else if (mag < -1.0f)
-      mag = -1.0f;
-    out[channel] = mag;
+    if (queue_index < psg->queue_tail) {
+      if (psg->queue_time[queue_index] <= render_ts) {
+        uint32_t queue_event = psg->queue[queue_index++];
+        _ay3_mix_event(psg, queue_event);
+      }
+    }
+    {
+      float mag = out[channel];
+      mag += 0.0f;
+      if (mag > 1.0f)
+        mag = 1.0f;
+      else if (mag < -1.0f)
+        mag = -1.0f;
+      out[channel] = mag;
+    }
     render_ts += render_dt;
     sample_count++;
   }
@@ -273,7 +289,7 @@ static void _ay3_update(struct ClemensAY38913 *psg, uint8_t *bus,
   uint8_t bdir = *bus_control & 0x2;
   uint8_t reset_b = *bus_control & 0x4;
   uint32_t queue_event = 0;
-  if (*bus_control != psg->bus_control) {
+  if (*bus_control == psg->bus_control) {
     return;
   }
   if (!reset_b) {
@@ -281,7 +297,7 @@ static void _ay3_update(struct ClemensAY38913 *psg, uint8_t *bus,
     return;
   }
 
-  // CLEM_LOG("AY3: reset_b=%c bdir=%c bc1=%c", reset_b ? '1' : '0',
+  //CLEM_LOG("AY3: reset_b=%c bdir=%c bc1=%c", reset_b ? '1' : '0',
   //          bdir ? '1' : '0', bc1 ? '1' : '0');
 
   switch (*bus_control & 0x3) {
