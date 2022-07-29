@@ -1,6 +1,7 @@
 #include "mockingboard.h"
 #include "clem_debug.h"
 
+#include <math.h>
 #include <stdbool.h>
 #include <string.h>
 
@@ -119,26 +120,75 @@ struct ClemensAY38913 {
   clem_clocks_duration_t queue_time[CLEM_AY3_QUEUE_SIZE];
   uint32_t queue_tail;
 
-  /* reference time step per tick (set at mega2 reference step) */
-  clem_clocks_duration_t ref_step;
+  /* reference time step per tick (set at mega2 reference step)  whicih should
+     translate to 1.023mhz */
+  float clock_freq_hz;
   /* bus counter to detect bdir changes */
   uint8_t bus_control;
   /* Current register ID latched for read/write */
   uint8_t reg_latch;
 
   /* mixer settings and state */
-
+  float mixer_tone_freq[3];
+  float mixer_tone_time[3];
 };
 
-static void _ay3_mix_event(struct ClemensAY38913 *psg, uint32_t event) {
+static void _ay3_tone_setup(struct ClemensAY38913 *psg, unsigned channel_id,
+                            uint8_t value, uint8_t byte_index) {
+  uint16_t current_period = (uint16_t)(floorf(
+      psg->clock_freq_hz / (16 * psg->mixer_tone_freq[channel_id])));
+  if (byte_index) {
+    current_period &= (0x00ff);
+    current_period |= ((uint16_t)(value) << 8);
+  } else {
+    current_period &= (0x0f00);
+    current_period |= value;
+  }
+  psg->mixer_tone_freq[channel_id] =
+      psg->clock_freq_hz / (16.0f * current_period);
+}
 
+static void _ay3_mix_event(struct ClemensAY38913 *psg, uint32_t event) {
+  uint8_t event_reg = (uint8_t)((event >> 8) & 0xff);
+  uint8_t event_value = (uint8_t)(event & 0xff);
+
+  switch (event_reg) {
+  case CLEM_AY3_REG_A_TONE_PERIOD_COARSE:
+    _ay3_tone_setup(psg, 0, event_reg, 1);
+    break;
+  case CLEM_AY3_REG_A_TONE_PERIOD_FINE:
+    _ay3_tone_setup(psg, 0, event_reg, 0);
+    break;
+  case CLEM_AY3_REG_B_TONE_PERIOD_COARSE:
+    _ay3_tone_setup(psg, 1, event_reg, 1);
+    break;
+  case CLEM_AY3_REG_B_TONE_PERIOD_FINE:
+    _ay3_tone_setup(psg, 1, event_reg, 0);
+    break;
+  case CLEM_AY3_REG_C_TONE_PERIOD_COARSE:
+    _ay3_tone_setup(psg, 2, event_reg, 1);
+    break;
+  case CLEM_AY3_REG_C_TONE_PERIOD_FINE:
+    _ay3_tone_setup(psg, 2, event_reg, 0);
+    break;
+  }
+}
+
+static uint32_t _ay3_queue_event(struct ClemensAY38913 *psg, uint8_t value) {
+  return (0x80000000 | ((uint16_t)psg->reg_latch << 8) | value);
 }
 
 static void _ay3_reset(struct ClemensAY38913 *psg,
                        clem_clocks_duration_t ref_step) {
+  float old_freq_hz = psg->clock_freq_hz;
   memset(psg, 0, sizeof(*psg));
   psg->bus_control = 0x00;
-  psg->ref_step = ref_step;
+  if (ref_step != 0) {
+    psg->clock_freq_hz = ((float)CLEM_CLOCKS_MEGA2_CYCLE / ref_step) *
+                         CLEM_MEGA2_CYCLES_PER_SECOND;
+  } else {
+    psg->clock_freq_hz = old_freq_hz;
+  }
 }
 
 unsigned _ay3_render(struct ClemensAY38913 *psg,
@@ -150,8 +200,8 @@ unsigned _ay3_render(struct ClemensAY38913 *psg,
       clem_calc_ns_step_from_clocks(duration, CLEM_CLOCKS_MEGA2_CYCLE) * 1e-9f;
   float sample_dt = 1.0f / samples_per_second;
   unsigned sample_count = 0;
-  clem_clocks_duration_t render_dt = clem_calc_clocks_step_from_ns(
-    sample_dt * 1e9f, CLEM_CLOCKS_MEGA2_CYCLE);
+  clem_clocks_duration_t render_dt =
+      clem_calc_clocks_step_from_ns(sample_dt * 1e9f, CLEM_CLOCKS_MEGA2_CYCLE);
   clem_clocks_duration_t render_ts = 0;
   float render_t;
   uint32_t queue_index = 0;
@@ -160,7 +210,8 @@ unsigned _ay3_render(struct ClemensAY38913 *psg,
        render_t < render_window_secs && sample_count < out_limit;
        render_t += sample_dt, out += samples_per_frame) {
     if (queue_index < psg->queue_tail) {
-      if (psg->queue_time[queue_index] <= render_ts) {
+      while (psg->queue_time[queue_index] <= render_ts &&
+             queue_index < psg->queue_tail) {
         uint32_t queue_event = psg->queue[queue_index++];
         _ay3_mix_event(psg, queue_event);
       }
@@ -293,12 +344,12 @@ static void _ay3_update(struct ClemensAY38913 *psg, uint8_t *bus,
     return;
   }
   if (!reset_b) {
-    _ay3_reset(psg, psg->ref_step);
+    _ay3_reset(psg, 0);
     return;
   }
 
-  //CLEM_LOG("AY3: reset_b=%c bdir=%c bc1=%c", reset_b ? '1' : '0',
-  //          bdir ? '1' : '0', bc1 ? '1' : '0');
+  // CLEM_LOG("AY3: reset_b=%c bdir=%c bc1=%c", reset_b ? '1' : '0',
+  //           bdir ? '1' : '0', bc1 ? '1' : '0');
 
   switch (*bus_control & 0x3) {
   case 0x3:
@@ -312,7 +363,7 @@ static void _ay3_update(struct ClemensAY38913 *psg, uint8_t *bus,
   case 0x2:
     /* WRITE TO PSG */
     _ay3_set(psg, *bus);
-    queue_event = 0x80000000 | ((uint16_t)psg->reg_latch << 8) | *bus;
+    queue_event = _ay3_queue_event(psg, *bus);
     break;
   default:
     /* INACTIVE */
