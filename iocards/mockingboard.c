@@ -143,8 +143,11 @@ unsigned _ay3_render(struct ClemensAY38913 *psg,
       clem_calc_ns_step_from_clocks(duration, CLEM_CLOCKS_MEGA2_CYCLE) * 1e-9f;
   float sample_dt = 1.0f / samples_per_second;
   unsigned sample_count = 0;
-
+  clem_clocks_duration_t render_dt = clem_calc_clocks_step_from_ns(
+    sample_dt * 1e9f, CLEM_CLOCKS_MEGA2_CYCLE);
+  clem_clocks_duration_t render_ts = 0;
   float render_t;
+
   for (render_t = 0.0f;
        render_t < render_window_secs && sample_count < out_limit;
        render_t += sample_dt, out += samples_per_frame) {
@@ -155,6 +158,7 @@ unsigned _ay3_render(struct ClemensAY38913 *psg,
     else if (mag < -1.0f)
       mag = -1.0f;
     out[channel] = mag;
+    render_ts += render_dt;
     sample_count++;
   }
 
@@ -393,6 +397,7 @@ typedef struct {
   uint8_t via_ay3_bus[2];
   uint8_t via_ay3_bus_control[2];
   /* timestamp within current render window */
+  clem_clocks_duration_t sync_time_budget;
   clem_clocks_duration_t ay3_render_slice_duration;
   struct ClemensClock last_clocks;
 } ClemensMockingboardContext;
@@ -496,14 +501,17 @@ static void io_reset(struct ClemensClock *clock, void *context) {
   board->via_ay3_bus[0] = 0x00;
   board->via_ay3_bus_control[0] = 0x00;
   board->via_ay3_bus_control[1] = 0x00;
+  board->ay3_render_slice_duration = 0;
+  board->sync_time_budget = 0;
 }
 
 static uint32_t io_sync(struct ClemensClock *clock, void *context) {
   ClemensMockingboardContext *board = (ClemensMockingboardContext *)context;
   clem_clocks_duration_t dt_clocks = clock->ts - s_context.last_clocks.ts;
-  clem_clocks_duration_t dt_spent = 0;
 
-  while (dt_spent < dt_clocks) {
+  board->sync_time_budget += dt_clocks;
+
+  while (board->sync_time_budget > clock->ref_step) {
     _clem_via_update_state(&board->via[0], &board->via_ay3_bus[0],
                            &board->via_ay3_bus_control[0]);
     _ay3_update(&board->ay3[0], &board->via_ay3_bus[0],
@@ -514,7 +522,7 @@ static uint32_t io_sync(struct ClemensClock *clock, void *context) {
     _ay3_update(&board->ay3[1], &board->via_ay3_bus[1],
                 &board->via_ay3_bus_control[1],
                 board->ay3_render_slice_duration);
-    dt_spent += clock->ref_step;
+    board->sync_time_budget -= clock->ref_step;
     board->ay3_render_slice_duration += clock->ref_step;
   }
 
