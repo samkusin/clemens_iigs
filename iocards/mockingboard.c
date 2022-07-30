@@ -1,6 +1,7 @@
 #include "mockingboard.h"
 #include "clem_debug.h"
 
+#include <float.h>
 #include <math.h>
 #include <stdbool.h>
 #include <string.h>
@@ -67,6 +68,9 @@
 #define CLEM_AY3_REG_IO_A 0x0e
 #define CLEM_AY3_REG_IO_B 0x0f
 
+#define CLEM_AY3_TONE_LEVEL_HIGH    0x80000000
+#define CLEM_AY3_TONE_LEVEL_ENABLED 0x40000000
+
 // TODO: other interrupts
 
 enum ClemensVIA6522TimerStatus {
@@ -129,54 +133,11 @@ struct ClemensAY38913 {
   uint8_t reg_latch;
 
   /* mixer settings and state */
-  float mixer_tone_freq[3];
+  float mixer_tone_period[3];
+  float mixer_tone_half_period[3];
   float mixer_tone_time[3];
+  uint32_t mixer_tone_level[3];
 };
-
-static void _ay3_tone_setup(struct ClemensAY38913 *psg, unsigned channel_id,
-                            uint8_t value, uint8_t byte_index) {
-  uint16_t current_period = (uint16_t)(floorf(
-      psg->clock_freq_hz / (16 * psg->mixer_tone_freq[channel_id])));
-  if (byte_index) {
-    current_period &= (0x00ff);
-    current_period |= ((uint16_t)(value) << 8);
-  } else {
-    current_period &= (0x0f00);
-    current_period |= value;
-  }
-  psg->mixer_tone_freq[channel_id] =
-      psg->clock_freq_hz / (16.0f * current_period);
-}
-
-static void _ay3_mix_event(struct ClemensAY38913 *psg, uint32_t event) {
-  uint8_t event_reg = (uint8_t)((event >> 8) & 0xff);
-  uint8_t event_value = (uint8_t)(event & 0xff);
-
-  switch (event_reg) {
-  case CLEM_AY3_REG_A_TONE_PERIOD_COARSE:
-    _ay3_tone_setup(psg, 0, event_reg, 1);
-    break;
-  case CLEM_AY3_REG_A_TONE_PERIOD_FINE:
-    _ay3_tone_setup(psg, 0, event_reg, 0);
-    break;
-  case CLEM_AY3_REG_B_TONE_PERIOD_COARSE:
-    _ay3_tone_setup(psg, 1, event_reg, 1);
-    break;
-  case CLEM_AY3_REG_B_TONE_PERIOD_FINE:
-    _ay3_tone_setup(psg, 1, event_reg, 0);
-    break;
-  case CLEM_AY3_REG_C_TONE_PERIOD_COARSE:
-    _ay3_tone_setup(psg, 2, event_reg, 1);
-    break;
-  case CLEM_AY3_REG_C_TONE_PERIOD_FINE:
-    _ay3_tone_setup(psg, 2, event_reg, 0);
-    break;
-  }
-}
-
-static uint32_t _ay3_queue_event(struct ClemensAY38913 *psg, uint8_t value) {
-  return (0x80000000 | ((uint16_t)psg->reg_latch << 8) | value);
-}
 
 static void _ay3_reset(struct ClemensAY38913 *psg,
                        clem_clocks_duration_t ref_step) {
@@ -190,6 +151,97 @@ static void _ay3_reset(struct ClemensAY38913 *psg,
     psg->clock_freq_hz = old_freq_hz;
   }
 }
+
+static void _ay3_tone_setup(struct ClemensAY38913 *psg, unsigned channel_id,
+                            uint8_t value, uint8_t byte_index) {
+  uint16_t current_period = (uint16_t)(floorf(
+      psg->clock_freq_hz * psg->mixer_tone_period[channel_id] / 16.0f));
+  if (byte_index) {
+    current_period &= (0x00ff);
+    current_period |= ((uint16_t)(value) << 8);
+  } else {
+    current_period &= (0x0f00);
+    current_period |= value;
+  }
+  psg->mixer_tone_period[channel_id] = (current_period * 16.0f) / psg->clock_freq_hz;
+  psg->mixer_tone_half_period[channel_id] = psg->mixer_tone_period[channel_id] * 0.5f;
+}
+
+static float _ay3_tone_render(struct ClemensAY38913 *psg, unsigned channel_id,
+                              float sample_dt) {
+  float dt_wave;
+  float mag;
+
+  if (psg->mixer_tone_half_period[channel_id] < FLT_EPSILON) {
+    return 0.0f;
+  }
+
+  dt_wave =  psg->mixer_tone_time[channel_id] + sample_dt;
+  if (dt_wave >= psg->mixer_tone_half_period[channel_id]) {
+    dt_wave -= psg->mixer_tone_half_period[channel_id];
+    psg->mixer_tone_level[channel_id] ^= CLEM_AY3_TONE_LEVEL_HIGH;
+  }
+  if (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_LEVEL_ENABLED) {
+    mag = (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_LEVEL_HIGH) ? 1.0f : -1.0f;
+  } else {
+    mag = 0.0f;
+  }
+  psg->mixer_tone_time[channel_id] = dt_wave;
+  return mag;
+}
+
+static void _ay3_tone_enable(struct ClemensAY38913* psg, uint8_t value) {
+  if (value & 0x01) {
+    psg->mixer_tone_level[0] &= ~CLEM_AY3_TONE_LEVEL_ENABLED;
+  } else {
+    psg->mixer_tone_level[0] |= CLEM_AY3_TONE_LEVEL_ENABLED;
+  }
+  if (value & 0x02) {
+    psg->mixer_tone_level[1] &= ~CLEM_AY3_TONE_LEVEL_ENABLED;
+  } else {
+    psg->mixer_tone_level[1] |= CLEM_AY3_TONE_LEVEL_ENABLED;
+  }
+  if (value & 0x04) {
+    psg->mixer_tone_level[2] &= ~CLEM_AY3_TONE_LEVEL_ENABLED;
+  } else {
+    psg->mixer_tone_level[2] |= CLEM_AY3_TONE_LEVEL_ENABLED;
+  }
+}
+
+static void _ay3_mix_event(struct ClemensAY38913 *psg, uint32_t event) {
+  uint8_t event_reg = (uint8_t)((event >> 8) & 0xff);
+  uint8_t event_value = (uint8_t)(event & 0xff);
+
+  switch (event_reg) {
+  case CLEM_AY3_REG_A_TONE_PERIOD_COARSE:
+    _ay3_tone_setup(psg, 0, event_value, 1);
+    break;
+  case CLEM_AY3_REG_A_TONE_PERIOD_FINE:
+    _ay3_tone_setup(psg, 0, event_value, 0);
+    break;
+  case CLEM_AY3_REG_B_TONE_PERIOD_COARSE:
+    _ay3_tone_setup(psg, 1, event_value, 1);
+    break;
+  case CLEM_AY3_REG_B_TONE_PERIOD_FINE:
+    _ay3_tone_setup(psg, 1, event_value, 0);
+    break;
+  case CLEM_AY3_REG_C_TONE_PERIOD_COARSE:
+    _ay3_tone_setup(psg, 2, event_value, 1);
+    break;
+  case CLEM_AY3_REG_C_TONE_PERIOD_FINE:
+    _ay3_tone_setup(psg, 2, event_value, 0);
+    break;
+  case CLEM_AY3_REG_ENABLE:
+    _ay3_tone_enable(psg, event_value);
+    break;
+
+  }
+}
+
+static uint32_t _ay3_queue_event(struct ClemensAY38913 *psg, uint8_t value) {
+  return (0x80000000 | ((uint16_t)psg->reg_latch << 8) | value);
+}
+
 
 unsigned _ay3_render(struct ClemensAY38913 *psg,
                      clem_clocks_duration_t duration, unsigned channel,
@@ -205,7 +257,12 @@ unsigned _ay3_render(struct ClemensAY38913 *psg,
   clem_clocks_duration_t render_ts = 0;
   float render_t;
   uint32_t queue_index = 0;
+  float half_tone_period[3], tone_period[3];
+  float sample[3];
+  float current;
 
+  //  TODO: we can just persist tone_period + half_tone_period  instead of
+  //        frequency and trim back and forth calculations in _ay3_tone_setup
   for (render_t = 0.0f;
        render_t < render_window_secs && sample_count < out_limit;
        render_t += sample_dt, out += samples_per_frame) {
@@ -216,17 +273,27 @@ unsigned _ay3_render(struct ClemensAY38913 *psg,
         _ay3_mix_event(psg, queue_event);
       }
     }
-    {
-      float mag = out[channel];
-      mag += 0.0f;
-      if (mag > 1.0f)
-        mag = 1.0f;
-      else if (mag < -1.0f)
-        mag = -1.0f;
-      out[channel] = mag;
-    }
+    sample[0] = _ay3_tone_render(psg, 0, sample_dt);
+    sample[1] = _ay3_tone_render(psg, 1, sample_dt);
+    sample[2] = _ay3_tone_render(psg, 2, sample_dt);
+    current = out[channel];
+    current += sample[0];
+    current += sample[1];
+    current += sample[2];
+    if (current > 1.0f)
+      current = 1.0f;
+    else if (current < -1.0f)
+      current = -1.0f;
+    out[channel] = current;
+
     render_ts += render_dt;
     sample_count++;
+  }
+
+  //  consume remaining events to prevent data loss if necessary
+  while (queue_index < psg->queue_tail) {
+    uint32_t queue_event = psg->queue[queue_index++];
+    _ay3_mix_event(psg, queue_event);
   }
 
   //  TODO: consume events until end of time window

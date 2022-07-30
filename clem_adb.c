@@ -2046,7 +2046,7 @@ uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
     /* clear strobe bit and return any-key status */
     if (!is_noop) {
       adb->io_key_last_ascii &= ~0x80;
-      // CLEM_LOG("c0%02x: %02X", ioreg, adb->io_key_last_ascii & 0x7f);
+    //  CLEM_LOG("c0%02x: %02X, %02X", ioreg, adb->is_asciikey_down, adb->io_key_last_ascii & 0x7f);
     }
     return (adb->is_asciikey_down ? 0x80 : 0x00) |
            (adb->io_key_last_ascii & 0x7f);
