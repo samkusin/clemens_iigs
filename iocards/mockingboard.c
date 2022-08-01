@@ -70,6 +70,37 @@
 
 #define CLEM_AY3_TONE_LEVEL_HIGH    0x80000000
 #define CLEM_AY3_TONE_LEVEL_ENABLED 0x40000000
+#define CLEM_AY3_TONE_NOISE_ENABLED 0x20000000
+
+#define CLEM_AY3_AMP_VARIABLE_MODE_FLAG     0x10
+#define CLEM_AY3_AMP_FIXED_LEVEL_MASK       0x0f
+#define CLEM_AY3_AMP_VARIABLE_MODE_FLAG     0x10
+#define CLEM_AY3_AMP_ENVELOPE_HOLD          0x01
+#define CLEM_AY3_AMP_ENVELOPE_ALTERNATE     0x02
+#define CLEM_AY3_AMP_ENVELOPE_ATTACK        0x04
+#define CLEM_AY3_AMP_ENVELOPE_CONTINUE      0x08
+
+//  TODO: evaluate from sources this is cribbed from KEGS
+static float s_ay3_8913_ampl_factor_westcott[16] = {
+	0.000f,	// level[0]
+	0.010f,	// level[1]
+	0.015f,	// level[2]
+	0.022f,	// level[3]
+	0.031f,	// level[4]
+	0.046f,	// level[5]
+	0.064f,	// level[6]
+	0.106f,	// level[7]
+	0.132f,	// level[8]
+	0.216f,	// level[9]
+	0.297f,	// level[10]
+	0.391f,	// level[11]
+	0.513f,	// level[12]
+	0.637f,	// level[13]
+	0.819f,	// level[14]
+	1.000f,	// level[15]
+};
+
+
 
 // TODO: other interrupts
 
@@ -133,10 +164,16 @@ struct ClemensAY38913 {
   uint8_t reg_latch;
 
   /* mixer settings and state */
-  float mixer_tone_period[3];
   float mixer_tone_half_period[3];
   float mixer_tone_time[3];
   uint32_t mixer_tone_level[3];
+  float mixer_noise_half_period;
+  float mixer_noise_time;
+  unsigned mixer_noise_level;
+  unsigned noise_seed;
+  uint8_t mixer_amp[3];
+  uint8_t mixer_envelope_control;
+  float mixer_envelope_period;
 };
 
 static void _ay3_reset(struct ClemensAY38913 *psg,
@@ -150,12 +187,16 @@ static void _ay3_reset(struct ClemensAY38913 *psg,
   } else {
     psg->clock_freq_hz = old_freq_hz;
   }
+  psg->noise_seed = 0xa0102035;
+  psg->mixer_amp[0] = 0x0f;
+  psg->mixer_amp[1] = 0x0f;
+  psg->mixer_amp[2] = 0x0f;
 }
 
 static void _ay3_tone_setup(struct ClemensAY38913 *psg, unsigned channel_id,
                             uint8_t value, uint8_t byte_index) {
   uint16_t current_period = (uint16_t)(floorf(
-      psg->clock_freq_hz * psg->mixer_tone_period[channel_id] / 16.0f));
+      psg->clock_freq_hz * psg->mixer_tone_half_period[channel_id] / 8.0f));
   if (byte_index) {
     current_period &= (0x00ff);
     current_period |= ((uint16_t)(value) << 8);
@@ -163,14 +204,45 @@ static void _ay3_tone_setup(struct ClemensAY38913 *psg, unsigned channel_id,
     current_period &= (0x0f00);
     current_period |= value;
   }
-  psg->mixer_tone_period[channel_id] = (current_period * 16.0f) / psg->clock_freq_hz;
-  psg->mixer_tone_half_period[channel_id] = psg->mixer_tone_period[channel_id] * 0.5f;
+  psg->mixer_tone_half_period[channel_id] = (current_period * 8.0f) / psg->clock_freq_hz;
+
+  if (psg->mixer_tone_half_period[channel_id] > psg->mixer_tone_time[channel_id])
+    psg->mixer_tone_time[channel_id] = psg->mixer_tone_half_period[channel_id];
+}
+
+static void _ay3_amp_setup(struct ClemensAY38913 *psg, unsigned channel_id,
+                            uint8_t value) {
+  psg->mixer_amp[channel_id] = value;
+}
+
+static void _ay3_noise_setup(struct ClemensAY38913 *psg, uint8_t value) {
+  psg->mixer_noise_half_period = (value * 8.0f) / psg->clock_freq_hz;
+
+  if (psg->mixer_noise_half_period > psg->mixer_noise_time)
+    psg->mixer_noise_time = psg->mixer_noise_half_period;
+}
+
+static unsigned _ay3_noise_gen(struct ClemensAY38913 *psg, float sample_dt) {
+  float dt_wave;
+
+  if (psg->mixer_noise_half_period < FLT_EPSILON) {
+    return 0;
+  }
+
+  dt_wave =  psg->mixer_noise_time + sample_dt;
+  if (dt_wave >= psg->mixer_noise_half_period) {
+    dt_wave -= psg->mixer_noise_half_period;
+    psg->mixer_noise_level = psg->noise_seed & 1;
+    psg->noise_seed = ((psg->noise_seed * 3) + 4) % 7;
+  }
+  psg->mixer_noise_time = dt_wave;
+  return psg->mixer_noise_level;
 }
 
 static float _ay3_tone_render(struct ClemensAY38913 *psg, unsigned channel_id,
-                              float sample_dt) {
+                              unsigned noise, float sample_dt) {
   float dt_wave;
-  float mag;
+  unsigned  level;
 
   if (psg->mixer_tone_half_period[channel_id] < FLT_EPSILON) {
     return 0.0f;
@@ -181,13 +253,28 @@ static float _ay3_tone_render(struct ClemensAY38913 *psg, unsigned channel_id,
     dt_wave -= psg->mixer_tone_half_period[channel_id];
     psg->mixer_tone_level[channel_id] ^= CLEM_AY3_TONE_LEVEL_HIGH;
   }
-  if (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_LEVEL_ENABLED) {
-    mag = (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_LEVEL_HIGH) ? 1.0f : -1.0f;
-  } else {
-    mag = 0.0f;
-  }
   psg->mixer_tone_time[channel_id] = dt_wave;
-  return mag;
+
+  if (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_LEVEL_ENABLED) {
+    level = (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_LEVEL_HIGH) ? 1 : 0;
+    level &= (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_NOISE_ENABLED) ? noise : 1;
+    return (float)((int)(level << 1) - 1);
+  } else {
+    return 0.0f;
+  }
+}
+
+static float _ay3_amp_modify(struct ClemensAY38913 *psg, unsigned channel_id,
+                             float sample_in, float sample_dt) {
+  float sample_out;
+  if (psg->mixer_amp[channel_id] & CLEM_AY3_AMP_VARIABLE_MODE_FLAG) {
+    sample_out = sample_in;
+  } else {
+    sample_out = sample_in *
+      s_ay3_8913_ampl_factor_westcott[psg->mixer_amp[channel_id] & CLEM_AY3_AMP_FIXED_LEVEL_MASK];
+  }
+
+  return sample_out;
 }
 
 static void _ay3_tone_enable(struct ClemensAY38913* psg, uint8_t value) {
@@ -205,6 +292,21 @@ static void _ay3_tone_enable(struct ClemensAY38913* psg, uint8_t value) {
     psg->mixer_tone_level[2] &= ~CLEM_AY3_TONE_LEVEL_ENABLED;
   } else {
     psg->mixer_tone_level[2] |= CLEM_AY3_TONE_LEVEL_ENABLED;
+  }
+  if (value & 0x08) {
+    psg->mixer_tone_level[0] &= ~CLEM_AY3_TONE_NOISE_ENABLED;
+  } else {
+    psg->mixer_tone_level[0] |= CLEM_AY3_TONE_NOISE_ENABLED;
+  }
+  if (value & 0x10) {
+    psg->mixer_tone_level[1] &= ~CLEM_AY3_TONE_NOISE_ENABLED;
+  } else {
+    psg->mixer_tone_level[1] |= CLEM_AY3_TONE_NOISE_ENABLED;
+  }
+  if (value & 0x20) {
+    psg->mixer_tone_level[2] &= ~CLEM_AY3_TONE_NOISE_ENABLED;
+  } else {
+    psg->mixer_tone_level[2] |= CLEM_AY3_TONE_NOISE_ENABLED;
   }
 }
 
@@ -234,7 +336,18 @@ static void _ay3_mix_event(struct ClemensAY38913 *psg, uint32_t event) {
   case CLEM_AY3_REG_ENABLE:
     _ay3_tone_enable(psg, event_value);
     break;
-
+  case CLEM_AY3_REG_NOISE_PERIOD:
+    _ay3_noise_setup(psg, event_value);
+    break;
+  case CLEM_AY3_REG_A_AMPLITUDE:
+    _ay3_amp_setup(psg, 0, event_value);
+    break;
+  case CLEM_AY3_REG_B_AMPLITUDE:
+    _ay3_amp_setup(psg, 1, event_value);
+    break;
+  case CLEM_AY3_REG_C_AMPLITUDE:
+    _ay3_amp_setup(psg, 2, event_value);
+    break;
   }
 }
 
@@ -260,6 +373,7 @@ unsigned _ay3_render(struct ClemensAY38913 *psg,
   float half_tone_period[3], tone_period[3];
   float sample[3];
   float current;
+  float noise;
 
   //  TODO: we can just persist tone_period + half_tone_period  instead of
   //        frequency and trim back and forth calculations in _ay3_tone_setup
@@ -273,9 +387,13 @@ unsigned _ay3_render(struct ClemensAY38913 *psg,
         _ay3_mix_event(psg, queue_event);
       }
     }
-    sample[0] = _ay3_tone_render(psg, 0, sample_dt);
-    sample[1] = _ay3_tone_render(psg, 1, sample_dt);
-    sample[2] = _ay3_tone_render(psg, 2, sample_dt);
+    noise = _ay3_noise_gen(psg, sample_dt);
+    sample[0] = _ay3_tone_render(psg, 0, noise, sample_dt);
+    sample[1] = _ay3_tone_render(psg, 1, noise, sample_dt);
+    sample[2] = _ay3_tone_render(psg, 2, noise, sample_dt);
+    sample[0] = _ay3_amp_modify(psg, 0, sample[0], sample_dt);
+    sample[1] = _ay3_amp_modify(psg, 0, sample[1], sample_dt);
+    sample[2] = _ay3_amp_modify(psg, 0, sample[2], sample_dt);
     current = out[channel];
     current += sample[0];
     current += sample[1];
@@ -415,7 +533,7 @@ static void _ay3_update(struct ClemensAY38913 *psg, uint8_t *bus,
     return;
   }
 
-  // CLEM_LOG("AY3: reset_b=%c bdir=%c bc1=%c", reset_b ? '1' : '0',
+  //CLEM_LOG("AY3: reset_b=%c bdir=%c bc1=%c", reset_b ? '1' : '0',
   //           bdir ? '1' : '0', bc1 ? '1' : '0');
 
   switch (*bus_control & 0x3) {
