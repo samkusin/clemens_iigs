@@ -173,6 +173,7 @@ struct ClemensAY38913 {
   unsigned noise_seed;
   uint8_t mixer_amp[3];
   uint8_t mixer_envelope_control;
+  float mixer_envelope_time;
   float mixer_envelope_period;
 };
 
@@ -206,7 +207,7 @@ static void _ay3_tone_setup(struct ClemensAY38913 *psg, unsigned channel_id,
   }
   psg->mixer_tone_half_period[channel_id] = (current_period * 8.0f) / psg->clock_freq_hz;
 
-  if (psg->mixer_tone_half_period[channel_id] > psg->mixer_tone_time[channel_id])
+  if (psg->mixer_tone_time[channel_id] > psg->mixer_tone_half_period[channel_id])
     psg->mixer_tone_time[channel_id] = psg->mixer_tone_half_period[channel_id];
 }
 
@@ -215,10 +216,32 @@ static void _ay3_amp_setup(struct ClemensAY38913 *psg, unsigned channel_id,
   psg->mixer_amp[channel_id] = value;
 }
 
+static void _ay3_envelope_setup(struct ClemensAY38913 *psg, uint8_t value,
+                                uint8_t byte_index) {
+  uint16_t current_period = (uint16_t)(floorf(
+      psg->clock_freq_hz * psg->mixer_envelope_period / 256.0f));
+  if (byte_index) {
+    current_period &= (0x00ff);
+    current_period |= ((uint16_t)(value) << 8);
+  } else {
+    current_period &= (0xff00);
+    current_period |= value;
+  }
+  psg->mixer_envelope_period = (current_period * 256.0f) / psg->clock_freq_hz;
+
+  // TODO: evaluate this... if period shrinks, do we want to clamp or wraparound?
+  if (psg->mixer_envelope_time > psg->mixer_envelope_period)
+    psg->mixer_envelope_time = psg->mixer_envelope_period;
+}
+
+static void _ay3_envelope_control(struct ClemensAY38913 *psg, uint8_t value) {
+  psg->mixer_envelope_control = value & 0xf;
+}
+
 static void _ay3_noise_setup(struct ClemensAY38913 *psg, uint8_t value) {
   psg->mixer_noise_half_period = (value * 8.0f) / psg->clock_freq_hz;
 
-  if (psg->mixer_noise_half_period > psg->mixer_noise_time)
+  if (psg->mixer_noise_time > psg->mixer_noise_half_period)
     psg->mixer_noise_time = psg->mixer_noise_half_period;
 }
 
@@ -264,11 +287,18 @@ static float _ay3_tone_render(struct ClemensAY38913 *psg, unsigned channel_id,
   }
 }
 
+static unsigned _ay3_envelope_gen(struct ClemensAY38913 *psg, float sample_dt) {
+  if (!((psg->mixer_amp[0] | psg->mixer_amp[1] | psg->mixer_amp[2]) &
+        CLEM_AY3_AMP_VARIABLE_MODE_FLAG)) {
+    return 0;
+  }
+}
+
 static float _ay3_amp_modify(struct ClemensAY38913 *psg, unsigned channel_id,
-                             float sample_in, float sample_dt) {
+                             float sample_in, unsigned envelope, float sample_dt) {
   float sample_out;
   if (psg->mixer_amp[channel_id] & CLEM_AY3_AMP_VARIABLE_MODE_FLAG) {
-    sample_out = sample_in;
+    sample_out = sample_in * s_ay3_8913_ampl_factor_westcott[envelope];
   } else {
     sample_out = sample_in *
       s_ay3_8913_ampl_factor_westcott[psg->mixer_amp[channel_id] & CLEM_AY3_AMP_FIXED_LEVEL_MASK];
@@ -348,6 +378,15 @@ static void _ay3_mix_event(struct ClemensAY38913 *psg, uint32_t event) {
   case CLEM_AY3_REG_C_AMPLITUDE:
     _ay3_amp_setup(psg, 2, event_value);
     break;
+  case CLEM_AY3_REG_ENVELOPE_COARSE:
+    _ay3_envelope_setup(psg, event_value, 1);
+    break;
+  case CLEM_AY3_REG_ENVELOPE_FINE:
+    _ay3_envelope_setup(psg, event_value, 0);
+    break;
+  case CLEM_AY3_REG_ENVELOPE_SHAPE:
+    _ay3_envelope_control(psg, event_value);
+    break;
   }
 }
 
@@ -374,6 +413,7 @@ unsigned _ay3_render(struct ClemensAY38913 *psg,
   float sample[3];
   float current;
   float noise;
+  unsigned envelope;
 
   //  TODO: we can just persist tone_period + half_tone_period  instead of
   //        frequency and trim back and forth calculations in _ay3_tone_setup
@@ -391,9 +431,10 @@ unsigned _ay3_render(struct ClemensAY38913 *psg,
     sample[0] = _ay3_tone_render(psg, 0, noise, sample_dt);
     sample[1] = _ay3_tone_render(psg, 1, noise, sample_dt);
     sample[2] = _ay3_tone_render(psg, 2, noise, sample_dt);
-    sample[0] = _ay3_amp_modify(psg, 0, sample[0], sample_dt);
-    sample[1] = _ay3_amp_modify(psg, 0, sample[1], sample_dt);
-    sample[2] = _ay3_amp_modify(psg, 0, sample[2], sample_dt);
+    envelope = _ay3_envelope_gen(psg, sample_dt);
+    sample[0] = _ay3_amp_modify(psg, 0, sample[0], envelope, sample_dt);
+    sample[1] = _ay3_amp_modify(psg, 0, sample[1], envelope, sample_dt);
+    sample[2] = _ay3_amp_modify(psg, 0, sample[2], envelope, sample_dt);
     current = out[channel];
     current += sample[0];
     current += sample[1];
