@@ -164,6 +164,7 @@ struct ClemensAY38913 {
   uint8_t reg_latch;
 
   /* mixer settings and state */
+  uint16_t mixer_tone_period_reg[3];
   float mixer_tone_half_period[3];
   float mixer_tone_time[3];
   uint32_t mixer_tone_level[3];
@@ -174,6 +175,7 @@ struct ClemensAY38913 {
   uint8_t mixer_amp[3];
   uint8_t mixer_envelope_control;
   float mixer_envelope_time;
+  uint16_t mixer_envelope_period_reg;
   float mixer_envelope_period;
 };
 
@@ -181,7 +183,6 @@ static void _ay3_reset(struct ClemensAY38913 *psg,
                        clem_clocks_duration_t ref_step) {
   float old_freq_hz = psg->clock_freq_hz;
   memset(psg, 0, sizeof(*psg));
-  psg->bus_control = 0x00;
   if (ref_step != 0) {
     psg->clock_freq_hz = ((float)CLEM_CLOCKS_MEGA2_CYCLE / ref_step) *
                          CLEM_MEGA2_CYCLES_PER_SECOND;
@@ -196,8 +197,7 @@ static void _ay3_reset(struct ClemensAY38913 *psg,
 
 static void _ay3_tone_setup(struct ClemensAY38913 *psg, unsigned channel_id,
                             uint8_t value, uint8_t byte_index) {
-  uint16_t current_period = (uint16_t)(floorf(
-      psg->clock_freq_hz * psg->mixer_tone_half_period[channel_id] / 8.0f));
+  uint16_t current_period = psg->mixer_tone_period_reg[channel_id];
   if (byte_index) {
     current_period &= (0x00ff);
     current_period |= ((uint16_t)(value) << 8);
@@ -205,6 +205,7 @@ static void _ay3_tone_setup(struct ClemensAY38913 *psg, unsigned channel_id,
     current_period &= (0x0f00);
     current_period |= value;
   }
+  psg->mixer_tone_period_reg[channel_id] = current_period;
   psg->mixer_tone_half_period[channel_id] = (current_period * 8.0f) / psg->clock_freq_hz;
 
   if (psg->mixer_tone_time[channel_id] > psg->mixer_tone_half_period[channel_id])
@@ -218,8 +219,8 @@ static void _ay3_amp_setup(struct ClemensAY38913 *psg, unsigned channel_id,
 
 static void _ay3_envelope_setup(struct ClemensAY38913 *psg, uint8_t value,
                                 uint8_t byte_index) {
-  uint16_t current_period = (uint16_t)(floorf(
-      psg->clock_freq_hz * psg->mixer_envelope_period / 256.0f));
+  uint16_t current_period = psg->mixer_envelope_period_reg;
+
   if (byte_index) {
     current_period &= (0x00ff);
     current_period |= ((uint16_t)(value) << 8);
@@ -227,6 +228,7 @@ static void _ay3_envelope_setup(struct ClemensAY38913 *psg, uint8_t value,
     current_period &= (0xff00);
     current_period |= value;
   }
+  psg->mixer_envelope_period_reg = current_period;
   psg->mixer_envelope_period = (current_period * 256.0f) / psg->clock_freq_hz;
 
   // TODO: evaluate this... if period shrinks, do we want to clamp or wraparound?
@@ -265,33 +267,102 @@ static unsigned _ay3_noise_gen(struct ClemensAY38913 *psg, float sample_dt) {
 static float _ay3_tone_render(struct ClemensAY38913 *psg, unsigned channel_id,
                               unsigned noise, float sample_dt) {
   float dt_wave;
-  unsigned  level;
+  float mag;
+  unsigned level;
 
   if (psg->mixer_tone_half_period[channel_id] < FLT_EPSILON) {
     return 0.0f;
   }
 
-  dt_wave =  psg->mixer_tone_time[channel_id] + sample_dt;
+  dt_wave =  psg->mixer_tone_time[channel_id];
+
+  if (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_LEVEL_ENABLED) {
+    level = (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_LEVEL_HIGH) ? 1 : 0;
+    level &= (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_NOISE_ENABLED) ? noise : 1;
+    mag = (float)((int)(level << 1) - 1);
+  } else {
+    mag = 0.0f;
+  }
+
+  dt_wave += sample_dt;
+
   if (dt_wave >= psg->mixer_tone_half_period[channel_id]) {
     dt_wave -= psg->mixer_tone_half_period[channel_id];
     psg->mixer_tone_level[channel_id] ^= CLEM_AY3_TONE_LEVEL_HIGH;
   }
   psg->mixer_tone_time[channel_id] = dt_wave;
-
-  if (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_LEVEL_ENABLED) {
-    level = (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_LEVEL_HIGH) ? 1 : 0;
-    level &= (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_NOISE_ENABLED) ? noise : 1;
-    return (float)((int)(level << 1) - 1);
-  } else {
-    return 0.0f;
-  }
+  return mag;
 }
 
 static unsigned _ay3_envelope_gen(struct ClemensAY38913 *psg, float sample_dt) {
+  unsigned level = 0;
+  float dt_envelope;
+  uint8_t cycle;
+
   if (!((psg->mixer_amp[0] | psg->mixer_amp[1] | psg->mixer_amp[2]) &
         CLEM_AY3_AMP_VARIABLE_MODE_FLAG)) {
-    return 0;
+    return level;
   }
+
+  cycle = psg->mixer_envelope_control >> 4;
+
+  dt_envelope = psg->mixer_envelope_time;
+
+  //  this is rather brute force - there's probably a better way to do this,
+  //  like evaluating each state and look at the cycle count within the if block
+  //  but get a reference working first.
+  if (cycle & 1) {
+    // alternate cycle
+    if (psg->mixer_envelope_control & CLEM_AY3_AMP_ENVELOPE_CONTINUE) {
+      if (psg->mixer_envelope_control & CLEM_AY3_AMP_ENVELOPE_HOLD) {
+        if (psg->mixer_envelope_control & CLEM_AY3_AMP_ENVELOPE_ATTACK) {
+          level = (psg->mixer_envelope_control & CLEM_AY3_AMP_ENVELOPE_ALTERNATE) ? 0 : 15;
+        } else {
+          level = (psg->mixer_envelope_control & CLEM_AY3_AMP_ENVELOPE_ALTERNATE) ? 15 : 0;
+        }
+      } else {
+        if (psg->mixer_envelope_control & CLEM_AY3_AMP_ENVELOPE_ATTACK) {
+          if (psg->mixer_envelope_control & CLEM_AY3_AMP_ENVELOPE_ALTERNATE) {
+            level = 15 - (unsigned)(dt_envelope * 16 / psg->mixer_envelope_period);
+          } else {
+            level = (unsigned)(dt_envelope * 16 / psg->mixer_envelope_period);
+          }
+        } else {
+          if (psg->mixer_envelope_control & CLEM_AY3_AMP_ENVELOPE_ALTERNATE) {
+            level = (unsigned)(dt_envelope * 16/ psg->mixer_envelope_period);
+          } else {
+            level = 15 - (unsigned)(dt_envelope * 16 / psg->mixer_envelope_period);
+          }
+        }
+      }
+    } else {
+      //  hold at level 0
+      level = 0;
+    }
+  } else {
+    //  hold doesn't matter here (see the state switch at end of period logic
+    //  above, where cycle will always be 1)
+    if (psg->mixer_envelope_control & CLEM_AY3_AMP_ENVELOPE_ATTACK) {
+      level = (unsigned)(dt_envelope * 16 / psg->mixer_envelope_period);
+    } else {
+      level = 15 - (unsigned)(dt_envelope * 16 / psg->mixer_envelope_period);
+    }
+  }
+
+  dt_envelope += sample_dt;
+  if (dt_envelope >= psg->mixer_envelope_period) {
+    // note the !CONTINUE conditional it's effectively a hold
+    if (!(psg->mixer_envelope_control & CLEM_AY3_AMP_ENVELOPE_CONTINUE)) {
+      psg->mixer_envelope_control = 0x10 | (psg->mixer_envelope_control & 0xf);
+    } else if ((psg->mixer_envelope_control & CLEM_AY3_AMP_ENVELOPE_HOLD)) {
+      psg->mixer_envelope_control = 0x10 | (psg->mixer_envelope_control & 0xf);
+    } else {
+      psg->mixer_envelope_control += 0x10;
+    }
+    dt_envelope -= psg->mixer_envelope_period;
+  }
+  psg->mixer_envelope_time  = dt_envelope;
+  return level;
 }
 
 static float _ay3_amp_modify(struct ClemensAY38913 *psg, unsigned channel_id,
@@ -409,7 +480,6 @@ unsigned _ay3_render(struct ClemensAY38913 *psg,
   clem_clocks_duration_t render_ts = 0;
   float render_t;
   uint32_t queue_index = 0;
-  float half_tone_period[3], tone_period[3];
   float sample[3];
   float current;
   float noise;
@@ -433,12 +503,12 @@ unsigned _ay3_render(struct ClemensAY38913 *psg,
     sample[2] = _ay3_tone_render(psg, 2, noise, sample_dt);
     envelope = _ay3_envelope_gen(psg, sample_dt);
     sample[0] = _ay3_amp_modify(psg, 0, sample[0], envelope, sample_dt);
-    sample[1] = _ay3_amp_modify(psg, 0, sample[1], envelope, sample_dt);
-    sample[2] = _ay3_amp_modify(psg, 0, sample[2], envelope, sample_dt);
+    sample[1] = _ay3_amp_modify(psg, 1, sample[1], envelope, sample_dt);
+    sample[2] = _ay3_amp_modify(psg, 2, sample[2], envelope, sample_dt);
     current = out[channel];
-    current += sample[0];
-    current += sample[1];
-    current += sample[2];
+    current += sample[0] * 0.75f;
+    current += sample[1] * 0.75f;
+    current += sample[2] * 0.75f;
     if (current > 1.0f)
       current = 1.0f;
     else if (current < -1.0f)
@@ -792,6 +862,7 @@ static void io_reset(struct ClemensClock *clock, void *context) {
   _ay3_reset(&board->ay3[1], clock->ref_step);
   memcpy(&board->last_clocks, clock, sizeof(board->last_clocks));
   board->via_ay3_bus[0] = 0x00;
+  board->via_ay3_bus[1] = 0x00;
   board->via_ay3_bus_control[0] = 0x00;
   board->via_ay3_bus_control[1] = 0x00;
   board->ay3_render_slice_duration = 0;
