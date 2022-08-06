@@ -11,6 +11,8 @@
 typedef uint64_t clem_clocks_time_t;
 typedef uint32_t clem_clocks_duration_t;
 
+typedef uint8_t*(*ClemensSerializerAllocateCb)(unsigned, void*);
+
 #define CLEM_TIME_UNINITIALIZED ((clem_clocks_time_t)(-1))
 
 /** A bit confusing... used for calculating our system clock.  These values
@@ -97,6 +99,7 @@ typedef struct {
   void (*io_write)(struct ClemensClock *clock, uint8_t data, uint8_t adr,
                    uint8_t flags, void *context);
   uint32_t (*io_sync)(struct ClemensClock *clock, void *context);
+
 } ClemensCard;
 
 #ifdef __cplusplus

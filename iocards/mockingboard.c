@@ -1,5 +1,6 @@
 #include "mockingboard.h"
 #include "clem_debug.h"
+#include "serializer.h"
 
 #include <float.h>
 #include <math.h>
@@ -49,7 +50,7 @@
 #define CLEM_VIA_6522_IER_TIMER1 0x40
 #define CLEM_VIA_6522_IER_TIMER2 0x20
 
-#define CLEM_AY3_QUEUE_SIZE 256
+#define CLEM_AY3_QUEUE_SIZE 32
 
 #define CLEM_AY3_REG_A_TONE_PERIOD_FINE 0x00
 #define CLEM_AY3_REG_A_TONE_PERIOD_COARSE 0x01
@@ -1054,6 +1055,62 @@ static void io_write(struct ClemensClock *clock, uint8_t data, uint8_t addr,
   }
 }
 
+struct ClemensSerializerRecord kAY3[] = {
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensAY38913, kClemensSerializerTypeUInt16, channel_tone_period, 3, 0),
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensAY38913, envelope_period),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensAY38913, kClemensSerializerTypeUInt8, channel_amplitude, 3, 0),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensAY38913, noise_period),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensAY38913, enable),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensAY38913, envelope_shape),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensAY38913, kClemensSerializerTypeUInt32, queue, CLEM_AY3_QUEUE_SIZE, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensAY38913, kClemensSerializerTypeDuration, queue_time, CLEM_AY3_QUEUE_SIZE, 0),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensAY38913, queue_tail),
+    CLEM_SERIALIZER_RECORD_FLOAT(struct ClemensAY38913, clock_freq_hz),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensAY38913, bus_control),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensAY38913, reg_latch),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensAY38913, kClemensSerializerTypeUInt16, mixer_tone_period_reg, 3, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensAY38913, kClemensSerializerTypeFloat, mixer_tone_half_period, 3, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensAY38913, kClemensSerializerTypeFloat, mixer_tone_time, 3, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensAY38913, kClemensSerializerTypeUInt32, mixer_tone_level, 3, 0),
+    CLEM_SERIALIZER_RECORD_FLOAT(struct ClemensAY38913, mixer_noise_half_period),
+    CLEM_SERIALIZER_RECORD_FLOAT(struct ClemensAY38913, mixer_noise_time),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensAY38913, mixer_noise_level),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensAY38913, noise_seed),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensAY38913, kClemensSerializerTypeUInt8, mixer_amp, 3, 0),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensAY38913, mixer_envelope_control),
+    CLEM_SERIALIZER_RECORD_FLOAT(struct ClemensAY38913, mixer_envelope_time),
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensAY38913, mixer_envelope_period_reg),
+    CLEM_SERIALIZER_RECORD_FLOAT(struct ClemensAY38913, mixer_envelope_period),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kVIA[] = {
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensVIA6522, kClemensSerializerTypeUInt8, data_dir, 2, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensVIA6522, kClemensSerializerTypeUInt8, data, 2, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensVIA6522, kClemensSerializerTypeUInt8, data_in, 2, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensVIA6522, kClemensSerializerTypeUInt16, timer1, 2, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensVIA6522, kClemensSerializerTypeUInt16, timer2, 2, 0),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensVIA6522, sr),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensVIA6522, ier),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensVIA6522, ifr),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensVIA6522, acr),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensVIA6522, pcr),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensVIA6522, timer1_status),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensVIA6522, timer2_status),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensVIA6522, timer1_wraparound),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kCard[] = {
+    CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(ClemensMockingboardContext, via, 2, struct ClemensVIA6522, kVIA),
+    CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(ClemensMockingboardContext, ay3, 2, struct ClemensAY38913, kAY3),
+    CLEM_SERIALIZER_RECORD_ARRAY(ClemensMockingboardContext, kClemensSerializerTypeUInt8, via_ay3_bus, 2, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(ClemensMockingboardContext, kClemensSerializerTypeUInt8, via_ay3_bus_control, 2, 0),
+    CLEM_SERIALIZER_RECORD_DURATION(ClemensMockingboardContext, sync_time_budget),
+    CLEM_SERIALIZER_RECORD_DURATION(ClemensMockingboardContext, ay3_render_slice_duration),
+    CLEM_SERIALIZER_RECORD_CLOCK_OBJECT(ClemensMockingboardContext, last_clocks),
+    CLEM_SERIALIZER_RECORD_EMPTY()};
+
 void clem_card_mockingboard_initialize(ClemensCard *card) {
   card->context = &s_context;
   card->io_reset = &io_reset;
@@ -1065,6 +1122,26 @@ void clem_card_mockingboard_initialize(ClemensCard *card) {
 void clem_card_mockingboard_uninitialize(ClemensCard *card) {
   memset(card, 0, sizeof(ClemensCard));
 }
+
+
+void clem_card_mockingboard_serialize(mpack_writer_t* writer, ClemensCard* card) {
+  struct ClemensSerializerRecord root;
+  memset(&root, 0, sizeof(root));
+  root.type = kClemensSerializerTypeRoot;
+  root.records = &kCard[0];
+  clemens_serialize_object(writer, (uintptr_t)card->context, &root);
+}
+
+void clem_card_mockingboard_unserialize(mpack_reader_t* reader, ClemensCard* card,
+                                        ClemensSerializerAllocateCb alloc_cb,
+                                        void* context) {
+  struct ClemensSerializerRecord root;
+  memset(&root, 0, sizeof(root));
+  root.type = kClemensSerializerTypeRoot;
+  root.records = &kCard[0];
+  clemens_unserialize_object(reader, (uintptr_t)card->context, &root, alloc_cb, context);
+}
+
 
 unsigned clem_card_ay3_render(ClemensCard *card, float *samples_out,
                               unsigned sample_limit, unsigned samples_per_frame,

@@ -3,6 +3,11 @@
 
 #include "clem_shared.h"
 
+typedef struct mpack_writer_t mpack_writer_t;
+typedef struct mpack_reader_t mpack_reader_t;
+
+
+
 /* these are here for references - the actual functions are determined
    by which bits in the address register are set on io_read and io_write
 */
@@ -21,6 +26,10 @@ extern "C" {
 
 void clem_card_mockingboard_initialize(ClemensCard *card);
 void clem_card_mockingboard_uninitialize(ClemensCard *card);
+void clem_card_mockingboard_serialize(mpack_writer_t* writer, ClemensCard* card);
+void clem_card_mockingboard_unserialize(mpack_reader_t* reader, ClemensCard* card,
+                                        ClemensSerializerAllocateCb alloc_cb,
+                                        void* context);
 unsigned clem_card_ay3_render(ClemensCard *card, float *samples_out,
                               unsigned sample_limit, unsigned samples_per_frame,
                               unsigned samples_per_second);

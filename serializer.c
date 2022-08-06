@@ -5,6 +5,7 @@
 /* Serializing the Machine */
 
 union ClemensSerializerVariant {
+  struct ClemensClock* clock_object;
   uint8_t *blob;
   uint64_t u64;
   clem_clocks_time_t clocks;
@@ -20,86 +21,6 @@ union ClemensSerializerVariant {
 
 #define CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER 0x00000001
 #define CLEM_SERIALIZER_CUSTOM_RECORD_NIBBLE_DISK 0x00000002
-
-#define CLEM_SERIALIZER_RECORD_COUNT(_records_)                                \
-  (sizeof(_records_) / sizeof(struct ClemensSerializerRecord))
-
-#define CLEM_SERIALIZER_RECORD(_struct_, _type_, _name_)                       \
-  {                                                                            \
-#_name_, _type_, kClemensSerializerTypeEmpty, offsetof(_struct_, _name_),  \
-        0, 0, NULL                                                             \
-  }
-
-#define CLEM_SERIALIZER_RECORD_PARAM(_struct_, _type_, _arr_type_, _name_,     \
-                                     _size_, _param_, _records_)               \
-  {                                                                            \
-#_name_, _type_, _arr_type_, offsetof(_struct_, _name_), _size_, _param_,  \
-        _records_                                                              \
-  }
-
-#define CLEM_SERIALIZER_RECORD_ARRAY(_struct_, _type_, _name_, _size_,         \
-                                     _param_)                                  \
-  CLEM_SERIALIZER_RECORD_PARAM(_struct_, kClemensSerializerTypeArray, _type_,  \
-                               _name_, _size_, _param_, NULL)
-
-#define CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(_struct_, _name_, _size_,         \
-                                             _object_type_, _records_)         \
-  CLEM_SERIALIZER_RECORD_PARAM(_struct_, kClemensSerializerTypeArray,          \
-                               kClemensSerializerTypeObject, _name_, _size_,   \
-                               sizeof(_object_type_), _records_)
-
-#define CLEM_SERIALIZER_RECORD_BOOL(_struct_, _name_)                          \
-  CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeBool, _name_)
-
-#define CLEM_SERIALIZER_RECORD_UINT8(_struct_, _name_)                         \
-  CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeUInt8, _name_)
-
-#define CLEM_SERIALIZER_RECORD_UINT16(_struct_, _name_)                        \
-  CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeUInt16, _name_)
-
-#define CLEM_SERIALIZER_RECORD_UINT32(_struct_, _name_)                        \
-  CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeUInt32, _name_)
-
-#define CLEM_SERIALIZER_RECORD_UINT64(_struct_, _name_)                        \
-  CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeUInt64, _name_)
-
-#define CLEM_SERIALIZER_RECORD_INT32(_struct_, _name_)                         \
-  CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeInt32, _name_)
-
-#define CLEM_SERIALIZER_RECORD_INT16(_struct_, _name_)                         \
-  CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeInt16, _name_)
-
-#define CLEM_SERIALIZER_RECORD_FLOAT(_struct_, _name_)                         \
-  CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeFloat, _name_)
-
-#define CLEM_SERIALIZER_RECORD_DURATION(_struct_, _name_)                      \
-  CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeDuration, _name_)
-
-#define CLEM_SERIALIZER_RECORD_CLOCKS(_struct_, _name_)                        \
-  CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeClocks, _name_)
-
-#define CLEM_SERIALIZER_RECORD_BLOB(_struct_, _name_, _size_)                  \
-  CLEM_SERIALIZER_RECORD_PARAM(_struct_, kClemensSerializerTypeBlob,           \
-                               kClemensSerializerTypeEmpty, _name_, _size_, 0, \
-                               NULL)
-
-#define CLEM_SERIALIZER_RECORD_OBJECT(_struct_, _name_, _object_type_,         \
-                                      _records_)                               \
-  CLEM_SERIALIZER_RECORD_PARAM(_struct_, kClemensSerializerTypeObject,         \
-                               kClemensSerializerTypeEmpty, _name_,            \
-                               sizeof(_object_type_), 0, _records_)
-
-#define CLEM_SERIALIZER_RECORD_CUSTOM(_struct_, _name_, _object_type_,         \
-                                      _record_id_)                             \
-  CLEM_SERIALIZER_RECORD_PARAM(_struct_, kClemensSerializerTypeCustom,         \
-                               kClemensSerializerTypeEmpty, _name_,            \
-                               sizeof(_object_type_), _record_id_, NULL)
-
-#define CLEM_SERIALIZER_RECORD_EMPTY()                                         \
-  {                                                                            \
-    NULL, kClemensSerializerTypeEmpty, kClemensSerializerTypeEmpty, 0, 0, 0,   \
-        NULL                                                                   \
-  }
 
 struct ClemensSerializerRecord kCPUPins[] = {
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPUPins, adr),
@@ -484,6 +405,14 @@ clemens_serialize_record(mpack_writer_t *writer, uintptr_t data_adr,
     mpack_write_u64(writer, variant.clocks);
     sz = sizeof(clem_clocks_time_t);
     break;
+  case kClemensSerializerTypeClockObject:
+    variant.clock_object = (struct ClemensClock *)(data_adr + record->offset);
+    mpack_start_array(writer, 2);
+    mpack_write_u64(writer, variant.clock_object->ts);
+    mpack_write_u32(writer, variant.clock_object->ref_step);
+    mpack_finish_array(writer);
+    sz = sizeof(struct ClemensClock);
+    break;
   case kClemensSerializerTypeBlob:
     variant.blob = *(uint8_t **)(data_adr + record->offset);
     mpack_build_map(writer);
@@ -552,6 +481,7 @@ static unsigned clemens_serialize_custom(mpack_writer_t *writer, void *ptr,
                                          unsigned sz, unsigned record_id) {
   struct ClemensAudioMixBuffer *audio_mix_buffer;
   struct ClemensNibbleDisk *nib_disk;
+  struct ClemensClock* clock;
 
   unsigned blob_size;
 
@@ -583,7 +513,8 @@ static unsigned clemens_serialize_custom(mpack_writer_t *writer, void *ptr,
       mpack_write_bool(writer, false);
     }
     break;
-  }
+ }
+
   mpack_complete_map(writer);
   return sz;
 }
@@ -692,6 +623,14 @@ clemens_unserialize_record(mpack_reader_t *reader, uintptr_t data_adr,
     variant.clocks = mpack_expect_u64(reader);
     *(clem_clocks_time_t *)(data_adr + record->offset) = (variant.clocks);
     sz = sizeof(clem_clocks_time_t);
+    break;
+  case kClemensSerializerTypeClockObject:
+    variant.clock_object = (struct ClemensClock*)(data_adr + record->offset);
+    mpack_expect_array_match(reader, 2);
+    variant.clock_object->ts = mpack_expect_u64(reader);
+    variant.clock_object->ref_step = mpack_expect_u32(reader);
+    mpack_done_array(reader);
+    sz = sizeof(struct ClemensClock);
     break;
   case kClemensSerializerTypeBlob:
     variant.blob = NULL;
