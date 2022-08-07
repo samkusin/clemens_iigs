@@ -106,6 +106,7 @@ static float s_ay3_8913_ampl_factor_westcott[16] = {
 // TODO: other interrupts
 
 enum ClemensVIA6522TimerStatus {
+  kClemensVIA6522TimerStatus_NoLatch,
   kClemensVIA6522TimerStatus_Inactive,
   kClemensVIA6522TimerStatus_LoadCounter,
   kClemensVIA6522TimerStatus_Active
@@ -279,7 +280,9 @@ static float _ay3_tone_render(struct ClemensAY38913 *psg, unsigned channel_id,
 
   if (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_LEVEL_ENABLED) {
     level = (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_LEVEL_HIGH) ? 1 : 0;
-    level &= (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_NOISE_ENABLED) ? noise : 1;
+    if (psg->mixer_tone_level[channel_id] & CLEM_AY3_TONE_NOISE_ENABLED) {
+      level &= noise;
+    }
     mag = (float)((int)(level << 1) - 1);
   } else {
     mag = 0.0f;
@@ -804,6 +807,7 @@ void _clem_via_update_state(struct ClemensVIA6522 *via, uint8_t *port_a,
   // PB7 toggling not supported (unneeded)
 
   // Timer 1 operation:
+  --via->timer1[1];
   if (via->timer1_status == kClemensVIA6522TimerStatus_LoadCounter) {
     via->timer1[1] = via->timer1[0];
     if (via->timer1_wraparound) {
@@ -816,8 +820,7 @@ void _clem_via_update_state(struct ClemensVIA6522 *via, uint8_t *port_a,
       via->timer1_status = kClemensVIA6522TimerStatus_Active;
     }
     via->timer1_wraparound = false;
-  } else {
-    --via->timer1[1];
+  } else if (via->timer1_status != kClemensVIA6522TimerStatus_NoLatch) {
     if (via->timer1[1] == 0xffff) {
       via->timer1_wraparound = true;
       if (via->timer1_status == kClemensVIA6522TimerStatus_Active) {
@@ -829,11 +832,11 @@ void _clem_via_update_state(struct ClemensVIA6522 *via, uint8_t *port_a,
 
   // PB6 pulse updated counter not supported (timer 2 pulse mode)
   // The T2 one-shot continues decrementing (no latch reload) once fired
+  --via->timer2[1];
   if (via->timer2_status == kClemensVIA6522TimerStatus_LoadCounter) {
     via->timer2[1] = via->timer2[0];
     via->timer2_status = kClemensVIA6522TimerStatus_Active;
-  } else {
-    --via->timer2[1];
+  } else if (via->timer2_status != kClemensVIA6522TimerStatus_NoLatch) {
     if (via->timer2[1] == 0xffff) {
       if (via->timer2_status == kClemensVIA6522TimerStatus_Active) {
         via->ifr |= CLEM_VIA_6522_IER_TIMER2;
