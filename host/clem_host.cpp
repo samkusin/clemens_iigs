@@ -63,8 +63,7 @@ struct FormatView {
 
 char clemens_is_mmio_card_rom(const ClemensMMIO &mmio, unsigned slot) {
   assert(slot > 0);
-  if ((mmio.mmap_register & CLEM_MEM_IO_MMAP_CXROM) &&
-      (mmio.mmap_register & (CLEM_MEM_IO_MMAP_C1ROM << (slot - 1)))) {
+  if ((mmio.mmap_register & (CLEM_MEM_IO_MMAP_C1ROM << (slot - 1)))) {
     return 'C';
   } else {
     return 'I';
@@ -170,6 +169,7 @@ void ClemensHost::emulatorLog(int log_level, ClemensMachine *machine,
   fputs(msg, stdout);
   fputc('\n', stdout);
   if (log_level == CLEM_DEBUG_LOG_UNIMPL) {
+    // TODO: display some informative message to the debugger
     host->emulationBreak();
   }
 }
@@ -269,8 +269,15 @@ void ClemensHost::frame(int width, int height, float deltaTime) {
 
     ClemensAudio audio;
     if (emulationRan && clemens_get_audio(&audio, &machine_)) {
+      float *audio_frame_head = reinterpret_cast<float *>(
+          audio.data + audio.frame_start * audio.frame_stride);
+      clem_card_ay3_render(&mockingboard_, audio_frame_head, audio.frame_count,
+                           audio.frame_stride / sizeof(float),
+                           audio_->getAudioFrequency());
       unsigned consumedFrames = audio_->queue(audio, deltaTime);
-      clemens_audio_next_frame(&machine_, consumedFrames);
+      //  consume the entire buffer even if we haven't caught up - real time
+      //  audio.
+      clemens_audio_next_frame(&machine_, audio.frame_count);
       diagnostics_.audioFrames += consumedFrames;
     }
 
@@ -516,14 +523,6 @@ void ClemensHost::frame(int width, int height, float deltaTime) {
       snprintf(label, sizeof(label), "Y   = %04X", cpuRegsNext.Y);
       ImGui::TableNextColumn();
       ImGui::Selectable(label, cpuRegsNext.Y != cpuRegsSaved_.Y);
-      ImGui::TableNextRow();
-      snprintf(label, sizeof(label), "PPC = %04X", cpuRegsNext.PPC);
-      ImGui::TableNextColumn();
-      ImGui::Selectable(label, cpuRegsNext.PPC != cpuRegsSaved_.PPC);
-      ImGui::TableNextRow();
-      snprintf(label, sizeof(label), "PPBR= %02X", cpuRegsNext.PPBR);
-      ImGui::TableNextColumn();
-      ImGui::Selectable(label, cpuRegsNext.PPBR != cpuRegsSaved_.PPBR);
     }
     ImGui::EndTable();
     ImGui::SameLine();
@@ -1682,7 +1681,7 @@ bool ClemensHost::createMachine(const char *filename, MachineType machineType) {
     ClemensAudioMixBuffer mix_buffer;
     mix_buffer.frames_per_second = audio_->getAudioFrequency();
     mix_buffer.stride =
-        audio_->getBufferStride(); //   2 channels, 16-bits per channel
+        audio_->getBufferStride(); //   2 channels, float per channel
     mix_buffer.frame_count = mix_buffer.frames_per_second / 4;
     mix_buffer.data =
         (uint8_t *)(slab_.allocate(mix_buffer.frame_count * mix_buffer.stride));
@@ -1776,9 +1775,34 @@ bool ClemensHost::saveState(const char *filename) {
   mpack_build_map(&writer);
   mpack_write_cstr(&writer, "machine");
   clemens_serialize_machine(&writer, &machine_);
+
   mpack_write_cstr(&writer, "bram");
   mpack_write_bin(&writer, (char *)clemens_rtc_get_bram(&machine_, NULL),
                   CLEM_RTC_BRAM_SIZE);
+
+  mpack_write_cstr(&writer, "slots");
+  {
+    mpack_start_array(&writer, 7);
+    // TODO: allow card slot configuration - right now we hard code cards into
+    //       their slots
+    mpack_write_cstr_or_nil(&writer, NULL);
+    mpack_write_cstr_or_nil(&writer, NULL);
+    mpack_write_cstr_or_nil(&writer, NULL);
+    mpack_write_cstr_or_nil(&writer, "mockingboard_c");
+    mpack_write_cstr_or_nil(&writer, NULL);
+    mpack_write_cstr_or_nil(&writer, NULL);
+    mpack_write_cstr_or_nil(&writer, NULL);
+    mpack_finish_array(&writer);
+  }
+  mpack_write_cstr(&writer, "cards");
+  {
+    //  TODO: we should use the slot mappings to decide which cards to
+    //        serialize... when we have configurable slot mappings!
+    mpack_build_map(&writer);
+    mpack_write_cstr(&writer, "mockingboard_c");
+    clem_card_mockingboard_serialize(&writer, machine_.card_slot[3]);
+    mpack_complete_map(&writer);
+  }
   mpack_write_cstr(&writer, "disks");
   {
     mpack_start_array(&writer, 4);
@@ -1823,6 +1847,36 @@ bool ClemensHost::loadState(const char *filename) {
   }
   mpack_done_bin(&reader);
   clemens_rtc_set_bram_dirty(&machine_);
+
+  //  slots and card data - see saveState TODOs that address why this is
+  //  hardcoded for now.
+  mpack_expect_cstr_match(&reader, "slots");
+  {
+    mpack_expect_array(&reader);
+    for (int i = 0; i < 7; ++i) {
+      // TODO: allow card slot configuration - right now we hard code cards into
+      //       their slots
+      if (mpack_peek_tag(&reader).type != mpack_type_nil) {
+        mpack_expect_cstr(&reader, str, sizeof(str));
+      } else {
+        mpack_expect_nil(&reader);
+      }
+    }
+    mpack_done_array(&reader);
+  }
+  mpack_expect_cstr_match(&reader, "cards");
+  {
+    uint32_t card_count = mpack_expect_map(&reader);
+    for (int i = 0; i < card_count; ++i) {
+      mpack_expect_cstr(&reader, str, sizeof(str));
+      if (!strncmp(str, "mockingboard_c", sizeof(str))) {
+        clem_card_mockingboard_unserialize(&reader, machine_.card_slot[3],
+                                           &ClemensHost::unserializeAllocate, this);
+      }
+    }
+    mpack_done_map(&reader);
+  }
+
   //  "disks"
   //  load woz filenames - the actual images have already been
   //  unserialized inside clemens_unserialize_machine
@@ -2129,11 +2183,11 @@ void ClemensHost::dumpMemory(unsigned bank, const char *filename) {
 
 void ClemensHost::insertCards() {
   clem_card_mockingboard_initialize(&mockingboard_);
-  machine_.card_slot[4] = &mockingboard_;
+  machine_.card_slot[3] = &mockingboard_;
 }
 
 void ClemensHost::ejectCards() {
-  machine_.card_slot[4] = NULL;
+  machine_.card_slot[3] = NULL;
   clem_card_mockingboard_uninitialize(&mockingboard_);
 }
 

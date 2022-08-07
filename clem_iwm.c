@@ -183,7 +183,7 @@ static void _clem_iwm_reset_lss(struct ClemensDeviceIWM *iwm,
 static void _clem_iwm_lss_write_log(struct ClemensDeviceIWM *iwm,
                                     struct ClemensClock *clock,
                                     const char *prefix) {
-  unsigned ns_write = _clem_calc_ns_step_from_clocks(
+  unsigned ns_write = clem_calc_ns_step_from_clocks(
       clock->ts - iwm->last_write_clocks_ts, clock->ref_step);
   CLEM_LOG("IWM: [%s] write latch %08X, duration dt = %.3f us, flags=%08X, "
            "counter=%u",
@@ -261,7 +261,7 @@ static bool _clem_iwm_lss_write_async(struct ClemensDeviceIWM *iwm,
 static void _clem_iwm_debug_log(struct ClemensDeviceIWM *iwm,
                                 struct ClemensClock *clock,
                                 unsigned current_mode) {
-  double ts = _clem_calc_secs_from_clocks(clock);
+  double ts = clem_calc_secs_from_clocks(clock);
   char *logtext;
   unsigned index;
   int logcnt;
@@ -428,8 +428,8 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm,
   struct ClemensClock next_clock;
 
   if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
-    delta_ns = _clem_calc_ns_step_from_clocks((clock->ts - iwm->last_clocks_ts),
-                                              clock->ref_step);
+    delta_ns = clem_calc_ns_step_from_clocks((clock->ts - iwm->last_clocks_ts),
+                                             clock->ref_step);
     lss_time_left_ns = delta_ns;
 
     /* catch up the LSS from the last sync to the current time */
@@ -442,8 +442,8 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm,
         _clem_iwm_lss(iwm, &drives->slot6[drive_index], &next_clock);
       }
       lss_time_left_ns -= iwm->lss_update_dt_ns;
-      next_clock.ts += _clem_calc_clocks_step_from_ns(iwm->lss_update_dt_ns,
-                                                      next_clock.ref_step);
+      next_clock.ts += clem_calc_clocks_step_from_ns(iwm->lss_update_dt_ns,
+                                                     next_clock.ref_step);
     }
     /* handle the 1 second drive motor timer */
     if (iwm->ns_drive_hold > 0) {
@@ -725,7 +725,7 @@ uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm,
                              struct ClemensClock *clock, uint8_t ioreg,
                              uint8_t flags) {
   uint8_t result = 0x00;
-  bool is_noop = (flags & CLEM_OP_IO_READ_NO_OP) != 0;
+  bool is_noop = (flags & CLEM_OP_IO_NO_OP) != 0;
 
   switch (ioreg) {
   case CLEM_MMIO_REG_DISK_INTERFACE:

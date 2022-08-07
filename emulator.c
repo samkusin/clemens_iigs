@@ -28,6 +28,8 @@
 
 static uint8_t s_empty_ram[CLEM_IIGS_BANK_SIZE];
 
+static struct ClemensOpcodeDesc sOpcodeDescriptions[256];
+
 static const char *s_drive_names[] = {
     "ClemensDisk 3.5 D1",
     "ClemensDisk 3.5 D2",
@@ -66,6 +68,13 @@ static const char *s_drive_names[] = {
  *  - interrupts are checked per time-slice,
  *      - if triggered, set the CPU state accordingly
  *      - ???
+ *
+ * References
+ * ----------
+ * Numerous
+ * For the 65816, the WDC documentation and cycle counts from
+ *  http://www.brutaldeluxe.fr/documentation/cortland/v7%2065SC816%20opcodes%20Cycle%20by%20cycle%20listing.pdf
+ *  which were instrumental to handling the various timing quirks
  */
 
 #define CLEM_I_PRINT_STATS(_clem_)                                             \
@@ -851,7 +860,7 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor,
   for (idx = 0; idx < 7; ++idx) {
     machine->card_slot[idx] = NULL;
     machine->card_slot_expansion_memory[idx] =
-        (((uint8_t *)slotExpansionROM) + (idx * 256));
+        (((uint8_t *)slotExpansionROM) + (idx * 2048));
   }
 
   machine->mmio_bypass = false;
@@ -1064,8 +1073,13 @@ unsigned clemens_out_hex_data_body(ClemensMachine *clem, char *hex,
                                    unsigned adr) {
   unsigned byte_amt = out_hex_byte_limit >> 1; /* 2 digits per byte */
   unsigned byte_idx;
-  const uint8_t *memory = clem->fpi_bank_map[bank & 0xff];
   unsigned chksum = 0;
+  const uint8_t *memory;
+  if (bank == 0xe0 || bank == 0xe1) {
+    memory = clem->mega2_bank_map[bank & 0x1];
+  } else {
+    memory = clem->fpi_bank_map[bank & 0xff];
+  }
 
   if (!memory)
     return UINT_MAX;
@@ -3049,7 +3063,8 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
   case CLEM_OPC_STA_DP_INDIRECT_IDY:
     _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0,
                                     false);
-    _clem_io_write_cycle(clem);
+
+    _clem_io_read_cycle(clem, tmp_addr, cpu->regs.Y, cpu->regs.DBR);
     _clem_write_indexed_816(clem, cpu->regs.A, tmp_addr, cpu->regs.Y,
                             cpu->regs.DBR, m_status, x_status);
     _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
@@ -3408,16 +3423,15 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
     _clem_read_pba(clem, &tmp_data, &tmp_pc);
     CLEM_CPU_I_INTR_LOG(cpu, "BRK");
     tmp_value = tmp_data;
-    _clem_irq_brk_setup(clem, tmp_pc, true);
-
     if (cpu->pins.emulation) {
-      tmp_pc =
-          _clem_read_interrupt_vector(clem, CLEM_6502_IRQBRK_VECTOR_LO_ADDR,
-                                      CLEM_6502_IRQBRK_VECTOR_HI_ADDR);
+      _clem_irq_brk_setup(clem, &cpu->regs.PBR, &tmp_pc,
+                          CLEM_6502_IRQBRK_VECTOR_LO_ADDR,
+                          CLEM_6502_IRQBRK_VECTOR_HI_ADDR, true);
+
     } else {
-      cpu->regs.PBR = 0x00;
-      tmp_pc = _clem_read_interrupt_vector(clem, CLEM_65816_BRK_VECTOR_LO_ADDR,
-                                           CLEM_65816_BRK_VECTOR_HI_ADDR);
+      _clem_irq_brk_setup(clem, &cpu->regs.PBR, &tmp_pc,
+                          CLEM_65816_BRK_VECTOR_LO_ADDR,
+                          CLEM_65816_BRK_VECTOR_HI_ADDR, true);
     }
     _opcode_instruction_define(&opc_inst, IR, tmp_value, true);
     break;
@@ -3426,15 +3440,15 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
     _clem_read_pba(clem, &tmp_data, &tmp_pc);
     CLEM_CPU_I_INTR_LOG(cpu, "COP");
     tmp_value = tmp_data;
-    _clem_irq_brk_setup(clem, tmp_pc, true);
-
     if (cpu->pins.emulation) {
-      tmp_pc = _clem_read_interrupt_vector(clem, CLEM_6502_COP_VECTOR_LO_ADDR,
-                                           CLEM_6502_COP_VECTOR_LO_ADDR);
+      _clem_irq_brk_setup(clem, &cpu->regs.PBR, &tmp_pc,
+                          CLEM_6502_COP_VECTOR_LO_ADDR,
+                          CLEM_6502_COP_VECTOR_LO_ADDR, true);
+
     } else {
-      cpu->regs.PBR = 0x00;
-      tmp_pc = _clem_read_interrupt_vector(clem, CLEM_65816_COP_VECTOR_LO_ADDR,
-                                           CLEM_65816_COP_VECTOR_HI_ADDR);
+      _clem_irq_brk_setup(clem, &cpu->regs.PBR, &tmp_pc,
+                          CLEM_65816_COP_VECTOR_LO_ADDR,
+                          CLEM_65816_COP_VECTOR_HI_ADDR, true);
     }
     _opcode_instruction_define(&opc_inst, IR, tmp_value, true);
     break;
@@ -3458,8 +3472,6 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
     assert(false);
     break;
   }
-  cpu->regs.PPBR = opc_pbr;
-  cpu->regs.PPC = opc_addr;
   cpu->regs.PC = tmp_pc;
 
   if (clem->debug_flags) {
@@ -3477,7 +3489,12 @@ void clemens_emulate(ClemensMachine *clem) {
   uint32_t delta_mega2_cycles;
   uint32_t card_result;
   uint32_t card_irqs;
+  uint32_t card_nmis;
   unsigned i;
+
+#if CLEM_DIAGNOSTIC_DEBUG
+  struct ClemensDiagnosticData diagnostic;
+#endif
 
   if (!cpu->pins.resbIn) {
     /*  the reset interrupt overrides any other state
@@ -3556,30 +3573,47 @@ void clemens_emulate(ClemensMachine *clem) {
     }
     cpu->state_type = kClemensCPUStateType_Execute;
     return;
-  } else if (cpu->state_type == kClemensCPUStateType_IRQ) {
+  } else if (cpu->state_type == kClemensCPUStateType_IRQ ||
+             cpu->state_type == kClemensCPUStateType_NMI) {
     uint8_t tmp_data;
     uint8_t tmp_datahi;
+    uint8_t vlo, vhi;
+    if (cpu->pins.emulation) {
+      vlo = cpu->state_type == kClemensCPUStateType_NMI
+                ? CLEM_6502_NMI_VECTOR_LO_ADDR
+                : CLEM_6502_IRQBRK_VECTOR_LO_ADDR;
+      vhi = cpu->state_type == kClemensCPUStateType_NMI
+                ? CLEM_6502_NMI_VECTOR_HI_ADDR
+                : CLEM_6502_IRQBRK_VECTOR_HI_ADDR;
+    } else {
+      vlo = cpu->state_type == kClemensCPUStateType_NMI
+                ? CLEM_65816_NMI_VECTOR_LO_ADDR
+                : CLEM_65816_IRQB_VECTOR_LO_ADDR;
+      vhi = cpu->state_type == kClemensCPUStateType_NMI
+                ? CLEM_65816_NMI_VECTOR_LO_ADDR
+                : CLEM_65816_IRQB_VECTOR_HI_ADDR;
+    }
+
     /* +2 cycles of 'internal ops'
        +3/4 cycles for stack operations
         2 cycles vector pull to PC
     */
     _clem_cycle(clem, 2);
-    _clem_irq_brk_setup(clem, cpu->regs.PC, false);
-    if (cpu->pins.emulation) {
-      cpu->regs.PC =
-          _clem_read_interrupt_vector(clem, CLEM_6502_IRQBRK_VECTOR_LO_ADDR,
-                                      CLEM_6502_IRQBRK_VECTOR_HI_ADDR);
-    } else {
-      cpu->regs.PBR = 0x00;
-      cpu->regs.PC = _clem_read_interrupt_vector(
-          clem, CLEM_65816_IRQB_VECTOR_LO_ADDR, CLEM_65816_IRQB_VECTOR_HI_ADDR);
-    }
+    _clem_irq_brk_setup(clem, &cpu->regs.PBR, &cpu->regs.PC, vlo, vhi, false);
     cpu->state_type = kClemensCPUStateType_Execute;
     return;
   }
+
+#if CLEM_DIAGNOSTIC_DEBUG
+  diagnostic.PC = cpu->regs.PC;
+  diagnostic.PBR = cpu->regs.PBR;
+#endif
   cpu_execute(cpu, clem);
 
   if (!clem->mmio_bypass) {
+#if CLEM_DIAGNOSTIC_DEBUG
+    clem->mmio.diagnostic = &diagnostic;
+#endif
     clem_iwm_speed_disk_gate(clem);
 
     //  1 mega2 cycle = 1023 nanoseconds
@@ -3599,14 +3633,17 @@ void clemens_emulate(ClemensMachine *clem) {
     clock.ts = clem->clocks_spent;
     clock.ref_step = clem->clocks_step_mega2;
 
+    card_nmis = 0;
     card_irqs = 0;
     for (i = 0; i < 7; ++i) {
       if (!clem->card_slot[i])
         continue;
       card_result =
           (*clem->card_slot[i]->io_sync)(&clock, clem->card_slot[i]->context);
-      if (card_result & CLEM_IRQ_ON)
+      if (card_result & CLEM_CARD_IRQ)
         card_irqs |= (CLEM_IRQ_SLOT_1 << i);
+      if (card_result & CLEM_CARD_NMI)
+        card_nmis |= (1 << i);
     }
 
     clem_vgc_sync(&mmio->vgc, &clock, clem->mega2_bank_map[0],
@@ -3630,9 +3667,11 @@ void clemens_emulate(ClemensMachine *clem) {
     mmio->irq_line =
         (mmio->dev_adb.irq_line | mmio->dev_timer.irq_line |
          mmio->dev_audio.irq_line | mmio->vgc.irq_line | card_irqs);
+    mmio->nmi_line = card_nmis;
     clem_iwm_speed_disk_gate(clem);
 
     cpu->pins.irqbIn = mmio->irq_line == 0;
+    cpu->pins.nmibIn = mmio->nmi_line == 0;
   }
 
   /* IRQB low triggers an interrupt next frame */
@@ -3640,5 +3679,9 @@ void clemens_emulate(ClemensMachine *clem) {
     if (!(cpu->regs.P & kClemensCPUStatus_IRQDisable)) {
       cpu->state_type = kClemensCPUStateType_IRQ;
     }
+  }
+  /* NMIB overrides IRQB settings and ignores IRQ disable */
+  if (!cpu->pins.nmibIn) {
+    cpu->state_type = kClemensCPUStateType_NMI;
   }
 }

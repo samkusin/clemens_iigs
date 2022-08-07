@@ -6,7 +6,6 @@
 
 #include "clem_defs.h"
 #include "clem_disk.h"
-#include "clem_shared.h"
 
 typedef struct ClemensMachine ClemensMachine;
 typedef void (*LoggerFn)(int level, ClemensMachine *machine, const char *msg);
@@ -159,7 +158,7 @@ struct ClemensDeviceAudio {
   bool a2_speaker_tense; /**< the a2 speaker state tense, relax */
   int32_t a2_speaker_frame_count;
   int32_t a2_speaker_frame_threshold;
-  int16_t a2_speaker_level;
+  float a2_speaker_level;
 
   /* host supplied mix buffer */
   struct ClemensAudioMixBuffer mix_buffer;
@@ -297,6 +296,13 @@ struct ClemensDeviceIWM {
   bool enable_debug; /**< If True, activates file logging */
 };
 
+#if CLEM_DIAGNOSTIC_DEBUG
+struct ClemensDiagnosticData {
+  uint16_t PC;
+  uint8_t PBR;
+};
+#endif
+
 /**
  * @brief FPI + MEGA2 MMIO Interface
  *
@@ -342,6 +348,10 @@ struct ClemensMMIO {
 
   /* All ticks are mega2 cycles */
   uint32_t irq_line; // see CLEM_IRQ_XXX flags, if !=0 triggers irqb
+  uint32_t nmi_line; // see ClEM_NMI_XXX flags
+#if CLEM_DIAGNOSTIC_DEBUG
+  struct ClemensDiagnosticData *diagnostic;
+#endif
 };
 
 /*  ClemensDrive Data
@@ -460,8 +470,6 @@ struct ClemensOpcodeDesc {
   char name[4];
 };
 
-static struct ClemensOpcodeDesc sOpcodeDescriptions[256];
-
 struct ClemensInstruction {
   struct ClemensOpcodeDesc *desc;
   uint16_t addr;
@@ -476,15 +484,13 @@ struct ClemensCPURegs {
   uint16_t A;
   uint16_t X;
   uint16_t Y;
-  uint16_t D;   // Direct
-  uint16_t S;   // Stack
-  uint16_t PC;  // Program Counter
-  uint16_t PPC; // Previous PC
-  uint8_t IR;   // Instruction Register
-  uint8_t P;    // Processor Status
-  uint8_t DBR;  // Data Bank (Memory)
-  uint8_t PBR;  // Program Bank (Memory)
-  uint8_t PPBR; // Previous PBR
+  uint16_t D;  // Direct
+  uint16_t S;  // Stack
+  uint16_t PC; // Program Counter
+  uint8_t IR;  // Instruction Register
+  uint8_t P;   // Processor Status
+  uint8_t DBR; // Data Bank (Memory)
+  uint8_t PBR; // Program Bank (Memory)
 };
 
 struct ClemensCPUPins {
@@ -494,7 +500,7 @@ struct ClemensCPUPins {
   bool abortIn;     // ABORTB In
   bool busEnableIn; // Bus Enable
   bool irqbIn;      // Interrupt Request
-  bool nmiIn;       // Non-Maskable Interrupt
+  bool nmibIn;      // Non-Maskable Interrupt
   bool readyOut;    // if false, then WAIT
   bool resbIn;      // RESET
   bool emulation;   // Emulation Status
@@ -511,7 +517,8 @@ enum ClemensCPUStateType {
   kClemensCPUStateType_None,
   kClemensCPUStateType_Reset,
   kClemensCPUStateType_Execute,
-  kClemensCPUStateType_IRQ
+  kClemensCPUStateType_IRQ,
+  kClemensCPUStateType_NMI
 };
 
 struct Clemens65C816 {

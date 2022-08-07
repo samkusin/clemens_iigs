@@ -1,26 +1,15 @@
 #ifndef CLEMENS_DEFS_H
 #define CLEMENS_DEFS_H
 
+#include "clem_shared.h"
+
 /* The emulator ID as defined when reading c04f */
 #define CLEM_EMULATOR_ID 0xce
 #define CLEM_EMULATOR_VER 0x01
 
-/** A bit confusing... used for calculating our system clock.  These values
- *  are relative to each other.
- *
- *  The clocks per mega2 cycle value will always be the largest.
- *
- *  If you divide the CLEM_CLOCKS_MEGA2_CYCLE by the CLEM_CLOCKS_FAST_CYCLE
- *  the value will be the effective maximum clock speed in Mhz of the CPU.
- */
-#define CLEM_CLOCKS_FAST_CYCLE 1023
-#define CLEM_CLOCKS_MEGA2_CYCLE 2864
-
-#define CLEM_MEGA2_CYCLES_PER_SECOND 1023000
 #define CLEM_MEGA2_CYCLES_PER_60TH (CLEM_MEGA2_CYCLES_PER_SECOND / 60)
 #define CLEM_MEGA2_TIMER_1SEC_US 1000000
 #define CLEM_MEGA2_TIMER_QSEC_US 266667
-#define CLEM_MEGA2_CYCLE_NS 978
 
 #define CLEM_1SEC_NS 1000000000
 #define CLEM_1MS_NS 1000000
@@ -86,6 +75,8 @@
 /** Vector addresses */
 #define CLEM_6502_COP_VECTOR_LO_ADDR (0xFFF4)
 #define CLEM_6502_COP_VECTOR_HI_ADDR (0xFFF5)
+#define CLEM_6502_NMI_VECTOR_LO_ADDR (0xFFFA)
+#define CLEM_6502_NMI_VECTOR_HI_ADDR (0xFFFB)
 #define CLEM_6502_RESET_VECTOR_LO_ADDR (0xFFFC)
 #define CLEM_6502_RESET_VECTOR_HI_ADDR (0xFFFD)
 #define CLEM_6502_IRQBRK_VECTOR_LO_ADDR (0xFFFE)
@@ -93,30 +84,36 @@
 
 #define CLEM_65816_COP_VECTOR_LO_ADDR (0xFFE4)
 #define CLEM_65816_COP_VECTOR_HI_ADDR (0xFFE5)
+#define CLEM_65816_NMI_VECTOR_LO_ADDR (0xFFEA)
+#define CLEM_65816_NMI_VECTOR_HI_ADDR (0xFFEB)
 #define CLEM_65816_BRK_VECTOR_LO_ADDR (0xFFE6)
 #define CLEM_65816_BRK_VECTOR_HI_ADDR (0xFFE7)
 #define CLEM_65816_IRQB_VECTOR_LO_ADDR (0xFFEE)
 #define CLEM_65816_IRQB_VECTOR_HI_ADDR (0xFFEF)
 
-/** IRQ line masks (0xff000000 are reserved for slot IRQs*/
-#define CLEM_IRQ_VGC_SCAN_LINE (0x00000010)
-#define CLEM_IRQ_VGC_BLANK (0x00000020)
-#define CLEM_IRQ_VGC_MASK (0x000000f0)
-#define CLEM_IRQ_TIMER_QSEC (0x00001000)
-#define CLEM_IRQ_TIMER_RTC_1SEC (0x00002000)
-#define CLEM_IRQ_TIMER_MASK (0x0000f000)
-#define CLEM_IRQ_ADB_KEYB_SRQ (0x00010000)
-#define CLEM_IRQ_ADB_MOUSE_SRQ (0x00020000) /* IIgs Unsupported */
-#define CLEM_IRQ_ADB_DATA (0x00040000)
-#define CLEM_IRQ_ADB_MASK (0x000f0000)
-#define CLEM_IRQ_SLOT_1 (0x01000000)
-#define CLEM_IRQ_SLOT_2 (0x02000000)
-#define CLEM_IRQ_SLOT_3 (0x04000000)
-#define CLEM_IRQ_SLOT_4 (0x08000000)
-#define CLEM_IRQ_SLOT_5 (0x10000000)
-#define CLEM_IRQ_SLOT_6 (0x20000000)
-#define CLEM_IRQ_SLOT_7 (0x40000000)
-#define CLEM_IRQ_ON (0x80000000) /* used by devices */
+/** IRQ line masks (0xfff000000 are reserved for slot IRQs + NMIs*/
+#define CLEM_IRQ_VGC_SCAN_LINE (0x00000001)
+#define CLEM_IRQ_VGC_BLANK (0x00000002)
+#define CLEM_IRQ_VGC_MASK (0x0000000f)
+#define CLEM_IRQ_TIMER_QSEC (0x00000010)
+#define CLEM_IRQ_TIMER_RTC_1SEC (0x00000020)
+#define CLEM_IRQ_TIMER_MASK (0x000000f0)
+#define CLEM_IRQ_ADB_KEYB_SRQ (0x00000100)
+#define CLEM_IRQ_ADB_MOUSE_SRQ (0x00000200) /* IIgs Unsupported */
+#define CLEM_IRQ_ADB_DATA (0x00000400)
+#define CLEM_IRQ_ADB_MASK (0x00000f00)
+#define CLEM_IRQ_SLOT_1 (0x00100000)
+#define CLEM_IRQ_SLOT_2 (0x00200000)
+#define CLEM_IRQ_SLOT_3 (0x00400000)
+#define CLEM_IRQ_SLOT_4 (0x00800000)
+#define CLEM_IRQ_SLOT_5 (0x01000000)
+#define CLEM_IRQ_SLOT_6 (0x02000000)
+#define CLEM_IRQ_SLOT_7 (0x04000000)
+//#define CLEM_CARD_NMI (0x40000000)
+//#define CLEM_CARD_IRQ (0x80000000)
+
+/** NMI line masks for card slot triggers */
+#define CLEM_NMI_CARD_MASK (0x000000ff)
 
 /** Opcodes! */
 #define CLEM_OPC_ADC_IMM (0x69)
@@ -375,12 +372,6 @@
 #define CLEM_OPC_WDM (0x42)
 #define CLEM_OPC_XBA (0xEB)
 #define CLEM_OPC_XCE (0xFB)
-
-/* Attempt to mimic VDA and VPA per memory access */
-#define CLEM_MEM_FLAG_OPCODE_FETCH (0x3)
-#define CLEM_MEM_FLAG_DATA (0x2)
-#define CLEM_MEM_FLAG_PROGRAM (0x1)
-#define CLEM_MEM_FLAG_NULL (0x0)
 
 #define CLEM_UTIL_set16_lo(_v16_, _v8_) (((_v16_)&0xff00) | ((_v8_)&0xff))
 
