@@ -67,6 +67,7 @@ target_include_directories(clemens_iigs
 target_link_libraries(clemens_iigs
     PRIVATE
         clemens_65816
+        clemens_65816_render
         clemens_65816_serializer
         clemens_65816_iocards
         ckaudio)

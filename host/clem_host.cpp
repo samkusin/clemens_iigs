@@ -259,10 +259,10 @@ void ClemensHost::frame(int width, int height, float deltaTime) {
                                             machine_.mega2_bank_map[1]);
       } else if (video.format == kClemensVideoFormat_Hires) {
         display_->renderHiresGraphics(video, machine_.mega2_bank_map[0]);
-      } else if (machine_.mmio.vgc.mode_flags & CLEM_VGC_LORES) {
-        display_->renderLoresGraphics(video, machine_.mega2_bank_map[0]);
       } else if (video.format == kClemensVideoFormat_Super_Hires) {
         display_->renderSuperHiresGraphics(video, machine_.mega2_bank_map[1]);
+      } else if (machine_.mmio.vgc.mode_flags & CLEM_VGC_LORES) {
+        display_->renderLoresGraphics(video, machine_.mega2_bank_map[0]);
       }
     }
     display_->finish(screenUVs);
@@ -2273,7 +2273,7 @@ bool ClemensHost::loadDisk(ClemensDriveType driveType, const char *filename) {
     if (stat(filename, &fileStat) != 0) {
       disk->nib.disk_type = diskType;
       disk->nib.is_double_sided = doubleSided;
-      isOk = createBlankDisk(&disk->nib);
+      isOk = createBlankDisk(disk);
     } else {
       switch (disk->diskContainerType) {
       case ClemensDisk::WOZ:
@@ -2424,48 +2424,49 @@ bool ClemensHost::load2IMGDisk(const char *filename,
   return false;
 }
 
-bool ClemensHost::createBlankDisk(struct ClemensNibbleDisk *disk) {
+bool ClemensHost::createBlankDisk(ClemensDisk *disk) {
   //  This method creates a very basic nibblized disk with many assumptions.
   //  Use real hardware if you want to experiment with copy protection, etc
   //  and generate the image using other tools.
   //
+  ClemensNibbleDisk* nib = &disk->nib;
   unsigned max_track_size_bytes, track_byte_offset;
 
-  auto trackDataSize = disk->bits_data_end - disk->bits_data;
-  memset(disk->bits_data, 0, trackDataSize);
+  auto trackDataSize = nib->bits_data_end - nib->bits_data;
+  memset(nib->bits_data, 0, trackDataSize);
 
-  switch (disk->disk_type) {
+  switch (nib->disk_type) {
   case CLEM_DISK_TYPE_5_25:
-    disk->bit_timing_ns = 4000;
-    disk->track_count = 35;
+    nib->bit_timing_ns = 4000;
+    nib->track_count = 35;
 
     max_track_size_bytes = CLEM_DISK_525_BYTES_PER_TRACK;
     for (unsigned i = 0; i < CLEM_DISK_LIMIT_QTR_TRACKS; ++i) {
       if ((i % 4) == 0 || (i % 4) == 1) {
-        disk->meta_track_map[i] = (i / 4);
+        nib->meta_track_map[i] = (i / 4);
       } else {
-        disk->meta_track_map[i] = 0xff;
+        nib->meta_track_map[i] = 0xff;
       }
     }
     track_byte_offset = 0;
-    for (unsigned i = 0; i < disk->track_count; ++i) {
-      disk->track_byte_offset[i] = track_byte_offset;
-      disk->track_byte_count[i] = max_track_size_bytes;
-      disk->track_bits_count[i] = CLEM_DISK_BLANK_TRACK_BIT_LENGTH_525;
-      disk->track_initialized[i] = 0;
+    for (unsigned i = 0; i < nib->track_count; ++i) {
+      nib->track_byte_offset[i] = track_byte_offset;
+      nib->track_byte_count[i] = max_track_size_bytes;
+      nib->track_bits_count[i] = CLEM_DISK_BLANK_TRACK_BIT_LENGTH_525;
+      nib->track_initialized[i] = 0;
       track_byte_offset += max_track_size_bytes;
     }
     break;
   case CLEM_DISK_TYPE_3_5:
-    disk->bit_timing_ns = 2000;
-    disk->track_count = disk->is_double_sided ? 160 : 80;
+    nib->bit_timing_ns = 2000;
+    nib->track_count = nib->is_double_sided ? 160 : 80;
     for (unsigned i = 0; i < CLEM_DISK_LIMIT_QTR_TRACKS; ++i) {
-      if (disk->is_double_sided) {
-        disk->meta_track_map[i] = i;
+      if (nib->is_double_sided) {
+        nib->meta_track_map[i] = i;
       } else if ((i % 2) == 0) {
-        disk->meta_track_map[i] = (i / 2);
+        nib->meta_track_map[i] = (i / 2);
       } else {
-        disk->meta_track_map[i] = 0xff;
+        nib->meta_track_map[i] = 0xff;
       }
     }
     track_byte_offset = 0;
@@ -2477,22 +2478,30 @@ bool ClemensHost::createBlankDisk(struct ClemensNibbleDisk *disk) {
       for (unsigned i = g_clem_track_start_per_region_35[region_index];
            i < g_clem_track_start_per_region_35[region_index + 1];) {
         unsigned track_index = i;
-        if (!disk->is_double_sided) {
+        if (!nib->is_double_sided) {
           track_index /= 2;
           i += 2;
         } else {
           i += 1;
         }
-        disk->track_byte_offset[track_index] = track_byte_offset;
-        disk->track_byte_count[track_index] = max_track_size_bytes;
-        disk->track_bits_count[track_index] = bits_cnt;
-        disk->track_initialized[track_index] = 0;
+        nib->track_byte_offset[track_index] = track_byte_offset;
+        nib->track_byte_count[track_index] = max_track_size_bytes;
+        nib->track_bits_count[track_index] = bits_cnt;
+        nib->track_initialized[track_index] = 0;
         track_byte_offset += max_track_size_bytes;
       }
     }
     break;
   default:
     return false;
+  }
+
+  switch (disk->diskContainerType) {
+    case ClemensDisk::IMG2: {
+      // TODO
+    } break;
+    default:
+      return false;
   }
   return true;
 }

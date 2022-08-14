@@ -69,8 +69,15 @@ add_library(clemens_65816_serializer STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/serializer.c")
 
 target_link_libraries(clemens_65816_serializer PUBLIC clemens_65816)
-
 target_include_directories(clemens_65816_serializer
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+
+add_library(clemens_65816_render STATIC
+    ${CONTRIB_SOURCES}
+    "${CMAKE_CURRENT_SOURCE_DIR}/render.c")
+
+target_link_libraries(clemens_65816_render PUBLIC clemens_65816)
+target_include_directories(clemens_65816_render
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
 

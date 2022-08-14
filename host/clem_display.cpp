@@ -1,4 +1,5 @@
 #include "clem_display.hpp"
+#include "render.h"
 
 #define STBTT_STATIC
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -478,6 +479,20 @@ ClemensDisplay::ClemensDisplay(ClemensDisplayProvider& provider) :
   imageDesc.data.subimage[0][0].size = sizeof(dblHiresColorData);
   dblhgrColorArray_ = sg_make_image(imageDesc);
 
+  emulatorRGBABuffer_ = new uint8_t[1024 * 8];
+
+  imageDesc = {};
+  imageDesc.width = 256;
+  imageDesc.height = 8;
+  imageDesc.type = SG_IMAGETYPE_2D;
+  imageDesc.pixel_format = SG_PIXELFORMAT_RGBA8;
+  imageDesc.min_filter = SG_FILTER_LINEAR;
+  imageDesc.mag_filter = SG_FILTER_LINEAR;
+  imageDesc.wrap_u = SG_WRAP_CLAMP_TO_EDGE;
+  imageDesc.wrap_v = SG_WRAP_CLAMP_TO_EDGE;
+  imageDesc.usage = SG_USAGE_STREAM;
+  rgbaColorArray_ = sg_make_image(imageDesc);
+
   imageDesc = {};
   imageDesc.width = kGraphicsTextureWidth;
   imageDesc.height = kGraphicsTextureHeight;
@@ -488,7 +503,6 @@ ClemensDisplay::ClemensDisplay(ClemensDisplayProvider& provider) :
   imageDesc.wrap_v = SG_WRAP_CLAMP_TO_EDGE;
   imageDesc.usage = SG_USAGE_STREAM;
   graphicsTarget_ = sg_make_image(imageDesc);
-
   emulatorVideoBuffer_ = new uint8_t[kGraphicsTextureWidth * kGraphicsTextureHeight];
 
   //  create offscreen pass and image targets
@@ -516,8 +530,11 @@ ClemensDisplay::~ClemensDisplay()
   sg_destroy_image(graphicsTarget_);
   sg_destroy_image(hgrColorArray_);
   sg_destroy_image(dblhgrColorArray_);
+  sg_destroy_image(rgbaColorArray_);
   sg_destroy_buffer(vertexBuffer_);
   sg_destroy_buffer(textVertexBuffer_);
+  delete[] emulatorVideoBuffer_;
+  delete[] emulatorRGBABuffer_;
 }
 
 void ClemensDisplay::start(
@@ -989,9 +1006,77 @@ void ClemensDisplay::renderSuperHiresGraphics(
   const ClemensVideo& video,
   const uint8_t* memory
 ) {
-  //  render - do this next to render placeholder data
-  //  phase 0 = simple purple scanline
-  //  phase 1 = use
+  // 1x2 pixels
+  uint8_t* video_out = emulatorVideoBuffer_;
+  clemens_render_video(&video, memory, video_out,
+                       kGraphicsTextureWidth, kGraphicsTextureHeight,
+                       kGraphicsTextureWidth * 2, 1);
+
+
+  uint8_t* buffer0 = video_out;
+  for (unsigned y = 0; y < video.scanline_count; ++y) {
+    uint8_t* buffer1 = buffer0 + kGraphicsTextureWidth;
+    memcpy(buffer1, buffer0, kGraphicsTextureWidth);
+    buffer0 += kGraphicsTextureWidth * 2;
+  }
+
+  for (unsigned y = 0; y < 8; ++y) {
+    uint8_t* texdata = &emulatorRGBABuffer_[1024 * y];
+    for (unsigned x = 0; x < 256; ++x) {
+        texdata[x * 4] = (uint8_t)(video.rgba[x] >> 24);
+        texdata[x * 4 + 1] = (uint8_t)((video.rgba[x] >> 16) & 0xff);
+        texdata[x * 4 + 2] = (uint8_t)((video.rgba[x] >> 8) & 0xff);
+        texdata[x * 4 + 3] = (uint8_t)(video.rgba[x] & 0xff);
+    }
+  }
+
+  sg_image_data graphicsImageData = {};
+  graphicsImageData.subimage[0][0].ptr = emulatorVideoBuffer_;
+  graphicsImageData.subimage[0][0].size = kGraphicsTextureWidth * kGraphicsTextureHeight;
+  sg_update_image(graphicsTarget_, graphicsImageData);
+
+  graphicsImageData.subimage[0][0].ptr = emulatorRGBABuffer_;
+  graphicsImageData.subimage[0][0].size = 256 * 4 * 8;
+  sg_update_image(rgbaColorArray_, graphicsImageData);
+
+  auto vertexParams = createVertexParams(
+    emulatorVideoDimensions_[0], emulatorVideoDimensions_[1]);
+  sg_range rangeParam;
+  rangeParam.ptr = &vertexParams;
+  rangeParam.size = sizeof(vertexParams);
+
+  sg_apply_pipeline(provider_.hiresPipeline_);
+  sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, rangeParam);
+
+  //  texture contains a scaled version of the original 280 x 160/192 screen
+  //  to avoid UV rounding issues
+  DrawVertex vertices[6];
+  float y_scalar = emulatorVideoDimensions_[1] / 200.0f;
+  float x0 = 0.0f;
+  float y0 = 0.0f;
+  float x1 = x0 + emulatorVideoDimensions_[0];
+  float y1 = y0 + (video.scanline_count * y_scalar);
+  float u1 = emulatorVideoDimensions_[0] / kGraphicsTextureWidth;
+  float v1 = (video.scanline_count * y_scalar) / kGraphicsTextureHeight;
+
+  sg_range verticesRange;
+  verticesRange.ptr = &vertices[0];
+  verticesRange.size = 6 * sizeof(DrawVertex);
+  vertices[0] = { { x0, y0 }, { 0.0f, 0.0f }, 0xffffffff };
+  vertices[1] = { { x0, y1 }, { 0.0f, v1   }, 0xffffffff };
+  vertices[2] = { { x1, y1 }, { u1,   v1   }, 0xffffffff };
+  vertices[3] = { { x0, y0 }, { 0.0f, 0.0f }, 0xffffffff };
+  vertices[4] = { { x1, y1 }, { u1,   v1   }, 0xffffffff };
+  vertices[5] = { { x1, y0 }, { u1,  0.0f  }, 0xffffffff };
+
+  sg_bindings renderBindings = {};
+  renderBindings.vertex_buffers[0] = vertexBuffer_;
+  renderBindings.fs_images[0] = graphicsTarget_;
+  renderBindings.fs_images[1] = rgbaColorArray_;
+  renderBindings.vertex_buffer_offsets[0] = (
+    sg_append_buffer(renderBindings.vertex_buffers[0], verticesRange));
+  sg_apply_bindings(renderBindings);
+  sg_draw(0, 6, 1);
 }
 
 

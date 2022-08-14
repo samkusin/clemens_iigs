@@ -230,7 +230,7 @@ struct ClemensDeviceDebugger {
  */
 struct ClemensScanline {
   unsigned offset;
-  unsigned control; /**< Used for IIgs scanline control */
+  unsigned control;                    /**< Used for IIgs scanline control */
 };
 
 struct ClemensVGC {
