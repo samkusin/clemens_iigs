@@ -56,6 +56,8 @@
 #define CLEM_DEBUG_LOG_UNIMPL 3
 #define CLEM_DEBUG_LOG_FATAL 4
 
+#define CLEM_DEBUG_TOOLBOX_MMGR   1
+
 /** Setting: ADB keyboard buffer size - this doesn't need to be large since
  *  Apple II apps typically expect to consume events via ISR or prompt polling
  *  of IO registers.  Our host should have the opportunity to send input to the

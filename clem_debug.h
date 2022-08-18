@@ -46,6 +46,8 @@ void clem_debug_trace_flush();
 void clem_debug_iwm_start(ClemensMachine *context);
 void clem_debug_iwm_stop(ClemensMachine *context);
 
+void clemens_debug_status_toolbox(ClemensMachine *context, unsigned id);
+
 #ifdef __cplusplus
 }
 #endif

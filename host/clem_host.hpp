@@ -81,6 +81,7 @@ private:
   bool parseCommandDebugContext(const char *line);
   bool parseCommandSetValue(const char *line);
   bool parseCommandDump(const char *line);
+  bool parseCommandToolbox(const char *line);
 
   bool parseImmediateValue(unsigned &value, const char *line);
   bool parseImmediateString(std::string &value, const char *line);

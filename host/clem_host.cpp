@@ -1164,6 +1164,8 @@ bool ClemensHost::parseCommand(const char *buffer) {
       return parseCommandSetValue(end);
     } else if (!strncasecmp(start, "dump", end - start)) {
       return parseCommandDump(end);
+    } else if (!strncasecmp(start, "toolbox", end - start)) {
+      return parseCommandToolbox(end);
     }
     return false;
   });
@@ -1461,6 +1463,9 @@ bool ClemensHost::parseCommandLog(const char *line) {
           (kClemensDebugFlag_StdoutOpcode | kClemensDebugFlag_DebugLogOpcode);
       return true;
     }
+    if (!strncasecmp(name, "toolbox", sizeof(name))) {
+
+    }
     if (!strncasecmp(name, "code", sizeof(name))) {
       if (programTrace_) {
         CLEM_HOST_COUT.format("code trace already active");
@@ -1469,6 +1474,14 @@ bool ClemensHost::parseCommandLog(const char *line) {
       programTrace_ = std::make_unique<ClemensProgramTrace>();
       clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint,
                               this);
+      return true;
+    }
+    if (!strncasecmp(name, "toolbox", sizeof(name))) {
+      if (!programTrace_) {
+        CLEM_HOST_COUT.format("no code trace active");
+        return false;
+      }
+      programTrace_->enableToolboxLogging(true);
       return true;
     }
     return false;
@@ -1514,6 +1527,14 @@ bool ClemensHost::parseCommandUnlog(const char *line) {
         clemens_opcode_callback(&machine_, NULL, this);
       }
       programTrace_ = nullptr;
+      return true;
+    }
+    if (!strncasecmp(name, "toolbox", sizeof(name))) {
+      if (!programTrace_) {
+        CLEM_HOST_COUT.format("no code trace active");
+        return false;
+      }
+      programTrace_->enableToolboxLogging(false);
       return true;
     }
     return false;
@@ -1590,6 +1611,24 @@ bool ClemensHost::parseCommandDump(const char *line) {
 
     dumpMemory(bank, "");
     return true;
+  });
+}
+
+bool ClemensHost::parseCommandToolbox(const char *line) {
+  const char *start = trimCommand(line);
+  if (!start) {
+    CLEM_HOST_COUT.format("usage: toolbox <mmgr>");
+    return false;
+  }
+  return parseCommandToken(start, [this](const char *start, const char *end) {
+    char name[16];
+    strncpy(name, start, std::min(sizeof(name) - 1, size_t(end - start)));
+    name[end - start] = '\0';
+    if (!strncasecmp(name, "mmgr", sizeof(name))) {
+      clemens_debug_status_toolbox(&machine_, CLEM_DEBUG_TOOLBOX_MMGR);
+      return true;
+    }
+    return false;
   });
 }
 

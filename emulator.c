@@ -200,6 +200,7 @@ static inline void
 _opcode_instruction_define_simple(struct ClemensInstruction *instr,
                                   uint8_t opcode) {
   instr->desc = &sOpcodeDescriptions[opcode];
+  instr->opc = opcode;
   instr->bank = 0x00;
   instr->opc_8 = false;
   instr->value = 0x0000;
