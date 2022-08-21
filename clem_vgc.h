@@ -3,27 +3,6 @@
 
 #include "clem_types.h"
 
-#define CLEM_VGC_GRAPHICS_MODE     0x00000001
-#define CLEM_VGC_MIXED_TEXT        0x00000002
-#define CLEM_VGC_80COLUMN_TEXT     0x00000004
-#define CLEM_VGC_LORES             0x00000010
-#define CLEM_VGC_HIRES             0x00000020
-#define CLEM_VGC_RESOLUTION_MASK   0x000000F0
-#define CLEM_VGC_SUPER_HIRES       0x00000100
-#define CLEM_VGC_ALTCHARSET        0x00010000
-#define CLEM_VGC_MONOCHROME        0x00020000
-#define CLEM_VGC_PAL               0x00040000
-#define CLEM_VGC_LANGUAGE          0x00080000
-#define CLEM_VGC_ENABLE_VBL_IRQ    0x00100000
-#define CLEM_VGC_DISABLE_AN3       0x00200000
-#define CLEM_VGC_DBLHIRES_MASK     0x00200025
-#define CLEM_VGC_INIT              0x80000000
-
-#define CLEM_VGC_SCANLINE_CONTROL_640_MODE          (0x80)
-#define CLEM_VGC_SCANLINE_CONTROL_INTERRUPT         (0x40)
-#define CLEM_VGC_SCANLINE_COLORFILL_MODE            (0x20)
-#define CLEM_VGC_SCANLINE_PALETTE_INDEX_MASK        (0x0f)
-
 /**
  * Video Interface
  * These functions emulate the various peripherals (internal and external)

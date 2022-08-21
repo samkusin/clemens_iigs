@@ -96,11 +96,13 @@ private:
   sg_buffer vertexBuffer_;
   sg_image hgrColorArray_;
   sg_image dblhgrColorArray_;
+  sg_image rgbaColorArray_;
   sg_image graphicsTarget_;
   sg_image screenTarget_;
   sg_pass screenPass_;
 
   uint8_t* emulatorVideoBuffer_;
+  uint8_t* emulatorRGBABuffer_;
   float emulatorVideoDimensions_[2];
   float emulatorMonitorDimensions_[2];
   unsigned emulatorTextColor_;

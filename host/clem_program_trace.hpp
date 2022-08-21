@@ -14,6 +14,8 @@ class ClemensProgramTrace
 public:
   ClemensProgramTrace();
 
+  void enableToolboxLogging(bool enable);
+
   ClemensTraceExecutedInstruction& addExecutedInstruction(
     const ClemensInstruction& instruction,
     const char* operand,
@@ -40,6 +42,14 @@ private:
   uint32_t actionCurrent_;
   std::vector<Action> actions_;
   std::vector<uint32_t> freeActionIndices_;
+
+  struct Toolbox {
+    uint16_t call;
+    uint16_t pc;
+    uint8_t pbr;
+  };
+  std::vector<Toolbox> toolboxCalls_;
+  bool enableToolboxLogging_;
 };
 
 #endif

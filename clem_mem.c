@@ -1771,6 +1771,7 @@ void clem_read(ClemensMachine *clem, uint8_t *data, uint16_t adr, uint8_t bank,
     } else {
       bank_actual = page->bank_read;
     }
+
     bank_mem = _clem_get_memory_bank(clem, bank_actual, &mega2_access);
 
     //  TODO: when reading from e0/e1 banks, is it always slow?

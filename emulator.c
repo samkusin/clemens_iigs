@@ -200,6 +200,7 @@ static inline void
 _opcode_instruction_define_simple(struct ClemensInstruction *instr,
                                   uint8_t opcode) {
   instr->desc = &sOpcodeDescriptions[opcode];
+  instr->opc = opcode;
   instr->bank = 0x00;
   instr->opc_8 = false;
   instr->value = 0x0000;
@@ -1180,14 +1181,22 @@ void clemens_eject_disk(ClemensMachine *clem, enum ClemensDriveType drive_type,
 
 ClemensMonitor *clemens_get_monitor(ClemensMonitor *monitor,
                                     ClemensMachine *clem) {
+  struct ClemensVGC* vgc = &clem->mmio.vgc;
+
   //  TODO: use vgc flags to detect NTSC vs PAL, Mono vs RGB
   monitor->signal = CLEM_MONITOR_SIGNAL_NTSC;
   monitor->signal = CLEM_MONITOR_COLOR_RGB;
-  monitor->width = 560;
-  monitor->height = 384;
   monitor->border_color = clem->mmio.dev_rtc.ctl_c034 & 0x0f;
   monitor->text_color = ((clem->mmio.vgc.text_bg_color & 0xf) << 4) |
                         (clem->mmio.vgc.text_fg_color & 0xf);
+
+  if (vgc->mode_flags & CLEM_VGC_SUPER_HIRES) {
+    monitor->width = 640;
+    monitor->height = 400;
+  } else {
+    monitor->width = 560;
+    monitor->height = 384;
+  }
   return monitor;
 }
 
@@ -1219,10 +1228,20 @@ void _clem_build_rgba_palettes(ClemensVideo *video, uint8_t *e1_bank) {
      byte 0 - green:blue, byte 1 - none:red nibbles
   */
   uint8_t *src = e1_bank + 0x9e00;
-  unsigned i;
+  unsigned i, r, g, b;
   for (i = 0; i < 256; ++i, src += 2) {
-    video->rgba[i] = (src[1] & 0x0f) | ((uint32_t)(src[0] & 0xf0) << 8) |
-                     ((uint32_t)(src[0] & 0x0f) << 16) | (0xff000000);
+    b = src[0] & 0xf;
+    g = src[0] >> 4;
+    r = src[1] & 0xf;
+
+    video->rgba[i] = (((r << 4) | r) << 24) |
+                     (((g << 4) | g) << 16) |
+                     (((b << 4) | b) << 8) |
+                     0xff;
+  }
+  src = e1_bank + 0x9d00;
+  for (i = 0; i < video->scanline_count; ++i) {
+    video->scanlines[i].control = src[i];
   }
 }
 
@@ -1237,6 +1256,7 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video,
     video->scanline_byte_cnt = 160;
     video->scanlines = vgc->shgr_scanlines;
     _clem_build_rgba_palettes(video, clem->mega2_bank_map[1]);
+    return video;
   } else if (vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE) {
     video->scanline_start = 0;
     if (vgc->mode_flags & CLEM_VGC_HIRES) {

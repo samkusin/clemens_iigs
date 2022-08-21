@@ -230,7 +230,7 @@ struct ClemensDeviceDebugger {
  */
 struct ClemensScanline {
   unsigned offset;
-  unsigned control; /**< Used for IIgs scanline control */
+  unsigned control;                    /**< Used for IIgs scanline control */
 };
 
 struct ClemensVGC {
@@ -476,6 +476,7 @@ struct ClemensInstruction {
   uint16_t value;
   uint8_t pbr;
   uint8_t bank;
+  uint8_t opc;
   bool opc_8;
   uint32_t cycles_spent;
 };

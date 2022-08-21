@@ -56,6 +56,8 @@
 #define CLEM_DEBUG_LOG_UNIMPL 3
 #define CLEM_DEBUG_LOG_FATAL 4
 
+#define CLEM_DEBUG_TOOLBOX_MMGR   1
+
 /** Setting: ADB keyboard buffer size - this doesn't need to be large since
  *  Apple II apps typically expect to consume events via ISR or prompt polling
  *  of IO registers.  Our host should have the opportunity to send input to the
@@ -531,6 +533,27 @@
 #define CLEM_VGC_COLOR_YELLOW 0x0D
 #define CLEM_VGC_COLOR_AQUAMARINE 0x0E
 #define CLEM_VGC_COLOR_WHITE 0x0F
+
+#define CLEM_VGC_GRAPHICS_MODE     0x00000001
+#define CLEM_VGC_MIXED_TEXT        0x00000002
+#define CLEM_VGC_80COLUMN_TEXT     0x00000004
+#define CLEM_VGC_LORES             0x00000010
+#define CLEM_VGC_HIRES             0x00000020
+#define CLEM_VGC_RESOLUTION_MASK   0x000000F0
+#define CLEM_VGC_SUPER_HIRES       0x00000100
+#define CLEM_VGC_ALTCHARSET        0x00010000
+#define CLEM_VGC_MONOCHROME        0x00020000
+#define CLEM_VGC_PAL               0x00040000
+#define CLEM_VGC_LANGUAGE          0x00080000
+#define CLEM_VGC_ENABLE_VBL_IRQ    0x00100000
+#define CLEM_VGC_DISABLE_AN3       0x00200000
+#define CLEM_VGC_DBLHIRES_MASK     0x00200025
+#define CLEM_VGC_INIT              0x80000000
+
+#define CLEM_VGC_SCANLINE_CONTROL_640_MODE          (0x80)
+#define CLEM_VGC_SCANLINE_CONTROL_INTERRUPT         (0x40)
+#define CLEM_VGC_SCANLINE_COLORFILL_MODE            (0x20)
+#define CLEM_VGC_SCANLINE_PALETTE_INDEX_MASK        (0x0f)
 
 #define CLEM_SCC_PORT_DTR 0x01
 #define CLEM_SCC_PORT_HSKI 0x02

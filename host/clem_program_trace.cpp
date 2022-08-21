@@ -5,11 +5,15 @@
 
 #include <inttypes.h>
 
-ClemensProgramTrace::ClemensProgramTrace()
+ClemensProgramTrace::ClemensProgramTrace() :
+  enableToolboxLogging_(false)
 {
   reset();
 }
 
+void ClemensProgramTrace::enableToolboxLogging(bool enable) {
+  enableToolboxLogging_ = true;
+}
 
 ClemensTraceExecutedInstruction& ClemensProgramTrace::addExecutedInstruction(
   const ClemensInstruction& instruction,
@@ -83,6 +87,15 @@ ClemensTraceExecutedInstruction& ClemensProgramTrace::addExecutedInstruction(
       ++nextSeq_;
       actionCurrent_ = newCurrentActionIdx;
       current = nullptr;
+    }
+  }
+
+  if (enableToolboxLogging_) {
+    if (instruction.opc == CLEM_OPC_JSL && instruction.bank == 0xe1 && instruction.value == 0x0000) {
+      toolboxCalls_.emplace_back();
+      toolboxCalls_.back().call = machineState.cpu.regs.X;
+      toolboxCalls_.back().pc = instruction.addr;
+      toolboxCalls_.back().pbr = instruction.pbr;
     }
   }
 
@@ -177,6 +190,21 @@ void ClemensProgramTrace::exportTrace(const char* filename)
       out[1] = '\0';
       fputs(line, fp);
       actionIndex = action.next;
+    }
+
+    if (!toolboxCalls_.empty()) {
+      fputs("\nTOOLBOX:\n=================================================\n", fp);
+
+      for (auto& tbc: toolboxCalls_) {
+        char* out = &line[0];
+        size_t outLeft = sizeof(line);
+        int amt = snprintf(out, outLeft, "%02X:%04X CALL #%04X", tbc.pbr, tbc.pc, tbc.call);
+        outLeft -= amt;
+        out += amt;
+        out[0] = '\n';
+        out[1] = '\0';
+        fputs(line, fp);
+      }
     }
     fclose(fp);
   }

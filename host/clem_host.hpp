@@ -41,11 +41,12 @@ public:
   void setDisplayImage(ImTextureID texId);
 
 private:
+  struct ClemensDisk;
   void emulate(float deltaTime);
 
   // TODO: consolidate these load/parse/init/release patterns into a class
   //       for reuse/subclassing of different disk types
-  bool createBlankDisk(struct ClemensNibbleDisk *disk);
+  bool createBlankDisk(ClemensDisk *disk);
   bool loadWOZDisk(const char *filename, struct ClemensWOZDisk *woz,
                    ClemensDriveType driveType);
   bool load2IMGDisk(const char *filename, struct Clemens2IMGDisk *disk,
@@ -55,7 +56,6 @@ private:
   bool saveClemensNibbleDisk(ClemensDriveType driveType);
 
 private:
-  struct ClemensDisk;
 
   void doIWMContextWindow();
   void doMemoryMapWindow();
@@ -81,6 +81,7 @@ private:
   bool parseCommandDebugContext(const char *line);
   bool parseCommandSetValue(const char *line);
   bool parseCommandDump(const char *line);
+  bool parseCommandToolbox(const char *line);
 
   bool parseImmediateValue(unsigned &value, const char *line);
   bool parseImmediateString(std::string &value, const char *line);

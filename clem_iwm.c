@@ -500,7 +500,6 @@ void _clem_iwm_io_switch(struct ClemensDeviceIWM *iwm,
     */
     iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_2;
     if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1)) {
-      CLEM_LOG("IWM: setting drive 1");
       iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_1;
       _clem_iwm_reset_lss(iwm, drives, clock);
     }
@@ -513,7 +512,6 @@ void _clem_iwm_io_switch(struct ClemensDeviceIWM *iwm,
 
     iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_1;
     if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2)) {
-      CLEM_LOG("IWM: setting drive 2");
       iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_2;
       ;
       _clem_iwm_reset_lss(iwm, drives, clock);
