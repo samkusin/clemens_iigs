@@ -6,7 +6,7 @@ The Clemens Apple IIgs emulator project is a personal attempt to write a modern 
 
 ## Summary
 
-The current state of the project is a IMGUI (Dear ImGui) debugger front end running the emulator with a very `gdb` like interface to inspect memory, tload disks and reset the system.  Documentation to come.
+The current state of the project is a IMGUI (Dear ImGui) debugger front end running the emulator with a very `gdb` like interface to inspect memory, load disks and reset the system.  Documentation to come.
 
 My goal is to provide a solid Apple IIgs backend + debugger for ambitious developers who want to write a modern frontend.
 
@@ -26,12 +26,13 @@ The emulator backend is written in C.  The `host` front-end is written in C++ wi
 * 80-column
 * IRQ/BRK/RESET interrupts
 * ROM 3 support
+* Super Hi-Res
+* Mockingboard C without SSI-223
 
 ### Missing Features
 
 These are essential IIgs features that will be worked on.  This cannot be considered a working emulator until the following are functional:
 
-* Super Hi-Res
 * Ensoniq Audio
 * Monochrome Display
 * Serial Communication
@@ -45,7 +46,6 @@ These are features that make Clemens an option for casual users.
 
 * Smartport (hard drive emulation)
 * Fast disk support - when disk is on, emulator runs at fastest possible speed
-* Mockingboard
 * 8mhz mode Transwarp-like mode
 * A user-friendly front-end
 * There are others
