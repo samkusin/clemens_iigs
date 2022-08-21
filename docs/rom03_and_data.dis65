@@ -10,7 +10,7 @@
 "EntryFlags":12780031,
 "AutoLabelStyle":"Simple",
 "AnalysisParams":{
-"AnalyzeUncategorizedData":true,
+"AnalyzeUncategorizedData":false,
 "DefaultTextScanMode":"LowHighAscii",
 "MinCharsForString":4,
 "SeekNearbyTargets":true,
@@ -103,6 +103,21 @@
 "Hint":"Code"},
 
 {
+"Low":131731,
+"High":131731,
+"Hint":"Code"},
+
+{
+"Low":131858,
+"High":131858,
+"Hint":"Code"},
+
+{
+"Low":132387,
+"High":132387,
+"Hint":"Code"},
+
+{
 "Low":133316,
 "High":133316,
 "Hint":"Code"},
@@ -125,6 +140,11 @@
 {
 "Low":204872,
 "High":204872,
+"Hint":"Code"},
+
+{
+"Low":262773,
+"High":262773,
 "Hint":"Code"},
 
 {
@@ -417,6 +437,7 @@
 "High":392000,
 "Hint":"Code"}],
 "StatusFlagOverrides":{
+"132387":304,
 "133316":304,
 "203480":304,
 "203931":304,
@@ -437,6 +458,7 @@
 "392000":19922944},
 
 "Comments":{
+"133877":"just a 32-bit incrementer",
 "198833":"Source Region 1",
 "198836":"Source Region 2",
 "198839":"Dest Region",
@@ -597,6 +619,120 @@
 
 "133349":{
 "Text":"varMaxBlock = free_space",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"131845":{
+"Text":"I think this routine detects writable memory per 64K bank starting at bank 0x7f (maximum expandable 8MB RAM on a IIgs) (basically a max mem check?)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"134758":{
+"Text":"_mmgrNextHandle = ptrNextHandle-\u003enext\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"134730":{
+"Text":"ptrNextHandle = _mmgrNextHandle",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"134740":{
+"Text":"if ptrNextHandle != nullptr goto advanceNextHandlePtr\r\n",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"134777":{
+"Text":"if ptrNextHandle-\u003enext != nullptr then ptrNextHandle-\u003enext-\u003eprev = nullptr\r\n--\u003e basically remove free handle from free list",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"132400":{
+"Text":"this will return carry set if the handle was allocated before (pulled from free list)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"132402":{
+"Text":"Copy *some* NewHandle args over to scratch space (blockSize, userID, attrs and the space reserved for the result handle = 12 bytes)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"133884":{
+"Text":"Block will have fixed address?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"133882":{
+"Text":"switch (varMemAttrs)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"133889":{
+"Text":"Make block unmovable and fixed bank",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"133902":{
+"Text":"Bits 10-13 should be zero according to docs... so does this check for invalid addrs and fail?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"133894":{
+"Text":"Block movable?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"133930":{
+"Text":"Block has a fixed bank?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"133947":{
+"Text":"Retrieve the first list node to search through?  Guessing the ones before are known to be system reserved and the value stored at $E11600 + X will contain the first node to check for the app.\r\nStored into $13",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"134252":{
+"Text":"Block must remain in fixed bank",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"134247":{
+"Text":"is bit 0 (block has fixed bank) on or off? \r\nvarMemAttrs \u003e\u003e 1 \u003e\u003e carry",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"134272":{
+"Text":"block address must remain fixed (carry == 1)\r\nvarMemAttrs \u003e\u003e 1 \u003e\u003e carry",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"134295":{
+"Text":"varMemAttrs \u003e\u003e 1 \u003e\u003e carry\r\nBlock must be paged aligned (shifted three bits at this point)",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"134303":{
+"Text":"Align page at memBlockEnd by clearing the first 8-bits",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -1247,6 +1383,146 @@
 "Value":16517327,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"132387":{
+"Label":"T_MEM_NEWHANDLE_0902",
+"Value":16516387,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"71176":{
+"Label":"_mmgrNextHandle",
+"Value":14751240,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"134758":{
+"Label":"advanceNextHandlePtr",
+"Value":16518758,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"134793":{
+"Label":"done",
+"Value":16518793,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"134730":{
+"Label":"_fn_allocHandle",
+"Value":16518730,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"71324":{
+"Label":"_entryfn_allocHandle",
+"Value":14751388,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"132405":{
+"Label":"copy_next",
+"Value":16516405,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"132434":{
+"Label":"userIdIs0",
+"Value":16516434,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"132475":{
+"Label":"blockSizeIs0",
+"Value":16516475,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"71216":{
+"Label":"_mmgrBlockCount",
+"Value":14751280,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"133894":{
+"Label":"checkMovable",
+"Value":16517894,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"133902":{
+"Label":"checkBit12",
+"Value":16517902,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"133947":{
+"Label":"bankNotFixed",
+"Value":16517947,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"134182":{
+"Label":"MMGR_GetHandleListNodeAtX",
+"Value":16518182,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"135003":{
+"Label":"_mmgr_fn_setupMemoryVarsForNode",
+"Value":16519003,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"133984":{
+"Label":"startFromHead",
+"Value":16517984,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"134247":{
+"Label":"isFixed",
+"Value":16518247,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"134272":{
+"Label":"checkBit1AddrFixed",
+"Value":16518272,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"134295":{
+"Label":"checkBit2PageAligned",
+"Value":16518295,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"134319":{
+"Label":"checkUseSpecialMemory",
+"Value":16518319,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -1290,6 +1566,18 @@
 "Length":12288,
 "Format":"Fill",
 "SubFormat":"None",
+"SymbolRef":null},
+
+"71176":{
+"Length":4,
+"Format":"NumericLE",
+"SubFormat":"Address",
+"SymbolRef":null},
+
+"71216":{
+"Length":4,
+"Format":"NumericLE",
+"SubFormat":"Hex",
 "SymbolRef":null},
 
 "73177":{
@@ -2779,8 +3067,61 @@
 "Part":"Low"}}},
 
 "LvTables":{
+"132387":{
+"Variables":[{
+"DataDescriptor":{
+"Length":2,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"UserId arg",
+"HasWidth":true,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"varUserID",
+"Value":9,
+"Source":"Variable",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+{
+"DataDescriptor":{
+"Length":4,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"Size of block to be allocated",
+"HasWidth":true,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"varBlockSize",
+"Value":11,
+"Source":"Variable",
+"Type":"ExternalAddr",
+"LabelAnno":"None"}],
+"ClearPrevious":false},
+
 "133316":{
 "Variables":[{
+"DataDescriptor":{
+"Length":2,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"The memory attributes as passed to NewHandle",
+"HasWidth":true,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"varMemAttrs",
+"Value":7,
+"Source":"Variable",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+{
 "DataDescriptor":{
 "Length":4,
 "Format":"NumericLE",
@@ -2863,6 +3204,23 @@
 "MultiMask":null,
 "Label":"curHandleListPtr",
 "Value":19,
+"Source":"Variable",
+"Type":"ExternalAddr",
+"LabelAnno":"None"},
+
+{
+"DataDescriptor":{
+"Length":4,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"Comment":"Like a pointer to the next NewHandle",
+"HasWidth":true,
+"Direction":"ReadWrite",
+"MultiMask":null,
+"Label":"ptrNextHandle",
+"Value":23,
 "Source":"Variable",
 "Type":"ExternalAddr",
 "LabelAnno":"None"},

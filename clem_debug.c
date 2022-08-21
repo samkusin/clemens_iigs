@@ -140,7 +140,7 @@ static void _debug_toolbox_mmgr(ClemensMachine *context) {
       mem = base_mem + (mmgr_handle.next & 0xffff);
     } else if ((mmgr_handle.next & 0x00ff0000) == 0x00e00000) {
       base_addr = 0x00e00000;
-      base_mem = context->mega2_bank_map[1];
+      base_mem = context->mega2_bank_map[0];
       mem = base_mem + (mmgr_handle.next & 0xffff);
     } else {
       CLEM_WARN("[debug.toolbox.mmgr]: handle located at unexpected bank %02X",
