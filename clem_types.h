@@ -559,6 +559,60 @@ enum ClemensVideoFormat {
  * @brief
  *
  */
+typedef struct ClemensMachine {
+  struct Clemens65C816 cpu;
+  /* clocks spent per cycle as set by the current speed settings */
+  clem_clocks_duration_t clocks_step;
+  /* clocks spent per cycle in fast mode */
+  clem_clocks_duration_t clocks_step_fast;
+  /* typically FPI speed mhz * clocks_step_fast */
+  clem_clocks_duration_t clocks_step_mega2;
+  /* clock timer - never change once system has been started */
+  clem_clocks_time_t clocks_spent;
+
+  /** Internal, tracks cycle count for holding down the reset key */
+  int resb_counter;
+  /** Internal, skips mmio if in 'simple' mode */
+  bool mmio_bypass;
+
+  struct ClemensMMIO mmio;
+  struct ClemensDriveBay active_drives;
+
+  /* each used bank MUST be 64K (65536) bytes */
+  uint8_t *fpi_bank_map[256]; // $00 - $ff
+  bool fpi_bank_used[256];
+  uint8_t *mega2_bank_map[2]; // $e0 - $e1
+
+  /* Provides remapping of memory read/write access per bank.  For the IIgs,
+     this map covers shadowed memory as well as language card and main/aux
+     bank access.
+  */
+  struct ClemensMemoryPageMap *bank_page_map[256];
+
+  /** Handlers for all slots */
+  ClemensCard *card_slot[7];
+  /** Expansion ROM area for each card.  This area is paged into addressable
+   *  memory with the correct IO instructions.  Each area should be 2K in
+   *  size.  As with card slot memory, slot 3 is ignored */
+  uint8_t *card_slot_expansion_memory[7];
+
+  /* Optional callback for debugging purposes.
+     When issued, it's guaranteed that all registers/CPU state has been
+     updated (and can be viewed as an accurate state of the machine after
+     running the opcode)
+  */
+  uint32_t debug_flags; // See enum kClemensDebugFlag_
+  void *debug_user_ptr;
+  /* opcode print callback */
+  ClemensOpcodeCallback opcode_post;
+  /* logger callback (if NULL, uses stdout) */
+  LoggerFn logger_fn;
+} ClemensMachine;
+
+/**
+ * @brief
+ *
+ */
 typedef struct {
   struct ClemensScanline *scanlines;
   int scanline_byte_cnt;
@@ -585,62 +639,6 @@ typedef struct {
   unsigned frame_stride; /** each frame is this size */
 } ClemensAudio;
 
-/**
- * @brief
- *
- */
-typedef struct ClemensMachine {
-  struct Clemens65C816 cpu;
-  /* clocks spent per cycle as set by the current speed settings */
-  clem_clocks_duration_t clocks_step;
-  /* clocks spent per cycle in fast mode */
-  clem_clocks_duration_t clocks_step_fast;
-  /* typically FPI speed mhz * clocks_step_fast */
-  clem_clocks_duration_t clocks_step_mega2;
-  /* clock timer - never change once system has been started */
-  clem_clocks_time_t clocks_spent;
-
-  /* each used bank MUST be 64K (65536) bytes */
-  uint8_t *fpi_bank_map[256]; // $00 - $ff
-  bool fpi_bank_used[256];
-
-  /* Provides remapping of memory read/write access per bank.  For the IIgs,
-     this map covers shadowed memory as well as language card and main/aux
-     bank access.
-  */
-  struct ClemensMemoryPageMap *bank_page_map[256];
-
-  /* Optional callback for debugging purposes.
-     When issued, it's guaranteed that all registers/CPU state has been
-     updated (and can be viewed as an accurate state of the machine after
-     running the opcode)
-  */
-  uint32_t debug_flags; // See enum kClemensDebugFlag_
-  void *debug_user_ptr;
-  /* opcode print callback */
-  ClemensOpcodeCallback opcode_post;
-  /* logger callback (if NULL, uses stdout) */
-  LoggerFn logger_fn;
-
-  /** Internal, tracks cycle count for holding down the reset key */
-  int resb_counter;
-  /** Internal, skips mmio if in 'simple' mode */
-  bool mmio_bypass;
-
-  /* The above can be moved to a 'simple' struct, and the below is specizlied
-     for the IIgs
-  */
-  uint8_t *mega2_bank_map[2]; // $e0 - $e1
-  /** Handlers for all slots */
-  ClemensCard *card_slot[7];
-  /** Expansion ROM area for each card.  This area is paged into addressable
-   *  memory with the correct IO instructions.  Each area should be 2K in
-   *  size.  As with card slot memory, slot 3 is ignored */
-  uint8_t *card_slot_expansion_memory[7];
-
-  struct ClemensMMIO mmio;
-  struct ClemensDriveBay active_drives;
-} ClemensMachine;
 
 #ifdef __cplusplus
 }
