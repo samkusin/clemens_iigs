@@ -22,45 +22,6 @@ union ClemensSerializerVariant {
 #define CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER 0x00000001
 #define CLEM_SERIALIZER_CUSTOM_RECORD_NIBBLE_DISK 0x00000002
 
-struct ClemensSerializerRecord kCPUPins[] = {
-    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPUPins, adr),
-    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPUPins, bank),
-    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPUPins, data),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, abortIn),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, busEnableIn),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, irqbIn),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, nmibIn),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, readyOut),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, resbIn),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, emulation),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, vdaOut),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, vpaOut),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, rwbOut),
-    CLEM_SERIALIZER_RECORD_EMPTY()};
-
-struct ClemensSerializerRecord kCPURegs[] = {
-    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, A),
-    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, X),
-    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, Y),
-    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, D),
-    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, S),
-    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, PC),
-    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, IR),
-    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, P),
-    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, DBR),
-    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, PBR),
-    CLEM_SERIALIZER_RECORD_EMPTY()};
-
-struct ClemensSerializerRecord kCPU[] = {
-    CLEM_SERIALIZER_RECORD_OBJECT(struct Clemens65C816, pins,
-                                  struct ClemensCPUPins, kCPUPins),
-    CLEM_SERIALIZER_RECORD_OBJECT(struct Clemens65C816, regs,
-                                  struct ClemensCPURegs, kCPURegs),
-    CLEM_SERIALIZER_RECORD_INT32(struct Clemens65C816, state_type),
-    CLEM_SERIALIZER_RECORD_UINT32(struct Clemens65C816, cycles_spent),
-    CLEM_SERIALIZER_RECORD_BOOL(struct Clemens65C816, enabled),
-    CLEM_SERIALIZER_RECORD_EMPTY()};
-
 struct ClemensSerializerRecord kVGC[] = {
     /* scan lines are generated */
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensVGC, ts_last_frame),
@@ -168,6 +129,7 @@ struct ClemensSerializerRecord kAudio[] = {
 
 struct ClemensSerializerRecord kSCC[] = {
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceSCC, ts_last_frame),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCC, state),
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceSCC,
                                  kClemensSerializerTypeUInt32, selected_reg, 2,
                                  0),
@@ -296,7 +258,47 @@ struct ClemensSerializerRecord kDriveBay[] = {
                                          struct ClemensDrive, kDrive),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
-struct ClemensSerializerRecord kMachine[] = {
+struct ClemensSerializerRecord kCPURegs[] = {
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, A),
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, X),
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, Y),
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, D),
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, S),
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, PC),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, IR),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, P),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, DBR),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPURegs, PBR),
+    CLEM_SERIALIZER_RECORD_EMPTY()};
+
+
+struct ClemensSerializerRecord kCPUPins[] = {
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPUPins, adr),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPUPins, bank),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensCPUPins, data),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, abortIn),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, busEnableIn),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, irqbIn),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, nmibIn),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, readyOut),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, resbIn),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, emulation),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, vdaOut),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, vpaOut),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensCPUPins, rwbOut),
+    CLEM_SERIALIZER_RECORD_EMPTY()};
+
+struct ClemensSerializerRecord kCPU[] = {
+    CLEM_SERIALIZER_RECORD_OBJECT(struct Clemens65C816, pins,
+                                  struct ClemensCPUPins, kCPUPins),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct Clemens65C816, regs,
+                                  struct ClemensCPURegs, kCPURegs),
+    CLEM_SERIALIZER_RECORD_INT32(struct Clemens65C816, state_type),
+    CLEM_SERIALIZER_RECORD_UINT32(struct Clemens65C816, cycles_spent),
+    CLEM_SERIALIZER_RECORD_BOOL(struct Clemens65C816, enabled),
+    CLEM_SERIALIZER_RECORD_EMPTY()};
+
+  struct ClemensSerializerRecord kMachine[] = {
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, cpu, struct Clemens65C816,
                                   kCPU),
     CLEM_SERIALIZER_RECORD_DURATION(ClemensMachine, clocks_step),
@@ -311,10 +313,12 @@ struct ClemensSerializerRecord kMachine[] = {
                                   struct ClemensDriveBay, kDriveBay),
 
     /* FPI bank map has custom serialization */
+    /* TODO: FPI BANK MAP and FP_BANK_USED */
     CLEM_SERIALIZER_RECORD_ARRAY(ClemensMachine, kClemensSerializerTypeBlob,
                                  mega2_bank_map, 2, CLEM_IIGS_BANK_SIZE),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
+// see clem_disk.h
 struct ClemensSerializerRecord kNibbleDisk[] = {
     // CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, disk_type),
     // CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, boot_type),
@@ -750,8 +754,7 @@ static unsigned clemens_unserialize_custom(mpack_reader_t *reader, void *ptr,
       mpack_read_bytes(reader, (char *)nib_disk->bits_data, v0);
       mpack_done_bin(reader);
     } else {
-      nib_disk->bits_data = NULL;
-      nib_disk->bits_data_end = NULL;
+      memset(nib_disk->bits_data, 0, nib_disk->bits_data_end - nib_disk->bits_data);
     }
     break;
   }
