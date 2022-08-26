@@ -137,20 +137,32 @@ struct ClemensAudioMixBuffer {
   uint8_t *data;
   unsigned stride;
   unsigned frame_count;
-  unsigned frames_per_second; /**< target audio frequency */
+  unsigned frames_per_second;   /**< target audio frequency */
+};
+
+struct ClemensDeviceEnsoniq {
+  /** Clocks budget for oscillator sync */
+  clem_clocks_duration_t dt_budget;
+  /** cycle counter with 1 cycle per oscillator */
+  unsigned cycle;
+
+  uint8_t sound_ram[65536];
+  uint8_t reg[256];             /**< DOC register values */
+  unsigned acc[32];             /**< Oscillator running accumulator */
+  unsigned ptr[32];             /**< Stored pointer from last cycle */
+  uint8_t irq_stack[32];        /**< IRQ stack */
+  unsigned irq_top;             /**< top of IRQ stack */
+
+  unsigned address;             /**< 16-bit address into RAM or registers */
+  unsigned ram_read_cntr;       /**< RAM read counter, reset on address change */
+
+  bool addr_auto_inc;           /**< Address auto incremented on access */
+  bool is_access_ram;           /**< If true, sound RAM, if false, registers */
+  bool is_busy;                 /**< DOC busy */
 };
 
 struct ClemensDeviceAudio {
-  uint8_t sound_ram[65536];
-
-  unsigned address;       /**< 16-bit address into RAM or registers */
-  unsigned ram_read_cntr; /**< RAM read counter, reset on address change */
-
-  uint8_t doc_reg[256]; /**< DOC register values */
-
-  bool addr_auto_inc; /**< Address auto incremented on access */
-  bool is_access_ram; /**< If true, sound RAM, if false, registers */
-  bool is_busy;       /**< DOC busy */
+  struct ClemensDeviceEnsoniq doc;
 
   /* settings */
   uint8_t volume;        /**< 0 - 15 */
