@@ -151,7 +151,6 @@ struct ClemensDeviceEnsoniq {
   unsigned acc[32];             /**< Oscillator running accumulator */
   unsigned ptr[32];             /**< Stored pointer from last cycle */
   uint8_t osc_flags[32];        /**< IRQ flagged */
-  unsigned irq_top;             /**< top of IRQ stack */
 
   unsigned address;             /**< 16-bit address into RAM or registers */
   unsigned ram_read_cntr;       /**< RAM read counter, reset on address change */

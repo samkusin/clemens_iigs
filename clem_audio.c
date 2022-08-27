@@ -102,26 +102,6 @@
 
 #define CLEM_ENSONIQ_OSC_LIMIT      32
 
-#define CLEM_ENSONIQ_OSC_CTL_FREE_MODE  0x00
-#define CLEM_ENSONIQ_OSC_CTL_M0    0x02
-#define CLEM_ENSONIQ_OSC_CTL_SYNC  0x04
-#define CLEM_ENSONIQ_OSC_CTL_HALT  0x01
-#define CLEM_ENSONIQ_OSC_CTL_IE    0x08
-
-#define CLEM_ENSONIQ_REG_OSC_FCLOW  0x00
-#define CLEM_ENSONIQ_REG_OSC_FCHI   0x20
-#define CLEM_ENSONIQ_REG_OSC_DATA   0x60
-#define CLEM_ENSONIQ_REG_OSC_PTR    0x80
-#define CLEM_ENSONIQ_REG_OSC_CTRL   0xa0
-#define CLEM_ENSONIQ_REG_OSC_SIZE   0xc0
-#define CLEM_ENSONIQ_REG_OSC_OIR    0xe0
-#define CLEM_ENSONIQ_REG_OSC_ENABLE 0xe1
-#define CLEM_ENSONIQ_REG_OSC_ADC    0xe2
-
-//  see doc->osc_flags
-#define CLEM_ENSONIQ_OSC_FLAG_IRQ  0x01
-
-
 static uint16_t s_ensoniq_ptr_bits_mask[8] = {
   0xff00, 0xfe00, 0xfc00, 0xf800, 0xf000, 0xe000, 0xc000, 0x8000
 };
@@ -140,7 +120,7 @@ void clem_ensoniq_reset(struct ClemensDeviceEnsoniq* doc) {
   memset(doc->ptr, 0, sizeof(doc->ptr));
   memset(doc->osc_flags, 0, sizeof(doc->osc_flags));
   // indicates IRQB line, so no interrupt, bits 0 and 6 == 1
-  doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] = 0xa1;
+  doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] = 0xc1;
   // 1 oscillator x 2 at minimum enabled
   doc->reg[CLEM_ENSONIQ_REG_OSC_ENABLE] = 2;
   // unsigned wave, so 0x80 == 0 signed
@@ -150,14 +130,14 @@ void clem_ensoniq_reset(struct ClemensDeviceEnsoniq* doc) {
 static void _clem_ensoniq_set_irq(struct ClemensDeviceEnsoniq* doc,
                                    unsigned osc_index) {
   if (doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] & 0x80) {
-    doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] = 0x21 | (uint8_t)((osc_index & 0x1f) << 1);
+    doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] = 0x41 | (uint8_t)((osc_index & 0x1f) << 1);
   }
   doc->osc_flags[osc_index] |= CLEM_ENSONIQ_OSC_FLAG_IRQ;
 }
 
 static void _clem_ensoniq_clear_irq(struct ClemensDeviceEnsoniq* doc) {
   unsigned osc_index = (doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] >> 1) & 0x1f;
-  doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] = 0xa1;    // Bits 7, 6 and 0 == 1
+  doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] = 0xc1;    // Bits 7, 6 and 0 == 1
   doc->osc_flags[osc_index] &= ~CLEM_ENSONIQ_OSC_FLAG_IRQ;
 }
 
