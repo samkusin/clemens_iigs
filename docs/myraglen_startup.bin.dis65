@@ -1202,6 +1202,18 @@
 "SubFormat":"Hex",
 "SymbolRef":null},
 
+"71079":{
+"Length":3,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
+"71099":{
+"Length":3,
+"Format":"NumericLE",
+"SubFormat":"Hex",
+"SymbolRef":null},
+
 "96204":{
 "Length":2,
 "Format":"NumericLE",

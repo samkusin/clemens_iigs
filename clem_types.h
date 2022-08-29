@@ -145,11 +145,13 @@ struct ClemensDeviceEnsoniq {
   clem_clocks_duration_t dt_budget;
   /** cycle counter with 1 cycle per oscillator */
   unsigned cycle;
+  /** PCM output (floating point per channel) */
+  float voice[16];
 
   uint8_t sound_ram[65536];
   uint8_t reg[256];             /**< DOC register values */
   unsigned acc[32];             /**< Oscillator running accumulator */
-  unsigned ptr[32];             /**< Stored pointer from last cycle */
+  uint16_t ptr[32];             /**< Stored pointer from last cycle */
   uint8_t osc_flags[32];        /**< IRQ flagged */
 
   unsigned address;             /**< 16-bit address into RAM or registers */

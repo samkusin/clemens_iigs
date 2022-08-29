@@ -982,7 +982,7 @@ void ClemensHost::doEnsoniqWindow() {
   //           Data, ACC, PTR
   //
   unsigned oscCount = doc.reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1;
-  ImGui::BeginTable("MMIO_Ensoniq_OSC", 6);
+  ImGui::BeginTable("MMIO_Ensoniq_OSC", 10);
   {
     ImGui::TableSetupColumn("OSC");
     ImGui::TableSetupColumn("IE");
@@ -990,11 +990,18 @@ void ClemensHost::doEnsoniqWindow() {
     ImGui::TableSetupColumn("M1");
     ImGui::TableSetupColumn("M0");
     ImGui::TableSetupColumn("CH");
+    ImGui::TableSetupColumn("FC");
+    ImGui::TableSetupColumn("ACC");
+    ImGui::TableSetupColumn("TBL");
+    ImGui::TableSetupColumn("PTR");
     ImGui::TableHeadersRow();
     ImColor oscActiveColor(0, 255, 255);
     ImColor oscHalted(64, 64, 64);
     for (unsigned oscIndex = 0; oscIndex < oscCount; ++oscIndex) {
       auto ctl = doc.reg[CLEM_ENSONIQ_REG_OSC_CTRL + oscIndex];
+      uint16_t fc =
+        ((uint16_t)doc.reg[CLEM_ENSONIQ_REG_OSC_FCHI + oscIndex] << 8) |
+          doc.reg[CLEM_ENSONIQ_REG_OSC_FCLOW + oscIndex];
       auto flags = doc.osc_flags[oscIndex];
       const ImColor& col = (ctl & CLEM_ENSONIQ_OSC_CTL_HALT) ? oscHalted : oscActiveColor;
       ImGui::TableNextColumn();
@@ -1009,6 +1016,14 @@ void ClemensHost::doEnsoniqWindow() {
       ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_M0) ? '1' : '0');
       ImGui::TableNextColumn();
       ImGui::TextColored(col, "%u", (ctl >> 4));
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%04X", fc);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%06X", doc.acc[oscIndex] & 0x00ffffff);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%04X", (uint16_t)doc.reg[CLEM_ENSONIQ_REG_OSC_PTR + oscIndex] << 8);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%04X",  doc.ptr[oscIndex]);
       ImGui::TableNextRow();
     }
   }
@@ -1543,8 +1558,8 @@ bool ClemensHost::parseCommandLog(const char *line) {
           (kClemensDebugFlag_StdoutOpcode | kClemensDebugFlag_DebugLogOpcode);
       return true;
     }
-    if (!strncasecmp(name, "toolbox", sizeof(name))) {
-
+    if (!strncasecmp(name, "irq", sizeof(name))) {
+      // TODO
     }
     if (!strncasecmp(name, "code", sizeof(name))) {
       if (programTrace_) {

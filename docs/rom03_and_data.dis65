@@ -123,6 +123,26 @@
 "Hint":"Code"},
 
 {
+"Low":183543,
+"High":183543,
+"Hint":"Code"},
+
+{
+"Low":183593,
+"High":183593,
+"Hint":"Code"},
+
+{
+"Low":184554,
+"High":184554,
+"Hint":"Code"},
+
+{
+"Low":185611,
+"High":185611,
+"Hint":"Code"},
+
+{
 "Low":203480,
 "High":203480,
 "Hint":"Code"},
@@ -145,6 +165,11 @@
 {
 "Low":262773,
 "High":262773,
+"Hint":"Code"},
+
+{
+"Low":306551,
+"High":306551,
 "Hint":"Code"},
 
 {
@@ -439,6 +464,7 @@
 "StatusFlagOverrides":{
 "132387":304,
 "133316":304,
+"183543":304,
 "203480":304,
 "203931":304,
 "203947":304,
@@ -475,6 +501,11 @@
 "357943":"Y \u003e= 5?",
 "357989":"This will return to the PC loaded onto the stack from a call table",
 "357995":"Load PC (return address) into stack rts ",
+"375935":"fast speed",
+"375938":"valid cya and I/O addressing",
+"375957":"zero page DP",
+"376275":"double load required whenever instigating a new data read",
+"376393":"pop the DIAGTYPE \u0026 INTEN result",
 "391331":"save speed register",
 "391335":"Fast speed",
 "391345":"restores speed register",
@@ -733,6 +764,66 @@
 
 "134303":{
 "Text":"Align page at memBlockEnd by clearing the first 8-bits",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"376285":{
+"Text":"IRQ should be cleared on second read if so then continue else proceed and throw an error",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"376258":{
+"Text":"Check DOC Interrupt register",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"376287":{
+"Text":"This will generate a sysfail if the sound manager hasn\u0027t been initialized",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"376326":{
+"Text":"Check DIAGTYPE interrupts",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"376244":{
+"Text":"Check DOC interrupts",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"375916":{
+"Text":"The IRQ handler issued from 00C074/E10010 for ROM 03\r\nThe 16-bit vector points to a hook that clears overflow",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"375926":{
+"Text":"Ensure valid CYA (fast speed) and shadow settings for IRQ",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"375960":{
+"Text":"emulator mode IRQ check?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"375962":{
+"Text":"emulated 6502 IRQ setup?",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"375970":{
+"Text":"Serial Communications IRQ",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -1523,6 +1614,118 @@
 "Value":16518319,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"375916":{
+"Label":"IRQ_HANDLER",
+"Value":16759916,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"376244":{
+"Label":"check_doc",
+"Value":16760244,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"184554":{
+"Label":"T_SND_SETSOUNDMIRQV",
+"Value":16568554,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"185611":{
+"Label":"MasterSoundIRQV",
+"Value":16569611,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"65740":{
+"Label":"_varDOCInterruptRegister",
+"Value":14745804,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"376310":{
+"Label":"doc_no_irq",
+"Value":16760310,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"376369":{
+"Label":"adb_irq",
+"Value":16760369,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"65800":{
+"Label":"_irq_saved_A",
+"Value":14745864,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"65817":{
+"Label":"_irq_saved_shadow_reg",
+"Value":14745881,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"65818":{
+"Label":"_irq_saved_cya_reg",
+"Value":14745882,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"65804":{
+"Label":"_irq_saved_Y",
+"Value":14745868,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"65802":{
+"Label":"_irq_saved_X",
+"Value":14745866,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"65808":{
+"Label":"_var_saved_dp",
+"Value":14745872,
+"Source":"User",
+"Type":"GlobalAddr",
+"LabelAnno":"None"},
+
+"375968":{
+"Label":"check_irq_6502",
+"Value":16759968,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"376086":{
+"Label":"common_816_irq",
+"Value":16760086,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"65580":{
+"Label":"TB_IRQ_SOUND_HOOK",
+"Value":14745644,
+"Source":"User",
+"Type":"GlobalAddr",
 "LabelAnno":"None"}},
 
 "OperandFormats":{
@@ -1565,6 +1768,12 @@
 "53248":{
 "Length":12288,
 "Format":"Fill",
+"SubFormat":"None",
+"SymbolRef":null},
+
+"65800":{
+"Length":2,
+"Format":"NumericLE",
 "SubFormat":"None",
 "SymbolRef":null},
 
@@ -3352,5 +3561,9 @@
 "Bank":0},
 
 "133320":{
+"FollowPbr":false,
+"Bank":225},
+
+"375926":{
 "FollowPbr":false,
 "Bank":225}}}

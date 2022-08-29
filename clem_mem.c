@@ -328,7 +328,7 @@ static uint8_t _clem_mmio_mega2_inten_get(struct ClemensMMIO *mmio) {
 }
 
 static uint8_t _clem_mmio_inttype_c046(struct ClemensMMIO *mmio) {
-  uint8_t result = mmio->irq_line ? CLEM_MMIO_INTTYPE_IRQ : 0;
+  uint8_t result = 0x0; // mmio->irq_line ? CLEM_MMIO_INTTYPE_IRQ : 0;
 
   if (mmio->irq_line & CLEM_IRQ_TIMER_QSEC) {
     result |= CLEM_MMIO_INTTYPE_QSEC;
