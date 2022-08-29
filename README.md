@@ -2,6 +2,7 @@
 
 ![Boot Sequence Demo](https://samirsinha.com/images/sample-iigs-boot.gif)
 
+
 The Clemens Apple IIgs emulator project is a personal attempt to write a modern functional emulator for the 65816 CPU based computer system from the late 1980s by Apple Computer, Inc.
 
 ## Summary
@@ -12,7 +13,8 @@ My goal is to provide a solid Apple IIgs backend + debugger for ambitious develo
 
 The emulator backend is written in C.  The `host` front-end is written in C++ with a few header only libraries for boilerplate rendering, I/O, GUI.
 
-### Disk types supported as of Version 0.2
+
+### Supported Disk Types
 
 * 5.25" and 3.5" WOZ images
 * DSK, 2MG, DO, PO images
@@ -55,6 +57,12 @@ These are features that make Clemens an option for casual users.
 The CHANGELOG.md contains what has been done and what will be done in the current version.
 
 The `docs` folder contains some very rough notes on various systems and technical notes for the IIgs.
+
+## Current Screenshots of IIgs Functionality
+
+![Myraglen](https://samirsinha.com/images/myraglen.png)
+
+![ProDOS 16](https://samirsinha.com/images/prodos16.png)
 
 ## Building
 
