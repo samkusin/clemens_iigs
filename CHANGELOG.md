@@ -1,12 +1,23 @@
 
+## Version 0.4 (WIP)
+
+* Emulated Mouse support
+* Linux builds (Clang or GCC)
+* New GUI/Debugger layout and improved performance counters
+* Quality-of-life improvements to interface
+* WOZ conversion to 2mg on disk insert for writable disks
+* Improved 3.5" emulated disk speeds
+* More GS title support
+
 ## Version 0.3
 
-* 320x200 mode and ProDOS 16 boot to finder
+* Super Hi-res mode and ProDOS 16 boot to finder
 * 2MG 3.5 and 5.25" support
 * DO, PO and DSK Load and Save
-* Preliminary 6522/Mockingboard architecture added
+* Mockingboard C without SSI-223 (voice) support
 * Improved Apple II Speaker support (still flawed but better)
 * Boots Nox Archaist and various Apple II 128K games
+* Ensoniq support - boots Tower of Myraglen
 
 ## Version 0.2
 

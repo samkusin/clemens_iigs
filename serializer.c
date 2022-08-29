@@ -95,17 +95,32 @@ struct ClemensSerializerRecord kDebugger[] = {
                                  256, 0),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
-struct ClemensSerializerRecord kAudio[] = {
-    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceAudio,
+
+struct ClemensSerializerRecord kEnsoniq[] = {
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceEnsoniq, dt_budget),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceEnsoniq, cycle),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceEnsoniq,
                                  kClemensSerializerTypeUInt8, sound_ram, 65536,
                                  0),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceAudio, address),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceAudio, ram_read_cntr),
-    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceAudio,
-                                 kClemensSerializerTypeUInt8, doc_reg, 256, 0),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceAudio, addr_auto_inc),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceAudio, is_access_ram),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceAudio, is_busy),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceEnsoniq,
+                                 kClemensSerializerTypeUInt8, reg, 256, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceEnsoniq,
+                                 kClemensSerializerTypeUInt32, acc, 32, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceEnsoniq,
+                                 kClemensSerializerTypeUInt32, ptr, 32, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceEnsoniq,
+                                 kClemensSerializerTypeUInt8, osc_flags, 32, 0),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceEnsoniq, address),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceEnsoniq, ram_read_cntr),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceEnsoniq, addr_auto_inc),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceEnsoniq, is_access_ram),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceEnsoniq, is_busy),
+    CLEM_SERIALIZER_RECORD_EMPTY()
+};
+
+struct ClemensSerializerRecord kAudio[] = {
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensDeviceAudio, doc,
+                                  struct ClemensDeviceEnsoniq, kEnsoniq),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceAudio, volume),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceAudio, a2_speaker),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceAudio, a2_speaker_tense),

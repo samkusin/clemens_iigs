@@ -59,6 +59,7 @@ private:
 
   void doIWMContextWindow();
   void doMemoryMapWindow();
+  void doEnsoniqWindow();
   void doDriveBayLights(ClemensDrive *drives, int driveCount, int driveIndex,
                         bool isEnabled, bool isRunning);
 
@@ -184,7 +185,7 @@ private:
 
   enum class InputContext { None, TerminalKeyboardFocus };
 
-  enum class DebugContext { IWM, MemoryMaps };
+  enum class DebugContext { IWM, MemoryMaps, Ensoniq };
 
   InputContext widgetInputContext_;
   DebugContext widgetDebugContext_;

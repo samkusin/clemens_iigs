@@ -611,10 +611,14 @@ void ClemensHost::frame(int width, int height, float deltaTime) {
 
   windowCursorPos.x += windowSize.x;
 
-  ImVec2 memoryViewSize{windowSize.x, windowSize.y};
+  ImVec2 memoryViewSize{windowSize};
   ImVec2 memoryViewCursor{windowCursorPos};
-  ImGui::SetNextWindowPos(memoryViewCursor);
-  ImGui::SetNextWindowSize(memoryViewSize);
+
+  ImVec2 contextViewSize{memoryViewSize.x, memoryViewSize.y * 0.4f};
+  ImVec2 contextViewCursor{windowCursorPos};
+
+  ImGui::SetNextWindowPos(contextViewCursor);
+  ImGui::SetNextWindowSize(contextViewSize);
 
   ImGui::Begin("Context", nullptr,
                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
@@ -644,14 +648,28 @@ void ClemensHost::frame(int width, int height, float deltaTime) {
       ImGui::EndTable();
     }
     ImGui::EndChild();
-    ImGui::Separator();
+  }
+  ImGui::End();
+
+  contextViewCursor.y += contextViewSize.y;
+  contextViewSize.y = memoryViewSize.y * 0.6f;
+  ImGui::SetNextWindowPos(contextViewCursor);
+  ImGui::SetNextWindowSize(contextViewSize);
+
+  ImGui::Begin("Context Detail", nullptr,
+               ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+                   ImGuiWindowFlags_NoBringToFrontOnFocus);
+  {
     if (widgetDebugContext_ == DebugContext::IWM) {
       doIWMContextWindow();
     } else if (widgetDebugContext_ == DebugContext::MemoryMaps) {
       doMemoryMapWindow();
+    } else if (widgetDebugContext_ == DebugContext::Ensoniq) {
+      doEnsoniqWindow();
     }
   }
   ImGui::End();
+
   memoryViewCursor.x += memoryViewSize.x;
   ImGui::SetNextWindowPos(memoryViewCursor);
   ImGui::SetNextWindowSize(memoryViewSize);
@@ -936,6 +954,83 @@ void ClemensHost::doMemoryMapWindow() {
   }
   ImGui::EndTable();
   ImGui::EndGroup();
+}
+
+void ClemensHost::doEnsoniqWindow() {
+  const ClemensDeviceEnsoniq &doc = machine_.mmio.dev_audio.doc;
+
+  ImGui::BeginGroup();
+
+  ImGui::BeginTable("MMIO_Ensoniq_Global", 3);
+  {
+    ImGui::TableSetupColumn("OIR");
+    ImGui::TableSetupColumn("OSC");
+    ImGui::TableSetupColumn("ADC");
+    ImGui::TableHeadersRow();
+    ImGui::TableNextColumn();
+    ImGui::Text("%c:%u", doc.reg[CLEM_ENSONIQ_REG_OSC_OIR] & 0x80 ? '-' : 'I',
+                         (doc.reg[CLEM_ENSONIQ_REG_OSC_OIR] >> 1) & 0x1f);
+    ImGui::TableNextColumn();
+    ImGui::Text("%u", doc.reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1);
+    ImGui::TableNextColumn();
+    ImGui::Text("%02X", doc.reg[CLEM_ENSONIQ_REG_OSC_ADC]);
+  }
+  ImGui::EndTable();
+
+  //  OSC 0, 1, ... N
+  //  Per OSC: Control: Halt, Mode, Channel, IE, IRQ
+  //           Data, ACC, PTR
+  //
+  unsigned oscCount = doc.reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1;
+  ImGui::BeginTable("MMIO_Ensoniq_OSC", 10);
+  {
+    ImGui::TableSetupColumn("OSC");
+    ImGui::TableSetupColumn("IE");
+    ImGui::TableSetupColumn("IR");
+    ImGui::TableSetupColumn("M1");
+    ImGui::TableSetupColumn("M0");
+    ImGui::TableSetupColumn("CH");
+    ImGui::TableSetupColumn("FC");
+    ImGui::TableSetupColumn("ACC");
+    ImGui::TableSetupColumn("TBL");
+    ImGui::TableSetupColumn("PTR");
+    ImGui::TableHeadersRow();
+    ImColor oscActiveColor(0, 255, 255);
+    ImColor oscHalted(64, 64, 64);
+    for (unsigned oscIndex = 0; oscIndex < oscCount; ++oscIndex) {
+      auto ctl = doc.reg[CLEM_ENSONIQ_REG_OSC_CTRL + oscIndex];
+      uint16_t fc =
+        ((uint16_t)doc.reg[CLEM_ENSONIQ_REG_OSC_FCHI + oscIndex] << 8) |
+          doc.reg[CLEM_ENSONIQ_REG_OSC_FCLOW + oscIndex];
+      auto flags = doc.osc_flags[oscIndex];
+      const ImColor& col = (ctl & CLEM_ENSONIQ_OSC_CTL_HALT) ? oscHalted : oscActiveColor;
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%u", oscIndex);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_IE) ? '1' : '0');
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%c", (flags & CLEM_ENSONIQ_OSC_FLAG_IRQ) ? 'I' : ' ');
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_SYNC) ? '1' : '0');
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_M0) ? '1' : '0');
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%u", (ctl >> 4));
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%04X", fc);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%06X", doc.acc[oscIndex] & 0x00ffffff);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%04X", (uint16_t)doc.reg[CLEM_ENSONIQ_REG_OSC_PTR + oscIndex] << 8);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%04X",  doc.ptr[oscIndex]);
+      ImGui::TableNextRow();
+    }
+  }
+  ImGui::EndTable();
+
+  ImGui::EndGroup();
+
 }
 
 void ClemensHost::doDriveBayLights(ClemensDrive *drives, int driveCount,
@@ -1463,8 +1558,8 @@ bool ClemensHost::parseCommandLog(const char *line) {
           (kClemensDebugFlag_StdoutOpcode | kClemensDebugFlag_DebugLogOpcode);
       return true;
     }
-    if (!strncasecmp(name, "toolbox", sizeof(name))) {
-
+    if (!strncasecmp(name, "irq", sizeof(name))) {
+      // TODO
     }
     if (!strncasecmp(name, "code", sizeof(name))) {
       if (programTrace_) {
@@ -1557,6 +1652,10 @@ bool ClemensHost::parseCommandDebugContext(const char *line) {
     }
     if (!strncasecmp(name, "mmap", sizeof(name))) {
       widgetDebugContext_ = DebugContext::MemoryMaps;
+      return true;
+    }
+    if (!strncasecmp(name, "doc", sizeof(name))) {
+      widgetDebugContext_ = DebugContext::Ensoniq;
       return true;
     }
     return false;

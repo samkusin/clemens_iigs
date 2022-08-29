@@ -119,8 +119,8 @@ void clem_ensoniq_reset(struct ClemensDeviceEnsoniq* doc) {
   memset(doc->acc, 0, sizeof(doc->acc));
   memset(doc->ptr, 0, sizeof(doc->ptr));
   memset(doc->osc_flags, 0, sizeof(doc->osc_flags));
-  // ensures no interrupt triggered
-  doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] = 0xff;
+  // indicates IRQB line, so no interrupt, bits 0 and 6 == 1
+  doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] = 0xc1;
   // 1 oscillator x 2 at minimum enabled
   doc->reg[CLEM_ENSONIQ_REG_OSC_ENABLE] = 2;
   // unsigned wave, so 0x80 == 0 signed
@@ -130,15 +130,14 @@ void clem_ensoniq_reset(struct ClemensDeviceEnsoniq* doc) {
 static void _clem_ensoniq_set_irq(struct ClemensDeviceEnsoniq* doc,
                                    unsigned osc_index) {
   if (doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] & 0x80) {
-    doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] &= ~0xbe;    // 01000001
-    doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] |= ((uint8_t)(osc_index << 1) & 0x3e);
+    doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] = 0x41 | (uint8_t)((osc_index & 0x1f) << 1);
   }
   doc->osc_flags[osc_index] |= CLEM_ENSONIQ_OSC_FLAG_IRQ;
 }
 
 static void _clem_ensoniq_clear_irq(struct ClemensDeviceEnsoniq* doc) {
   unsigned osc_index = (doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] >> 1) & 0x1f;
-  doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] |= 0x80;
+  doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] = 0xc1;    // Bits 7, 6 and 0 == 1
   doc->osc_flags[osc_index] &= ~CLEM_ENSONIQ_OSC_FLAG_IRQ;
 }
 
@@ -272,7 +271,6 @@ unsigned clem_ensoniq_voices(struct ClemensDeviceEnsoniq* doc) {
     if (!data) continue;
     //  AM mode is handled in the even oscillator
     if (sync_mode && (osc_idx & 1)) continue;
-
     if ((osc_idx + 1) & 1) {
       // TODO: this can be precalculated and stored into osc_flags for the
       //       current channel during the oscillator pass
@@ -282,7 +280,6 @@ unsigned clem_ensoniq_voices(struct ClemensDeviceEnsoniq* doc) {
         volume = doc->reg[CLEM_ENSONIQ_REG_OSC_DATA + osc_idx + 1];
       }
     }
-
     doc->voice[channel] += level * (volume/255.0f);
   }
 
@@ -357,20 +354,23 @@ uint8_t clem_ensoniq_read_data(struct ClemensDeviceEnsoniq* doc, uint8_t flags) 
       when we read the interrupt register on the DOC, it's read
       twice, following the convention here)
   */
-  if (doc->is_access_ram) {
-    result = doc->sound_ram[doc->address & 0xffff];
-  } else {
+  if (!doc->is_access_ram) {
+    /* do not apply this funky read logic to DOC register
+        reads to be safe - even though the ROM implies double
+        reading on address change is required.
+    */
     result = doc->reg[doc->address & 0xff];
+    switch (doc->address & 0xff) {
+      case CLEM_ENSONIQ_REG_OSC_OIR:
+        _clem_ensoniq_clear_irq(doc);
+        break;
+      default:
+        break;
+    }
   }
   if (doc->ram_read_cntr > 0) {
-    if (!doc->is_access_ram) {
-      switch (doc->address & 0xff) {
-        case CLEM_ENSONIQ_REG_OSC_OIR:
-          _clem_ensoniq_clear_irq(doc);
-          break;
-        default:
-          break;
-      }
+    if (doc->is_access_ram) {
+      result = doc->sound_ram[doc->address & 0xffff];
     }
     if (doc->addr_auto_inc) {
       ++doc->address;

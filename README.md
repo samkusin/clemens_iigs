@@ -26,14 +26,16 @@ The emulator backend is written in C.  The `host` front-end is written in C++ wi
 * 80-column
 * IRQ/BRK/RESET interrupts
 * ROM 3 support
-* Super Hi-Res
+* Super Hi-Res 320/640 modes
 * Mockingboard C without SSI-223
+* Ensoniq audio playback
+
+See CHANGELOG.md for details on the next release's upcoming features.
 
 ### Missing Features
 
 These are essential IIgs features that will be worked on.  This cannot be considered a working emulator until the following are functional:
 
-* Ensoniq Audio
 * Monochrome Display
 * Serial Communication
 * Extended character set text page
