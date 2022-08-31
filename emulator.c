@@ -808,16 +808,23 @@ bool clemens_is_initialized(const ClemensMachine *machine) {
   return true;
 }
 
+void clemens_host_setup(ClemensMachine* clem, LoggerFn logger,
+                        void* debug_user_ptr) {
+  clem->logger_fn = logger;
+  clem->debug_user_ptr = debug_user_ptr;
+  //  TODO: remove this once the debug context singleton limitation is removed
+  //        (see clem_debug.c)
+  clemens_debug_context(clem);
+}
+
 void clemens_opcode_callback(ClemensMachine *clem,
-                             ClemensOpcodeCallback callback,
-                             void *callback_ptr) {
+                             ClemensOpcodeCallback callback) {
   if (callback) {
     clem->debug_flags |= kClemensDebugFlag_OpcodeCallback;
   } else {
     clem->debug_flags &= ~kClemensDebugFlag_OpcodeCallback;
   }
   clem->opcode_post = callback;
-  clem->debug_user_ptr = callback_ptr;
 }
 
 void clemens_create_page_mapping(struct ClemensMemoryPageInfo *page,

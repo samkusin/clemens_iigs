@@ -96,15 +96,32 @@ bool clemens_is_initialized_simple(const ClemensMachine* clem);
 void clemens_emulate(ClemensMachine* clem);
 
 /**
+ * @brief Defines the logger function and machine specific context.
+ *
+ * This must be called before using other debug functionality.  It is mandatory
+ * for logging.
+ *
+ * For generalized debugging using the clem_debug device, see
+ * clemens_debug_context().
+ *
+ * @param clem
+ * @param logger
+ * @param debug_user_ptr
+ */
+void clemens_host_setup(ClemensMachine* clem, LoggerFn logger,
+                        void* debug_user_ptr);
+
+/**
  * @brief
+ *
+ * Must call clemens_host_setup() before defining a callback tp ensure context
+ * is delivered to the callback.
  *
  * @param clem
  * @param callback
- * @param callback_ptr
  */
 void clemens_opcode_callback(ClemensMachine* clem,
-                             ClemensOpcodeCallback callback,
-                             void* callback_ptr);
+                             ClemensOpcodeCallback callback);
 
 /**
  * @brief

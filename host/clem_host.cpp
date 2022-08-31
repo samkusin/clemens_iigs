@@ -1567,8 +1567,7 @@ bool ClemensHost::parseCommandLog(const char *line) {
         return false;
       }
       programTrace_ = std::make_unique<ClemensProgramTrace>();
-      clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint,
-                              this);
+      clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint);
       return true;
     }
     if (!strncasecmp(name, "toolbox", sizeof(name))) {
@@ -1619,7 +1618,7 @@ bool ClemensHost::parseCommandUnlog(const char *line) {
       programTrace_->exportTrace("code.out");
       if (isRunningEmulationUntilBreak()) {
         // don't log
-        clemens_opcode_callback(&machine_, NULL, this);
+        clemens_opcode_callback(&machine_, NULL);
       }
       programTrace_ = nullptr;
       return true;
@@ -1796,8 +1795,7 @@ bool ClemensHost::createMachine(const char *filename, MachineType machineType) {
     return false;
   }
 
-  machine_.logger_fn = &ClemensHost::emulatorLog;
-
+  clemens_host_setup(&machine_, &ClemensHost::emulatorLog, this);
   clemens_debug_context(&machine_);
 
   switch (machineType) {
@@ -1859,7 +1857,7 @@ bool ClemensHost::createMachine(const char *filename, MachineType machineType) {
 
   machineType_ = machineType;
 
-  clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
+  clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint);
 
   memoryViewBank_[0] = 0x00;
   memoryViewBank_[1] = 0x00;
@@ -2236,7 +2234,7 @@ void ClemensHost::stepMachine(int stepCount) {
   emulationSpeedSampled_ = 0.0f;
   machineCyclesSpentDuringSample_ = 0;
   sampleDuration_ = 0.0f;
-  clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint, this);
+  clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint);
 }
 
 bool ClemensHost::emulationRun(unsigned target) {
@@ -2246,7 +2244,7 @@ bool ClemensHost::emulationRun(unsigned target) {
     return false;
   }
   if (!programTrace_) {
-    clemens_opcode_callback(&machine_, NULL, this);
+    clemens_opcode_callback(&machine_, NULL);
   }
   return true;
 }

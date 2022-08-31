@@ -11,7 +11,13 @@
 
 #include <cstdio>
 
+#define CLEMENS_NEW_GUI
+
+#ifdef CLEMENS_NEW_GUI
+#include "clem_front.hpp"
+#else
 #include "clem_host.hpp"
+#endif
 
 #define SOKOL_IMPL
 #include "sokol/sokol_app.h"
@@ -20,7 +26,11 @@
 #include "sokol/sokol_imgui.h"
 
 
+#ifdef CLEMENS_NEW_GUI
+static ClemensFrontend* g_Host = nullptr;
+#else
 static ClemensHost* g_Host = nullptr;
+#endif
 static ClemensHostTimePoint g_LastTimepoint;
 static sg_pass_action g_sgPassAction;
 
@@ -149,7 +159,11 @@ static void onInit()
   g_sokolToADBKey[SAPP_KEYCODE_RIGHT_ALT] = CLEM_ADB_KEY_ROPTION;
   //g_sokolToADBKey[SAPP_KEYCODE_RIGHT_SUPER] = CLEM_ADB_KEY_COMMAND_APPLE;
 
+#ifdef CLEMENS_NEW_GUI
+  g_Host = new ClemensFrontend();
+#else
   g_Host = new ClemensHost();
+#endif
 }
 
 static void onFrame()

@@ -23,6 +23,11 @@ target_include_directories(ckaudio
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
 
+set(CINEK_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/cinek/ckdebug.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cinek/buffer.cpp"
+)
+
 set(SOKOL_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/sokol/sokol_gfx.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/sokol/sokol_app.h"
@@ -52,8 +57,11 @@ endif()
 
 add_executable(clemens_iigs
     ${PLATFORM_SOURCES}
+    ${CINEK_SOURCES}
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_display.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_backend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_front.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_app.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_utils.cpp"
@@ -72,6 +80,7 @@ target_link_libraries(clemens_iigs
         clemens_65816_iocards
         ckaudio)
 
+target_compile_features( clemens_iigs PRIVATE cxx_std_17 )
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(clemens_iigs PRIVATE -Wall -Wextra -pedantic)
     target_compile_options(clemens_iigs PUBLIC -fno-exceptions)

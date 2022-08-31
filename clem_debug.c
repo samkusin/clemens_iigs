@@ -10,6 +10,8 @@ static char s_clem_debug_buffer[65536 * 102];
 static unsigned s_clem_debug_cnt = 0;
 static ClemensMachine *s_clem_machine = NULL;
 
+//  TODO: this debug interface is a singleton.  Making this context per machine
+//        instance will take some work due to how the logger works.
 void clem_debug_context(ClemensMachine *context) { s_clem_machine = context; }
 
 void clem_debug_log(int log_level, const char *fmt, ...) {

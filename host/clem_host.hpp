@@ -17,12 +17,6 @@
 #include <string>
 #include <vector>
 
-struct ClemensHostInputEvent {
-  enum Type { KeyDown, KeyUp };
-  union {
-    unsigned adb_keycode;
-  };
-};
 
 class ClemensAudioDevice;
 class ClemensDisplay;
@@ -37,8 +31,6 @@ public:
   void frame(int width, int height, float deltaTime);
 
   void input(const ClemensInputEvent &input);
-
-  void setDisplayImage(ImTextureID texId);
 
 private:
   struct ClemensDisk;

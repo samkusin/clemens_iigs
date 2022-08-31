@@ -1,13 +1,15 @@
 
 ## Version 0.4 (WIP)
 
-* Emulated Mouse support
-* Linux builds (Clang or GCC)
 * New GUI/Debugger layout and improved performance counters
 * Quality-of-life improvements to interface
+* Emulated Mouse support
+* More GS title support
+* Lores and double lores graphics support
+* Alternate character set support
+* Linux builds (Clang or GCC)
 * WOZ conversion to 2mg on disk insert for writable disks
 * Improved 3.5" emulated disk speeds
-* More GS title support
 
 ## Version 0.3
 
