@@ -1217,6 +1217,7 @@ ClemensVideo *clemens_get_text_video(ClemensVideo *video,
     video->scanline_count = 4;
     video->scanline_start = 20;
   } else {
+    video->format = kClemensVideoFormat_None;
     return NULL;
   }
   video->format = kClemensVideoFormat_Text;
@@ -1292,6 +1293,7 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video,
     }
     video->scanline_byte_cnt = 40;
   } else {
+    video->format = kClemensVideoFormat_None;
     return NULL;
   }
   if (vgc->mode_flags & CLEM_VGC_HIRES) {

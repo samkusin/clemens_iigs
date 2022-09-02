@@ -595,9 +595,7 @@ void ClemensDisplay::renderTextPlane(
   int phase,
   bool useAlternateCharacterSet
 ) {
-  if (video.format != kClemensVideoFormat_Text &&
-      video.format != kClemensVideoFormat_Text_Alternate
-  ) {
+  if (video.format != kClemensVideoFormat_Text) {
     return;
   }
 

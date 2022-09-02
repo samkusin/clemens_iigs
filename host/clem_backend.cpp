@@ -1,6 +1,7 @@
 #include "clem_backend.hpp"
 #include "emulator.h"
 
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <optional>
@@ -9,13 +10,69 @@
 
 static constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
 
-ClemensBackend::ClemensBackend(std::string romPathname, const Config& config) :
+struct ClemensRunSampler {
+  //  our method of keeping the simulation in sync with real time is to rely
+  //  on two counters
+  //    - sDT = simulation counter that ticks at a fixed rate, and
+  //    - aDT = real-time timer that counts the actual time passed
+  //
+  //  if aDT < sDT, then sleep the amount of time needed to catch up with sDT
+  //  if aDT >= sDT, then clamp aDT to sDT
+  std::chrono::microseconds fixedTimeInterval;
+  std::chrono::microseconds actualTimeInterval;
+  std::chrono::microseconds sampledFrameTime;
+  uint64_t seqNo;
+  unsigned sampledFrameCount;
+  double sampledFramesPerSecond;
+
+  ClemensRunSampler() {
+    reset();
+    seqNo = 0;
+  }
+
+  void reset() {
+    fixedTimeInterval = std::chrono::microseconds::zero();
+    actualTimeInterval = std::chrono::microseconds::zero();
+    sampledFrameTime = std::chrono::microseconds::zero();
+    sampledFrameCount = 0;
+    sampledFramesPerSecond = 0.0f;
+  }
+
+  void update(std::chrono::microseconds fixedFrameInterval,
+              std::chrono::microseconds actualFrameInterval) {
+    fixedTimeInterval += fixedFrameInterval;
+    actualTimeInterval += actualFrameInterval;
+    if (actualTimeInterval < fixedTimeInterval) {
+      std::this_thread::sleep_for(fixedTimeInterval - actualTimeInterval);
+      fixedTimeInterval -= actualTimeInterval;
+      actualTimeInterval = std::chrono::microseconds::zero();
+    } else {
+      std::this_thread::yield();
+      if (actualTimeInterval - fixedFrameInterval > std::chrono::microseconds(500000)) {
+        actualTimeInterval = fixedTimeInterval = std::chrono::microseconds::zero();
+      }
+    }
+
+    sampledFrameTime += actualFrameInterval;
+    ++sampledFrameCount;
+
+    if (sampledFrameTime >= std::chrono::microseconds(500000)) {
+      sampledFramesPerSecond = sampledFrameCount * 1e6 / sampledFrameTime.count();
+      sampledFrameTime = std::chrono::microseconds::zero();
+      sampledFrameCount = 0;
+    }
+    ++seqNo;
+  }
+};
+
+ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
+                               PublishStateDelegate publishDelegate) :
   config_(config),
   slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
   emulatorStepsSinceReset_(0) {
-  runner_ = std::thread(&ClemensBackend::run, this);
   romBuffer_ = loadROM(romPathname.c_str());
 
+  memset(&machine_, 0, sizeof(machine_));
   clemens_host_setup(&machine_, &ClemensBackend::emulatorLog, this);
 
   switch (config_.type) {
@@ -26,6 +83,9 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config) :
 
   //  TODO: Only use this when opcode debugging is enabled
   clemens_opcode_callback(&machine_, &ClemensBackend::emulatorOpcodeCallback);
+
+  //  Everything is ready for the main thread
+  runner_ = std::thread(&ClemensBackend::main, this, std::move(publishDelegate));
 }
 
 ClemensBackend::~ClemensBackend() {
@@ -47,6 +107,14 @@ void ClemensBackend::setRefreshFrequency(unsigned hz) {
   queue(Command{Command::SetHostUpdateFrequency, fmt::format("{}", hz)});
 }
 
+void ClemensBackend::run() {
+  queue(Command{Command::RunMachine});
+}
+
+void ClemensBackend::publish() {
+  queue(Command{Command::Publish});
+}
+
 void ClemensBackend::queue(const Command& cmd) {
   {
     std::lock_guard<std::mutex> queuelock(commandQueueMutex_);
@@ -63,28 +131,39 @@ void ClemensBackend::queueToFront(const Command& cmd) {
   commandQueueCondition_.notify_one();
 }
 
-static int64_t calculateClocksPerTimeslice(unsigned hz) {
-    return CLEM_CLOCKS_MEGA2_CYCLE * (int64_t)(CLEM_MEGA2_CYCLES_PER_SECOND) / hz;
+static int64_t calculateClocksPerTimeslice(ClemensMachine* machine, unsigned hz) {
+  bool is_machine_slow;
+  return int64_t(clemens_clocks_per_second(machine, &is_machine_slow) / hz);
 }
 
-void ClemensBackend::run() {
-  int64_t clocksPerTimeslice = calculateClocksPerTimeslice(60);
+void ClemensBackend::main(PublishStateDelegate publishDelegate) {
   int64_t clocksRemainingInTimeslice = 0;
-  std::optional<int> stepsRemaining;
+  std::optional<int> stepsRemaining = 0;
   bool isActive = true;
   bool isMachineReady = false;
 
-  while (isActive) {
-    //  Processes all incoming commands from the frontend to control the
-    //  emulator.
-    std::unique_lock<std::mutex> queuelock(commandQueueMutex_);
-    commandQueueCondition_.wait(queuelock,
-      [this, &stepsRemaining] {
-        //  process commands, or we are in run mode, or in active step mode
-        return !commandQueue_.empty() ||
-               (stepsRemaining.has_value() && *stepsRemaining > 0);
-      });
+  ClemensRunSampler runSampler;
 
+  unsigned emulatorRefreshFrequency = 60;
+  auto fixedFrameInterval =
+    std::chrono::microseconds((long)std::floor(1e6/emulatorRefreshFrequency));
+  auto lastFrameTimePoint = std::chrono::high_resolution_clock::now();
+  while (isActive) {
+    bool isRunning = !stepsRemaining.has_value() || *stepsRemaining > 0;
+    bool publishState = false;
+
+    std::unique_lock<std::mutex> queuelock(commandQueueMutex_);
+    if (!isRunning) {
+      //  waiting for commands
+      commandQueueCondition_.wait(queuelock,
+        [this, &stepsRemaining] {
+          return !commandQueue_.empty();
+        });
+    }
+    //  TODO: we may just be able to use a vector for the command queue and
+    //        create a local copy of the queue to minimize time spent executing
+    //        commands.   the mutex seems to be used just for adds to the
+    //        command queue.
     while (!commandQueue_.empty() && isActive) {
       auto command = commandQueue_.front();
       commandQueue_.pop_front();
@@ -97,13 +176,32 @@ void ClemensBackend::run() {
           isMachineReady = true;
           break;
         case Command::SetHostUpdateFrequency:
-          clocksPerTimeslice = calculateClocksPerTimeslice(std::stoul(command.operand));
+          emulatorRefreshFrequency = std::stoul(command.operand);
+          if (emulatorRefreshFrequency) {
+            fixedFrameInterval =
+              std::chrono::microseconds((long)std::floor(1e6/emulatorRefreshFrequency));
+          } else {
+            fixedFrameInterval = std::chrono::microseconds::zero();
+          }
+          break;
+        case Command::RunMachine:
+          stepsRemaining = std::nullopt;
+          runSampler.reset();
+          break;
+        case Command::Publish:
+          publishState = true;
           break;
       }
     }
     queuelock.unlock();
-
-    if (!isActive || !isMachineReady) continue;
+    //  if isRunning is false, we use a condition var/wait to hold the thread
+    if (!isRunning || !isActive) continue;
+    //  TODO: these edge cases seem sloppy - but we'll need to prevent the
+    //        thread from spinning if the machine will not run
+    if (!isMachineReady || emulatorRefreshFrequency == 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(15));
+      continue;
+    }
 
     //  Run the emulator in either 'step' or 'run' mode.
     //
@@ -115,6 +213,8 @@ void ClemensBackend::run() {
     //  If neither mode is applicable, the emulator holds and this loop will
     //  wait for commands from the frontend
     //
+    int64_t clocksPerTimeslice =
+      calculateClocksPerTimeslice(&machine_, emulatorRefreshFrequency);
     clocksRemainingInTimeslice += clocksPerTimeslice;
     while (clocksRemainingInTimeslice > 0 &&
            (!stepsRemaining.has_value() || *stepsRemaining > 0)) {
@@ -144,6 +244,34 @@ void ClemensBackend::run() {
       //  timeslice and will wait for a new step/run request
       clocksRemainingInTimeslice = 0;
     }
+
+    auto currentFrameTimePoint = std::chrono::high_resolution_clock::now();
+    auto actualFrameInterval = std::chrono::duration_cast<std::chrono::microseconds>(
+      currentFrameTimePoint - lastFrameTimePoint);
+    lastFrameTimePoint = currentFrameTimePoint;
+
+    runSampler.update(fixedFrameInterval, actualFrameInterval);
+    //  TODO: publish emulator state using a callback
+    //        the recipient will synchronize with UI accordingly with the
+    //        assumption that once the callback returns, we can alter the state
+    //        again as needed next timeslice.
+    if (publishState) {
+      ClemensBackendState publishedState {};
+      publishedState.mmio_was_initialized = clemens_is_mmio_initialized(&machine_);
+      if (publishedState.mmio_was_initialized) {
+        clemens_get_monitor(&publishedState.monitor, &machine_);
+        clemens_get_text_video(&publishedState.text, &machine_);
+        clemens_get_graphics_video(&publishedState.graphics, &machine_);
+        clemens_get_audio(&publishedState.audio, &machine_);
+      }
+      publishedState.machine = &machine_;
+      publishedState.seqno = runSampler.seqNo;
+      publishedState.fps = runSampler.sampledFramesPerSecond;
+      publishDelegate(publishedState);
+      if (publishedState.mmio_was_initialized) {
+        clemens_audio_next_frame(&machine_, publishedState.audio.frame_count);
+      }
+    }
   } // isActive
 }
 
@@ -152,7 +280,6 @@ void ClemensBackend::resetMachine() {
   machine_.cpu.pins.resbIn = false;
   emulatorStepsSinceReset_ = 0;
 }
-
 
 cinek::CharBuffer ClemensBackend::loadROM(const char* romPathname) {
   cinek::CharBuffer romBuffer;

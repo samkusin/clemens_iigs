@@ -558,14 +558,13 @@ typedef void (*ClemensOpcodeCallback)(struct ClemensInstruction *, const char *,
  *
  */
 enum ClemensVideoFormat {
+  kClemensVideoFormat_None,
   kClemensVideoFormat_Text,
-  kClemensVideoFormat_Text_Alternate,
   kClemensVideoFormat_Lores,
   kClemensVideoFormat_Hires,
   kClemensVideoFormat_Double_Lores,
   kClemensVideoFormat_Double_Hires,
-  kClemensVideoFormat_Super_Hires,
-  kClemensVideoFormat_Count
+  kClemensVideoFormat_Super_Hires
 };
 
 /**
@@ -645,7 +644,7 @@ typedef struct {
 } ClemensMonitor;
 
 typedef struct {
-  uint8_t *data;         /** format will always by 16-bit pcm stereo */
+  uint8_t *data;         /** format will always by 32-bit float stereo */
   unsigned frame_total;  /** total number of frames in the buffer */
   unsigned frame_start;  /** --frame-- index into the data buffer */
   unsigned frame_count;  /** --frame-- count (this can wrap around) */

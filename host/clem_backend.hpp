@@ -1,12 +1,14 @@
 #ifndef CLEM_HOST_BACKEND_HPP
 #define CLEM_HOST_BACKEND_HPP
 
-#include "clem_types.h"
+#include "clem_host_shared.hpp"
+
 #include "cinek/fixedstack.hpp"
 #include "cinek/buffer.hpp"
 
 #include <condition_variable>
 #include <deque>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -22,22 +24,27 @@ public:
     unsigned audioSamplesPerSecond;
     Type type;
   };
-  ClemensBackend(std::string romPathname, const Config& config);
+  using PublishStateDelegate = std::function<void(const ClemensBackendState&)>;
+  ClemensBackend(std::string romPathname, const Config& config,
+                 PublishStateDelegate publishDelegate);
   ~ClemensBackend();
+
 
   //  Queues a command to the backend.   Most commands are processed on the next
   //  execution frame.  Certain commands may hold the queue (i.e. like wait())
   //  Priority commands like Cancel or Terminate are pushed to the front,
   //  overriding commands like Wait.
   void terminate();
-
   //  Issues a soft reset to the machine.   This is roughly equivalent to pressing
   //  the power button.
   void reset();
-
   //  The host should expect emulator state refreshes at this frequency if in
   //  run mode
   void setRefreshFrequency(unsigned hz);
+  //  Clears step mode and enter run mode
+  void run();
+  //  Will issue the publish delegate on the next machine iteration
+  void publish();
 
 private:
   struct Command {
@@ -45,17 +52,19 @@ private:
       Undefined,
       Terminate,
       SetHostUpdateFrequency,
-      ResetMachine
+      ResetMachine,
+      RunMachine,
+      Publish
     };
-    Type type;
+    Type type = Undefined;
     std::string operand;
   };
 
-  void resetMachine();
-
-  void run();
   void queue(const Command& cmd);
   void queueToFront(const Command& cmd);
+
+  void main(PublishStateDelegate publishDelegate);
+  void resetMachine();
 
   cinek::CharBuffer loadROM(const char* romPathname);
   //  TODO: These methods could be moved into a subclass as they are specific
@@ -71,10 +80,12 @@ private:
 
 private:
   Config config_;
+
   std::thread runner_;
   std::deque<Command> commandQueue_;
   std::mutex commandQueueMutex_;
   std::condition_variable commandQueueCondition_;
+
 
   //  memory allocated once for the machine
   cinek::FixedStack slabMemory_;
