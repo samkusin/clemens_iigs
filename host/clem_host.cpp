@@ -100,7 +100,8 @@ void ClemensHost::Diagnostics::reset() {
   frameTime = 5.0f;
 }
 
-ClemensHost::ClemensHost()
+ClemensHost::ClemensHost(const cinek::ByteBuffer& systemFontLoBuffer,
+                         const cinek::ByteBuffer& systemFontHiBuffer)
     : machine_(), machineType_(MachineType::None), disks35_{}, disks525_{},
       emulationRunTime_(0.0f), emulationSliceTimeLeft_(0.0f),
       emulationSliceDuration_(0.0f), emulationStepCount_(0),
@@ -139,7 +140,9 @@ ClemensHost::ClemensHost()
     disk.diskContainerType = ClemensDisk::None;
   }
 
-  displayProvider_ = std::make_unique<ClemensDisplayProvider>();
+  displayProvider_ = std::make_unique<ClemensDisplayProvider>(
+    systemFontLoBuffer,
+    systemFontHiBuffer);
   display_ = std::make_unique<ClemensDisplay>(*displayProvider_);
 }
 

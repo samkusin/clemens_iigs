@@ -11,7 +11,9 @@
 #include <functional>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <thread>
+#include <vector>
 
 
 //  TODO: Machine type logic could be subclassed into an Apple2GS backend, etc.
@@ -45,6 +47,8 @@ public:
   void run();
   //  Will issue the publish delegate on the next machine iteration
   void publish();
+  //  Send host input to the emulator
+  void inputEvent(const ClemensInputEvent& inputEvent);
 
 private:
   struct Command {
@@ -54,7 +58,8 @@ private:
       SetHostUpdateFrequency,
       ResetMachine,
       RunMachine,
-      Publish
+      Publish,
+      Input
     };
     Type type = Undefined;
     std::string operand;
@@ -65,6 +70,7 @@ private:
 
   void main(PublishStateDelegate publishDelegate);
   void resetMachine();
+  void inputMachine(const std::string_view& inputParam);
 
   cinek::CharBuffer loadROM(const char* romPathname);
   //  TODO: These methods could be moved into a subclass as they are specific
@@ -86,13 +92,13 @@ private:
   std::mutex commandQueueMutex_;
   std::condition_variable commandQueueCondition_;
 
-
   //  memory allocated once for the machine
   cinek::FixedStack slabMemory_;
   //  the actual machine object
   cinek::CharBuffer romBuffer_;
   ClemensMachine machine_;
-  uint64_t emulatorStepsSinceReset_;
+
+  std::vector<ClemensBackendOutputText> logOutput_;
 };
 
 #endif

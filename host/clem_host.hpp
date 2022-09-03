@@ -7,6 +7,7 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_memory_editor.h"
 
+#include "cinek/buffer.hpp"
 #include "cinek/fixedstack.hpp"
 #include "clem_host_utils.hpp"
 #include "external/mpack.h"
@@ -25,7 +26,8 @@ class ClemensProgramTrace;
 
 class ClemensHost {
 public:
-  ClemensHost();
+  ClemensHost(const cinek::ByteBuffer& systemFontLoBuffer,
+              const cinek::ByteBuffer& systemFontHiBuffer);
   ~ClemensHost();
 
   void frame(int width, int height, float deltaTime);

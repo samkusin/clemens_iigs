@@ -3,6 +3,7 @@
 
 #include "clem_types.h"
 #include "sokol/sokol_gfx.h"
+#include "cinek/buffer.hpp"
 
 struct ClemensDisplayVertex
 {
@@ -23,7 +24,8 @@ struct ClemensDisplayVertexParams
 class ClemensDisplayProvider
 {
 public:
-  ClemensDisplayProvider();
+  ClemensDisplayProvider(const cinek::ByteBuffer& systemFontLoBuffer,
+                         const cinek::ByteBuffer& systemFontHiBuffer);
   ~ClemensDisplayProvider();
 
 private:
@@ -32,9 +34,11 @@ private:
   using DrawVertex = ClemensDisplayVertex;
   using DisplayVertexParams = ClemensDisplayVertexParams;
 
+  cinek::ByteBuffer systemFontFileBuffer_;
+  cinek::ByteBuffer systemFontFileHiBuffer_;
+
   sg_image systemFontImage_;
   sg_image systemFontImageHi_;
-  sg_image loresFont_;
   sg_image blankImage_;
   sg_shader textShader_;
   sg_shader backShader_;

@@ -1,5 +1,6 @@
 
 #include "clem_host_platform.h"
+#include <cinttypes>
 
 #if CLEMENS_PLATFORM_WINDOWS
 #define SOKOL_D3D11
@@ -33,8 +34,62 @@ static ClemensHost* g_Host = nullptr;
 #endif
 static ClemensHostTimePoint g_LastTimepoint;
 static sg_pass_action g_sgPassAction;
+static unsigned g_ADBKeyToggleMask = 0;
 
 std::array<unsigned, 512> g_sokolToADBKey;
+
+cinek::ByteBuffer loadFont(const char* pathname) {
+  FILE* fp = fopen(pathname, "rb");
+  if (!fp) return cinek::ByteBuffer();
+
+  fseek(fp, 0, SEEK_END);
+  long sz = ftell(fp);
+  unsigned char* buf = (unsigned char*)malloc(sz);
+  fseek(fp, 0, SEEK_SET);
+  fread(buf, 1, sz, fp);
+  fclose(fp);
+  return cinek::ByteBuffer(buf, (int32_t)sz, (int32_t)sz);
+}
+
+static void imguiFontSetup(const cinek::ByteBuffer& systemFontLoBuffer,
+                           const cinek::ByteBuffer& systemFontHiBuffer) {
+  auto& io = ImGui::GetIO();
+    // add fonts
+  io.Fonts->Clear();
+
+  ImFontConfig font_cfg;
+  font_cfg.FontDataOwnedByAtlas = false;
+
+
+  strncpy(font_cfg.Name, "A2Lo", sizeof(font_cfg.Name));
+  io.Fonts->AddFontFromMemoryTTF(const_cast<uint8_t*>(systemFontLoBuffer.getHead()),
+                                 systemFontLoBuffer.getSize(),
+                                 16.0f, &font_cfg);
+  strncpy(font_cfg.Name, "A2Hi", sizeof(font_cfg.Name));
+  io.Fonts->AddFontFromMemoryTTF(const_cast<uint8_t*>(systemFontHiBuffer.getHead()),
+                                 systemFontHiBuffer.getSize(),
+                                 16.0f, &font_cfg);
+
+  if (!io.Fonts->IsBuilt()) {
+    unsigned char *font_pixels;
+    int font_width, font_height;
+    io.Fonts->GetTexDataAsRGBA32(&font_pixels, &font_width, &font_height);
+    sg_image_desc img_desc;
+    memset(&img_desc, 0, sizeof(img_desc));
+    img_desc.width = font_width;
+    img_desc.height = font_height;
+    img_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
+    img_desc.wrap_u = SG_WRAP_CLAMP_TO_EDGE;
+    img_desc.wrap_v = SG_WRAP_CLAMP_TO_EDGE;
+    img_desc.min_filter = SG_FILTER_LINEAR;
+    img_desc.mag_filter = SG_FILTER_LINEAR;
+    img_desc.data.subimage[0][0].ptr = font_pixels;
+    img_desc.data.subimage[0][0].size = (size_t)(font_width * font_height) * sizeof(uint32_t);
+    img_desc.label = "sokol-imgui-font";
+    _simgui.img = sg_make_image(&img_desc);
+    io.Fonts->TexID = (ImTextureID)(uintptr_t)_simgui.img.id;
+  }
+}
 
 static void onInit()
 {
@@ -51,6 +106,9 @@ static void onInit()
   g_sgPassAction.colors[0].value = { 0.0f, 0.5f, 0.75f, 1.0f };
 
   simgui_desc_t simguiDesc = {};
+#ifdef CLEMENS_NEW_GUI
+  simguiDesc.no_default_font = true;
+#endif
   simgui_setup(simguiDesc);
 
   g_sokolToADBKey.fill((unsigned)(-1));
@@ -159,11 +217,16 @@ static void onInit()
   g_sokolToADBKey[SAPP_KEYCODE_RIGHT_ALT] = CLEM_ADB_KEY_ROPTION;
   //g_sokolToADBKey[SAPP_KEYCODE_RIGHT_SUPER] = CLEM_ADB_KEY_COMMAND_APPLE;
 
+  auto systemFontLoBuffer = loadFont("fonts/PrintChar21.ttf");
+  auto systemFontHiBuffer = loadFont("fonts/PRNumber3.ttf");
 #ifdef CLEMENS_NEW_GUI
-  g_Host = new ClemensFrontend();
+  imguiFontSetup(systemFontLoBuffer, systemFontHiBuffer);
+  g_Host = new ClemensFrontend(systemFontLoBuffer, systemFontHiBuffer);
 #else
-  g_Host = new ClemensHost();
+  g_Host = new ClemensHost(systemFontLoBuffer, systemFontHiBuffer);
 #endif
+  free(systemFontLoBuffer.getHead());
+  free(systemFontHiBuffer.getHead());
 }
 
 static void onFrame()
@@ -217,6 +280,12 @@ static void onEvent(const sapp_event* evt)
       break;
   }
   if (clemInput.type != kClemensInputType_None) {
+    if (clem_host_get_caps_lock_state()) {
+      g_ADBKeyToggleMask |= CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;
+    } else {
+      g_ADBKeyToggleMask &= ~CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;
+    }
+    clemInput.adb_key_toggle_mask = g_ADBKeyToggleMask;
     g_Host->input(clemInput);
   }
 

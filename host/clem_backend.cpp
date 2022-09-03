@@ -1,4 +1,5 @@
 #include "clem_backend.hpp"
+#include "clem_host_platform.h"
 #include "emulator.h"
 
 #include <chrono>
@@ -9,6 +10,7 @@
 #include "fmt/format.h"
 
 static constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
+static constexpr unsigned kLogOutputLineLimit = 1024;
 
 struct ClemensRunSampler {
   //  our method of keeping the simulation in sync with real time is to rely
@@ -68,8 +70,7 @@ struct ClemensRunSampler {
 ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
                                PublishStateDelegate publishDelegate) :
   config_(config),
-  slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
-  emulatorStepsSinceReset_(0) {
+  slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)) {
   romBuffer_ = loadROM(romPathname.c_str());
 
   memset(&machine_, 0, sizeof(machine_));
@@ -92,6 +93,8 @@ ClemensBackend::~ClemensBackend() {
   terminate();
   runner_.join();
 
+  saveBRAM();
+
   free(slabMemory_.getHead());
 }
 
@@ -101,6 +104,11 @@ void ClemensBackend::terminate() {
 
 void ClemensBackend::reset() {
   queue(Command{Command::ResetMachine});
+}
+
+void ClemensBackend::resetMachine() {
+  machine_.cpu.pins.resbIn = false;
+  machine_.resb_counter = 3;
 }
 
 void ClemensBackend::setRefreshFrequency(unsigned hz) {
@@ -113,6 +121,47 @@ void ClemensBackend::run() {
 
 void ClemensBackend::publish() {
   queue(Command{Command::Publish});
+}
+
+static const char* sInputKeys[] = {
+  "",
+  "keyD",
+  "keyU",
+  "mouseD",
+  "mouseU",
+  NULL
+};
+
+void ClemensBackend::inputEvent(const ClemensInputEvent& input) {
+  CK_ASSERT_RETURN(*sInputKeys[input.type] != '\0');
+  queue(Command{
+    Command::Input,
+    fmt::format("{}={},{}", sInputKeys[input.type], input.value,
+                input.adb_key_toggle_mask)}
+  );
+}
+
+void ClemensBackend::inputMachine(const std::string_view& inputParam) {
+  if (!clemens_is_mmio_initialized(&machine_)) {
+    return;
+  }
+  auto equalsTokenPos = inputParam.find('=');
+  auto name = inputParam.substr(0, equalsTokenPos);
+  auto value = inputParam.substr(equalsTokenPos+1);
+  for (const char** keyName = &sInputKeys[0]; *keyName != NULL; ++keyName) {
+    if (name == *keyName) {
+      ClemensInputEvent inputEvent;
+      inputEvent.type = (ClemensInputType)((int)(keyName - &sInputKeys[0]));
+      //  oh why, oh why no straightforward C++ conversion from std::string_view
+      //  to number
+      auto commaPos = value.find(',');
+      auto inputValue = value.substr(0, commaPos);
+      auto inputModifiers = value.substr(commaPos + 1);
+      inputEvent.value = std::stoul(std::string(inputValue));
+      inputEvent.adb_key_toggle_mask = std::stoul(std::string(inputModifiers));
+      clemens_input(&machine_, &inputEvent);
+    }
+  }
 }
 
 void ClemensBackend::queue(const Command& cmd) {
@@ -191,6 +240,9 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         case Command::Publish:
           publishState = true;
           break;
+        case Command::Input:
+          inputMachine(command.operand);
+          break;
       }
     }
     queuelock.unlock();
@@ -218,11 +270,6 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     clocksRemainingInTimeslice += clocksPerTimeslice;
     while (clocksRemainingInTimeslice > 0 &&
            (!stepsRemaining.has_value() || *stepsRemaining > 0)) {
-
-      if (emulatorStepsSinceReset_ >= 2) {
-        machine_.cpu.pins.resbIn = true;
-      }
-
       clem_clocks_time_t pre_emulate_time = machine_.clocks_spent;
       clemens_emulate(&machine_);
       clem_clocks_duration_t emulate_step_time = machine_.clocks_spent - pre_emulate_time;
@@ -231,7 +278,6 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       if (stepsRemaining.has_value()) {
         *stepsRemaining -= 1;
       }
-      ++emulatorStepsSinceReset_;
 
       //  TODO: MMIO bypass
 
@@ -267,18 +313,16 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       publishedState.machine = &machine_;
       publishedState.seqno = runSampler.seqNo;
       publishedState.fps = runSampler.sampledFramesPerSecond;
+      publishedState.hostCPUID = clem_host_get_processor_number();
+      publishedState.logBufferStart = logOutput_.data();
+      publishedState.logBufferEnd = logOutput_.data() + logOutput_.size();
       publishDelegate(publishedState);
       if (publishedState.mmio_was_initialized) {
         clemens_audio_next_frame(&machine_, publishedState.audio.frame_count);
       }
+      logOutput_.clear();
     }
   } // isActive
-}
-
-//  Issues a soft reset to the machine.   Pushes the RESB pin low on the 65816
-void ClemensBackend::resetMachine() {
-  machine_.cpu.pins.resbIn = false;
-  emulatorStepsSinceReset_ = 0;
 }
 
 cinek::CharBuffer ClemensBackend::loadROM(const char* romPathname) {
@@ -348,6 +392,9 @@ void ClemensBackend::loadBRAM() {
 void ClemensBackend::emulatorLog(int log_level, ClemensMachine *machine,
                                  const char *msg) {
   auto *host = reinterpret_cast<ClemensBackend *>(machine->debug_user_ptr);
+  if (host->logOutput_.size() >= kLogOutputLineLimit) return;
+
+  host->logOutput_.emplace_back(ClemensBackendOutputText{log_level, msg});
 }
 
 //  If enabled, this emulator issues this callback per instruction

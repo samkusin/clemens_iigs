@@ -1790,6 +1790,8 @@ void clem_adb_device_input(struct ClemensDeviceADB *adb,
     }
     break;
   }
+
+  clem_adb_device_key_toggle(adb, input->adb_key_toggle_mask);
 }
 
 void clem_adb_device_key_toggle(struct ClemensDeviceADB *adb,

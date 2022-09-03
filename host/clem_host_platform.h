@@ -62,6 +62,15 @@ double clem_host_timepoint_deltad(ClemensHostTimePoint* t1,
  */
 bool clem_host_get_caps_lock_state();
 
+/**
+ * @brief Returns the current processor the local thread is running on
+ *
+ * Effectively getcpu() on Linux, and GetCurrentProcessorNumber() on Windows
+ *
+ * @return unsigned
+ */
+unsigned clem_host_get_processor_number();
+
 #ifdef __cplusplus
 }
 #endif

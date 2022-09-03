@@ -1,5 +1,8 @@
 #include "clem_display.hpp"
+#include "cinek/buffer.hpp"
+
 #include "render.h"
+
 
 #define STBTT_STATIC
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -261,25 +264,13 @@ uint32_t grColorToABGR(unsigned color)
 
 
 
-static sg_image loadFont(const char* pathname, stbtt_bakedchar* glyphSet)
+static sg_image loadFont(stbtt_bakedchar* glyphSet,
+                         const cinek::ByteBuffer& fileBuffer)
 {
-//  TODO: move font load and setup into a shared class or static data
-  FILE* fp = fopen(pathname, "rb");
-  if (!fp) {
-    return sg_image{};
-  }
-  fseek(fp, 0, SEEK_END);
-
-  long sz = ftell(fp);
-  unsigned char* buf = (unsigned char*)malloc(sz);
-  fseek(fp, 0, SEEK_SET);
-  fread(buf, 1, sz, fp);
-  fclose(fp);
-
   unsigned char *textureData = (unsigned char *)malloc(
     kFontTextureWidth * kFontTextureHeight);
 
-  stbtt_BakeFontBitmap(buf, 0, 16.0f,
+  stbtt_BakeFontBitmap(fileBuffer.getHead(), 0, 16.0f,
                        textureData, kFontTextureWidth, kFontTextureHeight,
                        0xe000, 512,
                        glyphSet);
@@ -295,7 +286,6 @@ static sg_image loadFont(const char* pathname, stbtt_bakedchar* glyphSet)
   imageDesc.data.subimage[0][0].size = imageDesc.width * imageDesc.height;
   sg_image fontImage = sg_make_image(imageDesc);
 
-  free(buf);
   free(textureData);
 
   return fontImage;
@@ -303,10 +293,12 @@ static sg_image loadFont(const char* pathname, stbtt_bakedchar* glyphSet)
 
 } // namespace anon
 
-ClemensDisplayProvider::ClemensDisplayProvider() {
-  systemFontImage_ = loadFont("fonts/PrintChar21.ttf", kGlyphSet40col);
-  systemFontImageHi_ = loadFont("fonts/PRNumber3.ttf", kGlyphSet80col);
-
+ClemensDisplayProvider::ClemensDisplayProvider(
+  const cinek::ByteBuffer& systemFontLoBuffer,
+  const cinek::ByteBuffer& systemFontHiBuffer
+) {
+  systemFontImage_ = loadFont(kGlyphSet40col, systemFontLoBuffer);
+  systemFontImageHi_ = loadFont(kGlyphSet80col, systemFontHiBuffer);
 
   const uint8_t blankImageData[16] = {
     0xff, 0xff, 0xff, 0xff,
@@ -407,6 +399,13 @@ ClemensDisplayProvider::~ClemensDisplayProvider() {
   sg_destroy_image(systemFontImageHi_);
   sg_destroy_image(systemFontImage_);
   sg_destroy_image(blankImage_);
+
+  if (systemFontFileBuffer_.getHead()) {
+    free(systemFontFileBuffer_.getHead());
+  }
+  if (systemFontFileHiBuffer_.getHead()) {
+    free(systemFontFileHiBuffer_.getHead());
+  }
 }
 
 ClemensDisplay::ClemensDisplay(ClemensDisplayProvider& provider) :

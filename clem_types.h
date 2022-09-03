@@ -228,6 +228,8 @@ struct ClemensInputEvent {
   enum ClemensInputType type;
   /* value based on the input type (ADB keycode, mouse or gamepad button) */
   unsigned value;
+  /* key toggle mask */
+  unsigned adb_key_toggle_mask;
 };
 
 struct ClemensDeviceDebugger {
