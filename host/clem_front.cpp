@@ -227,20 +227,6 @@ static ImColor getDefaultColor(bool hi) {
   return kDefaultColor;
 }
 
-#define CLEM_HOST_GUI_CPU_PINS_COLOR(_field_) \
-  lastFrameCPUPins_._field_ != frameReadState_.cpu.pins._field_ ? \
-    getModifiedColor(frameReadState_.cpu.pins._field_) : \
-    getDefaultColor(frameReadState_.cpu.pins._field_)
-
-#define CLEM_HOST_GUI_CPU_PINS_INV_COLOR(_field_) \
-  lastFrameCPUPins_._field_ != frameReadState_.cpu.pins._field_ ? \
-    getModifiedColor(!frameReadState_.cpu.pins._field_) : \
-    getDefaultColor(!frameReadState_.cpu.pins._field_)
-
-#define CLEM_HOST_GUI_CPU_FIELD_COLOR(_field_) \
-  lastFrameCPURegs_._field_ != frameReadState_.cpu.regs._field_ ? \
-    getModifiedColor(true) : getDefaultColor(true)
-
 template<typename T>
 static ImColor getStatusFieldColor(T a, T b, T statusMask) {
   return (a & statusMask) != (b & statusMask) ?
@@ -256,7 +242,17 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
                ImGuiWindowFlags_NoCollapse |
                ImGuiWindowFlags_NoBringToFrontOnFocus |
                ImGuiWindowFlags_NoMove);
+  doMachineDiagnosticsDisplay();
+  ImGui::Separator();
+  doMachineDiskDisplay();
+  ImGui::Separator();
+  doMachineCPUInfoDisplay();
+  ImGui::Separator();
 
+  ImGui::End();
+}
+
+void ClemensFrontend::doMachineDiagnosticsDisplay() {
   ImGui::BeginTable("Diagnostics", 4);
   ImGui::TableNextColumn();
   ImGui::Text("CPU %02u", clem_host_get_processor_number());
@@ -276,10 +272,63 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
   ImGui::TableNextColumn();
   ImGui::Text("fps");
   ImGui::EndTable();
+}
 
-  ImGui::Separator();
+void ClemensFrontend::doMachineDiskDisplay() {
+  ImGui::BeginTable("DiskSelect", 3);
+  ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
+                          ImGui::GetFont()->GetCharAdvance('A'));
+  ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed);
+  ImGui::TableSetupColumn("Image", ImGuiTableColumnFlags_WidthStretch);
+  ImGui::TableHeadersRow();
+  ImGui::TableNextColumn();
+  ImGui::TableNextColumn();
+  ImGui::Text("s5,d1");
+  ImGui::TableNextColumn();
+  doMachineDiskSelection(kClemensDrive_3_5_D1);
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::TableNextColumn();
+  ImGui::Text("s5,d2");
+  ImGui::TableNextColumn();
+  doMachineDiskSelection(kClemensDrive_3_5_D2);
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::TableNextColumn();
+  ImGui::Text("s6,d1");
+  ImGui::TableNextColumn();
+  doMachineDiskSelection(kClemensDrive_5_25_D1);
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::TableNextColumn();
+  ImGui::Text("s6,d2");
+  ImGui::TableNextColumn();
+  doMachineDiskSelection(kClemensDrive_5_25_D2);
+  ImGui::EndTable();
+}
 
+void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType) {
+  ClemensBackendDiskDrive& drive = frameReadState_.diskDrives[driveType];
+  if (ImGui::BeginCombo("",drive.imagePath.c_str(), ImGuiComboFlags_NoArrowButton)) {
+    ImGui::EndCombo();
+  }
+}
 
+#define CLEM_HOST_GUI_CPU_PINS_COLOR(_field_) \
+  lastFrameCPUPins_._field_ != frameReadState_.cpu.pins._field_ ? \
+    getModifiedColor(frameReadState_.cpu.pins._field_) : \
+    getDefaultColor(frameReadState_.cpu.pins._field_)
+
+#define CLEM_HOST_GUI_CPU_PINS_INV_COLOR(_field_) \
+  lastFrameCPUPins_._field_ != frameReadState_.cpu.pins._field_ ? \
+    getModifiedColor(!frameReadState_.cpu.pins._field_) : \
+    getDefaultColor(!frameReadState_.cpu.pins._field_)
+
+#define CLEM_HOST_GUI_CPU_FIELD_COLOR(_field_) \
+  lastFrameCPURegs_._field_ != frameReadState_.cpu.regs._field_ ? \
+    getModifiedColor(true) : getDefaultColor(true)
+
+void ClemensFrontend::doMachineCPUInfoDisplay() {
   ImGui::BeginTable("Machine", 3);
   // Registers
   ImGui::TableSetupColumn("Registers", ImGuiTableColumnFlags_WidthStretch);
@@ -392,10 +441,6 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
   ImGui::EndTable();
 
   ImGui::EndTable();
-
-  ImGui::Separator();
-
-  ImGui::End();
 }
 
 void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,

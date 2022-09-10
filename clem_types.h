@@ -421,12 +421,11 @@ struct ClemensDriveBay {
  */
 enum ClemensDriveType {
   kClemensDrive_Invalid = -1,
-  kClemensDrive_3_5 = 0,
-  kClemensDrive_3_5_D1 = kClemensDrive_3_5,
+  kClemensDrive_3_5_D1 = 0,
   kClemensDrive_3_5_D2,
-  kClemensDrive_5_25,
-  kClemensDrive_5_25_D1 = kClemensDrive_5_25,
-  kClemensDrive_5_25_D2
+  kClemensDrive_5_25_D1,
+  kClemensDrive_5_25_D2,
+  kClemensDrive_Count
 };
 
 /* Note that in emulation mode, the EmulatedBrk flag should be

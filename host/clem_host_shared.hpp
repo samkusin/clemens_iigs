@@ -22,6 +22,13 @@ struct ClemensBackendBreakpoint {
   uint32_t address;
 };
 
+struct ClemensBackendDiskDrive {
+  std::string imagePath;
+  bool motorOn;
+  bool spinning;
+  bool writeProtected;
+};
+
 struct ClemensBackendState {
   const ClemensMachine* machine;
   double fps;
@@ -41,6 +48,7 @@ struct ClemensBackendState {
   const ClemensBackendBreakpoint* bpBufferStart;
   const ClemensBackendBreakpoint* bpBufferEnd;
   const ClemensBackendBreakpoint* bpHit;
+  const ClemensBackendDiskDrive* diskDrives;
 };
 
 #endif

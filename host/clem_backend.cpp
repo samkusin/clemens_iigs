@@ -401,6 +401,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       publishedState.bpBufferEnd = breakpoints_.data() + breakpoints_.size();
       publishedState.bpHit =
         hitBreakpoint != UINT32_MAX ? breakpoints_.data() + hitBreakpoint : nullptr;
+      publishedState.diskDrives = diskDrives_.data();
       publishedState.commandFailed = std::move(commandFailed);
       publishDelegate(publishedState);
       if (publishedState.mmio_was_initialized) {

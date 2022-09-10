@@ -9,6 +9,7 @@
 #include "cinek/fixedstack.hpp"
 #include "imgui/imgui.h"
 
+#include <array>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
@@ -38,6 +39,10 @@ private:
   void backendStateDelegate(const ClemensBackendState& state);
 
   void doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize);
+  void doMachineDiagnosticsDisplay();
+  void doMachineDiskDisplay();
+  void doMachineDiskSelection(ClemensDriveType driveType);
+  void doMachineCPUInfoDisplay();
   void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
                            float screenU, float screenV);
   void doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize);
@@ -82,6 +87,8 @@ private:
     ClemensBackendBreakpoint* breakpoints;
     ClemensBackendBreakpoint* hitBreakpoint;
     unsigned breakpointCount;
+
+    std::array<ClemensBackendDiskDrive, kClemensDrive_Count> diskDrives;
 
     Clemens65C816 cpu;
     ClemensMonitor monitorFrame;

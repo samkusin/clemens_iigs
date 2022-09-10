@@ -6,6 +6,7 @@
 #include "cinek/fixedstack.hpp"
 #include "cinek/buffer.hpp"
 
+#include <array>
 #include <condition_variable>
 #include <deque>
 #include <functional>
@@ -26,6 +27,11 @@ public:
     unsigned audioSamplesPerSecond;
     Type type;
   };
+  //  The PublishStateDelegate provides backend state to the front end GUI
+  //  Data passed through the delegate is guaranteed to be valid within its
+  //    scope.  The front-end should copy what it needs for its display during
+  //    the delegate's scope. Once the delegate has finished, the data in
+  //    ClemensBackendState should be considered invalid/undefined.
   using PublishStateDelegate = std::function<void(const ClemensBackendState&)>;
   ClemensBackend(std::string romPathname, const Config& config,
                  PublishStateDelegate publishDelegate);
@@ -114,6 +120,7 @@ private:
 
   std::vector<ClemensBackendOutputText> logOutput_;
   std::vector<ClemensBackendBreakpoint> breakpoints_;
+  std::array<ClemensBackendDiskDrive, kClemensDrive_Count> diskDrives_;
 };
 
 #endif
