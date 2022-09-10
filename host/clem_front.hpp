@@ -13,7 +13,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <unordered_map>
+#include <vector>
 
 struct ImFont;
 
@@ -47,12 +47,13 @@ private:
 
   void executeCommand(std::string_view command);
   void cmdHelp(std::string_view operand);
+  void cmdBreak(std::string_view operand);
+  void cmdList(std::string_view operand);
+  void cmdRun(std::string_view operand);
 
 private:
 
   ClemensDisplayProvider displayProvider_;
-
-  std::unordered_map<std::string, ImFont*> fonts_;
 
   ClemensDisplay display_;
   ClemensAudioDevice audio_;
@@ -78,6 +79,9 @@ private:
     uint8_t* memoryView;
     uint8_t* audioBuffer;
     LogOutputNode* logNode;
+    ClemensBackendBreakpoint* breakpoints;
+    ClemensBackendBreakpoint* hitBreakpoint;
+    unsigned breakpointCount;
 
     Clemens65C816 cpu;
     ClemensMonitor monitorFrame;
@@ -92,6 +96,8 @@ private:
     unsigned backendCPUID;
     float fps;
     bool mmioWasInitialized;
+
+    std::optional<bool> commandFailed;
   };
 
   cinek::FixedStack frameWriteMemory_;
@@ -125,6 +131,8 @@ private:
     Execution
   };
   TerminalMode terminalMode_;
+
+  std::vector<ClemensBackendBreakpoint> breakpoints_;
 };
 
 #endif

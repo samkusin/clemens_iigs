@@ -49,6 +49,12 @@ public:
   void publish();
   //  Send host input to the emulator
   void inputEvent(const ClemensInputEvent& inputEvent);
+  //  Break
+  void breakExecution();
+  //  Add a breakpoint
+  void addBreakpoint(const ClemensBackendBreakpoint& breakpoint);
+  //  Remove a breakpoint
+  void removeBreakpoint(unsigned index);
 
 private:
   struct Command {
@@ -59,7 +65,10 @@ private:
       ResetMachine,
       RunMachine,
       Publish,
-      Input
+      Input,
+      Break,
+      AddBreakpoint,
+      DelBreakpoint
     };
     Type type = Undefined;
     std::string operand;
@@ -71,8 +80,13 @@ private:
   void main(PublishStateDelegate publishDelegate);
   void resetMachine();
   void inputMachine(const std::string_view& inputParam);
+  bool addBreakpoint(const std::string_view& inputParam);
+  bool delBreakpoint(const std::string_view& inputParam);
 
   cinek::CharBuffer loadROM(const char* romPathname);
+
+  unsigned checkHitBreakpoint();
+
   //  TODO: These methods could be moved into a subclass as they are specific
   //        to machine type
   void initApple2GS();
@@ -99,6 +113,7 @@ private:
   ClemensMachine machine_;
 
   std::vector<ClemensBackendOutputText> logOutput_;
+  std::vector<ClemensBackendBreakpoint> breakpoints_;
 };
 
 #endif

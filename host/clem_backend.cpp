@@ -164,6 +164,66 @@ void ClemensBackend::inputMachine(const std::string_view& inputParam) {
   }
 }
 
+void ClemensBackend::breakExecution() {
+  queue(Command{Command::Break});
+}
+
+void ClemensBackend::addBreakpoint(const ClemensBackendBreakpoint& breakpoint) {
+  Command cmd;
+  cmd.operand = fmt::format("{:s}:{:06X}",
+    breakpoint.type == ClemensBackendBreakpoint::DataRead ? "r" :
+    breakpoint.type == ClemensBackendBreakpoint::Write ? "w" : "", breakpoint.address);
+  cmd.type = Command::AddBreakpoint;
+  queue(std::move(cmd));
+}
+
+bool ClemensBackend::addBreakpoint(const std::string_view& inputParam) {
+  auto sepPos = inputParam.find(':');
+  assert(sepPos != std::string_view::npos);
+  auto type = inputParam.substr(0, sepPos);
+  auto address = inputParam.substr(sepPos+1);
+  ClemensBackendBreakpoint bp;
+  if (type == "r") {
+    bp.type = ClemensBackendBreakpoint::DataRead;
+  } else if (type == "w") {
+    bp.type = ClemensBackendBreakpoint::Write;
+  } else {
+    bp.type = ClemensBackendBreakpoint::Execute;
+  }
+  bp.address = (uint32_t)std::stoul(std::string(address), nullptr, 16);
+  auto range = std::equal_range(breakpoints_.begin(), breakpoints_.end(), bp,
+    [](const ClemensBackendBreakpoint& bp, const ClemensBackendBreakpoint& newBp) {
+      return bp.address < newBp.address;
+    });
+  while (range.first != range.second) {
+    if (range.first->type == bp.type) {
+      break;
+    }
+    range.first++;
+  }
+  if (range.first == range.second) {
+    breakpoints_.emplace(range.second, bp);
+  }
+  return true;
+}
+
+void ClemensBackend::removeBreakpoint(unsigned index) {
+  queue(Command{Command::DelBreakpoint, std::to_string(index)});
+}
+
+bool ClemensBackend::delBreakpoint(const std::string_view& inputParam) {
+  if (inputParam.empty()) {
+    breakpoints_.clear();
+    return true;
+  }
+  unsigned index = (unsigned)std::stoul(std::string(inputParam));
+  if (index >= breakpoints_.size()) {
+    return false;
+  }
+  breakpoints_.erase(breakpoints_.begin() + index);
+  return true;
+}
+
 void ClemensBackend::queue(const Command& cmd) {
   {
     std::lock_guard<std::mutex> queuelock(commandQueueMutex_);
@@ -200,6 +260,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
   while (isActive) {
     bool isRunning = !stepsRemaining.has_value() || *stepsRemaining > 0;
     bool publishState = false;
+    std::optional<bool> commandFailed;
 
     std::unique_lock<std::mutex> queuelock(commandQueueMutex_);
     if (!isRunning) {
@@ -216,6 +277,9 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     while (!commandQueue_.empty() && isActive) {
       auto command = commandQueue_.front();
       commandQueue_.pop_front();
+      if (!commandFailed.has_value() && command.type != Command::Publish) {
+        commandFailed = false;
+      }
       switch (command.type) {
         case Command::Terminate:
           isActive = false;
@@ -235,6 +299,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           break;
         case Command::RunMachine:
           stepsRemaining = std::nullopt;
+          isRunning = true;
           runSampler.reset();
           break;
         case Command::Publish:
@@ -242,6 +307,15 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           break;
         case Command::Input:
           inputMachine(command.operand);
+          break;
+        case Command::Break:
+          stepsRemaining = 0;
+          break;
+        case Command::AddBreakpoint:
+          if (!addBreakpoint(command.operand)) commandFailed = true;
+          break;
+        case Command::DelBreakpoint:
+          if (!delBreakpoint(command.operand)) commandFailed = true;
           break;
       }
     }
@@ -268,15 +342,22 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     int64_t clocksPerTimeslice =
       calculateClocksPerTimeslice(&machine_, emulatorRefreshFrequency);
     clocksRemainingInTimeslice += clocksPerTimeslice;
+    unsigned hitBreakpoint = UINT32_MAX;
     while (clocksRemainingInTimeslice > 0 &&
            (!stepsRemaining.has_value() || *stepsRemaining > 0)) {
+      if (!breakpoints_.empty()) {
+        if ((hitBreakpoint = checkHitBreakpoint()) == UINT32_MAX) {
+          stepsRemaining = 0;
+          break;
+        }
+      }
       clem_clocks_time_t pre_emulate_time = machine_.clocks_spent;
       clemens_emulate(&machine_);
       clem_clocks_duration_t emulate_step_time = machine_.clocks_spent - pre_emulate_time;
 
       clocksRemainingInTimeslice -= emulate_step_time;
       if (stepsRemaining.has_value()) {
-        *stepsRemaining -= 1;
+       stepsRemaining = *stepsRemaining - 1;
       }
 
       //  TODO: MMIO bypass
@@ -316,6 +397,11 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       publishedState.hostCPUID = clem_host_get_processor_number();
       publishedState.logBufferStart = logOutput_.data();
       publishedState.logBufferEnd = logOutput_.data() + logOutput_.size();
+      publishedState.bpBufferStart = breakpoints_.data();
+      publishedState.bpBufferEnd = breakpoints_.data() + breakpoints_.size();
+      publishedState.bpHit =
+        hitBreakpoint != UINT32_MAX ? breakpoints_.data() + hitBreakpoint : nullptr;
+      publishedState.commandFailed = std::move(commandFailed);
       publishDelegate(publishedState);
       if (publishedState.mmio_was_initialized) {
         clemens_audio_next_frame(&machine_, publishedState.audio.frame_count);
@@ -323,6 +409,36 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       logOutput_.clear();
     }
   } // isActive
+}
+
+unsigned ClemensBackend::checkHitBreakpoint() {
+  for (auto it = breakpoints_.begin(); it != breakpoints_.end(); ++it) {
+    uint16_t b_adr = (uint16_t)(it->address & 0xffff);
+    uint8_t b_bank = (uint8_t)(it->address >> 16);
+    unsigned index = (unsigned)(it - breakpoints_.begin());
+    switch (it->type) {
+      case ClemensBackendBreakpoint::Execute:
+        if (machine_.cpu.regs.PBR == b_bank && machine_.cpu.regs.PC == b_adr) {
+          return index;
+        }
+        break;
+      case ClemensBackendBreakpoint::DataRead:
+      case ClemensBackendBreakpoint::Write:
+        if (machine_.cpu.regs.DBR == b_bank && machine_.cpu.pins.adr == b_adr) {
+          if (machine_.cpu.pins.vdaOut) {
+            if (it->type == ClemensBackendBreakpoint::DataRead &&
+                machine_.cpu.pins.rwbOut) {
+              return index;
+            } else if (it->type == ClemensBackendBreakpoint::Write &&
+                       !machine_.cpu.pins.rwbOut) {
+              return index;
+            }
+          }
+        }
+        break;
+    }
+  }
+  return UINT32_MAX;
 }
 
 cinek::CharBuffer ClemensBackend::loadROM(const char* romPathname) {

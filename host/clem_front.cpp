@@ -138,6 +138,23 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
       logNode = logNode->next;
     }
 
+    breakpoints_.clear();
+    for (unsigned bpIndex = 0; bpIndex < frameReadState_.breakpointCount; ++bpIndex) {
+      breakpoints_.emplace_back(frameReadState_.breakpoints[bpIndex]);
+    }
+    if (frameReadState_.commandFailed.has_value()) {
+      if (*frameReadState_.commandFailed) {
+        CLEM_TERM_COUT.print(TerminalLine::Error, "Failed.");
+      } else {
+        CLEM_TERM_COUT.print(TerminalLine::Info, "Ok.");
+      }
+    }
+    if (frameReadState_.hitBreakpoint) {
+      CLEM_TERM_COUT.format(TerminalLine::Info, "Breakpoint {} hit {:02X}/{:04X}.",
+                            frameReadState_.hitBreakpoint - frameReadState_.breakpoints,
+                            (frameReadState_.hitBreakpoint->address >> 16) & 0xff,
+                            frameReadState_.hitBreakpoint->address & 0xffff);
+    }
     frameLastSeqNo_ = frameSeqNo_;
   }
   frameLock.unlock();
@@ -375,6 +392,9 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
   ImGui::EndTable();
 
   ImGui::EndTable();
+
+  ImGui::Separator();
+
   ImGui::End();
 }
 
@@ -550,6 +570,7 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState& state) {
     frameWriteState_.backendCPUID = state.hostCPUID;
     frameWriteState_.fps = state.fps;
     frameWriteState_.mmioWasInitialized = state.mmio_was_initialized;
+    frameWriteState_.commandFailed = state.commandFailed;
 
     //  copy over component state as needed
     frameWriteState_.vgcModeFlags = state.machine->mmio.vgc.mode_flags;
@@ -569,17 +590,31 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState& state) {
 
     frameWriteState_.logNode = nullptr;
     LogOutputNode* prev = nullptr;
-    for (auto* logStart = state.logBufferStart; logStart != state.logBufferEnd; ++logStart) {
+    for (auto* logItem = state.logBufferStart; logItem != state.logBufferEnd; ++logItem) {
       LogOutputNode* logMemory = reinterpret_cast<LogOutputNode*>(frameWriteMemory_.allocate(
-        sizeof(LogOutputNode) + CK_ALIGN_SIZE_TO_ARCH(logStart->text.size())));
-      logMemory->logLevel = logStart->level;
-      logMemory->sz = unsigned(logStart->text.size());
-      logStart->text.copy(reinterpret_cast<char*>(logMemory) + sizeof(LogOutputNode),
-                          std::string::npos);
+        sizeof(LogOutputNode) + CK_ALIGN_SIZE_TO_ARCH(logItem->text.size())));
+      logMemory->logLevel = logItem->level;
+      logMemory->sz = unsigned(logItem->text.size());
+      logItem->text.copy(reinterpret_cast<char*>(logMemory) + sizeof(LogOutputNode),
+                         std::string::npos);
       logMemory->next = nullptr;
       if (!frameWriteState_.logNode) frameWriteState_.logNode = logMemory;
       else prev->next = logMemory;
       prev = logMemory;
+    }
+
+    frameWriteState_.breakpoints =
+      frameWriteMemory_.allocateArray<ClemensBackendBreakpoint>(
+        state.bpBufferEnd - state.bpBufferStart);
+    frameWriteState_.breakpointCount = (unsigned)(state.bpBufferEnd - state.bpBufferStart);
+    frameWriteState_.hitBreakpoint = nullptr;
+    auto* bpDest = frameWriteState_.breakpoints;
+    for (auto* bpCur = state.bpBufferStart;
+         bpCur != state.bpBufferEnd; ++bpCur, ++bpDest) {
+      *bpDest = *bpCur;
+      if (bpCur == state.bpHit) {
+        frameWriteState_.hitBreakpoint = bpDest;
+      }
     }
   }
   framePublished_.notify_one();
@@ -593,18 +628,106 @@ void ClemensFrontend::executeCommand(std::string_view command) {
                                                : std::string_view();
   if (action == "help" || action == "?") {
     cmdHelp(operand);
+  } else if (action == "run" || action == "r") {
+    cmdRun(operand);
+  } else if (action == "break" || action == "b") {
+    cmdBreak(operand);
+  } else if (action == "list" || action == "l") {
+    cmdList(operand);
   } else if (!action.empty()) {
     CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
   }
 }
 
 void ClemensFrontend::cmdHelp(std::string_view operand) {
-  CLEM_TERM_COUT.print(TerminalLine::Info, "r]un                 - execute emulator until break");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak               - break excution at current PC");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak <address>     - break execution at specified address");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak r:<address>   - break when reading from specified address");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak w:<address>   - break when writing to specified address");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "reset                - soft reset of the machine");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "reboot               - hard reset of the machine");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "reset                       - soft reset of the machine");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "reboot                      - hard reset of the machine");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "disk                        - disk information");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "disk <s5|6>,<d1|2>,<image>  - insert disk");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "disk <s5|6>,<d1|2>          - disk at slot s, drive d");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "eject <s5|6>,<d1|2>         - eject disk");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "r]un                        - execute emulator until break");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak                      - break execution at current PC");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak <address>            - break execution at address");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak r:<address>          - break on data read from address");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak w:<address>          - break on write to address");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "l]ist                       - list all breakpoints");
   CLEM_TERM_COUT.newline();
+}
+
+void ClemensFrontend::cmdBreak(std::string_view operand) {
+  //  parse [r|w]<address>
+  ClemensBackendBreakpoint breakpoint {ClemensBackendBreakpoint::Undefined};
+  auto sepPos = operand.find(':');
+  if (sepPos != std::string_view::npos) {
+    auto typeStr = operand.substr(0, sepPos);
+    if (typeStr.size() == 1) {
+      if (typeStr[0] == 'r') {
+        breakpoint.type = ClemensBackendBreakpoint::DataRead;
+      } else if (typeStr[0] == 'w') {
+        breakpoint.type = ClemensBackendBreakpoint::Write;
+      }
+    }
+    if (breakpoint.type == ClemensBackendBreakpoint::Undefined) {
+      CLEM_TERM_COUT.format(TerminalLine::Error,
+                            "Breakpoint type {} is invalid.", typeStr);
+      return;
+    }
+    operand = operand.substr(sepPos + 1);
+    if (operand.empty()) {
+      CLEM_TERM_COUT.format(TerminalLine::Error,
+                            "Breakpoint type {} is invalid.", typeStr);
+      return;
+    }
+  } else {
+    breakpoint.type = ClemensBackendBreakpoint::Execute;
+  }
+
+  char address[16];
+  auto bankSepPos = operand.find('//');
+  if (bankSepPos == std::string_view::npos) {
+    if (operand.size() >= 2) {
+      snprintf(address, sizeof(address), "%02X", frameReadState_.cpu.regs.PBR);
+      operand.copy(address + 2, 4, 2);
+    } else if (!operand.empty()) {
+      CLEM_TERM_COUT.format(TerminalLine::Error, "Address {} is invalid.", operand);
+      return;
+    }
+  } else if (bankSepPos == 2 && operand.size() > bankSepPos) {
+    operand.copy(address, bankSepPos, 0);
+    operand.copy(address + bankSepPos, operand.size() - (bankSepPos + 1), bankSepPos + 1);
+  } else {
+    CLEM_TERM_COUT.format(TerminalLine::Error, "Address {} is invalid.", operand);
+    return;
+  }
+  if (operand.empty()) {
+    backend_->breakExecution();
+  } else {
+    address[6] = '\0';
+    char* addressEnd = NULL;
+    breakpoint.address = std::strtoul(address, &addressEnd, 16);
+    if (addressEnd != address + 6) {
+      CLEM_TERM_COUT.format(TerminalLine::Error,
+                            "Address format is invalid read from '{}'", operand);
+      return;
+    }
+    backend_->addBreakpoint(breakpoint);
+  }
+}
+
+void ClemensFrontend::cmdList(std::string_view operand) {
+  //  TODO: granular listing based on operand
+  if (breakpoints_.empty()) {
+    CLEM_TERM_COUT.print(TerminalLine::Info, "No breakpoints defined.");
+    return;
+  }
+  for (size_t i = 0; i < breakpoints_.size(); ++i) {
+    auto& bp = breakpoints_[i];
+    CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {:02X}/{:04X}", i,
+                          (bp.address >> 16) & 0xff, bp.address & 0xffff);
+  }
+}
+
+void ClemensFrontend::cmdRun(std::string_view operand) {
+  backend_->run();
 }
