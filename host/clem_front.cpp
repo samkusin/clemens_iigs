@@ -3,7 +3,7 @@
 #include "clem_host_platform.h"
 
 #include "fmt/format.h"
-#include "imgui/imgui.h"
+#include "imgui_filedialog/ImGuiFileDialog.h"
 
 template<typename TBufferType>
 struct FormatView {
@@ -275,41 +275,60 @@ void ClemensFrontend::doMachineDiagnosticsDisplay() {
 }
 
 void ClemensFrontend::doMachineDiskDisplay() {
-  ImGui::BeginTable("DiskSelect", 3);
+  ImGui::BeginTable("DiskSelect", 2);
+  ImGui::TableSetupColumn("Image", ImGuiTableColumnFlags_WidthStretch);
   ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
                           ImGui::GetFont()->GetCharAdvance('A'));
-  ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed);
-  ImGui::TableSetupColumn("Image", ImGuiTableColumnFlags_WidthStretch);
   ImGui::TableHeadersRow();
   ImGui::TableNextColumn();
-  ImGui::TableNextColumn();
-  ImGui::Text("s5,d1");
-  ImGui::TableNextColumn();
   doMachineDiskSelection(kClemensDrive_3_5_D1);
+  ImGui::TableNextColumn();
   ImGui::TableNextRow();
-  ImGui::TableNextColumn();
-  ImGui::TableNextColumn();
-  ImGui::Text("s5,d2");
   ImGui::TableNextColumn();
   doMachineDiskSelection(kClemensDrive_3_5_D2);
+  ImGui::TableNextColumn();
   ImGui::TableNextRow();
-  ImGui::TableNextColumn();
-  ImGui::TableNextColumn();
-  ImGui::Text("s6,d1");
   ImGui::TableNextColumn();
   doMachineDiskSelection(kClemensDrive_5_25_D1);
+  ImGui::TableNextColumn();
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::TableNextColumn();
-  ImGui::Text("s6,d2");
-  ImGui::TableNextColumn();
   doMachineDiskSelection(kClemensDrive_5_25_D2);
+  ImGui::TableNextColumn();
   ImGui::EndTable();
 }
 
 void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType) {
+  static const char* driveName[] = { "Slot5 D1", "Slot5 D2", "Slot6 D1", "Slot6 D2" };
   ClemensBackendDiskDrive& drive = frameReadState_.diskDrives[driveType];
-  if (ImGui::BeginCombo("",drive.imagePath.c_str(), ImGuiComboFlags_NoArrowButton)) {
+  //  2 states: empty, has disk
+  //    options if empty: <blank disk>, <import image>, image 0, image 1, ...
+  //    options if full: <eject>
+  const char* imageName;
+  if (!drive.imagePath.empty()) {
+    if (drive.state == ClemensBackendDiskDrive::Ejecting) {
+      imageName = "- Ejecting";
+    } {
+      imageName = drive.imagePath.c_str();
+    }
+  } else {
+    imageName = "- Empty";
+  }
+  if (ImGui::BeginCombo(driveName[driveType], imageName, ImGuiComboFlags_NoArrowButton)) {
+
+    if (!drive.imagePath.empty() && ImGui::Selectable("<eject>")) {
+      //backend_->ejectDisk(driveType);
+    }
+    if (drive.state != ClemensBackendDiskDrive::Ejecting) {
+      if (ImGui::Selectable("<insert blank disk>")) {
+        //backend_->insertDisk(driveType);
+      }
+      if (ImGui::Selectable("<import master>")) {
+        //  File GUI dialog
+
+        //backend_->insertDisk(driveType);
+      }
+    }
     ImGui::EndCombo();
   }
 }
@@ -504,7 +523,7 @@ void ClemensFrontend::doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize
   float rightPaddingX = 3 * (ImGui::GetFont()->GetCharAdvance('A') +
                              style.FramePadding.x*2 + style.ItemSpacing.x);
   ImGui::SetNextItemWidth(rootSize.x - xpos - ImGui::GetStyle().WindowPadding.x - rightPaddingX);
-  if (ImGui::InputText("", inputLine, sizeof(inputLine), ImGuiInputTextFlags_EnterReturnsTrue)) {
+  if (ImGui::InputText("##", inputLine, sizeof(inputLine), ImGuiInputTextFlags_EnterReturnsTrue)) {
     auto* inputLineEnd = &inputLine[0] + strnlen(inputLine, sizeof(inputLine));
     if (inputLineEnd != &inputLine[0]) {
       const char* inputStart = &inputLine[0];

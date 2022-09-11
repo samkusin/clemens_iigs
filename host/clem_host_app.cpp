@@ -6,7 +6,7 @@
 #define SOKOL_D3D11
 #endif
 
-#include "imgui/imgui.h"
+#include "imgui.h"
 
 #include <array>
 

@@ -7,7 +7,7 @@
 #include "cinek/buffer.hpp"
 #include "cinek/circular_buffer.hpp"
 #include "cinek/fixedstack.hpp"
-#include "imgui/imgui.h"
+#include "imgui.h"
 
 #include <array>
 #include <condition_variable>

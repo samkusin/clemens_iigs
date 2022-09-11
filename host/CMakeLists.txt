@@ -6,6 +6,8 @@ project(clements_iigs LANGUAGES C CXX)
 # build imgui
 # build app
 
+add_subdirectory(imgui)
+
 # TODO: make header-only version when ready
 set(CKAUDIO_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/core.h"
@@ -39,16 +41,6 @@ set(FMT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/fmt/format.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/fmt/format.cc")
 
-set(IMGUI_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imstb_rectpack.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imstb_textedit.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imstb_truetype.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_draw.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_tables.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_widgets.cpp")
-
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(PLATFORM_SOURCES
@@ -78,7 +70,8 @@ target_link_libraries(clemens_iigs
         clemens_65816_render
         clemens_65816_serializer
         clemens_65816_iocards
-        ckaudio)
+        ckaudio
+        imgui)
 
 target_compile_features( clemens_iigs PRIVATE cxx_std_17 )
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

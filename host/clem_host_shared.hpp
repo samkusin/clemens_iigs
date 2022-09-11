@@ -23,9 +23,14 @@ struct ClemensBackendBreakpoint {
 };
 
 struct ClemensBackendDiskDrive {
+  enum State {
+    Idle,
+    Active,
+    Spinning,
+    Ejecting
+  };
   std::string imagePath;
-  bool motorOn;
-  bool spinning;
+  State state;
   bool writeProtected;
 };
 
