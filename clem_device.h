@@ -193,6 +193,19 @@ void clem_iwm_eject_disk(struct ClemensDeviceIWM *iwm,
                          struct ClemensNibbleDisk *disk);
 
 /**
+ * @brief For 3.5" drives, issues the eject command and polls until complete
+ *
+ * @param iwm
+ * @param drive_type
+ * @param disk The output disk once eject is complete
+ * @return true Disk has ejected
+ * @return false Disk is still ejecting
+ */
+bool clem_iwm_eject_disk_async(struct ClemensDeviceIWM *iwm,
+                               struct ClemensDrive *drive,
+                               struct ClemensNibbleDisk *disk);
+
+/**
  * @brief Executed frequently enough to emulate a IWM controller
  *
  * Note, due to the emulation rate (down to the microsecond of machine time),

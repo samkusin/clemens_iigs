@@ -47,6 +47,11 @@ struct Clemens2IMGDisk {
     bool is_write_protected;    /**< Write protected image */
     bool is_nibblized;          /**< See the clem_2img_nibblize_data call */
 
+    /* This is provided by the caller.  At the very least the nib->bits_data and
+       nib->bits_data_end byte vector must be defined before calling
+       clem_2img_nibblize_data.  The byte vector and metadata will be populated
+       by said call.
+    */
     struct ClemensNibbleDisk* nib;
 };
 
@@ -60,8 +65,10 @@ struct ClemensNibEncoder {
 /**
  * @brief Obtains information from a 2IMG disk image used for processing
  *
+ * This function will initialize a new Clemens2IMGDisk object.
+ *
  * Calling this function is required before running the nibbilization pass via
- * clem_2img_nibblize_data
+ * clem_2img_nibblize_data.
  *
  * @param disk
  * @param image
@@ -89,9 +96,9 @@ bool clem_2img_parse_header(struct Clemens2IMGDisk* disk,
  * @return false
  */
 bool clem_2img_generate_header(struct Clemens2IMGDisk* disk,
-                            uint32_t format,
-                            uint8_t* image,
-                            uint8_t* image_end);
+                               uint32_t format,
+                               uint8_t* image,
+                               uint8_t* image_end);
 
 /**
  * @brief Runs the nibbilization pass on the disk image.

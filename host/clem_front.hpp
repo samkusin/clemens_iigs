@@ -2,6 +2,7 @@
 #define CLEM_HOST_FRONT_HPP
 
 #include "clem_host_shared.hpp"
+#include "clem_disk_library.hpp"
 #include "clem_display.hpp"
 #include "clem_audio.hpp"
 #include "cinek/buffer.hpp"
@@ -50,6 +51,10 @@ private:
   void layoutTerminalLines();
   void layoutConsoleLines();
 
+  std::pair<std::string, bool> importDisks(std::string outputPath, std::string name,
+                                           ClemensDriveType driveType,
+                                           std::vector<std::string> imagePaths);
+
   void executeCommand(std::string_view command);
   void cmdHelp(std::string_view operand);
   void cmdBreak(std::string_view operand);
@@ -57,7 +62,6 @@ private:
   void cmdRun(std::string_view operand);
 
 private:
-
   ClemensDisplayProvider displayProvider_;
 
   ClemensDisplay display_;
@@ -88,7 +92,7 @@ private:
     ClemensBackendBreakpoint* hitBreakpoint;
     unsigned breakpointCount;
 
-    std::array<ClemensBackendDiskDrive, kClemensDrive_Count> diskDrives;
+    std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives;
 
     Clemens65C816 cpu;
     ClemensMonitor monitorFrame;
@@ -140,6 +144,36 @@ private:
   TerminalMode terminalMode_;
 
   std::vector<ClemensBackendBreakpoint> breakpoints_;
+
+private:
+  //  UI State Specific Flows
+  void doModalOperations(int width, int height);
+  void doImportDiskSetFlowStart(int width, int height);
+  void doImportDiskSetReplaceOld(int width, int height);
+  void doImportDiskSet(int width, int height);
+  void doNewBlankDisk(int widht, int height);
+
+  enum class GUIMode {
+    Emulator,
+    ImportDiskModal,
+    BlankDiskModal,
+    ImportDiskSetFlow,
+    ImportDiskSetReplaceOld,
+    ImportDiskSet,
+    NewBlankDisk
+  };
+  GUIMode guiMode_;
+  ClemensDriveType importDriveType_;
+  std::string importDiskSetName_;
+  std::string importDiskSetPath_;
+  std::vector<std::string> importDiskFiles_;
+  std::string messageModalString_;
+
+  std::string diskLibraryRootPath_;
+
+  ClemensDiskLibrary diskLibrary_;
+
+  unsigned diskComboStateFlags_;        // if opened, flag == 1 else 0
 };
 
 #endif

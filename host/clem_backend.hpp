@@ -5,6 +5,7 @@
 
 #include "cinek/fixedstack.hpp"
 #include "cinek/buffer.hpp"
+#include "clem_woz.h"
 
 #include <array>
 #include <condition_variable>
@@ -55,6 +56,10 @@ public:
   void publish();
   //  Send host input to the emulator
   void inputEvent(const ClemensInputEvent& inputEvent);
+  //  Insert disk
+  void insertDisk(ClemensDriveType driveType, std::string diskPath);
+  //  Eject disk
+  void ejectDisk(ClemensDriveType driveType);
   //  Break
   void breakExecution();
   //  Add a breakpoint
@@ -71,6 +76,8 @@ private:
       ResetMachine,
       RunMachine,
       Publish,
+      InsertDisk,
+      EjectDisk,
       Input,
       Break,
       AddBreakpoint,
@@ -85,13 +92,17 @@ private:
 
   void main(PublishStateDelegate publishDelegate);
   void resetMachine();
+  bool insertDisk(const std::string_view& inputParam);
+  void ejectDisk(const std::string_view& inputParam);
   void inputMachine(const std::string_view& inputParam);
   bool addBreakpoint(const std::string_view& inputParam);
   bool delBreakpoint(const std::string_view& inputParam);
-
-  cinek::CharBuffer loadROM(const char* romPathname);
-
   unsigned checkHitBreakpoint();
+
+  void initEmulatedDiskLocalStorage();
+  bool loadDisk(ClemensDriveType driveType);
+  bool saveDisk(ClemensDriveType driveType);
+  cinek::ByteBuffer loadROM(const char* romPathname);
 
   //  TODO: These methods could be moved into a subclass as they are specific
   //        to machine type
@@ -115,12 +126,15 @@ private:
   //  memory allocated once for the machine
   cinek::FixedStack slabMemory_;
   //  the actual machine object
-  cinek::CharBuffer romBuffer_;
+  cinek::ByteBuffer romBuffer_;
+  cinek::ByteBuffer diskBuffer_;
   ClemensMachine machine_;
 
   std::vector<ClemensBackendOutputText> logOutput_;
   std::vector<ClemensBackendBreakpoint> breakpoints_;
-  std::array<ClemensBackendDiskDrive, kClemensDrive_Count> diskDrives_;
+  std::array<ClemensWOZDisk, kClemensDrive_Count> diskContainers_;
+  std::array<ClemensNibbleDisk, kClemensDrive_Count> disks_;
+  std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives_;
 };
 
 #endif

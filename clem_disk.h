@@ -71,7 +71,6 @@
     = 780 bytes per sector base
  */
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -94,17 +93,33 @@ extern unsigned g_clem_track_start_per_region_35[CLEM_DISK_35_NUM_REGIONS + 1];
     1 + (CLEM_DISK_35_BYTES_TRACK_GAP_1 - CLEM_DISK_35_BYTES_TRACK_GAP_3) + \
     ((_sectors_) * CLEM_DISK_35_BYTES_PER_SECTOR))
 
+#define CLEM_DISK_525_MAX_DATA_SIZE (50 * CLEM_DISK_525_BYTES_PER_TRACK)
+#define CLEM_DISK_35_MAX_DATA_SIZE (160 * CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(12))
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
+ * @brief
+ *
+ */
+enum ClemensDriveType {
+  kClemensDrive_Invalid = -1,
+  kClemensDrive_3_5_D1 = 0,
+  kClemensDrive_3_5_D2,
+  kClemensDrive_5_25_D1,
+  kClemensDrive_5_25_D2,
+  kClemensDrive_Count
+};
+
+/**
  * @brief Represents a nibbilized disk from a WOZ or 2IMG compliant image
  *
  */
 struct ClemensNibbleDisk {
-    unsigned disk_type;
+    unsigned disk_type;                 /* see CLEM_DISK_TYPE_XXX defines */
     unsigned bit_timing_ns;             /* time to read (and write?) */
     unsigned track_count;
 

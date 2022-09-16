@@ -61,8 +61,8 @@ struct ClemensWOZChunkHeader {
 };
 
 struct ClemensWOZDisk {
-  unsigned disk_type;
-  unsigned boot_type;
+  unsigned disk_type;       /* CLEM_WOZ_DISK_XXX */
+  unsigned boot_type;       /* CLEM_WOZ_BOOT_XXX */
   unsigned flags; /* CLEM_WOZ_SUPPORT, CLEM_WOZ_IMAGE */
   unsigned required_ram_kb;
   unsigned max_track_size_bytes;
@@ -71,6 +71,10 @@ struct ClemensWOZDisk {
   /* Extra data not necessary for the backend */
   char creator[32];
 
+  /* This is provided by the caller.  At the very least the nib->bits_data and
+     nib->bits_data_end byte vector must be defined so the parser can populate
+     this byte vector with nibbles
+  */
   struct ClemensNibbleDisk *nib;
 };
 
@@ -125,6 +129,9 @@ const uint8_t *
 clem_woz_parse_meta_chunk(struct ClemensWOZDisk *disk,
                           const struct ClemensWOZChunkHeader *header,
                           const uint8_t *data, size_t data_sz);
+
+const uint8_t*
+clem_woz_serialize(struct ClemensWOZDisk* disk, uint8_t* out, size_t* out_size);
 
 #ifdef __cplusplus
 }

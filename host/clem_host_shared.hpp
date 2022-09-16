@@ -6,6 +6,9 @@
 #include <optional>
 #include <string>
 
+#define CLEM_HOST_LIBRARY_DIR "library"
+#define CLEM_HOST_SNAPSHOT_DIR "snapshots"
+
 struct ClemensBackendOutputText {
   int level;
   std::string text;
@@ -22,17 +25,14 @@ struct ClemensBackendBreakpoint {
   uint32_t address;
 };
 
-struct ClemensBackendDiskDrive {
-  enum State {
-    Idle,
-    Active,
-    Spinning,
-    Ejecting
-  };
+struct ClemensBackendDiskDriveState {
   std::string imagePath;
-  State state;
-  bool writeProtected;
+  bool isWriteProtected;
+  bool isSpinning;
+  bool isEjecting;
+  bool saveFailed;
 };
+
 
 struct ClemensBackendState {
   const ClemensMachine* machine;
@@ -53,7 +53,7 @@ struct ClemensBackendState {
   const ClemensBackendBreakpoint* bpBufferStart;
   const ClemensBackendBreakpoint* bpBufferEnd;
   const ClemensBackendBreakpoint* bpHit;
-  const ClemensBackendDiskDrive* diskDrives;
+  const ClemensBackendDiskDriveState* diskDrives;
 };
 
 #endif

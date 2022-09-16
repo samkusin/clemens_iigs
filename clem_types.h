@@ -415,19 +415,6 @@ struct ClemensDriveBay {
   struct ClemensDrive slot6[2];
 };
 
-/**
- * @brief
- *
- */
-enum ClemensDriveType {
-  kClemensDrive_Invalid = -1,
-  kClemensDrive_3_5_D1 = 0,
-  kClemensDrive_3_5_D2,
-  kClemensDrive_5_25_D1,
-  kClemensDrive_5_25_D2,
-  kClemensDrive_Count
-};
-
 /* Note that in emulation mode, the EmulatedBrk flag should be
    stored in the status register - for our purposes we mock this
    behvaior only when the application has access to the status

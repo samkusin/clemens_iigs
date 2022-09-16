@@ -199,7 +199,10 @@ unsigned clem_drive_pre_step(struct ClemensDrive *drive, unsigned *io_flags) {
 
   if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
     drive->read_buffer = 0;
+    drive->is_spindle_on = false;
     return CLEM_IWM_DRIVE_INVALID_TRACK_POS;
+  } else {
+    drive->is_spindle_on = true;
   }
   return track_cur_pos;
 }

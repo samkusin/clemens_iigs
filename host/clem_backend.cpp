@@ -1,4 +1,5 @@
 #include "clem_backend.hpp"
+#include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
 #include "emulator.h"
 
@@ -11,6 +12,10 @@
 
 static constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
 static constexpr unsigned kLogOutputLineLimit = 1024;
+
+static std::array<std::string_view, 4> sDriveNames = {
+  "s5d1", "s5d2", "s6d1", "s6d2"
+};
 
 struct ClemensRunSampler {
   //  our method of keeping the simulation in sync with real time is to rely
@@ -71,6 +76,9 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
                                PublishStateDelegate publishDelegate) :
   config_(config),
   slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)) {
+
+  initEmulatedDiskLocalStorage();
+
   romBuffer_ = loadROM(romPathname.c_str());
 
   memset(&machine_, 0, sizeof(machine_));
@@ -84,6 +92,13 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
 
   //  TODO: Only use this when opcode debugging is enabled
   clemens_opcode_callback(&machine_, &ClemensBackend::emulatorOpcodeCallback);
+  /*
+  diskDrives_[kClemensDrive_5_25_D1].imagePath = "dos_3_3_master.woz";
+  if (!loadDisk(kClemensDrive_5_25_D1) ||
+      !clemens_assign_disk(&machine_, kClemensDrive_5_25_D1, &disks_[kClemensDrive_5_25_D1])) {
+    diskDrives_[kClemensDrive_5_25_D1].imagePath.clear();
+  }
+  */
 
   //  Everything is ready for the main thread
   runner_ = std::thread(&ClemensBackend::main, this, std::move(publishDelegate));
@@ -121,6 +136,83 @@ void ClemensBackend::run() {
 
 void ClemensBackend::publish() {
   queue(Command{Command::Publish});
+}
+
+void ClemensBackend::insertDisk(ClemensDriveType driveType, std::string diskPath) {
+  queue(Command{Command::InsertDisk,
+                fmt::format("{}={}", sDriveNames[(int)driveType], diskPath)});
+}
+
+bool ClemensBackend::insertDisk(const std::string_view& inputParam) {
+  auto sepPos = inputParam.find('=');
+  if (sepPos == std::string_view::npos) return false;
+  auto driveName = inputParam.substr(0, sepPos);
+  auto imagePath = inputParam.substr(sepPos + 1);
+  auto driveIt = std::find(sDriveNames.begin(), sDriveNames.end(), driveName);
+  if (driveIt == sDriveNames.end()) return false;
+  unsigned driveIndex = unsigned(driveIt - sDriveNames.begin());
+  auto driveType = static_cast<ClemensDriveType>(driveIndex);
+
+  diskDrives_[driveIndex].imagePath = imagePath;
+  if (!loadDisk(driveType) ||
+      !clemens_assign_disk(&machine_, driveType, &disks_[driveIndex])) {
+    diskDrives_[driveIndex].imagePath.clear();
+    return false;
+  }
+
+  return true;
+}
+
+void ClemensBackend::ejectDisk(ClemensDriveType driveType) {
+  queue(Command{Command::EjectDisk, std::string(sDriveNames[(int)driveType])});
+}
+
+void ClemensBackend::ejectDisk(const std::string_view& inputParam) {
+  auto driveIt = std::find(sDriveNames.begin(), sDriveNames.end(), inputParam);
+  if (driveIt == sDriveNames.end()) return;
+  unsigned driveIndex = unsigned(driveIt - sDriveNames.begin());
+  diskDrives_[driveIndex].isEjecting = true;
+}
+
+bool ClemensBackend::loadDisk(ClemensDriveType driveType) {
+  diskBuffer_.reset();
+
+  std::ifstream input(diskDrives_[driveType].imagePath,
+                      std::ios_base::in | std::ios_base::binary);
+  if (input.fail()) return false;
+
+  input.seekg(0, std::ios_base::end);
+  size_t inputImageSize = input.tellg();
+  if (inputImageSize > diskBuffer_.getCapacity()) return false;
+
+  auto bits = diskBuffer_.forwardSize(inputImageSize);
+  input.seekg(0);
+  input.read((char *)bits.first, inputImageSize);
+  if (input.fail() || input.bad()) return false;
+
+  diskContainers_[driveType].nib = &disks_[driveType];
+  auto parseBuffer = cinek::ConstCastRange<uint8_t>(bits);
+  if (!ClemensDiskUtilities::parseWOZ(&diskContainers_[driveType], parseBuffer)) {
+    return false;
+  }
+
+  return true;
+}
+
+bool ClemensBackend::saveDisk(ClemensDriveType driveType) {
+  diskBuffer_.reset();
+  auto writeOut = diskBuffer_.forwardSize(diskBuffer_.getCapacity());
+
+  size_t writeOutCount = cinek::length(writeOut);
+  if (!clem_woz_serialize(&diskContainers_[driveType], writeOut.first, &writeOutCount)) {
+    return false;
+  }
+  std::ofstream out(diskDrives_[driveType].imagePath,
+                    std::ios_base::out | std::ios_base::binary);
+  if (out.fail()) return false;
+  out.write((char*)writeOut.first, writeOutCount);
+  if (out.fail() || out.bad()) return false;
+  return true;
 }
 
 static const char* sInputKeys[] = {
@@ -277,8 +369,10 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     while (!commandQueue_.empty() && isActive) {
       auto command = commandQueue_.front();
       commandQueue_.pop_front();
-      if (!commandFailed.has_value() && command.type != Command::Publish) {
-        commandFailed = false;
+      if (!commandFailed.has_value()) {
+        if (command.type != Command::Publish && command.type != Command::Input) {
+          commandFailed = false;
+        }
       }
       switch (command.type) {
         case Command::Terminate:
@@ -304,6 +398,12 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           break;
         case Command::Publish:
           publishState = true;
+          break;
+        case Command::InsertDisk:
+          if (!insertDisk(command.operand)) commandFailed = true;
+          break;
+        case Command::EjectDisk:
+          ejectDisk(command.operand);
           break;
         case Command::Input:
           inputMachine(command.operand);
@@ -378,6 +478,24 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     lastFrameTimePoint = currentFrameTimePoint;
 
     runSampler.update(fixedFrameInterval, actualFrameInterval);
+
+    for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end(); ++diskDriveIt) {
+      auto& diskDrive = *diskDriveIt;
+      auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
+      auto driveType = static_cast<ClemensDriveType>(driveIndex);
+      auto* clemensDrive = clemens_drive_get(&machine_, driveType);
+      diskDrive.isSpinning = clemensDrive->is_spindle_on;
+      diskDrive.isWriteProtected = clemensDrive->disk.is_write_protected;
+      diskDrive.saveFailed = false;
+      if (diskDrive.isEjecting) {
+        if (clemens_eject_disk_async(&machine_, driveType, &disks_[driveIndex])) {
+          diskDrive.isEjecting = false;
+          if (!saveDisk(driveType)) diskDrive.saveFailed = true;
+          diskDrive.imagePath.clear();
+        }
+      }
+    }
+
     //  TODO: publish emulator state using a callback
     //        the recipient will synchronize with UI accordingly with the
     //        assumption that once the callback returns, we can alter the state
@@ -442,17 +560,48 @@ unsigned ClemensBackend::checkHitBreakpoint() {
   return UINT32_MAX;
 }
 
-cinek::CharBuffer ClemensBackend::loadROM(const char* romPathname) {
-  cinek::CharBuffer romBuffer;
+void ClemensBackend::initEmulatedDiskLocalStorage() {
+  diskBuffer_ =
+    cinek::ByteBuffer((uint8_t*)slabMemory_.allocate(CLEM_DISK_35_MAX_DATA_SIZE),
+                      CLEM_DISK_35_MAX_DATA_SIZE + 4096);
+  disks_[kClemensDrive_3_5_D1].bits_data =
+    (uint8_t*)slabMemory_.allocate(CLEM_DISK_35_MAX_DATA_SIZE);
+  disks_[kClemensDrive_3_5_D1].bits_data_end =
+    disks_[kClemensDrive_3_5_D1].bits_data + CLEM_DISK_35_MAX_DATA_SIZE;
+  disks_[kClemensDrive_3_5_D2].bits_data =
+    (uint8_t*)slabMemory_.allocate(CLEM_DISK_35_MAX_DATA_SIZE);
+  disks_[kClemensDrive_3_5_D2].bits_data_end =
+    disks_[kClemensDrive_3_5_D2].bits_data + CLEM_DISK_35_MAX_DATA_SIZE;
+
+  disks_[kClemensDrive_5_25_D1].bits_data =
+    (uint8_t*)slabMemory_.allocate(CLEM_DISK_525_MAX_DATA_SIZE);
+  disks_[kClemensDrive_5_25_D1].bits_data_end =
+    disks_[kClemensDrive_5_25_D1].bits_data + CLEM_DISK_525_MAX_DATA_SIZE;
+  disks_[kClemensDrive_5_25_D2].bits_data =
+    (uint8_t*)slabMemory_.allocate(CLEM_DISK_525_MAX_DATA_SIZE);
+  disks_[kClemensDrive_5_25_D2].bits_data_end =
+    disks_[kClemensDrive_5_25_D2].bits_data + CLEM_DISK_525_MAX_DATA_SIZE;
+
+  //  some sanity values to initialize
+  for (auto& diskDrive : diskDrives_) {
+    diskDrive.isEjecting = false;
+    diskDrive.isSpinning = false;
+    diskDrive.isWriteProtected = true;
+    diskDrive.saveFailed = false;
+  }
+}
+
+cinek::ByteBuffer ClemensBackend::loadROM(const char* romPathname) {
+  cinek::ByteBuffer romBuffer;
   std::ifstream romFileStream(romPathname, std::ios::binary | std::ios::ate);
   unsigned romMemorySize = 0;
 
   if (romFileStream.is_open()) {
     romMemorySize = unsigned(romFileStream.tellg());
-    romBuffer = cinek::CharBuffer(
-      (char *)slabMemory_.allocate(romMemorySize), romMemorySize);
+    romBuffer = cinek::ByteBuffer(
+      (uint8_t *)slabMemory_.allocate(romMemorySize), romMemorySize);
     romFileStream.seekg(0, std::ios::beg);
-    romFileStream.read(romBuffer.forwardSize(romMemorySize).first, romMemorySize);
+    romFileStream.read((char*)romBuffer.forwardSize(romMemorySize).first, romMemorySize);
     romFileStream.close();
   }
   return romBuffer;

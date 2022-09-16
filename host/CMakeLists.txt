@@ -28,7 +28,7 @@ target_include_directories(ckaudio
 set(CINEK_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/cinek/ckdebug.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/cinek/buffer.cpp"
-)
+    "${CMAKE_CURRENT_SOURCE_DIR}/cinek/encode.c")
 
 set(SOKOL_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/sokol/sokol_gfx.h"
@@ -53,10 +53,13 @@ add_executable(clemens_iigs
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_display.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_backend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk_library.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_front.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_app.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_utils.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_import_disk.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_program_trace.cpp"
     ${FMT_SOURCES}
     ${SOKOL_SOURCES}

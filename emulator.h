@@ -252,6 +252,22 @@ void clemens_eject_disk(ClemensMachine* clem, enum ClemensDriveType drive_type,
                         struct ClemensNibbleDisk* disk);
 
 /**
+ * @brief Performs a device specific eject of a disk (3.5" disks mainly.)
+ *
+ * The eject sequence can take a second or so if exact Apple Drive 3.5"
+ * emulation is desired.
+ *
+ * @param clem
+ * @param drive_type
+ * @param disk  The final nibbilised disk object
+ * @return true Disk has ejected
+ * @return false Disk is still ejecting
+ */
+bool clemens_eject_disk_async(ClemensMachine* clem,
+                              enum ClemensDriveType drive_type,
+                              struct ClemensNibbleDisk* disk);
+
+/**
  * @brief Forwards input from ths host machine to the ADB
  *
  * @param clem

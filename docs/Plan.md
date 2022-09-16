@@ -10,24 +10,21 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Support 320x200 Super Hires Mode
-  * C029 Bits 7 and 6 (Super Hires and Bank 01 memory layout)
-  * Per scanline information to display color fill/320 vs 4 color 640
-* VGC Interrupt Support
+* New GUI Host (better debugging, more intuitive, quality of life)
+* Linux support
+* Lores mode
 * Double Lores Mode (should be simple given how clem_display.cpp is written)
 * Verify Mega II Interrupts work
 * Clean up ADB support (Mouse)
 * SCC Support
-* Ensoniq Support - http://www.buchty.net/ensoniq/5503.html
-* Apple IIgs Diagnostic Test
-* Better Apple II Speaker Support
-* Monochrome Support
-* Mockingboard Support
-* Smartport Hard Drive Support
 * Joystick/Paddle Support
+* Apple IIgs Diagnostic Test
+* Monochrome Support
+* Smartport Hard Drive Support
 * Dblhires is offset by 4 pixels (1 block) in display due to conversion method
 * Black and White DBLHIRES ($C029 bit 5)
 * Flashing Characters
+* ROM 01
 * Data accesses across banks are allowed (but not stack accesses?)
 * Audit Direct Page in emulation mode (wrap zero page, only if D=0000 for 6502
   instructions, but for 65816 instructions there is no wrapping?)
@@ -36,9 +33,15 @@ This is a running todo list.
 * ADB Mouse on Keypad Feature
 * clipboard (paste)
 
-
 ## DONE
 
+* VGC Interrupt Support
+* Better Apple II Speaker Support
+* Ensoniq Support - http://www.buchty.net/ensoniq/5503.html
+* Support 320x200 Super Hires Mode
+  * C029 Bits 7 and 6 (Super Hires and Bank 01 memory layout)
+  * Per scanline information to display color fill/320 vs 4 color 640
+* Mockingboard Support (MB C no SSI-263)
 * Support DSK and PO, 2IMG files
   * 2IMG serialization
   * Allow PO loading from the 2IMG system (for .po files)

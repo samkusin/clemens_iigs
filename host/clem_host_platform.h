@@ -22,6 +22,10 @@ typedef struct {
   char data[8];
 } ClemensHostTimePoint;
 
+typedef struct {
+  unsigned char data[16];
+} ClemensHostUUID;
+
 /**
  * @brief
  *
@@ -70,6 +74,16 @@ bool clem_host_get_caps_lock_state();
  * @return unsigned
  */
 unsigned clem_host_get_processor_number();
+
+/**
+ * @brief Generates a UUID using the preferred OS method
+ *
+ * Under Windows, UuidCreate
+ * Under Linux, libuuid
+ *
+ * @param uuid
+ */
+void clem_host_uuid_gen(ClemensHostUUID* uuid);
 
 #ifdef __cplusplus
 }

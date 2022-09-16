@@ -62,6 +62,14 @@ unsigned g_clem_track_start_per_region_35[CLEM_DISK_35_NUM_REGIONS + 1] = {
  *  If HI, then a command is executed.
  */
 
+void clem_disk_35_start_eject(struct ClemensDrive* drive) {
+    if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING) return;
+    drive->is_spindle_on = false;
+    drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_EJECTING;
+    drive->step_timer_35_ns = CLEM_IWM_DISK35_EJECT_TIME_NS;
+    CLEM_LOG("clem_drive35: ejecting disk");
+}
+
 void clem_disk_read_and_position_head_35(
     struct ClemensDrive* drive,
     unsigned *io_flags,
@@ -85,7 +93,8 @@ void clem_disk_read_and_position_head_35(
     drive->step_timer_35_ns = clem_util_timer_decrement(
         cur_step_timer_ns, dt_ns);
 
-    if (!drive->step_timer_35_ns && drive->step_timer_35_ns < cur_step_timer_ns) {
+    if (drive->has_disk && !drive->step_timer_35_ns &&
+        drive->step_timer_35_ns < cur_step_timer_ns) {
         /* step or eject completed */
         if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING) {
             drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_EJECTING;
@@ -151,12 +160,7 @@ void clem_disk_read_and_position_head_35(
                     CLEM_DEBUG("clem_drive35: drive motor off");
                     break;
                 case CLEM_IWM_DISK35_CTL_EJECT:
-                    if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {
-                        drive->is_spindle_on = false;
-                        drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_EJECTING;
-                        drive->step_timer_35_ns = CLEM_IWM_DISK35_EJECT_TIME_NS;
-                        CLEM_LOG("clem_drive35: ejecting disk");
-                    }
+                    clem_disk_35_start_eject(drive);
                     break;
                 default:
                     CLEM_LOG("clem_drive35: ctl %02X not supported?", ctl_switch);

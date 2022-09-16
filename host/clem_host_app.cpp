@@ -9,8 +9,8 @@
 #include "imgui.h"
 
 #include <array>
-
 #include <cstdio>
+#include <filesystem>
 
 #define CLEMENS_NEW_GUI
 
@@ -91,10 +91,19 @@ static void imguiFontSetup(const cinek::ByteBuffer& systemFontLoBuffer,
   }
 }
 
+static void initDirectories() {
+#ifdef CLEMENS_NEW_GUI
+  std::filesystem::create_directory(CLEM_HOST_LIBRARY_DIR);
+  std::filesystem::create_directory(CLEM_HOST_SNAPSHOT_DIR);
+#endif
+}
+
 static void onInit()
 {
   clem_host_timepoint_init();
   clem_host_timepoint_now(&g_LastTimepoint);
+
+  initDirectories();
 
   CoInitializeEx(NULL, COINIT_MULTITHREADED);
 

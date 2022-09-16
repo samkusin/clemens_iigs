@@ -4,13 +4,6 @@
 #include <assert.h>
 #include <string.h>
 
-#define CLEM_2IMG_DISK_TYPE_UNKNOWN 0
-#define CLEM_2IMG_DISK_TYPE_5_25 1
-#define CLEM_2IMG_DISK_TYPE_3_5 2
-
-#define CLEM_2IMG_DISK_SIZE_5_25 (140 * 1024)
-#define CLEM_2IMG_DISK_SIZE_3_5 (800 * 1024)
-
 /*
 https://apple2.org.za/gswv/a2zine/Docs/DiskImage_2MG_Info.txt
 
@@ -272,7 +265,7 @@ bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format,
     if (disk_size % 512) {
       return false;
     }
-  } else {
+  } else if (format == CLEM_2IMG_FORMAT_DOS) {
     disk->block_count = 0;
     if (disk_size % 256) {
       return false;

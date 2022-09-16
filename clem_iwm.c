@@ -138,7 +138,7 @@ void clem_iwm_debug_stop(struct ClemensDeviceIWM *iwm) {
 void clem_iwm_eject_disk(struct ClemensDeviceIWM *iwm,
                          struct ClemensDrive *drive,
                          struct ClemensNibbleDisk *disk) {
-  if (drive->has_disk) {
+  if (drive->disk.disk_type != CLEM_DISK_TYPE_NONE) {
     memcpy(disk, &drive->disk, sizeof(drive->disk));
     if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
       drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_EJECTING;
@@ -147,6 +147,22 @@ void clem_iwm_eject_disk(struct ClemensDeviceIWM *iwm,
     drive->has_disk = false;
   }
   memset(&drive->disk, 0, sizeof(drive->disk));
+}
+
+bool clem_iwm_eject_disk_async(struct ClemensDeviceIWM *iwm,
+                               struct ClemensDrive *drive,
+                               struct ClemensNibbleDisk *disk) {
+
+  if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
+    if (drive->has_disk) {
+      if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {
+        clem_disk_35_start_eject(drive);
+        return false;
+      }
+    }
+  }
+  clem_iwm_eject_disk(iwm, drive, disk);
+  return true;
 }
 
 struct ClemensDrive *_clem_iwm_select_drive(struct ClemensDeviceIWM *iwm,

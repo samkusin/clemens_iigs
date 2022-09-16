@@ -1186,6 +1186,20 @@ void clemens_eject_disk(ClemensMachine *clem, enum ClemensDriveType drive_type,
   clem_iwm_eject_disk(&clem->mmio.dev_iwm, drive, disk);
 }
 
+bool clemens_eject_disk_async(ClemensMachine* clem,
+                              enum ClemensDriveType drive_type,
+                              struct ClemensNibbleDisk* disk) {
+  struct ClemensDrive *drive = clemens_drive_get(clem, drive_type);
+  if (drive && clemens_is_initialized_simple(clem)) {
+    if (drive->disk.disk_type != CLEM_DISK_TYPE_NONE) {
+      CLEM_LOG("%s ejecting disk", s_drive_names[drive_type]);
+    }
+    return clem_iwm_eject_disk_async(&clem->mmio.dev_iwm, drive, disk);
+  }
+  clem_iwm_eject_disk(&clem->mmio.dev_iwm, drive, disk);
+  return true;
+}
+
 ClemensMonitor *clemens_get_monitor(ClemensMonitor *monitor,
                                     ClemensMachine *clem) {
   struct ClemensVGC* vgc = &clem->mmio.vgc;
