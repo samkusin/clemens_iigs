@@ -3,6 +3,7 @@
 
 #include "clem_types.h"
 
+#include <array>
 #include <optional>
 #include <string>
 
@@ -33,13 +34,45 @@ struct ClemensBackendDiskDriveState {
   bool saveFailed;
 };
 
+struct ClemensBackendConfig {
+  enum class Type {
+    Apple2GS
+  };
+
+  std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDriveStates;
+  unsigned audioSamplesPerSecond;
+  Type type;
+};
+
+struct ClemensBackendCommand {
+  enum Type {
+    Undefined,
+    Terminate,
+    SetHostUpdateFrequency,
+    ResetMachine,
+    RunMachine,
+    Publish,
+    InsertDisk,
+    EjectDisk,
+    Input,
+    Break,
+    AddBreakpoint,
+    DelBreakpoint
+  };
+  Type type = Undefined;
+  std::string operand;
+};
+
 
 struct ClemensBackendState {
   const ClemensMachine* machine;
   double fps;
   uint64_t seqno;
   bool mmio_was_initialized;
+  std::optional<bool> terminated;
   std::optional<bool> commandFailed;
+  // valid if commandFailed
+  std::optional<ClemensBackendCommand::Type> commandType;
 
   ClemensMonitor monitor;
   ClemensVideo text;
@@ -52,7 +85,7 @@ struct ClemensBackendState {
   const ClemensBackendOutputText* logBufferEnd;
   const ClemensBackendBreakpoint* bpBufferStart;
   const ClemensBackendBreakpoint* bpBufferEnd;
-  const ClemensBackendBreakpoint* bpHit;
+  std::optional<unsigned> bpHitIndex;
   const ClemensBackendDiskDriveState* diskDrives;
 };
 

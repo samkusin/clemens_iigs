@@ -11,19 +11,22 @@ with ROM1 if possible compatibility.)
 This is a running todo list.
 
 * New GUI Host (better debugging, more intuitive, quality of life)
-* Linux support
+* Fix Slot 3 I/O (defaulting to card vs internal ROM) - broke when Mockingboard
+  support added
+* Card expansion ROM selector is not working
 * Lores mode
-* Double Lores Mode (should be simple given how clem_display.cpp is written)
 * Verify Mega II Interrupts work
+* Linux support
+* Flashing Characters
 * Clean up ADB support (Mouse)
 * SCC Support
 * Joystick/Paddle Support
 * Apple IIgs Diagnostic Test
+* Double Lores Mode (should be simple given how clem_display.cpp is written)
 * Monochrome Support
 * Smartport Hard Drive Support
 * Dblhires is offset by 4 pixels (1 block) in display due to conversion method
 * Black and White DBLHIRES ($C029 bit 5)
-* Flashing Characters
 * ROM 01
 * Data accesses across banks are allowed (but not stack accesses?)
 * Audit Direct Page in emulation mode (wrap zero page, only if D=0000 for 6502

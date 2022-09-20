@@ -580,9 +580,9 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr,
     if (addr == 0xCFFF) {
       /* TODO: CFFF access */
     } else if (addr < 0xCFFF && addr >= 0xC800) {
-      slot_idx = clem->mmio.card_expansion_rom_index;
-      if (slot_idx >= 0) {
-        result = clem->card_slot_expansion_memory[slot_idx][addr - 0xc800];
+      slot_idx = (uint8_t)(clem->mmio.card_expansion_rom_index & 0xff);
+      if (slot_idx > 0 && slot_idx <= 7) {
+        result = clem->card_slot_expansion_memory[slot_idx  - 1][addr - 0xc800];
       }
     } else if (addr >= 0xC100) {
       slot_idx = (uint8_t)(addr >> 8) - 0xc0 - 1;

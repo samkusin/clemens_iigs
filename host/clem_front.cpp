@@ -9,6 +9,14 @@
 
 #include <filesystem>
 
+//  TODO: implement all current commands documented in help
+//  TODO: blank disk gui selection for disk set (selecting combo create will
+//        enable another input widget, unselecting will gray out that widget.)
+//  TODO: memory debug gui
+//  TODO: memory dump command (non-gui)
+//  TODO: instruction trace (improved)
+//
+
 template<typename TBufferType>
 struct FormatView {
   using BufferType = TBufferType;
@@ -54,6 +62,32 @@ private:
 #define CLEM_TERM_COUT FormatView<decltype(ClemensFrontend::terminalLines_)>(terminalLines_)
 
 static constexpr size_t kFrameMemorySize = 8 * 1024 * 1024;
+static constexpr size_t kLogMemorySize = 256 * 1024;
+
+static std::string getCommandTypeName(ClemensBackendCommand::Type type) {
+  switch (type) {
+    case ClemensBackendCommand::AddBreakpoint:
+      return "AddBreakpoint";
+    case ClemensBackendCommand::Break:
+      return "Break";
+    case ClemensBackendCommand::DelBreakpoint:
+      return "DelBreakpoint";
+    case ClemensBackendCommand::EjectDisk:
+      return "EjectDisk";
+    case ClemensBackendCommand::InsertDisk:
+      return "InsertDisk";
+    case ClemensBackendCommand::ResetMachine:
+      return "ResetMachine";
+    case ClemensBackendCommand::RunMachine:
+      return "RunMachine";
+    case ClemensBackendCommand::SetHostUpdateFrequency:
+      return "SetHostUpdateFrequency";
+    case ClemensBackendCommand::Terminate:
+      return "Terminate";
+    default:
+      return "Command";
+  }
+}
 
 ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer& systemFontLoBuffer,
                                  const cinek::ByteBuffer& systemFontHiBuffer) :
@@ -62,6 +96,7 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer& systemFontLoBuffer,
   audio_(),
   frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
   frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
+  logMemory_(kLogMemorySize, malloc(kLogMemorySize)),
   frameSeqNo_(std::numeric_limits<decltype(frameSeqNo_)>::max()),
   frameLastSeqNo_(std::numeric_limits<decltype(frameLastSeqNo_)>::max()),
   lastFrameCPUPins_{},
@@ -76,15 +111,12 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer& systemFontLoBuffer,
   diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512),
   diskComboStateFlags_(0)
 {
+  lastCommandState_.logNode = lastCommandState_.logNodeTail = nullptr;
+
   audio_.start();
-  ClemensBackend::Config backendConfig;
-  backendConfig.type = ClemensBackend::Type::Apple2GS;
-  backendConfig.audioSamplesPerSecond = audio_.getAudioFrequency();
-  backend_ = std::make_unique<ClemensBackend>("gs_rom_3.rom", backendConfig,
-    std::bind(&ClemensFrontend::backendStateDelegate, this, std::placeholders::_1));
-  backend_->setRefreshFrequency(60);
-  backend_->reset();
-  backend_->run();
+  config_.type = ClemensBackend::Config::Type::Apple2GS;
+  config_.audioSamplesPerSecond = audio_.getAudioFrequency();
+  createBackend();
 
   CLEM_TERM_COUT.print(TerminalLine::Info, "Welcome to the Clemens IIgs Emulator");
 }
@@ -102,6 +134,15 @@ void ClemensFrontend::input(const ClemensInputEvent &input){
   }
 }
 
+void ClemensFrontend::createBackend() {
+  backend_ = std::make_unique<ClemensBackend>("gs_rom_3.rom", config_,
+    std::bind(&ClemensFrontend::backendStateDelegate, this, std::placeholders::_1));
+  backend_->setRefreshFrequency(60);
+  backend_->reset();
+  backend_->run();
+  guiMode_ = GUIMode::Emulator;
+}
+
 void ClemensFrontend::backendStateDelegate(const ClemensBackendState& state) {
   {
     std::lock_guard<std::mutex> frameLock(frameMutex_);
@@ -116,7 +157,6 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState& state) {
     frameWriteState_.backendCPUID = state.hostCPUID;
     frameWriteState_.fps = state.fps;
     frameWriteState_.mmioWasInitialized = state.mmio_was_initialized;
-    frameWriteState_.commandFailed = state.commandFailed;
 
     //  copy over component state as needed
     frameWriteState_.vgcModeFlags = state.machine->mmio.vgc.mode_flags;
@@ -134,38 +174,53 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState& state) {
     frameWriteState_.audioBuffer = (uint8_t*)frameWriteMemory_.allocate(audioBufferSize);
     memcpy(frameWriteState_.audioBuffer, state.audio.data, audioBufferSize);
 
-    frameWriteState_.logNode = nullptr;
-    LogOutputNode* prev = nullptr;
-    for (auto* logItem = state.logBufferStart; logItem != state.logBufferEnd; ++logItem) {
-      LogOutputNode* logMemory = reinterpret_cast<LogOutputNode*>(frameWriteMemory_.allocate(
-        sizeof(LogOutputNode) + CK_ALIGN_SIZE_TO_ARCH(logItem->text.size())));
-      logMemory->logLevel = logItem->level;
-      logMemory->sz = unsigned(logItem->text.size());
-      logItem->text.copy(reinterpret_cast<char*>(logMemory) + sizeof(LogOutputNode),
-                         std::string::npos);
-      logMemory->next = nullptr;
-      if (!frameWriteState_.logNode) frameWriteState_.logNode = logMemory;
-      else prev->next = logMemory;
-      prev = logMemory;
+    const ClemensBackendDiskDriveState* driveState = state.diskDrives;
+    for (auto& diskDrive : frameWriteState_.diskDrives) {
+      diskDrive = *driveState;
+      if (state.terminated.has_value() && *state.terminated) {
+        config_.diskDriveStates[size_t(driveState - state.diskDrives)] = *driveState;
+      }
+      ++driveState;
     }
 
     frameWriteState_.breakpoints =
       frameWriteMemory_.allocateArray<ClemensBackendBreakpoint>(
         state.bpBufferEnd - state.bpBufferStart);
     frameWriteState_.breakpointCount = (unsigned)(state.bpBufferEnd - state.bpBufferStart);
-    frameWriteState_.hitBreakpoint = nullptr;
     auto* bpDest = frameWriteState_.breakpoints;
     for (auto* bpCur = state.bpBufferStart;
          bpCur != state.bpBufferEnd; ++bpCur, ++bpDest) {
       *bpDest = *bpCur;
-      if (bpCur == state.bpHit) {
-        frameWriteState_.hitBreakpoint = bpDest;
+      if (state.bpHitIndex.has_value() && !lastCommandState_.hitBreakpoint.has_value()) {
+        if (unsigned(bpCur - state.bpBufferStart) == *state.bpHitIndex) {
+          lastCommandState_.hitBreakpoint = *state.bpHitIndex;
+        }
       }
     }
-    const ClemensBackendDiskDriveState* driveState = state.diskDrives;
-    for (auto& diskDrive : frameWriteState_.diskDrives) {
-      diskDrive = *driveState;
-      ++driveState;
+    if (!lastCommandState_.commandFailed.has_value()) {
+      lastCommandState_.commandFailed = state.commandFailed;
+    }
+    if (!lastCommandState_.commandType.has_value()) {
+      lastCommandState_.commandType = state.commandType;
+    }
+    if (!lastCommandState_.terminated.has_value()) {
+      lastCommandState_.terminated = state.terminated;
+    }
+
+    for (auto* logItem = state.logBufferStart; logItem != state.logBufferEnd; ++logItem) {
+      LogOutputNode* logMemory = reinterpret_cast<LogOutputNode*>(logMemory_.allocate(
+        sizeof(LogOutputNode) + CK_ALIGN_SIZE_TO_ARCH(logItem->text.size())));
+      logMemory->logLevel = logItem->level;
+      logMemory->sz = unsigned(logItem->text.size());
+      logItem->text.copy(reinterpret_cast<char*>(logMemory) + sizeof(LogOutputNode),
+                         std::string::npos);
+      logMemory->next = nullptr;
+      if (!lastCommandState_.logNode) {
+        lastCommandState_.logNode = logMemory;
+      } else {
+        lastCommandState_.logNodeTail->next = logMemory;
+      }
+      lastCommandState_.logNodeTail = logMemory;
     }
   }
   framePublished_.notify_one();
@@ -178,6 +233,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
   //
   //  developer_layout(width, height, deltaTime);
   bool isNewFrame = false;
+  bool isBackendTerminated = false;
   std::unique_lock<std::mutex> frameLock(frameMutex_);
   framePublished_.wait_for(frameLock, std::chrono::milliseconds::zero(),
     [this]() {
@@ -193,7 +249,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
     std::swap(frameWriteMemory_, frameReadMemory_);
     std::swap(frameWriteState_, frameReadState_);
 
-    LogOutputNode* logNode = frameReadState_.logNode;
+    LogOutputNode* logNode = lastCommandState_.logNode;
     while (logNode) {
       if (consoleLines_.isFull()) {
         consoleLines_.pop();
@@ -221,23 +277,34 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
       consoleLines_.push(std::move(logLine));
       logNode = logNode->next;
     }
+    lastCommandState_.logNode = lastCommandState_.logNodeTail = nullptr;
+    logMemory_.reset();
 
     breakpoints_.clear();
     for (unsigned bpIndex = 0; bpIndex < frameReadState_.breakpointCount; ++bpIndex) {
       breakpoints_.emplace_back(frameReadState_.breakpoints[bpIndex]);
     }
-    if (frameReadState_.commandFailed.has_value()) {
-      if (*frameReadState_.commandFailed) {
-        CLEM_TERM_COUT.print(TerminalLine::Error, "Failed.");
+    if (lastCommandState_.commandFailed.has_value()) {
+      if (*lastCommandState_.commandFailed) {
+        CLEM_TERM_COUT.format(TerminalLine::Error, "{} Failed.",
+                              getCommandTypeName(*lastCommandState_.commandType));
       } else {
         CLEM_TERM_COUT.print(TerminalLine::Info, "Ok.");
       }
+      lastCommandState_.commandFailed = std::nullopt;
+      lastCommandState_.commandType = std::nullopt;
     }
-    if (frameReadState_.hitBreakpoint) {
+    if (lastCommandState_.hitBreakpoint.has_value()) {
+      unsigned bpIndex = *lastCommandState_.hitBreakpoint;
       CLEM_TERM_COUT.format(TerminalLine::Info, "Breakpoint {} hit {:02X}/{:04X}.",
-                            frameReadState_.hitBreakpoint - frameReadState_.breakpoints,
-                            (frameReadState_.hitBreakpoint->address >> 16) & 0xff,
-                            frameReadState_.hitBreakpoint->address & 0xffff);
+                            bpIndex,
+                            (breakpoints_[bpIndex].address >> 16) & 0xff,
+                            breakpoints_[bpIndex].address & 0xffff);
+      lastCommandState_.hitBreakpoint = std::nullopt;
+    }
+    if (lastCommandState_.terminated.has_value()) {
+      isBackendTerminated = *lastCommandState_.terminated;
+      lastCommandState_.terminated = std::nullopt;
     }
     frameLastSeqNo_ = frameSeqNo_;
   }
@@ -314,6 +381,12 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
       break;
     case GUIMode::NewBlankDisk:
       doNewBlankDisk(width, height);
+      break;
+    case GUIMode::RebootEmulator:
+      if (isBackendTerminated) {
+        backend_ = nullptr;
+        createBackend();
+      }
       break;
     default:
       break;
@@ -1094,6 +1167,10 @@ void ClemensFrontend::executeCommand(std::string_view command) {
     cmdBreak(operand);
   } else if (action == "list" || action == "l") {
     cmdList(operand);
+  } else if (action == "reboot") {
+    cmdReboot(operand);
+  } else if (action == "reset") {
+    cmdReset(operand);
   } else if (!action.empty()) {
     CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
   }
@@ -1177,17 +1254,28 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
 
 void ClemensFrontend::cmdList(std::string_view operand) {
   //  TODO: granular listing based on operand
+  static const char* bpType[] = {"unknown", "execute", "data-read", "write"};
   if (breakpoints_.empty()) {
     CLEM_TERM_COUT.print(TerminalLine::Info, "No breakpoints defined.");
     return;
   }
   for (size_t i = 0; i < breakpoints_.size(); ++i) {
     auto& bp = breakpoints_[i];
-    CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {:02X}/{:04X}", i,
-                          (bp.address >> 16) & 0xff, bp.address & 0xffff);
+    CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {:02X}/{:04X} {}", i,
+                          (bp.address >> 16) & 0xff, bp.address & 0xffff,
+                          bpType[bp.type]);
   }
 }
 
 void ClemensFrontend::cmdRun(std::string_view operand) {
   backend_->run();
+}
+
+void ClemensFrontend::cmdReboot(std::string_view operand) {
+  guiMode_ = GUIMode::RebootEmulator;
+  backend_->terminate();
+}
+
+void ClemensFrontend::cmdReset(std::string_view operand) {
+  backend_->reset();
 }

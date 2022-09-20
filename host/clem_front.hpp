@@ -35,6 +35,8 @@ public:
 private:
   template<typename TBufferType> friend struct FormatView;
 
+  void createBackend();
+
   //  the backend state delegate is run on a separate thread and notifies
   //  when a frame has been published
   void backendStateDelegate(const ClemensBackendState& state);
@@ -60,6 +62,8 @@ private:
   void cmdBreak(std::string_view operand);
   void cmdList(std::string_view operand);
   void cmdRun(std::string_view operand);
+  void cmdReboot(std::string_view operand);
+  void cmdReset(std::string_view operand);
 
 private:
   ClemensDisplayProvider displayProvider_;
@@ -82,6 +86,9 @@ private:
     LogOutputNode* next;
   };
 
+  // This state comes in for any update to the emulator per frame.  As such
+  // its possible to "lose" state if the emulator runs faster than the UI.
+  // This is OK in most cases as the UI will only present this data per frame
   struct FrameState {
     uint8_t* bankE0;
     uint8_t* bankE1;
@@ -89,7 +96,6 @@ private:
     uint8_t* audioBuffer;
     LogOutputNode* logNode;
     ClemensBackendBreakpoint* breakpoints;
-    ClemensBackendBreakpoint* hitBreakpoint;
     unsigned breakpointCount;
 
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives;
@@ -107,14 +113,28 @@ private:
     unsigned backendCPUID;
     float fps;
     bool mmioWasInitialized;
-
-    std::optional<bool> commandFailed;
   };
+
+  //  This state sticks around until processed by the UI frame - a hacky solution
+  //  to the problem mentioned with FrameState.  In some cases we want to know
+  //  when an event happened (command failed, termination, breakpoint hit, etc)
+  struct LastCommandState {
+    std::optional<bool> terminated;
+    std::optional<bool> commandFailed;
+    std::optional<ClemensBackendCommand::Type> commandType;
+    std::optional<unsigned> hitBreakpoint;
+    LogOutputNode* logNode;
+    LogOutputNode* logNodeTail;
+  };
+
+  ClemensBackendConfig config_;
 
   cinek::FixedStack frameWriteMemory_;
   cinek::FixedStack frameReadMemory_;
+  cinek::FixedStack logMemory_;
   FrameState frameWriteState_;
   FrameState frameReadState_;
+  LastCommandState lastCommandState_;
   ClemensCPUPins lastFrameCPUPins_;
   ClemensCPURegs lastFrameCPURegs_;
   uint32_t lastFrameIRQs_, lastFrameNMIs_;
@@ -160,7 +180,8 @@ private:
     ImportDiskSetFlow,
     ImportDiskSetReplaceOld,
     ImportDiskSet,
-    NewBlankDisk
+    NewBlankDisk,
+    RebootEmulator
   };
   GUIMode guiMode_;
   ClemensDriveType importDriveType_;

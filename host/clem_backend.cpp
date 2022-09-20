@@ -4,6 +4,7 @@
 #include "emulator.h"
 
 #include <chrono>
+#include <cstdarg>
 #include <cstdlib>
 #include <fstream>
 #include <optional>
@@ -28,13 +29,11 @@ struct ClemensRunSampler {
   std::chrono::microseconds fixedTimeInterval;
   std::chrono::microseconds actualTimeInterval;
   std::chrono::microseconds sampledFrameTime;
-  uint64_t seqNo;
   unsigned sampledFrameCount;
   double sampledFramesPerSecond;
 
   ClemensRunSampler() {
     reset();
-    seqNo = 0;
   }
 
   void reset() {
@@ -68,9 +67,16 @@ struct ClemensRunSampler {
       sampledFrameTime = std::chrono::microseconds::zero();
       sampledFrameCount = 0;
     }
-    ++seqNo;
   }
 };
+
+template<typename ...Args>
+void ClemensBackend::localLog(int log_level, const char* msg, Args... args) {
+  if (logOutput_.size() >= kLogOutputLineLimit) return;
+  ClemensBackendOutputText logLine{log_level,};
+  logLine.text = fmt::format(msg, args...);
+  logOutput_.emplace_back(logLine);
+}
 
 ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
                                PublishStateDelegate publishDelegate) :
@@ -85,7 +91,7 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
   clemens_host_setup(&machine_, &ClemensBackend::emulatorLog, this);
 
   switch (config_.type) {
-    case Type::Apple2GS:
+    case ClemensBackendConfig::Type::Apple2GS:
       initApple2GS();
       break;
   }
@@ -340,19 +346,22 @@ static int64_t calculateClocksPerTimeslice(ClemensMachine* machine, unsigned hz)
 void ClemensBackend::main(PublishStateDelegate publishDelegate) {
   int64_t clocksRemainingInTimeslice = 0;
   std::optional<int> stepsRemaining = 0;
-  bool isActive = true;
+  bool isTerminated = false;
   bool isMachineReady = false;
 
   ClemensRunSampler runSampler;
 
+  uint64_t publishSeqNo = 0;
   unsigned emulatorRefreshFrequency = 60;
   auto fixedFrameInterval =
     std::chrono::microseconds((long)std::floor(1e6/emulatorRefreshFrequency));
   auto lastFrameTimePoint = std::chrono::high_resolution_clock::now();
-  while (isActive) {
+  while (!isTerminated) {
     bool isRunning = !stepsRemaining.has_value() || *stepsRemaining > 0;
     bool publishState = false;
+    bool updateSeqNo = false;
     std::optional<bool> commandFailed;
+    std::optional<Command::Type> commandType;
 
     std::unique_lock<std::mutex> queuelock(commandQueueMutex_);
     if (!isRunning) {
@@ -366,17 +375,17 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     //        create a local copy of the queue to minimize time spent executing
     //        commands.   the mutex seems to be used just for adds to the
     //        command queue.
-    while (!commandQueue_.empty() && isActive) {
+    while (!commandQueue_.empty() && !isTerminated) {
       auto command = commandQueue_.front();
       commandQueue_.pop_front();
-      if (!commandFailed.has_value()) {
-        if (command.type != Command::Publish && command.type != Command::Input) {
+      if (command.type != Command::Publish && command.type != Command::Input) {
+        if (!commandFailed.has_value()) {
           commandFailed = false;
         }
       }
       switch (command.type) {
         case Command::Terminate:
-          isActive = false;
+          isTerminated = true;
           break;
         case Command::ResetMachine:
           resetMachine();
@@ -418,82 +427,110 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           if (!delBreakpoint(command.operand)) commandFailed = true;
           break;
       }
+      if (commandFailed.has_value() && *commandFailed == true && !commandType.has_value()) {
+        commandType = command.type;
+      }
     }
     queuelock.unlock();
-    //  if isRunning is false, we use a condition var/wait to hold the thread
-    if (!isRunning || !isActive) continue;
+
     //  TODO: these edge cases seem sloppy - but we'll need to prevent the
     //        thread from spinning if the machine will not run
     if (!isMachineReady || emulatorRefreshFrequency == 0) {
       std::this_thread::sleep_for(std::chrono::milliseconds(15));
       continue;
     }
+    //  if isRunning is false, we use a condition var/wait to hold the thread
+    std::optional<unsigned> hitBreakpoint;
+    if (isRunning && !isTerminated) {
+      //  Run the emulator in either 'step' or 'run' mode.
+      //
+      //  RUN MODE executes several instructions in time slices to maximize
+      //  performance while providing feedback to the frontend.
+      //
+      //  STEP MODE executes a single instruction and decrements a 'step' counter
+      //
+      //  If neither mode is applicable, the emulator holds and this loop will
+      //  wait for commands from the frontend
+      //
+      int64_t clocksPerTimeslice =
+        calculateClocksPerTimeslice(&machine_, emulatorRefreshFrequency);
+      clocksRemainingInTimeslice += clocksPerTimeslice;
+      while (clocksRemainingInTimeslice > 0 &&
+            (!stepsRemaining.has_value() || *stepsRemaining > 0)) {
+        clem_clocks_time_t pre_emulate_time = machine_.clocks_spent;
+        clemens_emulate(&machine_);
+        clem_clocks_duration_t emulate_step_time = machine_.clocks_spent - pre_emulate_time;
+        clocksRemainingInTimeslice -= emulate_step_time;
+        if (stepsRemaining.has_value()) {
+          stepsRemaining = *stepsRemaining - 1;
+        }
 
-    //  Run the emulator in either 'step' or 'run' mode.
-    //
-    //  RUN MODE executes several instructions in time slices to maximize
-    //  performance while providing feedback to the frontend.
-    //
-    //  STEP MODE executes a single instruction and decrements a 'step' counter
-    //
-    //  If neither mode is applicable, the emulator holds and this loop will
-    //  wait for commands from the frontend
-    //
-    int64_t clocksPerTimeslice =
-      calculateClocksPerTimeslice(&machine_, emulatorRefreshFrequency);
-    clocksRemainingInTimeslice += clocksPerTimeslice;
-    unsigned hitBreakpoint = UINT32_MAX;
-    while (clocksRemainingInTimeslice > 0 &&
-           (!stepsRemaining.has_value() || *stepsRemaining > 0)) {
-      if (!breakpoints_.empty()) {
-        if ((hitBreakpoint = checkHitBreakpoint()) == UINT32_MAX) {
-          stepsRemaining = 0;
-          break;
+        //  TODO: MMIO bypass
+
+        //  TODO: check breakpoints, etc
+
+        if (!breakpoints_.empty()) {
+          if ((hitBreakpoint = checkHitBreakpoint()).has_value()) {
+            stepsRemaining = 0;
+            break;
+          }
+        }
+      } // clocksRemainingInTimeslice
+
+      if (stepsRemaining.has_value() && *stepsRemaining == 0) {
+        //  if we've finished stepping through code, we are also done with our
+        //  timeslice and will wait for a new step/run request
+        clocksRemainingInTimeslice = 0;
+      }
+
+      auto currentFrameTimePoint = std::chrono::high_resolution_clock::now();
+      auto actualFrameInterval = std::chrono::duration_cast<std::chrono::microseconds>(
+        currentFrameTimePoint - lastFrameTimePoint);
+      lastFrameTimePoint = currentFrameTimePoint;
+
+      runSampler.update(fixedFrameInterval, actualFrameInterval);
+
+      for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end(); ++diskDriveIt) {
+        auto& diskDrive = *diskDriveIt;
+        auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
+        auto driveType = static_cast<ClemensDriveType>(driveIndex);
+        auto* clemensDrive = clemens_drive_get(&machine_, driveType);
+        diskDrive.isSpinning = clemensDrive->is_spindle_on;
+        diskDrive.isWriteProtected = clemensDrive->disk.is_write_protected;
+        diskDrive.saveFailed = false;
+        if (diskDrive.isEjecting) {
+          if (clemens_eject_disk_async(&machine_, driveType, &disks_[driveIndex])) {
+            diskDrive.isEjecting = false;
+            if (!saveDisk(driveType)) diskDrive.saveFailed = true;
+            diskDrive.imagePath.clear();
+          }
         }
       }
-      clem_clocks_time_t pre_emulate_time = machine_.clocks_spent;
-      clemens_emulate(&machine_);
-      clem_clocks_duration_t emulate_step_time = machine_.clocks_spent - pre_emulate_time;
-
-      clocksRemainingInTimeslice -= emulate_step_time;
-      if (stepsRemaining.has_value()) {
-       stepsRemaining = *stepsRemaining - 1;
-      }
-
-      //  TODO: MMIO bypass
-
-      //  TODO: check breakpoints, etc
-
-    } // clocksRemainingInTimeslice
-
-    if (stepsRemaining.has_value() && *stepsRemaining == 0) {
-      //  if we've finished stepping through code, we are also done with our
-      //  timeslice and will wait for a new step/run request
-      clocksRemainingInTimeslice = 0;
+      updateSeqNo = true;
     }
 
-    auto currentFrameTimePoint = std::chrono::high_resolution_clock::now();
-    auto actualFrameInterval = std::chrono::duration_cast<std::chrono::microseconds>(
-      currentFrameTimePoint - lastFrameTimePoint);
-    lastFrameTimePoint = currentFrameTimePoint;
+    if (isTerminated) {
+      //  eject and save all disks
+      for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end(); ++diskDriveIt) {
+        auto& diskDrive = *diskDriveIt;
+        if (diskDrive.imagePath.empty()) continue;
 
-    runSampler.update(fixedFrameInterval, actualFrameInterval);
-
-    for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end(); ++diskDriveIt) {
-      auto& diskDrive = *diskDriveIt;
-      auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
-      auto driveType = static_cast<ClemensDriveType>(driveIndex);
-      auto* clemensDrive = clemens_drive_get(&machine_, driveType);
-      diskDrive.isSpinning = clemensDrive->is_spindle_on;
-      diskDrive.isWriteProtected = clemensDrive->disk.is_write_protected;
-      diskDrive.saveFailed = false;
-      if (diskDrive.isEjecting) {
+        auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
+        auto driveType = static_cast<ClemensDriveType>(driveIndex);
+        auto* clemensDrive = clemens_drive_get(&machine_, driveType);
         if (clemens_eject_disk_async(&machine_, driveType, &disks_[driveIndex])) {
-          diskDrive.isEjecting = false;
-          if (!saveDisk(driveType)) diskDrive.saveFailed = true;
-          diskDrive.imagePath.clear();
+          saveDisk(driveType);
+          localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", diskDrive.imagePath);
         }
       }
+      publishState = true;
+      updateSeqNo = true;
+    }
+
+    updateSeqNo = updateSeqNo || commandFailed.has_value();
+
+    if (updateSeqNo) {
+      publishSeqNo++;
     }
 
     //  TODO: publish emulator state using a callback
@@ -510,27 +547,32 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         clemens_get_audio(&publishedState.audio, &machine_);
       }
       publishedState.machine = &machine_;
-      publishedState.seqno = runSampler.seqNo;
+      publishedState.seqno = publishSeqNo;
       publishedState.fps = runSampler.sampledFramesPerSecond;
       publishedState.hostCPUID = clem_host_get_processor_number();
       publishedState.logBufferStart = logOutput_.data();
       publishedState.logBufferEnd = logOutput_.data() + logOutput_.size();
       publishedState.bpBufferStart = breakpoints_.data();
       publishedState.bpBufferEnd = breakpoints_.data() + breakpoints_.size();
-      publishedState.bpHit =
-        hitBreakpoint != UINT32_MAX ? breakpoints_.data() + hitBreakpoint : nullptr;
+      if (hitBreakpoint.has_value()) {
+        publishedState.bpHitIndex = *hitBreakpoint;
+      }
       publishedState.diskDrives = diskDrives_.data();
       publishedState.commandFailed = std::move(commandFailed);
+      publishedState.commandType = std::move(commandType);
+      if (isTerminated) {
+        publishedState.terminated = isTerminated;
+      }
       publishDelegate(publishedState);
       if (publishedState.mmio_was_initialized) {
         clemens_audio_next_frame(&machine_, publishedState.audio.frame_count);
       }
       logOutput_.clear();
     }
-  } // isActive
+  } // !isTerminated
 }
 
-unsigned ClemensBackend::checkHitBreakpoint() {
+std::optional<unsigned> ClemensBackend::checkHitBreakpoint() {
   for (auto it = breakpoints_.begin(); it != breakpoints_.end(); ++it) {
     uint16_t b_adr = (uint16_t)(it->address & 0xffff);
     uint8_t b_bank = (uint8_t)(it->address >> 16);
@@ -557,7 +599,7 @@ unsigned ClemensBackend::checkHitBreakpoint() {
         break;
     }
   }
-  return UINT32_MAX;
+  return std::nullopt;
 }
 
 void ClemensBackend::initEmulatedDiskLocalStorage() {

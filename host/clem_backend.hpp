@@ -21,13 +21,8 @@
 //  TODO: Machine type logic could be subclassed into an Apple2GS backend, etc.
 class ClemensBackend {
 public:
-  enum class Type {
-    Apple2GS
-  };
-  struct Config {
-    unsigned audioSamplesPerSecond;
-    Type type;
-  };
+  using Config = ClemensBackendConfig;
+
   //  The PublishStateDelegate provides backend state to the front end GUI
   //  Data passed through the delegate is guaranteed to be valid within its
   //    scope.  The front-end should copy what it needs for its display during
@@ -68,24 +63,7 @@ public:
   void removeBreakpoint(unsigned index);
 
 private:
-  struct Command {
-    enum Type {
-      Undefined,
-      Terminate,
-      SetHostUpdateFrequency,
-      ResetMachine,
-      RunMachine,
-      Publish,
-      InsertDisk,
-      EjectDisk,
-      Input,
-      Break,
-      AddBreakpoint,
-      DelBreakpoint
-    };
-    Type type = Undefined;
-    std::string operand;
-  };
+  using Command = ClemensBackendCommand;
 
   void queue(const Command& cmd);
   void queueToFront(const Command& cmd);
@@ -97,7 +75,7 @@ private:
   void inputMachine(const std::string_view& inputParam);
   bool addBreakpoint(const std::string_view& inputParam);
   bool delBreakpoint(const std::string_view& inputParam);
-  unsigned checkHitBreakpoint();
+  std::optional<unsigned> checkHitBreakpoint();
 
   void initEmulatedDiskLocalStorage();
   bool loadDisk(ClemensDriveType driveType);
@@ -109,6 +87,9 @@ private:
   void initApple2GS();
   void loadBRAM();
   void saveBRAM();
+
+  template<typename ...Args>
+  void localLog(int log_level, const char* msg, Args... args);
 
   static void emulatorLog(int log_level, ClemensMachine *machine,
                           const char *msg);
@@ -136,5 +117,8 @@ private:
   std::array<ClemensNibbleDisk, kClemensDrive_Count> disks_;
   std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives_;
 };
+
+
+
 
 #endif
