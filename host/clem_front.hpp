@@ -1,13 +1,13 @@
 #ifndef CLEM_HOST_FRONT_HPP
 #define CLEM_HOST_FRONT_HPP
 
-#include "clem_host_shared.hpp"
-#include "clem_disk_library.hpp"
-#include "clem_display.hpp"
-#include "clem_audio.hpp"
 #include "cinek/buffer.hpp"
 #include "cinek/circular_buffer.hpp"
 #include "cinek/fixedstack.hpp"
+#include "clem_audio.hpp"
+#include "clem_disk_library.hpp"
+#include "clem_display.hpp"
+#include "clem_host_shared.hpp"
 #include "imgui.h"
 
 #include <array>
@@ -23,8 +23,8 @@ class ClemensBackend;
 
 class ClemensFrontend {
 public:
-  ClemensFrontend(const cinek::ByteBuffer& systemFontLoBuffer,
-                  const cinek::ByteBuffer& systemFontHiBuffer);
+  ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
+                  const cinek::ByteBuffer &systemFontHiBuffer);
   ~ClemensFrontend();
 
   //  application rendering hook
@@ -33,21 +33,21 @@ public:
   void input(const ClemensInputEvent &input);
 
 private:
-  template<typename TBufferType> friend struct FormatView;
+  template <typename TBufferType> friend struct FormatView;
 
   void createBackend();
 
   //  the backend state delegate is run on a separate thread and notifies
   //  when a frame has been published
-  void backendStateDelegate(const ClemensBackendState& state);
+  void backendStateDelegate(const ClemensBackendState &state);
 
   void doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize);
   void doMachineDiagnosticsDisplay();
   void doMachineDiskDisplay();
   void doMachineDiskSelection(ClemensDriveType driveType);
+  void doMachineDiskStatus(ClemensDriveType driveType);
   void doMachineCPUInfoDisplay();
-  void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
-                           float screenU, float screenV);
+  void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU, float screenV);
   void doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize);
 
   void layoutTerminalLines();
@@ -64,6 +64,7 @@ private:
   void cmdRun(std::string_view operand);
   void cmdReboot(std::string_view operand);
   void cmdReset(std::string_view operand);
+  void cmdDisk(std::string_view operand);
 
 private:
   ClemensDisplayProvider displayProvider_;
@@ -82,20 +83,20 @@ private:
   //  keep the frame mutex between the two threads.
   struct LogOutputNode {
     int logLevel;
-    unsigned sz;          // size of log text following this struct in memory
-    LogOutputNode* next;
+    unsigned sz; // size of log text following this struct in memory
+    LogOutputNode *next;
   };
 
   // This state comes in for any update to the emulator per frame.  As such
   // its possible to "lose" state if the emulator runs faster than the UI.
   // This is OK in most cases as the UI will only present this data per frame
   struct FrameState {
-    uint8_t* bankE0;
-    uint8_t* bankE1;
-    uint8_t* memoryView;
-    uint8_t* audioBuffer;
-    LogOutputNode* logNode;
-    ClemensBackendBreakpoint* breakpoints;
+    uint8_t *bankE0;
+    uint8_t *bankE1;
+    uint8_t *memoryView;
+    uint8_t *audioBuffer;
+    LogOutputNode *logNode;
+    ClemensBackendBreakpoint *breakpoints;
     unsigned breakpointCount;
 
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives;
@@ -123,8 +124,8 @@ private:
     std::optional<bool> commandFailed;
     std::optional<ClemensBackendCommand::Type> commandType;
     std::optional<unsigned> hitBreakpoint;
-    LogOutputNode* logNode;
-    LogOutputNode* logNodeTail;
+    LogOutputNode *logNode;
+    LogOutputNode *logNodeTail;
   };
 
   ClemensBackendConfig config_;
@@ -141,26 +142,15 @@ private:
   bool emulatorHasKeyboardFocus_;
 
   struct TerminalLine {
-    enum Type {
-      Debug,
-      Info,
-      Warn,
-      Error,
-      Command
-    };
+    enum Type { Debug, Info, Warn, Error, Command };
     std::string text;
     Type type;
   };
-  template<size_t N>
-  using TerminalBuffer = cinek::CircularBuffer<TerminalLine, N>;
+  template <size_t N> using TerminalBuffer = cinek::CircularBuffer<TerminalLine, N>;
   TerminalBuffer<128> terminalLines_;
   TerminalBuffer<512> consoleLines_;
 
-  enum class TerminalMode {
-    Command,
-    Log,
-    Execution
-  };
+  enum class TerminalMode { Command, Log, Execution };
   TerminalMode terminalMode_;
 
   std::vector<ClemensBackendBreakpoint> breakpoints_;
@@ -194,7 +184,7 @@ private:
 
   ClemensDiskLibrary diskLibrary_;
 
-  unsigned diskComboStateFlags_;        // if opened, flag == 1 else 0
+  unsigned diskComboStateFlags_; // if opened, flag == 1 else 0
 };
 
 #endif

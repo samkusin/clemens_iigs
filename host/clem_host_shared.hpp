@@ -57,7 +57,8 @@ struct ClemensBackendCommand {
     Input,
     Break,
     AddBreakpoint,
-    DelBreakpoint
+    DelBreakpoint,
+    WriteProtectDisk
   };
   Type type = Undefined;
   std::string operand;

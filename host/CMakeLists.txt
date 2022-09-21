@@ -6,7 +6,7 @@ project(clements_iigs LANGUAGES C CXX)
 # build imgui
 # build app
 
-add_subdirectory(imgui)
+add_subdirectory(ext/imgui)
 
 # TODO: make header-only version when ready
 set(CKAUDIO_SOURCES
@@ -31,15 +31,15 @@ set(CINEK_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/cinek/encode.c")
 
 set(SOKOL_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/sokol/sokol_gfx.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/sokol/sokol_app.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/sokol/sokol_glue.h")
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/sokol/sokol_gfx.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/sokol/sokol_app.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/sokol/sokol_glue.h")
 
 set(FMT_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/fmt/core.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/fmt/format-inl.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/fmt/format.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/fmt/format.cc")
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/core.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/format-inl.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/format.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/format.cc")
 
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
@@ -66,7 +66,8 @@ add_executable(clemens_iigs
     ${IMGUI_SOURCES})
 
 target_include_directories(clemens_iigs
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/ext)
 target_link_libraries(clemens_iigs
     PRIVATE
         clemens_65816

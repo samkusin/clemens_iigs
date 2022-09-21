@@ -1,12 +1,14 @@
-#include "clem_backend.hpp"
 #include "clem_front.hpp"
-#include "clem_import_disk.hpp"
+#include "clem_backend.hpp"
+#include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
+#include "clem_import_disk.hpp"
 
 #include "cinek/encode.h"
 #include "fmt/format.h"
 #include "imgui_filedialog/ImGuiFileDialog.h"
 
+#include <charconv>
 #include <filesystem>
 
 //  TODO: implement all current commands documented in help
@@ -17,8 +19,7 @@
 //  TODO: instruction trace (improved)
 //
 
-template<typename TBufferType>
-struct FormatView {
+template <typename TBufferType> struct FormatView {
   using BufferType = TBufferType;
   using StringType = typename BufferType::ValueType;
   using LevelType = typename StringType::Type;
@@ -28,32 +29,33 @@ struct FormatView {
   template <typename... Args>
   void format(LevelType type, const char *formatStr, const Args &...args) {
     size_t sz = fmt::formatted_size(formatStr, args...);
-    auto& line = rotateBuffer();
+    auto &line = rotateBuffer();
     line.type = type;
     line.text.resize(sz);
     fmt::format_to_n(line.text.data(), sz, formatStr, args...);
   }
-  void print(LevelType type, const char* text) {
-    auto& line = rotateBuffer();
+  void print(LevelType type, const char *text) {
+    auto &line = rotateBuffer();
     line.type = type;
     line.text.assign(text);
   }
   void print(LevelType type, std::string_view text) {
-    auto& line = rotateBuffer();
+    auto &line = rotateBuffer();
     line.type = type;
     line.text.assign(text);
   }
   void newline() {
-    auto& line = rotateBuffer();
+    auto &line = rotateBuffer();
     line.type = LevelType::Info;
     line.text.clear();
   }
+
 private:
-  StringType& rotateBuffer() {
+  StringType &rotateBuffer() {
     if (buffer_.isFull()) {
       buffer_.pop();
     }
-    StringType& tail = *buffer_.acquireTail();
+    StringType &tail = *buffer_.acquireTail();
     buffer_.push();
     return tail;
   }
@@ -66,51 +68,43 @@ static constexpr size_t kLogMemorySize = 256 * 1024;
 
 static std::string getCommandTypeName(ClemensBackendCommand::Type type) {
   switch (type) {
-    case ClemensBackendCommand::AddBreakpoint:
-      return "AddBreakpoint";
-    case ClemensBackendCommand::Break:
-      return "Break";
-    case ClemensBackendCommand::DelBreakpoint:
-      return "DelBreakpoint";
-    case ClemensBackendCommand::EjectDisk:
-      return "EjectDisk";
-    case ClemensBackendCommand::InsertDisk:
-      return "InsertDisk";
-    case ClemensBackendCommand::ResetMachine:
-      return "ResetMachine";
-    case ClemensBackendCommand::RunMachine:
-      return "RunMachine";
-    case ClemensBackendCommand::SetHostUpdateFrequency:
-      return "SetHostUpdateFrequency";
-    case ClemensBackendCommand::Terminate:
-      return "Terminate";
-    default:
-      return "Command";
+  case ClemensBackendCommand::AddBreakpoint:
+    return "AddBreakpoint";
+  case ClemensBackendCommand::Break:
+    return "Break";
+  case ClemensBackendCommand::DelBreakpoint:
+    return "DelBreakpoint";
+  case ClemensBackendCommand::EjectDisk:
+    return "EjectDisk";
+  case ClemensBackendCommand::InsertDisk:
+    return "InsertDisk";
+  case ClemensBackendCommand::ResetMachine:
+    return "ResetMachine";
+  case ClemensBackendCommand::RunMachine:
+    return "RunMachine";
+  case ClemensBackendCommand::SetHostUpdateFrequency:
+    return "SetHostUpdateFrequency";
+  case ClemensBackendCommand::Terminate:
+    return "Terminate";
+  default:
+    return "Command";
   }
 }
 
-ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer& systemFontLoBuffer,
-                                 const cinek::ByteBuffer& systemFontHiBuffer) :
-  displayProvider_(systemFontLoBuffer, systemFontHiBuffer),
-  display_(displayProvider_),
-  audio_(),
-  frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
-  frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
-  logMemory_(kLogMemorySize, malloc(kLogMemorySize)),
-  frameSeqNo_(std::numeric_limits<decltype(frameSeqNo_)>::max()),
-  frameLastSeqNo_(std::numeric_limits<decltype(frameLastSeqNo_)>::max()),
-  lastFrameCPUPins_{},
-  lastFrameCPURegs_{},
-  lastFrameIRQs_(0),
-  lastFrameNMIs_(0),
-  emulatorHasKeyboardFocus_(true),
-  terminalMode_(TerminalMode::Command),
-  guiMode_(GUIMode::Emulator),
-  diskLibraryRootPath_{(std::filesystem::current_path() /
-                        std::filesystem::path(CLEM_HOST_LIBRARY_DIR)).string()},
-  diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512),
-  diskComboStateFlags_(0)
-{
+ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
+                                 const cinek::ByteBuffer &systemFontHiBuffer)
+    : displayProvider_(systemFontLoBuffer, systemFontHiBuffer), display_(displayProvider_),
+      audio_(), frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
+      frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
+      logMemory_(kLogMemorySize, malloc(kLogMemorySize)),
+      frameSeqNo_(std::numeric_limits<decltype(frameSeqNo_)>::max()),
+      frameLastSeqNo_(std::numeric_limits<decltype(frameLastSeqNo_)>::max()), lastFrameCPUPins_{},
+      lastFrameCPURegs_{}, lastFrameIRQs_(0), lastFrameNMIs_(0), emulatorHasKeyboardFocus_(true),
+      terminalMode_(TerminalMode::Command), guiMode_(GUIMode::Emulator),
+      diskLibraryRootPath_{
+          (std::filesystem::current_path() / std::filesystem::path(CLEM_HOST_LIBRARY_DIR))
+              .string()},
+      diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0) {
   lastCommandState_.logNode = lastCommandState_.logNodeTail = nullptr;
 
   audio_.start();
@@ -128,22 +122,23 @@ ClemensFrontend::~ClemensFrontend() {
   free(frameReadMemory_.getHead());
 }
 
-void ClemensFrontend::input(const ClemensInputEvent &input){
+void ClemensFrontend::input(const ClemensInputEvent &input) {
   if (emulatorHasKeyboardFocus_) {
     backend_->inputEvent(input);
   }
 }
 
 void ClemensFrontend::createBackend() {
-  backend_ = std::make_unique<ClemensBackend>("gs_rom_3.rom", config_,
-    std::bind(&ClemensFrontend::backendStateDelegate, this, std::placeholders::_1));
+  backend_ = std::make_unique<ClemensBackend>(
+      "gs_rom_3.rom", config_,
+      std::bind(&ClemensFrontend::backendStateDelegate, this, std::placeholders::_1));
   backend_->setRefreshFrequency(60);
   backend_->reset();
   backend_->run();
   guiMode_ = GUIMode::Emulator;
 }
 
-void ClemensFrontend::backendStateDelegate(const ClemensBackendState& state) {
+void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
   {
     std::lock_guard<std::mutex> frameLock(frameMutex_);
 
@@ -165,17 +160,17 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState& state) {
 
     //  copy over memory banks as needed
     frameWriteMemory_.reset();
-    frameWriteState_.bankE0 = (uint8_t*)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
+    frameWriteState_.bankE0 = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
     memcpy(frameWriteState_.bankE0, state.machine->mega2_bank_map[0], CLEM_IIGS_BANK_SIZE);
-    frameWriteState_.bankE1 = (uint8_t*)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
+    frameWriteState_.bankE1 = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
     memcpy(frameWriteState_.bankE1, state.machine->mega2_bank_map[1], CLEM_IIGS_BANK_SIZE);
 
     auto audioBufferSize = int32_t(state.audio.frame_total * state.audio.frame_stride);
-    frameWriteState_.audioBuffer = (uint8_t*)frameWriteMemory_.allocate(audioBufferSize);
+    frameWriteState_.audioBuffer = (uint8_t *)frameWriteMemory_.allocate(audioBufferSize);
     memcpy(frameWriteState_.audioBuffer, state.audio.data, audioBufferSize);
 
-    const ClemensBackendDiskDriveState* driveState = state.diskDrives;
-    for (auto& diskDrive : frameWriteState_.diskDrives) {
+    const ClemensBackendDiskDriveState *driveState = state.diskDrives;
+    for (auto &diskDrive : frameWriteState_.diskDrives) {
       diskDrive = *driveState;
       if (state.terminated.has_value() && *state.terminated) {
         config_.diskDriveStates[size_t(driveState - state.diskDrives)] = *driveState;
@@ -183,13 +178,11 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState& state) {
       ++driveState;
     }
 
-    frameWriteState_.breakpoints =
-      frameWriteMemory_.allocateArray<ClemensBackendBreakpoint>(
+    frameWriteState_.breakpoints = frameWriteMemory_.allocateArray<ClemensBackendBreakpoint>(
         state.bpBufferEnd - state.bpBufferStart);
     frameWriteState_.breakpointCount = (unsigned)(state.bpBufferEnd - state.bpBufferStart);
-    auto* bpDest = frameWriteState_.breakpoints;
-    for (auto* bpCur = state.bpBufferStart;
-         bpCur != state.bpBufferEnd; ++bpCur, ++bpDest) {
+    auto *bpDest = frameWriteState_.breakpoints;
+    for (auto *bpCur = state.bpBufferStart; bpCur != state.bpBufferEnd; ++bpCur, ++bpDest) {
       *bpDest = *bpCur;
       if (state.bpHitIndex.has_value() && !lastCommandState_.hitBreakpoint.has_value()) {
         if (unsigned(bpCur - state.bpBufferStart) == *state.bpHitIndex) {
@@ -207,12 +200,12 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState& state) {
       lastCommandState_.terminated = state.terminated;
     }
 
-    for (auto* logItem = state.logBufferStart; logItem != state.logBufferEnd; ++logItem) {
-      LogOutputNode* logMemory = reinterpret_cast<LogOutputNode*>(logMemory_.allocate(
-        sizeof(LogOutputNode) + CK_ALIGN_SIZE_TO_ARCH(logItem->text.size())));
+    for (auto *logItem = state.logBufferStart; logItem != state.logBufferEnd; ++logItem) {
+      LogOutputNode *logMemory = reinterpret_cast<LogOutputNode *>(
+          logMemory_.allocate(sizeof(LogOutputNode) + CK_ALIGN_SIZE_TO_ARCH(logItem->text.size())));
       logMemory->logLevel = logItem->level;
       logMemory->sz = unsigned(logItem->text.size());
-      logItem->text.copy(reinterpret_cast<char*>(logMemory) + sizeof(LogOutputNode),
+      logItem->text.copy(reinterpret_cast<char *>(logMemory) + sizeof(LogOutputNode),
                          std::string::npos);
       logMemory->next = nullptr;
       if (!lastCommandState_.logNode) {
@@ -236,9 +229,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
   bool isBackendTerminated = false;
   std::unique_lock<std::mutex> frameLock(frameMutex_);
   framePublished_.wait_for(frameLock, std::chrono::milliseconds::zero(),
-    [this]() {
-      return frameSeqNo_ != frameLastSeqNo_;
-    });
+                           [this]() { return frameSeqNo_ != frameLastSeqNo_; });
   isNewFrame = frameLastSeqNo_ != frameSeqNo_;
   if (isNewFrame) {
     lastFrameCPURegs_ = frameReadState_.cpu.regs;
@@ -249,7 +240,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
     std::swap(frameWriteMemory_, frameReadMemory_);
     std::swap(frameWriteState_, frameReadState_);
 
-    LogOutputNode* logNode = lastCommandState_.logNode;
+    LogOutputNode *logNode = lastCommandState_.logNode;
     while (logNode) {
       if (consoleLines_.isFull()) {
         consoleLines_.pop();
@@ -257,22 +248,22 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
       TerminalLine logLine;
       logLine.text.assign((char *)logNode + sizeof(LogOutputNode), logNode->sz);
       switch (logNode->logLevel) {
-        case CLEM_DEBUG_LOG_DEBUG:
-          logLine.type = TerminalLine::Debug;
-          break;
-        case CLEM_DEBUG_LOG_INFO:
-          logLine.type = TerminalLine::Info;
-          break;
-        case CLEM_DEBUG_LOG_WARN:
-          logLine.type = TerminalLine::Warn;
-          break;
-        case CLEM_DEBUG_LOG_FATAL:
-        case CLEM_DEBUG_LOG_UNIMPL:
-          logLine.type = TerminalLine::Error;
-          break;
-        default:
-          logLine.type = TerminalLine::Info;
-          break;
+      case CLEM_DEBUG_LOG_DEBUG:
+        logLine.type = TerminalLine::Debug;
+        break;
+      case CLEM_DEBUG_LOG_INFO:
+        logLine.type = TerminalLine::Info;
+        break;
+      case CLEM_DEBUG_LOG_WARN:
+        logLine.type = TerminalLine::Warn;
+        break;
+      case CLEM_DEBUG_LOG_FATAL:
+      case CLEM_DEBUG_LOG_UNIMPL:
+        logLine.type = TerminalLine::Error;
+        break;
+      default:
+        logLine.type = TerminalLine::Info;
+        break;
       }
       consoleLines_.push(std::move(logLine));
       logNode = logNode->next;
@@ -296,8 +287,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
     }
     if (lastCommandState_.hitBreakpoint.has_value()) {
       unsigned bpIndex = *lastCommandState_.hitBreakpoint;
-      CLEM_TERM_COUT.format(TerminalLine::Info, "Breakpoint {} hit {:02X}/{:04X}.",
-                            bpIndex,
+      CLEM_TERM_COUT.format(TerminalLine::Info, "Breakpoint {} hit {:02X}/{:04X}.", bpIndex,
                             (breakpoints_[bpIndex].address >> 16) & 0xff,
                             breakpoints_[bpIndex].address & 0xffff);
       lastCommandState_.hitBreakpoint = std::nullopt;
@@ -313,11 +303,11 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
   //  render video
   constexpr int kClemensScreenWidth = 720;
   constexpr int kClemensScreenHeight = 480;
-  float screenUVs[2] { 0.0f, 0.0f };
+  float screenUVs[2]{0.0f, 0.0f};
 
   if (frameReadState_.mmioWasInitialized) {
-    const uint8_t* e0mem = frameReadState_.bankE0;
-    const uint8_t* e1mem = frameReadState_.bankE1;
+    const uint8_t *e0mem = frameReadState_.bankE0;
+    const uint8_t *e1mem = frameReadState_.bankE1;
     display_.start(frameReadState_.monitorFrame, kClemensScreenWidth, kClemensScreenHeight);
     if (frameReadState_.textFrame.format == kClemensVideoFormat_Text) {
       bool altCharSet = frameReadState_.vgcModeFlags & CLEM_VGC_ALTCHARSET;
@@ -339,7 +329,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
     display_.finish(screenUVs);
 
     // render audio
-    auto& audioFrame = frameReadState_.audioFrame;
+    auto &audioFrame = frameReadState_.audioFrame;
     if (isNewFrame && audioFrame.frame_count > 0) {
       float *audio_frame_head = reinterpret_cast<float *>(
           audioFrame.data + audioFrame.frame_start * audioFrame.frame_stride);
@@ -365,31 +355,31 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
   doMachineTerminalLayout(ImVec2(kMonitorX, height - kTerminalViewHeight),
                           ImVec2(width - kMonitorX, kTerminalViewHeight));
 
-  switch(guiMode_) {
-    case GUIMode::ImportDiskModal:
-    case GUIMode::BlankDiskModal:
-      doModalOperations(width, height);
-      break;
-    case GUIMode::ImportDiskSetFlow:
-      doImportDiskSetFlowStart(width, height);
-      break;
-    case GUIMode::ImportDiskSetReplaceOld:
-      doImportDiskSetReplaceOld(width, height);
-      break;
-    case GUIMode::ImportDiskSet:
-      doImportDiskSet(width, height);
-      break;
-    case GUIMode::NewBlankDisk:
-      doNewBlankDisk(width, height);
-      break;
-    case GUIMode::RebootEmulator:
-      if (isBackendTerminated) {
-        backend_ = nullptr;
-        createBackend();
-      }
-      break;
-    default:
-      break;
+  switch (guiMode_) {
+  case GUIMode::ImportDiskModal:
+  case GUIMode::BlankDiskModal:
+    doModalOperations(width, height);
+    break;
+  case GUIMode::ImportDiskSetFlow:
+    doImportDiskSetFlowStart(width, height);
+    break;
+  case GUIMode::ImportDiskSetReplaceOld:
+    doImportDiskSetReplaceOld(width, height);
+    break;
+  case GUIMode::ImportDiskSet:
+    doImportDiskSet(width, height);
+    break;
+  case GUIMode::NewBlankDisk:
+    doNewBlankDisk(width, height);
+    break;
+  case GUIMode::RebootEmulator:
+    if (isBackendTerminated) {
+      backend_ = nullptr;
+      createBackend();
+    }
+    break;
+  default:
+    break;
   }
 
   backend_->publish();
@@ -405,21 +395,18 @@ static ImColor getDefaultColor(bool hi) {
   return kDefaultColor;
 }
 
-template<typename T>
-static ImColor getStatusFieldColor(T a, T b, T statusMask) {
-  return (a & statusMask) != (b & statusMask) ?
-      getModifiedColor(b & statusMask) : getDefaultColor(b & statusMask);
+template <typename T> static ImColor getStatusFieldColor(T a, T b, T statusMask) {
+  return (a & statusMask) != (b & statusMask) ? getModifiedColor(b & statusMask)
+                                              : getDefaultColor(b & statusMask);
 }
 
 void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
   ImGui::SetNextWindowPos(rootAnchor);
   ImGui::SetNextWindowSize(rootSize);
   ImGui::Begin("Status", nullptr,
-               ImGuiWindowFlags_NoTitleBar |
-               ImGuiWindowFlags_NoResize |
-               ImGuiWindowFlags_NoCollapse |
-               ImGuiWindowFlags_NoBringToFrontOnFocus |
-               ImGuiWindowFlags_NoMove);
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                   ImGuiWindowFlags_NoMove);
   doMachineDiagnosticsDisplay();
   ImGui::Separator();
   doMachineDiskDisplay();
@@ -454,38 +441,43 @@ void ClemensFrontend::doMachineDiagnosticsDisplay() {
 
 void ClemensFrontend::doMachineDiskDisplay() {
   ImGui::BeginTable("DiskSelect", 2);
+  ImGui::TableSetupColumn(
+      "WP", ImGuiTableColumnFlags_WidthFixed,
+      (ImGui::GetStyle().FramePadding.x + ImGui::GetFont()->GetCharAdvance('W')) * 2);
   ImGui::TableSetupColumn("Image", ImGuiTableColumnFlags_WidthStretch);
-  ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
-                          ImGui::GetFont()->GetCharAdvance('A'));
   ImGui::TableHeadersRow();
   ImGui::TableNextColumn();
-  doMachineDiskSelection(kClemensDrive_3_5_D1);
+  doMachineDiskStatus(kClemensDrive_3_5_D1);
   ImGui::TableNextColumn();
+  doMachineDiskSelection(kClemensDrive_3_5_D1);
   ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  doMachineDiskStatus(kClemensDrive_3_5_D2);
   ImGui::TableNextColumn();
   doMachineDiskSelection(kClemensDrive_3_5_D2);
-  ImGui::TableNextColumn();
   ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  doMachineDiskStatus(kClemensDrive_5_25_D1);
   ImGui::TableNextColumn();
   doMachineDiskSelection(kClemensDrive_5_25_D1);
-  ImGui::TableNextColumn();
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  doMachineDiskSelection(kClemensDrive_5_25_D2);
+  doMachineDiskStatus(kClemensDrive_5_25_D2);
   ImGui::TableNextColumn();
+  doMachineDiskSelection(kClemensDrive_5_25_D2);
   ImGui::EndTable();
 }
 
-static const char* sDriveName[] = { "Slot5 D1", "Slot5 D2", "Slot6 D1", "Slot6 D2" };
-static const char* sDriveDescription[] = { "3.5 inch 800K", "3.5 inch 800K",
-                                           "5.25 inch 140K", "5.25 inch 140K" };
+static const char *sDriveName[] = {"Slot5 D1", "Slot5 D2", "Slot6 D1", "Slot6 D2"};
+static const char *sDriveDescription[] = {"3.5 inch 800K", "3.5 inch 800K", "5.25 inch 140K",
+                                          "5.25 inch 140K"};
 
 void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType) {
-  const ClemensBackendDiskDriveState& drive = frameReadState_.diskDrives[driveType];
+  const ClemensBackendDiskDriveState &drive = frameReadState_.diskDrives[driveType];
   //  2 states: empty, has disk
   //    options if empty: <blank disk>, <import image>, image 0, image 1, ...
   //    options if full: <eject>
-  const char* imageName;
+  const char *imageName;
   if (drive.isEjecting) {
     imageName = "Ejecting...";
   } else if (drive.imagePath.empty()) {
@@ -506,7 +498,7 @@ void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType) {
     } else {
       diskLibrary_.update();
     }
-    if (!drive.imagePath.empty() && !drive.isEjecting &&  ImGui::Selectable("<eject>")) {
+    if (!drive.imagePath.empty() && !drive.isEjecting && ImGui::Selectable("<eject>")) {
       backend_->ejectDisk(driveType);
     }
     if (drive.imagePath.empty()) {
@@ -520,7 +512,7 @@ void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType) {
       }
       ImGui::Separator();
       std::filesystem::path selectedPath;
-      diskLibrary_.iterate([&selectedPath](const ClemensDiskLibrary::DiskEntry& entry) {
+      diskLibrary_.iterate([&selectedPath](const ClemensDiskLibrary::DiskEntry &entry) {
         auto relativePath = entry.location.parent_path().filename() / entry.location.stem();
         if (ImGui::Selectable(relativePath.string().c_str())) {
           selectedPath = entry.location.string();
@@ -539,19 +531,30 @@ void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType) {
   }
 }
 
-#define CLEM_HOST_GUI_CPU_PINS_COLOR(_field_) \
-  lastFrameCPUPins_._field_ != frameReadState_.cpu.pins._field_ ? \
-    getModifiedColor(frameReadState_.cpu.pins._field_) : \
-    getDefaultColor(frameReadState_.cpu.pins._field_)
+void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType) {
+  const ClemensBackendDiskDriveState &drive = frameReadState_.diskDrives[driveType];
+  if (drive.imagePath.empty())
+    return;
 
-#define CLEM_HOST_GUI_CPU_PINS_INV_COLOR(_field_) \
-  lastFrameCPUPins_._field_ != frameReadState_.cpu.pins._field_ ? \
-    getModifiedColor(!frameReadState_.cpu.pins._field_) : \
-    getDefaultColor(!frameReadState_.cpu.pins._field_)
+  bool wp = drive.isWriteProtected;
+  if (ImGui::Checkbox("", &wp)) {
+    backend_->writeProtectDisk(driveType, wp);
+  }
+}
 
-#define CLEM_HOST_GUI_CPU_FIELD_COLOR(_field_) \
-  lastFrameCPURegs_._field_ != frameReadState_.cpu.regs._field_ ? \
-    getModifiedColor(true) : getDefaultColor(true)
+#define CLEM_HOST_GUI_CPU_PINS_COLOR(_field_)                                                      \
+  lastFrameCPUPins_._field_ != frameReadState_.cpu.pins._field_                                    \
+      ? getModifiedColor(frameReadState_.cpu.pins._field_)                                         \
+      : getDefaultColor(frameReadState_.cpu.pins._field_)
+
+#define CLEM_HOST_GUI_CPU_PINS_INV_COLOR(_field_)                                                  \
+  lastFrameCPUPins_._field_ != frameReadState_.cpu.pins._field_                                    \
+      ? getModifiedColor(!frameReadState_.cpu.pins._field_)                                        \
+      : getDefaultColor(!frameReadState_.cpu.pins._field_)
+
+#define CLEM_HOST_GUI_CPU_FIELD_COLOR(_field_)                                                     \
+  lastFrameCPURegs_._field_ != frameReadState_.cpu.regs._field_ ? getModifiedColor(true)           \
+                                                                : getDefaultColor(true)
 
 void ClemensFrontend::doMachineCPUInfoDisplay() {
   ImGui::BeginTable("Machine", 3);
@@ -566,81 +569,67 @@ void ClemensFrontend::doMachineCPUInfoDisplay() {
   ImGui::TableNextColumn();
   ImGui::BeginTable("Registers", 1);
   ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(PBR),
-    "PBR  =%02X  ", frameReadState_.cpu.regs.PBR);
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(PBR), "PBR  =%02X  ",
+                     frameReadState_.cpu.regs.PBR);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(PC),
-    "PC   =%04X", frameReadState_.cpu.regs.PC);
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(PC), "PC   =%04X", frameReadState_.cpu.regs.PC);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(IR),
-    "IR   =%02X  ", frameReadState_.cpu.regs.IR);
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(IR), "IR   =%02X  ",
+                     frameReadState_.cpu.regs.IR);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(DBR),
-    "DBR  =%02X  ", frameReadState_.cpu.regs.DBR);
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(DBR), "DBR  =%02X  ",
+                     frameReadState_.cpu.regs.DBR);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(S),
-    "S    =%04X", frameReadState_.cpu.regs.S);
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(S), "S    =%04X", frameReadState_.cpu.regs.S);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(D),
-    "D    =%04X", frameReadState_.cpu.regs.D);
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(D), "D    =%04X", frameReadState_.cpu.regs.D);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(A),
-    "A    =%04X  ", frameReadState_.cpu.regs.A);
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(A), "A    =%04X  ", frameReadState_.cpu.regs.A);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(X),
-    "X    =%04X", frameReadState_.cpu.regs.X);
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(X), "X    =%04X", frameReadState_.cpu.regs.X);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(Y),
-    "Y    =%04X", frameReadState_.cpu.regs.Y);
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(Y), "Y    =%04X", frameReadState_.cpu.regs.Y);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::TextColored(
-    getStatusFieldColor<uint8_t>(
-      lastFrameCPURegs_.P, frameReadState_.cpu.regs.P, kClemensCPUStatus_Negative),
-    "n");
+  ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
+                                                  kClemensCPUStatus_Negative),
+                     "n");
   ImGui::SameLine(0.0f, 4.0f);
-  ImGui::TextColored(
-    getStatusFieldColor<uint8_t>(
-      lastFrameCPURegs_.P, frameReadState_.cpu.regs.P, kClemensCPUStatus_Overflow),
-    "v");
+  ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
+                                                  kClemensCPUStatus_Overflow),
+                     "v");
   ImGui::SameLine(0.0f, 4.0f);
-  ImGui::TextColored(
-    getStatusFieldColor<uint8_t>(
-      lastFrameCPURegs_.P, frameReadState_.cpu.regs.P, kClemensCPUStatus_MemoryAccumulator),
-    frameReadState_.cpu.pins.emulation ? " " : "m");
+  ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
+                                                  kClemensCPUStatus_MemoryAccumulator),
+                     frameReadState_.cpu.pins.emulation ? " " : "m");
   ImGui::SameLine(0.0f, 4.0f);
-  ImGui::TextColored(
-    getStatusFieldColor<uint8_t>(
-      lastFrameCPURegs_.P, frameReadState_.cpu.regs.P, kClemensCPUStatus_Index),
-    frameReadState_.cpu.pins.emulation ? " " : "x");
+  ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
+                                                  kClemensCPUStatus_Index),
+                     frameReadState_.cpu.pins.emulation ? " " : "x");
   ImGui::SameLine(0.0f, 4.0f);
-  ImGui::TextColored(
-    getStatusFieldColor<uint8_t>(
-      lastFrameCPURegs_.P, frameReadState_.cpu.regs.P, kClemensCPUStatus_Decimal),
-    "d");
+  ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
+                                                  kClemensCPUStatus_Decimal),
+                     "d");
   ImGui::SameLine(0.0f, 4.0f);
-  ImGui::TextColored(
-    getStatusFieldColor<uint8_t>(
-      lastFrameCPURegs_.P, frameReadState_.cpu.regs.P, kClemensCPUStatus_IRQDisable),
-    "i");
+  ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
+                                                  kClemensCPUStatus_IRQDisable),
+                     "i");
   ImGui::SameLine(0.0f, 4.0f);
-  ImGui::TextColored(
-    getStatusFieldColor<uint8_t>(
-      lastFrameCPURegs_.P, frameReadState_.cpu.regs.P, kClemensCPUStatus_Zero),
-    "z");
+  ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
+                                                  kClemensCPUStatus_Zero),
+                     "z");
   ImGui::SameLine(0.0f, 4.0f);
-  ImGui::TextColored(
-    getStatusFieldColor<uint8_t>(
-      lastFrameCPURegs_.P, frameReadState_.cpu.regs.P, kClemensCPUStatus_Carry),
-    "c");
+  ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
+                                                  kClemensCPUStatus_Carry),
+                     "c");
   ImGui::EndTable();
 
   ImGui::TableNextColumn();
@@ -668,16 +657,14 @@ void ClemensFrontend::doMachineCPUInfoDisplay() {
   ImGui::EndTable();
 }
 
-void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
-                                          float screenU, float screenV) {
+void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU,
+                                          float screenV) {
   ImGui::SetNextWindowPos(rootAnchor);
   ImGui::SetNextWindowSize(rootSize);
   ImGui::Begin("Display", nullptr,
-                ImGuiWindowFlags_NoTitleBar |
-                ImGuiWindowFlags_NoResize |
-                ImGuiWindowFlags_NoCollapse |
-                ImGuiWindowFlags_NoBringToFrontOnFocus |
-                ImGuiWindowFlags_NoMove);
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                   ImGuiWindowFlags_NoMove);
   ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // No tint
   ImTextureID texId{(void *)((uintptr_t)display_.getScreenTarget().id)};
   ImVec2 p = ImGui::GetCursorScreenPos();
@@ -687,8 +674,8 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
   ImVec2 display_uv(screenU, screenV);
   ImGui::GetWindowDrawList()->AddImage(
       texId, ImVec2(monitorAnchor.x, monitorAnchor.y),
-      ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y),
-      ImVec2(0, 0), display_uv, ImGui::GetColorU32(tint_col));
+      ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y), ImVec2(0, 0),
+      display_uv, ImGui::GetColorU32(tint_col));
 
   if (ImGui::IsWindowFocused()) {
     ImGui::SetKeyboardFocusHere(0);
@@ -704,10 +691,8 @@ void ClemensFrontend::doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize
   ImGui::SetNextWindowPos(rootAnchor);
   ImGui::SetNextWindowSize(rootSize);
   ImGui::Begin("Terminal", nullptr,
-                ImGuiWindowFlags_NoTitleBar |
-                ImGuiWindowFlags_NoResize |
-                ImGuiWindowFlags_NoCollapse |
-                ImGuiWindowFlags_NoMove);
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove);
   ImVec2 contentSize = ImGui::GetContentRegionAvail();
   contentSize.y -= (ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y);
   ImGui::BeginChild("TerminalView", contentSize);
@@ -720,22 +705,23 @@ void ClemensFrontend::doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize
   }
   ImGui::EndChild();
   ImGui::Separator();
-  ImGui::PushStyleColor(ImGuiCol_FrameBg,
-                          ImGui::GetStyleColorVec4(ImGuiCol_WindowBg));
+  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetStyleColorVec4(ImGuiCol_WindowBg));
   ImGui::Text("*");
   ImGui::SameLine();
-  auto& style = ImGui::GetStyle();
+  auto &style = ImGui::GetStyle();
   float xpos = ImGui::GetCursorPosX();
-  float rightPaddingX = 3 * (ImGui::GetFont()->GetCharAdvance('A') +
-                             style.FramePadding.x*2 + style.ItemSpacing.x);
+  float rightPaddingX =
+      3 * (ImGui::GetFont()->GetCharAdvance('A') + style.FramePadding.x * 2 + style.ItemSpacing.x);
   ImGui::SetNextItemWidth(rootSize.x - xpos - ImGui::GetStyle().WindowPadding.x - rightPaddingX);
   if (ImGui::InputText("##", inputLine, sizeof(inputLine), ImGuiInputTextFlags_EnterReturnsTrue)) {
-    auto* inputLineEnd = &inputLine[0] + strnlen(inputLine, sizeof(inputLine));
+    auto *inputLineEnd = &inputLine[0] + strnlen(inputLine, sizeof(inputLine));
     if (inputLineEnd != &inputLine[0]) {
-      const char* inputStart = &inputLine[0];
-      const char* inputEnd = inputLineEnd - 1;
-      for (; std::isspace(*inputStart) && inputStart < inputEnd; ++inputStart);
-      for (; std::isspace(*inputEnd) && inputEnd > inputStart; --inputEnd);
+      const char *inputStart = &inputLine[0];
+      const char *inputEnd = inputLineEnd - 1;
+      for (; std::isspace(*inputStart) && inputStart < inputEnd; ++inputStart)
+        ;
+      for (; std::isspace(*inputEnd) && inputEnd > inputStart; --inputEnd)
+        ;
       if (inputStart <= inputEnd) {
         std::string_view commandLine(inputStart, (inputEnd - inputStart) + 1);
         executeCommand(commandLine);
@@ -748,23 +734,23 @@ void ClemensFrontend::doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize
   auto activeButtonColor = style.Colors[ImGuiCol_ButtonActive];
   auto buttonColor = style.Colors[ImGuiCol_Button];
   ImGui::PushStyleColor(ImGuiCol_Button,
-    terminalMode_==TerminalMode::Command ? activeButtonColor : buttonColor);
+                        terminalMode_ == TerminalMode::Command ? activeButtonColor : buttonColor);
   if (ImGui::Button("C")) {
     terminalMode_ = TerminalMode::Command;
   }
   ImGui::PopStyleColor();
   ImGui::SameLine();
   ImGui::PushStyleColor(ImGuiCol_Button,
-    terminalMode_==TerminalMode::Log ? activeButtonColor : buttonColor);
+                        terminalMode_ == TerminalMode::Log ? activeButtonColor : buttonColor);
   if (ImGui::Button("L")) {
     terminalMode_ = TerminalMode::Log;
   }
   ImGui::PopStyleColor();
   ImGui::SameLine();
   ImGui::PushStyleColor(ImGuiCol_Button,
-    terminalMode_==TerminalMode::Execution ? activeButtonColor : buttonColor);
+                        terminalMode_ == TerminalMode::Execution ? activeButtonColor : buttonColor);
   if (ImGui::Button("E")) {
-      terminalMode_ = TerminalMode::Execution;
+    terminalMode_ = TerminalMode::Execution;
   }
   ImGui::PopStyleColor();
   ImGui::End();
@@ -772,20 +758,20 @@ void ClemensFrontend::doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize
 
 void ClemensFrontend::layoutTerminalLines() {
   for (size_t index = 0; index < terminalLines_.size(); ++index) {
-    auto& line = terminalLines_.at(index);
+    auto &line = terminalLines_.at(index);
     switch (line.type) {
-      case TerminalLine::Debug:
-        ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(192, 192, 192, 255));
-        break;
-      case TerminalLine::Warn:
-        ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(255, 255, 0, 255));
-        break;
-      case TerminalLine::Error:
-        ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(255, 0, 192, 255));
-        break;
-      case TerminalLine::Command:
-        ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(0, 255, 255, 255));
-        break;
+    case TerminalLine::Debug:
+      ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(192, 192, 192, 255));
+      break;
+    case TerminalLine::Warn:
+      ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(255, 255, 0, 255));
+      break;
+    case TerminalLine::Error:
+      ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(255, 0, 192, 255));
+      break;
+    case TerminalLine::Command:
+      ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(0, 255, 255, 255));
+      break;
     }
     ImGui::TextUnformatted(terminalLines_.at(index).text.c_str());
     if (line.type != TerminalLine::Info) {
@@ -797,20 +783,20 @@ void ClemensFrontend::layoutTerminalLines() {
 
 void ClemensFrontend::layoutConsoleLines() {
   for (size_t index = 0; index < consoleLines_.size(); ++index) {
-    auto& line = consoleLines_.at(index);
+    auto &line = consoleLines_.at(index);
     switch (line.type) {
-      case TerminalLine::Debug:
-        ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(192, 192, 192, 255));
-        break;
-      case TerminalLine::Warn:
-        ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(255, 255, 0, 255));
-        break;
-      case TerminalLine::Error:
-        ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(255, 0, 192, 255));
-        break;
-      case TerminalLine::Command:
-        ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(0, 255, 255, 255));
-        break;
+    case TerminalLine::Debug:
+      ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(192, 192, 192, 255));
+      break;
+    case TerminalLine::Warn:
+      ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(255, 255, 0, 255));
+      break;
+    case TerminalLine::Error:
+      ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(255, 0, 192, 255));
+      break;
+    case TerminalLine::Command:
+      ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(0, 255, 255, 255));
+      break;
     }
     ImGui::TextUnformatted(consoleLines_.at(index).text.c_str());
     if (line.type != TerminalLine::Info) {
@@ -823,18 +809,13 @@ void ClemensFrontend::layoutConsoleLines() {
 void ClemensFrontend::doModalOperations(int width, int height) {
   if (!ImGuiFileDialog::Instance()->WasOpenedThisFrame()) {
     if (guiMode_ == GUIMode::ImportDiskModal) {
-        //  File GUI dialog
-        const char* filters =
+      //  File GUI dialog
+      const char *filters =
           "Disk image files (*.dsk *.do *.po *.2mg *.woz){.dsk,.do,.po,.2mg,.woz}";
 
-        ImGuiFileDialog::Instance()->OpenDialog("choose_disk_images",
-                                                "Choose Disk Image",
-                                                filters,
-                                                ".",
-                                                "",
-                                                16,
-                                                (void *)((intptr_t)importDriveType_),
-                                                ImGuiFileDialogFlags_Modal);
+      ImGuiFileDialog::Instance()->OpenDialog("choose_disk_images", "Choose Disk Image", filters,
+                                              ".", "", 16, (void *)((intptr_t)importDriveType_),
+                                              ImGuiFileDialogFlags_Modal);
     }
   }
   if (ImGuiFileDialog::Instance()->Display("choose_disk_images", ImGuiWindowFlags_NoCollapse,
@@ -842,9 +823,10 @@ void ClemensFrontend::doModalOperations(int width, int height) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
       auto selection = ImGuiFileDialog::Instance()->GetSelection();
       auto filepath = ImGuiFileDialog::Instance()->GetCurrentPath();
-      auto driveType = (ClemensDriveType)(reinterpret_cast<intptr_t>(ImGuiFileDialog::Instance()->GetUserDatas()));
+      auto driveType = (ClemensDriveType)(reinterpret_cast<intptr_t>(
+          ImGuiFileDialog::Instance()->GetUserDatas()));
       importDiskFiles_.clear();
-      for (auto& e : selection) {
+      for (auto &e : selection) {
         importDiskFiles_.emplace_back(e.second);
       }
       guiMode_ = GUIMode::ImportDiskSetFlow;
@@ -862,8 +844,8 @@ void ClemensFrontend::doModalOperations(int width, int height) {
   }
   ImVec2 center = ImGui::GetMainViewport()->GetCenter();
   ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-  ImGui::SetNextWindowSize(ImVec2(std::max(720.0f, width * 0.33f),
-                           7 * ImGui::GetTextLineHeightWithSpacing()));
+  ImGui::SetNextWindowSize(
+      ImVec2(std::max(720.0f, width * 0.33f), 7 * ImGui::GetTextLineHeightWithSpacing()));
   if (ImGui::BeginPopupModal("Enter Disk Set Name", NULL, 0)) {
     ImGui::Spacing();
     char collectionName[64] = "";
@@ -875,16 +857,16 @@ void ClemensFrontend::doModalOperations(int width, int height) {
     //       'next frame return true' hack flag.  Investigate but no need to
     //        waste cycles on figuring out this minor UI convenience for now.
     ImGui::BeginTable("Disk Label Entry", 2);
-    ImGui::TableSetupColumn(
-      "", ImGuiTableColumnFlags_WidthFixed,
-      ImGui::CalcTextSize("Disk Name").x + ImGui::GetStyle().ColumnsMinSpacing);
+    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
+                            ImGui::CalcTextSize("Disk Name").x +
+                                ImGui::GetStyle().ColumnsMinSpacing);
     ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
     ImGui::TextUnformatted("Disk Set");
     ImGui::TableNextColumn();
     if (ImGui::InputText("##1", collectionName, sizeof(collectionName),
-                          ImGuiInputTextFlags_EnterReturnsTrue)) {
+                         ImGuiInputTextFlags_EnterReturnsTrue)) {
       importDiskSetPath_ = collectionName;
     }
     ImGui::TableNextRow();
@@ -892,15 +874,15 @@ void ClemensFrontend::doModalOperations(int width, int height) {
     ImGui::TextUnformatted("Disk Name");
     ImGui::TableNextColumn();
     if (ImGui::InputText("##2", imageName, sizeof(imageName),
-                          ImGuiInputTextFlags_EnterReturnsTrue)) {
+                         ImGuiInputTextFlags_EnterReturnsTrue)) {
       importDiskSetName_ = imageName;
     }
     ImGui::EndTable();
     if (ImGui::Button("Ok")) {
-      if (!importDiskSetPath_.empty() && !std::filesystem::path(importDiskSetPath_).empty()
-          && !importDiskSetName_.empty()) {
-        importDiskSetPath_ = (std::filesystem::path(diskLibraryRootPath_) /
-                              importDiskSetPath_).string();
+      if (!importDiskSetPath_.empty() && !std::filesystem::path(importDiskSetPath_).empty() &&
+          !importDiskSetName_.empty()) {
+        importDiskSetPath_ =
+            (std::filesystem::path(diskLibraryRootPath_) / importDiskSetPath_).string();
         guiMode_ = GUIMode::NewBlankDisk;
       } else {
         guiMode_ = GUIMode::Emulator;
@@ -935,7 +917,7 @@ void ClemensFrontend::doImportDiskSetFlowStart(int width, int height) {
     ImGui::SetItemDefaultFocus();
     bool doImport = false;
     if (ImGui::InputText("##", collectionName, sizeof(collectionName),
-                          ImGuiInputTextFlags_EnterReturnsTrue)) {
+                         ImGuiInputTextFlags_EnterReturnsTrue)) {
       importDiskSetName_ = collectionName;
       doImport = true;
     }
@@ -944,8 +926,8 @@ void ClemensFrontend::doImportDiskSetFlowStart(int width, int height) {
     }
     if (doImport) {
       if (!importDiskSetName_.empty() && !std::filesystem::path(importDiskSetName_).empty()) {
-        importDiskSetPath_ = (std::filesystem::path(diskLibraryRootPath_) /
-                            importDiskSetName_).string();
+        importDiskSetPath_ =
+            (std::filesystem::path(diskLibraryRootPath_) / importDiskSetName_).string();
         if (std::filesystem::exists(importDiskSetPath_)) {
           guiMode_ = GUIMode::ImportDiskSetReplaceOld;
         } else {
@@ -958,7 +940,7 @@ void ClemensFrontend::doImportDiskSetFlowStart(int width, int height) {
     }
     ImGui::SameLine();
     if (ImGui::Button("Cancel")) {
-        guiMode_ = GUIMode::Emulator;
+      guiMode_ = GUIMode::Emulator;
       ImGui::CloseCurrentPopup();
     }
     ImGui::Spacing();
@@ -985,9 +967,9 @@ void ClemensFrontend::doImportDiskSetReplaceOld(int width, int height) {
   auto guiModeLast = guiMode_;
   ImVec2 center = ImGui::GetMainViewport()->GetCenter();
   ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-  ImGui::SetNextWindowSize(ImVec2(std::max((float)width * 0.40f, 720.0f),
-                                  std::max((float)height * 0.25f, 360.0f)),
-                                  ImGuiCond_Appearing);
+  ImGui::SetNextWindowSize(
+      ImVec2(std::max((float)width * 0.40f, 720.0f), std::max((float)height * 0.25f, 360.0f)),
+      ImGuiCond_Appearing);
   bool failure = false;
   if (ImGui::BeginPopupModal("Replace Disk Set", NULL)) {
     ImGui::Spacing();
@@ -1001,9 +983,9 @@ void ClemensFrontend::doImportDiskSetReplaceOld(int width, int height) {
     auto cursorPos = ImGui::GetCursorPos();
     auto contentRegionAvail = ImGui::GetContentRegionAvail();
 
-    ImGui::SetCursorPos(
-      ImVec2(cursorPos.x, cursorPos.y + contentRegionAvail.y -
-                          (ImGui::GetStyle().FramePadding.y * 2 + ImGui::GetTextLineHeight())));
+    ImGui::SetCursorPos(ImVec2(
+        cursorPos.x, cursorPos.y + contentRegionAvail.y -
+                         (ImGui::GetStyle().FramePadding.y * 2 + ImGui::GetTextLineHeight())));
     if (ImGui::Button("Yes")) {
       std::error_code errorCode;
       ImGui::CloseCurrentPopup();
@@ -1043,9 +1025,9 @@ void ClemensFrontend::doImportDiskSetReplaceOld(int width, int height) {
 void ClemensFrontend::doImportDiskSet(int width, int height) {
   ImVec2 center = ImGui::GetMainViewport()->GetCenter();
   ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-  ImGui::SetNextWindowSize(ImVec2(std::max((float)width * 0.40f, 720.0f),
-                                  std::max((float)height * 0.25f, 360.0f)),
-                                  ImGuiCond_Appearing);
+  ImGui::SetNextWindowSize(
+      ImVec2(std::max((float)width * 0.40f, 720.0f), std::max((float)height * 0.25f, 360.0f)),
+      ImGuiCond_Appearing);
   if (ImGui::BeginPopupModal("Import Disk Set Error", NULL)) {
     auto cursorPos = ImGui::GetCursorPos();
     auto contentRegionAvail = ImGui::GetContentRegionAvail();
@@ -1054,9 +1036,9 @@ void ClemensFrontend::doImportDiskSet(int width, int height) {
     ImGui::TextWrapped(messageModalString_.c_str());
     ImGui::Spacing();
     ImGui::Spacing();
-    ImGui::SetCursorPos(
-      ImVec2(cursorPos.x, cursorPos.y + contentRegionAvail.y -
-                          (ImGui::GetStyle().FramePadding.y * 2 + ImGui::GetTextLineHeight())));
+    ImGui::SetCursorPos(ImVec2(
+        cursorPos.x, cursorPos.y + contentRegionAvail.y -
+                         (ImGui::GetStyle().FramePadding.y * 2 + ImGui::GetTextLineHeight())));
     if (ImGui::Button("Ok")) {
       ImGui::CloseCurrentPopup();
       guiMode_ = GUIMode::Emulator;
@@ -1064,9 +1046,9 @@ void ClemensFrontend::doImportDiskSet(int width, int height) {
     ImGui::EndPopup();
   }
   ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-  ImGui::SetNextWindowSize(ImVec2(std::max((float)width * 0.40f, 720.0f),
-                                  std::max((float)height * 0.20f, 280.0f)),
-                                  ImGuiCond_Appearing);
+  ImGui::SetNextWindowSize(
+      ImVec2(std::max((float)width * 0.40f, 720.0f), std::max((float)height * 0.20f, 280.0f)),
+      ImGuiCond_Appearing);
   if (ImGui::BeginPopupModal("Confirmation", NULL)) {
     auto cursorPos = ImGui::GetCursorPos();
     auto contentRegionAvail = ImGui::GetContentRegionAvail();
@@ -1074,15 +1056,14 @@ void ClemensFrontend::doImportDiskSet(int width, int height) {
     ImGui::Spacing();
     ImGui::TextWrapped(messageModalString_.c_str());
     ImGui::Spacing();
-    ImGui::SetCursorPos(
-      ImVec2(cursorPos.x, cursorPos.y + contentRegionAvail.y -
-                          (ImGui::GetStyle().FramePadding.y * 2 + ImGui::GetTextLineHeight())));
+    ImGui::SetCursorPos(ImVec2(
+        cursorPos.x, cursorPos.y + contentRegionAvail.y -
+                         (ImGui::GetStyle().FramePadding.y * 2 + ImGui::GetTextLineHeight())));
     if (ImGui::Button("Ok")) {
       ImGui::CloseCurrentPopup();
       guiMode_ = GUIMode::Emulator;
     }
     ImGui::EndPopup();
-
   }
 }
 
@@ -1098,9 +1079,10 @@ void ClemensFrontend::doNewBlankDisk(int width, int height) {
   //  issue backend::InsertNewDisk()
 }
 
-std::pair<std::string, bool>  ClemensFrontend::importDisks(
-  std::string outputPath, std::string collectionName,
-  ClemensDriveType driveType, std::vector<std::string> imagePaths) {
+std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath,
+                                                          std::string collectionName,
+                                                          ClemensDriveType driveType,
+                                                          std::vector<std::string> imagePaths) {
   //  parse file extension for supported types:
   //    WOZ
   //    2MG
@@ -1109,56 +1091,73 @@ std::pair<std::string, bool>  ClemensFrontend::importDisks(
   //    PO
   //  only succeed if each image works with the desired drive type
   ClemensDiskImporter importer(driveType, imagePaths.size());
-  for (auto& imagePath : imagePaths) {
-    ClemensWOZDisk* disk = importer.add(imagePath);
+  for (auto &imagePath : imagePaths) {
+    ClemensWOZDisk *disk = importer.add(imagePath);
     if (!disk) {
-      return std::make_pair(
-        fmt::format("Failed to import disk image {} for drive format {}",
-                    imagePath,  sDriveDescription[driveType]),
-        false);
+      return std::make_pair(fmt::format("Failed to import disk image {} for drive format {}",
+                                        imagePath, sDriveDescription[driveType]),
+                            false);
     }
     switch (driveType) {
-      case kClemensDrive_3_5_D1:
-      case kClemensDrive_3_5_D2:
-        if (disk->nib->disk_type != CLEM_DISK_TYPE_3_5) {
-          return std::make_pair(
+    case kClemensDrive_3_5_D1:
+    case kClemensDrive_3_5_D2:
+      if (disk->nib->disk_type != CLEM_DISK_TYPE_3_5) {
+        return std::make_pair(
             fmt::format("Disk image {} with type 3.5 doesn't match drive with required format {}",
-                        imagePath,  sDriveDescription[driveType]),
+                        imagePath, sDriveDescription[driveType]),
             false);
-        }
-        break;
-      case kClemensDrive_5_25_D1:
-      case kClemensDrive_5_25_D2:
-        if (disk->nib->disk_type != CLEM_DISK_TYPE_5_25) {
-          return std::make_pair(
+      }
+      break;
+    case kClemensDrive_5_25_D1:
+    case kClemensDrive_5_25_D2:
+      if (disk->nib->disk_type != CLEM_DISK_TYPE_5_25) {
+        return std::make_pair(
             fmt::format("Disk image {} with type 5.25 doesn't match drive with required format {}",
-                        imagePath,  sDriveDescription[driveType]),
+                        imagePath, sDriveDescription[driveType]),
             false);
-        }
-        break;
+      }
+      break;
     }
   }
   if (!std::filesystem::create_directories(outputPath)) {
-    return std::make_pair(
-      fmt::format("Unable to create directory {}", outputPath),
-      false);
+    return std::make_pair(fmt::format("Unable to create directory {}", outputPath), false);
   }
   if (!importer.build(outputPath)) {
     //  TODO: mare information please!
     return std::make_pair(
-      fmt::format("Import build step failed for drive type {}", sDriveDescription[driveType]),
-      false);
+        fmt::format("Import build step failed for drive type {}", sDriveDescription[driveType]),
+        false);
   }
 
   return std::make_pair(outputPath, true);
 }
 
+static std::string_view trimToken(const std::string_view& token, size_t off = 0,
+                                  size_t length=std::string_view::npos) {
+  return token.substr(off, length);
+}
+
+static bool parseBool(const std::string_view& token, bool& result) {
+  if (token == "on" || token == "true") {
+    result = true;
+    return true;
+  } else if (token == "off" || token == "false") {
+    result = false;
+    return false;
+  }
+  int v = 0;
+  if (std::from_chars(token.data(), token.data() + token.size(), v).ec == std::errc{}) {
+    result = v != 0;
+    return true;
+  }
+  return false;
+}
+
 void ClemensFrontend::executeCommand(std::string_view command) {
   CLEM_TERM_COUT.format(TerminalLine::Command, "* {}", command);
   auto sep = command.find(' ');
-  auto action = command.substr(0, sep);
-  auto operand = sep != std::string_view::npos ? command.substr(sep + 1)
-                                               : std::string_view();
+  auto action = trimToken(command, 0, sep);
+  auto operand = sep != std::string_view::npos ? trimToken(command, sep + 1) : std::string_view();
   if (action == "help" || action == "?") {
     cmdHelp(operand);
   } else if (action == "run" || action == "r") {
@@ -1171,30 +1170,39 @@ void ClemensFrontend::executeCommand(std::string_view command) {
     cmdReboot(operand);
   } else if (action == "reset") {
     cmdReset(operand);
+  } else if (action == "disk") {
+    cmdDisk(operand);
   } else if (!action.empty()) {
     CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
   }
 }
 
 void ClemensFrontend::cmdHelp(std::string_view operand) {
-  CLEM_TERM_COUT.print(TerminalLine::Info, "reset                       - soft reset of the machine");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "reboot                      - hard reset of the machine");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "reset                       - soft reset of the machine");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "reboot                      - hard reset of the machine");
   CLEM_TERM_COUT.print(TerminalLine::Info, "disk                        - disk information");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "disk <s5|6>,<d1|2>,<image>  - insert disk");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "disk <s5|6>,<d1|2>          - disk at slot s, drive d");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "eject <s5|6>,<d1|2>         - eject disk");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "r]un                        - execute emulator until break");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak                      - break execution at current PC");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak <address>            - break execution at address");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak r:<address>          - break on data read from address");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak w:<address>          - break on write to address");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "disk <drive>,file=<image>   - insert disk");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "disk <drive>,wprot=<off|on> - write protect");
+  CLEM_TERM_COUT.print(TerminalLine::Info, "disk <drive>,eject          - eject disk");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "r]un                        - execute emulator until break");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "b]reak                      - break execution at current PC");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "b]reak <address>            - break execution at address");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "b]reak r:<address>          - break on data read from address");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "b]reak w:<address>          - break on write to address");
   CLEM_TERM_COUT.print(TerminalLine::Info, "l]ist                       - list all breakpoints");
   CLEM_TERM_COUT.newline();
 }
 
 void ClemensFrontend::cmdBreak(std::string_view operand) {
   //  parse [r|w]<address>
-  ClemensBackendBreakpoint breakpoint {ClemensBackendBreakpoint::Undefined};
+  ClemensBackendBreakpoint breakpoint{ClemensBackendBreakpoint::Undefined};
   auto sepPos = operand.find(':');
   if (sepPos != std::string_view::npos) {
     auto typeStr = operand.substr(0, sepPos);
@@ -1206,14 +1214,12 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
       }
     }
     if (breakpoint.type == ClemensBackendBreakpoint::Undefined) {
-      CLEM_TERM_COUT.format(TerminalLine::Error,
-                            "Breakpoint type {} is invalid.", typeStr);
+      CLEM_TERM_COUT.format(TerminalLine::Error, "Breakpoint type {} is invalid.", typeStr);
       return;
     }
     operand = operand.substr(sepPos + 1);
     if (operand.empty()) {
-      CLEM_TERM_COUT.format(TerminalLine::Error,
-                            "Breakpoint type {} is invalid.", typeStr);
+      CLEM_TERM_COUT.format(TerminalLine::Error, "Breakpoint type {} is invalid.", typeStr);
       return;
     }
   } else {
@@ -1241,41 +1247,101 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
     backend_->breakExecution();
   } else {
     address[6] = '\0';
-    char* addressEnd = NULL;
+    char *addressEnd = NULL;
     breakpoint.address = std::strtoul(address, &addressEnd, 16);
     if (addressEnd != address + 6) {
-      CLEM_TERM_COUT.format(TerminalLine::Error,
-                            "Address format is invalid read from '{}'", operand);
+      CLEM_TERM_COUT.format(TerminalLine::Error, "Address format is invalid read from '{}'",
+                            operand);
       return;
     }
     backend_->addBreakpoint(breakpoint);
   }
 }
 
-void ClemensFrontend::cmdList(std::string_view operand) {
+void ClemensFrontend::cmdList(std::string_view /*operand*/) {
   //  TODO: granular listing based on operand
-  static const char* bpType[] = {"unknown", "execute", "data-read", "write"};
+  static const char *bpType[] = {"unknown", "execute", "data-read", "write"};
   if (breakpoints_.empty()) {
     CLEM_TERM_COUT.print(TerminalLine::Info, "No breakpoints defined.");
     return;
   }
   for (size_t i = 0; i < breakpoints_.size(); ++i) {
-    auto& bp = breakpoints_[i];
+    auto &bp = breakpoints_[i];
     CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {:02X}/{:04X} {}", i,
-                          (bp.address >> 16) & 0xff, bp.address & 0xffff,
-                          bpType[bp.type]);
+                          (bp.address >> 16) & 0xff, bp.address & 0xffff, bpType[bp.type]);
   }
 }
 
-void ClemensFrontend::cmdRun(std::string_view operand) {
-  backend_->run();
-}
+void ClemensFrontend::cmdRun(std::string_view /*operand*/) { backend_->run(); }
 
-void ClemensFrontend::cmdReboot(std::string_view operand) {
+void ClemensFrontend::cmdReboot(std::string_view /*operand*/) {
   guiMode_ = GUIMode::RebootEmulator;
   backend_->terminate();
 }
 
-void ClemensFrontend::cmdReset(std::string_view operand) {
-  backend_->reset();
+void ClemensFrontend::cmdReset(std::string_view /*operand*/) { backend_->reset(); }
+
+void ClemensFrontend::cmdDisk(std::string_view operand) {
+  // disk
+  // disk <drive>,file=<image>
+  // disk <drive>,wprot=off|on
+  if (operand.empty()) {
+    for (auto it = frameReadState_.diskDrives.begin(); it != frameReadState_.diskDrives.end();
+         ++it) {
+      auto driveType = static_cast<ClemensDriveType>(it - frameReadState_.diskDrives.begin());
+    CLEM_TERM_COUT.format(TerminalLine::Info, "{} {}: {}", it->isWriteProtected ? "wp" : "  ",
+                            ClemensDiskUtilities::getDriveName(driveType),
+                            it->imagePath.empty() ? "<none>" : it->imagePath);
+    }
+    return;
+  }
+  auto sepPos = operand.find(',');
+  auto driveType = ClemensDiskUtilities::getDriveType(trimToken(operand, 0, sepPos));
+  if (driveType == kClemensDrive_Invalid) {
+    CLEM_TERM_COUT.format(TerminalLine::Error, "Invalid drive name {} specified.", operand);
+    return;
+  }
+  auto& driveInfo = frameReadState_.diskDrives[driveType];
+  std::string_view diskOpExpr;
+  if (sepPos == std::string_view::npos || (diskOpExpr = trimToken(operand, sepPos+1)).empty()) {
+
+    CLEM_TERM_COUT.format(TerminalLine::Info, "{} {}: {}", driveInfo.isWriteProtected ? "wp" : "  ",
+                            ClemensDiskUtilities::getDriveName(driveType),
+                            driveInfo.imagePath.empty() ? "<none>" : driveInfo.imagePath);
+    return;
+  }
+
+  bool validOp = true;
+  bool validValue = true;
+  sepPos = diskOpExpr.find('=');
+  auto diskOpType = trimToken(diskOpExpr, 0, sepPos);
+  std::string_view diskOpValue;
+  if (sepPos == std::string_view::npos) {
+    if (diskOpType == "eject") {
+      backend_->ejectDisk(driveType);
+    } else {
+      validOp = false;
+    }
+  } else {
+    diskOpValue = trimToken(diskOpExpr, sepPos+1);
+    if (diskOpType == "file") {
+      backend_->insertDisk(driveType, std::string(diskOpValue));
+    } else if (diskOpType == "wprot") {
+      bool wprot;
+      if (parseBool(diskOpValue, wprot)) {
+        backend_->writeProtectDisk(driveType, wprot);
+      } else {
+        validValue = false;
+      }
+    } else {
+      validOp = false;
+    }
+  }
+  if (!validValue) {
+    CLEM_TERM_COUT.format(TerminalLine::Error, "Invalid value {} in expression.", diskOpValue);
+    return;
+  } else if (!validOp) {
+    CLEM_TERM_COUT.format(TerminalLine::Error, "Invalid or unsupported operation {}.", diskOpExpr);
+    return;
+  }
 }

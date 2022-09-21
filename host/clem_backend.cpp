@@ -14,10 +14,6 @@
 static constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
 static constexpr unsigned kLogOutputLineLimit = 1024;
 
-static std::array<std::string_view, 4> sDriveNames = {
-  "s5d1", "s5d2", "s6d1", "s6d2"
-};
-
 struct ClemensRunSampler {
   //  our method of keeping the simulation in sync with real time is to rely
   //  on two counters
@@ -146,7 +142,7 @@ void ClemensBackend::publish() {
 
 void ClemensBackend::insertDisk(ClemensDriveType driveType, std::string diskPath) {
   queue(Command{Command::InsertDisk,
-                fmt::format("{}={}", sDriveNames[(int)driveType], diskPath)});
+                fmt::format("{}={}", ClemensDiskUtilities::getDriveName(driveType), diskPath)});
 }
 
 bool ClemensBackend::insertDisk(const std::string_view& inputParam) {
@@ -154,15 +150,13 @@ bool ClemensBackend::insertDisk(const std::string_view& inputParam) {
   if (sepPos == std::string_view::npos) return false;
   auto driveName = inputParam.substr(0, sepPos);
   auto imagePath = inputParam.substr(sepPos + 1);
-  auto driveIt = std::find(sDriveNames.begin(), sDriveNames.end(), driveName);
-  if (driveIt == sDriveNames.end()) return false;
-  unsigned driveIndex = unsigned(driveIt - sDriveNames.begin());
-  auto driveType = static_cast<ClemensDriveType>(driveIndex);
+  auto driveType = ClemensDiskUtilities::getDriveType(driveName);
+  if (driveType == kClemensDrive_Invalid) return false;
 
-  diskDrives_[driveIndex].imagePath = imagePath;
+  diskDrives_[driveType].imagePath = imagePath;
   if (!loadDisk(driveType) ||
-      !clemens_assign_disk(&machine_, driveType, &disks_[driveIndex])) {
-    diskDrives_[driveIndex].imagePath.clear();
+      !clemens_assign_disk(&machine_, driveType, &disks_[driveType])) {
+    diskDrives_[driveType].imagePath.clear();
     return false;
   }
 
@@ -170,14 +164,33 @@ bool ClemensBackend::insertDisk(const std::string_view& inputParam) {
 }
 
 void ClemensBackend::ejectDisk(ClemensDriveType driveType) {
-  queue(Command{Command::EjectDisk, std::string(sDriveNames[(int)driveType])});
+  queue(Command{Command::EjectDisk,
+                std::string(ClemensDiskUtilities::getDriveName(driveType))});
 }
 
 void ClemensBackend::ejectDisk(const std::string_view& inputParam) {
-  auto driveIt = std::find(sDriveNames.begin(), sDriveNames.end(), inputParam);
-  if (driveIt == sDriveNames.end()) return;
-  unsigned driveIndex = unsigned(driveIt - sDriveNames.begin());
-  diskDrives_[driveIndex].isEjecting = true;
+  auto driveType = ClemensDiskUtilities::getDriveType(inputParam);
+  diskDrives_[driveType].isEjecting = true;
+}
+
+void ClemensBackend::writeProtectDisk(ClemensDriveType driveType, bool wp) {
+  queue(Command{Command::WriteProtectDisk,
+                fmt::format("{},{}", ClemensDiskUtilities::getDriveName(driveType),
+                                     wp ? 1 : 0)});
+}
+
+bool ClemensBackend::writeProtectDisk(const std::string_view& inputParam) {
+  auto sepPos = inputParam.find(',');
+  if (sepPos == std::string_view::npos) return false;
+  auto driveParam = inputParam.substr(0, sepPos);
+  auto driveType = ClemensDiskUtilities::getDriveType(driveParam);
+  auto* drive = clemens_drive_get(&machine_, driveType);
+  if (!drive || !drive->has_disk) return false;
+
+  auto enableParam = inputParam.substr(sepPos+1);
+  drive->disk.is_write_protected = enableParam == "1";
+
+  return true;
 }
 
 bool ClemensBackend::loadDisk(ClemensDriveType driveType) {
@@ -413,6 +426,9 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           break;
         case Command::EjectDisk:
           ejectDisk(command.operand);
+          break;
+        case Command::WriteProtectDisk:
+          writeProtectDisk(command.operand);
           break;
         case Command::Input:
           inputMachine(command.operand);

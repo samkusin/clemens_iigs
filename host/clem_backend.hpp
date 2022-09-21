@@ -3,8 +3,8 @@
 
 #include "clem_host_shared.hpp"
 
-#include "cinek/fixedstack.hpp"
 #include "cinek/buffer.hpp"
+#include "cinek/fixedstack.hpp"
 #include "clem_woz.h"
 
 #include <array>
@@ -17,7 +17,6 @@
 #include <thread>
 #include <vector>
 
-
 //  TODO: Machine type logic could be subclassed into an Apple2GS backend, etc.
 class ClemensBackend {
 public:
@@ -28,11 +27,10 @@ public:
   //    scope.  The front-end should copy what it needs for its display during
   //    the delegate's scope. Once the delegate has finished, the data in
   //    ClemensBackendState should be considered invalid/undefined.
-  using PublishStateDelegate = std::function<void(const ClemensBackendState&)>;
-  ClemensBackend(std::string romPathname, const Config& config,
+  using PublishStateDelegate = std::function<void(const ClemensBackendState &)>;
+  ClemensBackend(std::string romPathname, const Config &config,
                  PublishStateDelegate publishDelegate);
   ~ClemensBackend();
-
 
   //  Queues a command to the backend.   Most commands are processed on the next
   //  execution frame.  Certain commands may hold the queue (i.e. like wait())
@@ -50,7 +48,7 @@ public:
   //  Will issue the publish delegate on the next machine iteration
   void publish();
   //  Send host input to the emulator
-  void inputEvent(const ClemensInputEvent& inputEvent);
+  void inputEvent(const ClemensInputEvent &inputEvent);
   //  Insert disk
   void insertDisk(ClemensDriveType driveType, std::string diskPath);
   //  Eject disk
@@ -58,29 +56,32 @@ public:
   //  Break
   void breakExecution();
   //  Add a breakpoint
-  void addBreakpoint(const ClemensBackendBreakpoint& breakpoint);
+  void addBreakpoint(const ClemensBackendBreakpoint &breakpoint);
   //  Remove a breakpoint
   void removeBreakpoint(unsigned index);
+  //  Sets the write protect status on a disk in a drive
+  void writeProtectDisk(ClemensDriveType driveType, bool wp);
 
 private:
   using Command = ClemensBackendCommand;
 
-  void queue(const Command& cmd);
-  void queueToFront(const Command& cmd);
+  void queue(const Command &cmd);
+  void queueToFront(const Command &cmd);
 
   void main(PublishStateDelegate publishDelegate);
   void resetMachine();
-  bool insertDisk(const std::string_view& inputParam);
-  void ejectDisk(const std::string_view& inputParam);
-  void inputMachine(const std::string_view& inputParam);
-  bool addBreakpoint(const std::string_view& inputParam);
-  bool delBreakpoint(const std::string_view& inputParam);
+  bool insertDisk(const std::string_view &inputParam);
+  void ejectDisk(const std::string_view &inputParam);
+  bool writeProtectDisk(const std::string_view &inputParam);
+  void inputMachine(const std::string_view &inputParam);
+  bool addBreakpoint(const std::string_view &inputParam);
+  bool delBreakpoint(const std::string_view &inputParam);
   std::optional<unsigned> checkHitBreakpoint();
 
   void initEmulatedDiskLocalStorage();
   bool loadDisk(ClemensDriveType driveType);
   bool saveDisk(ClemensDriveType driveType);
-  cinek::ByteBuffer loadROM(const char* romPathname);
+  cinek::ByteBuffer loadROM(const char *romPathname);
 
   //  TODO: These methods could be moved into a subclass as they are specific
   //        to machine type
@@ -88,13 +89,11 @@ private:
   void loadBRAM();
   void saveBRAM();
 
-  template<typename ...Args>
-  void localLog(int log_level, const char* msg, Args... args);
+  template <typename... Args> void localLog(int log_level, const char *msg, Args... args);
 
-  static void emulatorLog(int log_level, ClemensMachine *machine,
-                          const char *msg);
-  static void emulatorOpcodeCallback(struct ClemensInstruction *inst,
-                                     const char *operand, void *this_ptr);
+  static void emulatorLog(int log_level, ClemensMachine *machine, const char *msg);
+  static void emulatorOpcodeCallback(struct ClemensInstruction *inst, const char *operand,
+                                     void *this_ptr);
 
 private:
   Config config_;
@@ -117,8 +116,5 @@ private:
   std::array<ClemensNibbleDisk, kClemensDrive_Count> disks_;
   std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives_;
 };
-
-
-
 
 #endif

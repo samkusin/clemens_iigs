@@ -1,16 +1,13 @@
 #include "clem_import_disk.hpp"
 
+#include "clem_2img.h"
 #include "clem_disk_utils.hpp"
 #include "clem_woz.h"
-#include "clem_2img.h"
-
 
 #include <cassert>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
-
-
 
 size_t ClemensDiskImporter::calculateRequiredMemory(ClemensDriveType driveType,
                                                     size_t count) const {
@@ -27,21 +24,14 @@ size_t ClemensDiskImporter::calculateRequiredMemory(ClemensDriveType driveType,
   return size;
 }
 
-ClemensDiskImporter::ClemensDiskImporter(ClemensDriveType driveType, size_t count) :
-  memory_(calculateRequiredMemory(driveType, count),
-          malloc(calculateRequiredMemory(driveType, count))),
-  driveType_(driveType),
-  head_(nullptr),
-  tail_(nullptr) {
+ClemensDiskImporter::ClemensDiskImporter(ClemensDriveType driveType, size_t count)
+    : memory_(calculateRequiredMemory(driveType, count),
+              malloc(calculateRequiredMemory(driveType, count))),
+      driveType_(driveType), head_(nullptr), tail_(nullptr) {}
 
+ClemensDiskImporter::~ClemensDiskImporter() { free(memory_.getHead()); }
 
-}
-
-ClemensDiskImporter::~ClemensDiskImporter() {
-  free(memory_.getHead());
-}
-
-ClemensWOZDisk* ClemensDiskImporter::add(std::string path) {
+ClemensWOZDisk *ClemensDiskImporter::add(std::string path) {
   std::filesystem::path fsPath = path;
   std::ifstream input(fsPath, std::ios_base::in | std::ios_base::binary);
   auto fsPathExtension = fsPath.extension();
@@ -55,13 +45,14 @@ ClemensWOZDisk* ClemensDiskImporter::add(std::string path) {
     return nullptr;
   }
 
-  uint8_t* bits_start = (uint8_t*)memory_.allocate(inputImageSize);
-  uint8_t* bits_end = bits_start + inputImageSize;
+  uint8_t *bits_start = (uint8_t *)memory_.allocate(inputImageSize);
+  uint8_t *bits_end = bits_start + inputImageSize;
   input.seekg(0);
   input.read((char *)bits_start, inputImageSize);
-  if (input.fail() || input.bad()) return nullptr;
+  if (input.fail() || input.bad())
+    return nullptr;
 
-  DiskRecord* record = nullptr;
+  DiskRecord *record = nullptr;
   if (fsPathExtension == ".woz") {
     record = parseWOZ(bits_start, bits_end);
   } else if (fsPathExtension == ".2mg") {
@@ -71,7 +62,8 @@ ClemensWOZDisk* ClemensDiskImporter::add(std::string path) {
   } else if (fsPathExtension == ".po") {
     record = parseImage(bits_start, bits_end, CLEM_2IMG_FORMAT_PRODOS);
   }
-  if (!record) return nullptr;
+  if (!record)
+    return nullptr;
   auto fsName = fsPath.filename();
   fsName.string().copy(record->name, sizeof(record->name), 0);
   if (!head_) {
@@ -84,18 +76,20 @@ ClemensWOZDisk* ClemensDiskImporter::add(std::string path) {
   return &record->disk;
 }
 
-auto ClemensDiskImporter::parseWOZ(uint8_t* bits_data, uint8_t* bits_data_end) -> DiskRecord* {
-  DiskRecord* record = memory_.newItem<DiskRecord>();
-  if (!record) return nullptr;
+auto ClemensDiskImporter::parseWOZ(uint8_t *bits_data, uint8_t *bits_data_end) -> DiskRecord * {
+  DiskRecord *record = memory_.newItem<DiskRecord>();
+  if (!record)
+    return nullptr;
 
-  ClemensWOZDisk* sourceDisk = &record->disk;
+  ClemensWOZDisk *sourceDisk = &record->disk;
   sourceDisk->nib = memory_.newItem<ClemensNibbleDisk>();
-  if (!sourceDisk->nib) return nullptr;
+  if (!sourceDisk->nib)
+    return nullptr;
   size_t bits_size = ClemensDiskUtilities::calculateNibRequiredMemory(driveType_);
-  sourceDisk->nib->bits_data = (uint8_t*)memory_.allocate(bits_size);
+  sourceDisk->nib->bits_data = (uint8_t *)memory_.allocate(bits_size);
   sourceDisk->nib->bits_data_end = sourceDisk->nib->bits_data + bits_size;
 
-  cinek::ConstRange<uint8_t> buffer(bits_data,bits_data_end );
+  cinek::ConstRange<uint8_t> buffer(bits_data, bits_data_end);
   if (!ClemensDiskUtilities::parseWOZ(sourceDisk, buffer)) {
     return nullptr;
   }
@@ -106,12 +100,13 @@ auto ClemensDiskImporter::parseWOZ(uint8_t* bits_data, uint8_t* bits_data_end) -
 
 // TODO: move equivalent 2IMG, etc parse utilities into ClemensDiskUtilities
 
-auto ClemensDiskImporter::parse2IMG(uint8_t* bits_data, uint8_t* bits_data_end) -> DiskRecord* {
+auto ClemensDiskImporter::parse2IMG(uint8_t *bits_data, uint8_t *bits_data_end) -> DiskRecord * {
   struct Clemens2IMGDisk disk {};
   disk.nib = memory_.newItem<ClemensNibbleDisk>();
-  if (!clem_2img_parse_header(&disk, bits_data, bits_data_end)) return nullptr;
+  if (!clem_2img_parse_header(&disk, bits_data, bits_data_end))
+    return nullptr;
   size_t bits_size = ClemensDiskUtilities::calculateNibRequiredMemory(driveType_);
-  disk.nib->bits_data = (uint8_t*)memory_.allocate(bits_size);
+  disk.nib->bits_data = (uint8_t *)memory_.allocate(bits_size);
   disk.nib->bits_data_end = disk.nib->bits_data + bits_size;
   if (disk.block_count <= 280 || (disk.data_end - disk.data) <= 140 * 1024) {
     disk.nib->disk_type = CLEM_DISK_TYPE_5_25;
@@ -124,23 +119,27 @@ auto ClemensDiskImporter::parse2IMG(uint8_t* bits_data, uint8_t* bits_data_end) 
   return nibblizeImage(&disk);
 }
 
-auto ClemensDiskImporter::parseImage(uint8_t* bits_data, uint8_t* bits_data_end,
-                                     unsigned type) -> DiskRecord* {
+auto ClemensDiskImporter::parseImage(uint8_t *bits_data, uint8_t *bits_data_end, unsigned type)
+    -> DiskRecord * {
   struct Clemens2IMGDisk disk {};
   disk.nib = memory_.newItem<ClemensNibbleDisk>();
-  if (!clem_2img_generate_header(&disk, type, bits_data, bits_data_end)) return nullptr;
+  if (!clem_2img_generate_header(&disk, type, bits_data, bits_data_end))
+    return nullptr;
   size_t bits_size = ClemensDiskUtilities::calculateNibRequiredMemory(driveType_);
-  disk.nib->bits_data = (uint8_t*)memory_.allocate(bits_size);
+  disk.nib->bits_data = (uint8_t *)memory_.allocate(bits_size);
   disk.nib->bits_data_end = disk.nib->bits_data + bits_size;
   return nibblizeImage(&disk);
 }
 
-auto ClemensDiskImporter::nibblizeImage(Clemens2IMGDisk* disk) -> DiskRecord* {
-  if (!disk->nib) return nullptr;
-  if (!clem_2img_nibblize_data(disk)) return nullptr;
+auto ClemensDiskImporter::nibblizeImage(Clemens2IMGDisk *disk) -> DiskRecord * {
+  if (!disk->nib)
+    return nullptr;
+  if (!clem_2img_nibblize_data(disk))
+    return nullptr;
 
-  DiskRecord* record = memory_.newItem<DiskRecord>();
-  if (!record) return nullptr;
+  DiskRecord *record = memory_.newItem<DiskRecord>();
+  if (!record)
+    return nullptr;
 
   if (disk->nib->disk_type == CLEM_DISK_TYPE_5_25) {
     record->disk.disk_type = CLEM_WOZ_DISK_5_25;
@@ -151,8 +150,8 @@ auto ClemensDiskImporter::nibblizeImage(Clemens2IMGDisk* disk) -> DiskRecord* {
   }
   // these images come from non-copy protected sources - which implies
   // synchronization
-  record->disk.flags = CLEM_WOZ_SUPPORT_UNKNOWN | CLEM_WOZ_IMAGE_CLEANED |
-                       CLEM_WOZ_IMAGE_SYNCHRONIZED;
+  record->disk.flags =
+      CLEM_WOZ_SUPPORT_UNKNOWN | CLEM_WOZ_IMAGE_CLEANED | CLEM_WOZ_IMAGE_SYNCHRONIZED;
   if (disk->nib->is_double_sided) {
     record->disk.flags |= CLEM_WOZ_IMAGE_DOUBLE_SIDED;
   }
@@ -168,8 +167,7 @@ auto ClemensDiskImporter::nibblizeImage(Clemens2IMGDisk* disk) -> DiskRecord* {
     }
   }
   //  block align the byte count
-  record->disk.max_track_size_bytes =
-    ((record->disk.max_track_size_bytes + 511) / 512) * 512;
+  record->disk.max_track_size_bytes = ((record->disk.max_track_size_bytes + 511) / 512) * 512;
   record->disk.version = 2;
   memset(record->disk.creator, 0x20, sizeof(record->disk.creator));
   record->disk.creator[0] = 'C';
@@ -192,15 +190,14 @@ auto ClemensDiskImporter::nibblizeImage(Clemens2IMGDisk* disk) -> DiskRecord* {
 
 bool ClemensDiskImporter::build(std::string outputDirPath) {
   unsigned scratchBufferSize = 0;
-  for (DiskRecord* record = head_; record; record = record->next) {
-    scratchBufferSize = std::max(
-      scratchBufferSize,
-      record->disk.max_track_size_bytes * record->disk.nib->track_count);
+  for (DiskRecord *record = head_; record; record = record->next) {
+    scratchBufferSize = std::max(scratchBufferSize,
+                                 record->disk.max_track_size_bytes * record->disk.nib->track_count);
   }
   scratchBufferSize += 4096;
 
-  uint8_t* writeBuffer = reinterpret_cast<uint8_t*>(memory_.allocate(scratchBufferSize));
-  for (DiskRecord* record = head_; record; record = record->next) {
+  uint8_t *writeBuffer = reinterpret_cast<uint8_t *>(memory_.allocate(scratchBufferSize));
+  for (DiskRecord *record = head_; record; record = record->next) {
     size_t writeOutCount = scratchBufferSize;
     if (!clem_woz_serialize(&record->disk, writeBuffer, &writeOutCount)) {
       return false;
@@ -211,7 +208,7 @@ bool ClemensDiskImporter::build(std::string outputDirPath) {
     if (out.fail()) {
       return false;
     }
-    out.write((char*)writeBuffer, writeOutCount);
+    out.write((char *)writeBuffer, writeOutCount);
     if (out.fail() || out.bad()) {
       return false;
     }

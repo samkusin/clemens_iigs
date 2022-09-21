@@ -1,9 +1,14 @@
 #include "clem_disk_utils.hpp"
 
+#include <array>
 #include <filesystem>
 #include <fstream>
 
 namespace ClemensDiskUtilities {
+
+static std::array<std::string_view, 4> sDriveNames = {
+  "s5d1", "s5d2", "s6d1", "s6d2"
+};
 
 struct ClemensWOZDisk* ClemensDiskUtilities::parseWOZ(
   struct ClemensWOZDisk* woz, cinek::ConstRange<uint8_t>& image) {
@@ -64,6 +69,18 @@ size_t calculateNibRequiredMemory(ClemensDriveType driveType) {
       break;
   }
   return size;
+}
+
+std::string_view getDriveName(ClemensDriveType driveType) {
+  if (driveType == kClemensDrive_Invalid) return "invalid";
+  return sDriveNames[driveType];
+}
+
+ClemensDriveType getDriveType(std::string_view driveName) {
+  auto driveIt = std::find(sDriveNames.begin(), sDriveNames.end(), driveName);
+  if (driveIt == sDriveNames.end()) return kClemensDrive_Invalid;
+  unsigned driveIndex = unsigned(driveIt - sDriveNames.begin());
+  return static_cast<ClemensDriveType>(driveIndex);
 }
 
 

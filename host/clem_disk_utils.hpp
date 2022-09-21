@@ -11,6 +11,9 @@ size_t calculateNibRequiredMemory(ClemensDriveType driveType);
 
 struct ClemensWOZDisk* parseWOZ(struct ClemensWOZDisk* woz, cinek::ConstRange<uint8_t>& image);
 
+std::string_view getDriveName(ClemensDriveType driveType);
+
+ClemensDriveType getDriveType(std::string_view driveName);
 
 } // end namespace
 
