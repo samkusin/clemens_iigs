@@ -3,6 +3,8 @@
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
 #include "clem_import_disk.hpp"
+#include "clem_mem.h"
+#include "clem_mmio_defs.h"
 
 #include "cinek/encode.h"
 #include "fmt/format.h"
@@ -11,13 +13,16 @@
 #include <charconv>
 #include <filesystem>
 
-//  TODO: implement all current commands documented in help
+
+//  TODO: IO Debug Vieww
 //  TODO: blank disk gui selection for disk set (selecting combo create will
 //        enable another input widget, unselecting will gray out that widget.)
-//  TODO: memory debug gui
 //  TODO: memory dump command (non-gui)
 //  TODO: instruction trace (improved)
 //
+
+//  DONE: implement all current commands documented in help
+//  DONE: memory debug gui
 
 template <typename TBufferType> struct FormatView {
   using BufferType = TBufferType;
@@ -60,6 +65,167 @@ private:
     return tail;
   }
 };
+
+namespace {
+
+//  TODO: move into clemens library
+struct ClemensIODescriptor {
+  char readLabel[16];
+  char writeLabel[16];
+  char readDesc[48];
+  char writeDesc[48];
+  uint8_t reg;
+};
+
+std::array<ClemensIODescriptor, 256> sDebugIODescriptors;
+
+void initDebugIODescriptors() {
+  sDebugIODescriptors[CLEM_MMIO_REG_KEYB_READ] = ClemensIODescriptor{
+    "KBD", "CLR80COL", "Last key pressed.", "Disable 80-column store.", };
+  sDebugIODescriptors[CLEM_MMIO_REG_80STOREON_WRITE] = ClemensIODescriptor{
+    "", "SET80COL", "", "Enable 80-column store.", };
+  sDebugIODescriptors[CLEM_MMIO_REG_RDMAINRAM] = ClemensIODescriptor{
+    "", "RDMAINRAM", "", "Read from main 48K RAM.", };
+  sDebugIODescriptors[CLEM_MMIO_REG_RDCARDRAM] = ClemensIODescriptor{
+    "", "RDCARDRAM", "", "Read from alt 48K RAM.", };
+  // TODO: 0x04 - 0x0f
+  sDebugIODescriptors[CLEM_MMIO_REG_ANYKEY_STROBE] = ClemensIODescriptor{
+    "KBDSTRB", "", "Turn off keypressed, b7=ANYKEY", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_LC_BANK_TEST] = ClemensIODescriptor{
+    "RDLCBNK2", "", "b7=LC Bank 2 enabled", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_ROM_RAM_TEST] = ClemensIODescriptor{
+    "RDLCRAM", "", "b7=LC RAM enabled", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_RAMRD_TEST] = ClemensIODescriptor{
+    "RDRAMRD", "", "b7=Alt 48K read enabled", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_RAMWRT_TEST] = ClemensIODescriptor{
+    "RDRAMWRT", "", "b7=Alt 48K write enabled", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_READCXROM] = ClemensIODescriptor{
+    "RDCXROM", "", "b7=Internal slot ROM enabled", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_RDALTZP_TEST] = ClemensIODescriptor{
+    "RDALTZP", "", "b7=Aux bank zero page + LC", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_READC3ROM] = ClemensIODescriptor{
+    "RDC3ROM", "", "b7=Slot C300 space enabled", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_80COLSTORE_TEST] = ClemensIODescriptor{
+    "RD80COL", "", "b7=80-column store enabled", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_VBLBAR] = ClemensIODescriptor{
+    "RDVBLBAR", "", "b7=Not in vertical blank region", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_TXT_TEST] = ClemensIODescriptor{
+    "RDTEXT", "", "b7=Text mode enabled", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_MIXED_TEST] = ClemensIODescriptor{
+    "RDMIX", "", "b7=Text+Graphics mode enabled", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_TXTPAGE2_TEST] = ClemensIODescriptor{
+    "RDPAGE2", "", "b7=Text Page 2 enabled", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_HIRES_TEST] = ClemensIODescriptor{
+    "RDHIRES", "", "b7=Hires mode on", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_ALTCHARSET_TEST] = ClemensIODescriptor{
+    "ALTCHARSET", "", "b7=Alternate chararacter set on", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_80COLUMN_TEST] = ClemensIODescriptor{
+    "RD80VID", "", "b7=80-column hardware on", "", };
+  //  NOP: 0x20
+  sDebugIODescriptors[CLEM_MMIO_REG_VGC_MONO] = ClemensIODescriptor{
+    "MONOCOLOR", "MONOCOLOR", "b7=Monochrome enabled", "b7=monochrome enabled", };
+  sDebugIODescriptors[CLEM_MMIO_REG_VGC_TEXT_COLOR] = ClemensIODescriptor{
+    "TBCOLOR", "TBCOLOR", "bits [7:4]=foreground, [3:0]=background",
+    "bits [7:4]=foreground, [3:0]=background", };
+  sDebugIODescriptors[CLEM_MMIO_REG_VGC_IRQ_BYTE] = ClemensIODescriptor{
+    "VGCINT", "", "VGC Interrupt register", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_ADB_MOUSE_DATA] = ClemensIODescriptor{
+    "MOUSEDATA", "", "ADB Mouse status", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_ADB_MODKEY] = ClemensIODescriptor{
+    "KEYMODREG", "", "ADB Modifier Key status", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_ADB_CMD_DATA] = ClemensIODescriptor{
+    "DATAREG", "DATAREG", "ADB Data In", "ADB Data Out", };
+  sDebugIODescriptors[CLEM_MMIO_REG_ADB_STATUS] = ClemensIODescriptor{
+    "KMSTATUS", "", "ADB Status", "", };
+  // NOP: 0x28
+  sDebugIODescriptors[CLEM_MMIO_REG_NEWVIDEO] = ClemensIODescriptor{
+    "NEWVIDEO", "NEWVIDEO", "IIGS video state/super-hires", "IIGS video state/super-hires", };
+  //  NOP: 0x2A
+  sDebugIODescriptors[CLEM_MMIO_REG_LANGSEL] = ClemensIODescriptor{
+    "LANGSEL", "LANGSEL", "IIGS language and NTSC/PAL", "IIGS language and NTSC/PAL", };
+  //  NOP: 0x2C
+  sDebugIODescriptors[CLEM_MMIO_REG_SLOTROMSEL] = ClemensIODescriptor{
+    "SLTROMSEL", "SLTROMSEL", "Slot int/card ROM select", "Slot int/card ROM status", };
+  sDebugIODescriptors[CLEM_MMIO_REG_VGC_VERTCNT] = ClemensIODescriptor{
+    "VERTCNT", "", "IIGS vert. video counter bits", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_VGC_HORIZCNT] = ClemensIODescriptor{
+    "HORIZCNT", "", "IIGS horiz. video counter bits", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_SPKR] = ClemensIODescriptor{
+    "SPKR", "SPKR", "Apple II speaker pulse", "Apple II speaker pulse", };
+  sDebugIODescriptors[CLEM_MMIO_REG_DISK_INTERFACE] = ClemensIODescriptor{
+    "DISKREG", "DISKREG", "Apple 3.5 disk enable", "Apple 3.5 disk enable", };
+  sDebugIODescriptors[CLEM_MMIO_REG_RTC_VGC_SCANINT] = ClemensIODescriptor{
+    "", "SCANINT", "", "Scanline + 1 sec. interrupt control", };
+  sDebugIODescriptors[CLEM_MMIO_REG_RTC_DATA] = ClemensIODescriptor{
+    "CLOCKDATA", "CLOCKDATA", "RTC GLU Data register in", "RTC GLU Data register out", };
+  sDebugIODescriptors[CLEM_MMIO_REG_RTC_CTL] = ClemensIODescriptor{
+    "CLOCKCTL", "CLOCKCTL", "RTC GLU Control register out", "RTC GLU Control register in", };
+  sDebugIODescriptors[CLEM_MMIO_REG_SHADOW] = ClemensIODescriptor{
+    "SHADOW", "SHADOW", "IIGS Shadow I/O RAM Register", "IIGS Shadow I/O RAM Register", };
+  sDebugIODescriptors[CLEM_MMIO_REG_SPEED] = ClemensIODescriptor{
+    "CYAREG", "CYAREG", "IIGS System + Disk Speed", "IIGS System + Disk Speed", };
+  //  TODO: 0x37 - 0x3B
+  sDebugIODescriptors[CLEM_MMIO_REG_AUDIO_CTL] = ClemensIODescriptor{
+    "SOUNDCTL", "SOUNDCTL", "IIGS Audio GLU Control", "IIGS Audio GLU Control", };
+  sDebugIODescriptors[CLEM_MMIO_REG_AUDIO_DATA] = ClemensIODescriptor{
+    "SOUNDDATA", "SOUNDDATA", "IIGS Audio GLU Data", "IIGS Audio GLU Data", };
+  sDebugIODescriptors[CLEM_MMIO_REG_AUDIO_ADRLO] = ClemensIODescriptor{
+    "SOUNDADRL", "SOUNDADRL", "IIGS Audio GLU Address Lo", "IIGS Audio GLU Address Lo", };
+  sDebugIODescriptors[CLEM_MMIO_REG_AUDIO_ADRHI] = ClemensIODescriptor{
+    "SOUNDADRH", "SOUNDADRH", "IIGS Audio GLU Address Hi", "IIGS Audio GLU Address Hi", };
+  //  NOP: 0x40
+  sDebugIODescriptors[CLEM_MMIO_REG_MEGA2_INTEN] = ClemensIODescriptor{
+    "SOUNDADRL", "SOUNDADRL", "IIGS Mega2 Interrupt Enable", "IIGS Mega2 Interrupt Enable", };
+  //  NOP: 0x42, 0x43
+  //  TODO: 0x44 - 0x45
+  sDebugIODescriptors[CLEM_MMIO_REG_DIAG_INTTYPE] = ClemensIODescriptor{
+    "INTFLAG", "INTFLAG", "IIGS Mega2 Interrupt Status", "IIGS Mega2 Interrupt Status", };
+  sDebugIODescriptors[CLEM_MMIO_REG_CLRVBLINT] = ClemensIODescriptor{
+    "", "CLRVBLINT", "", "IIGS Clear VBL Interrupt", };
+  //  TODO: 0x48
+  //  NOP: 0x49 - 0x4e
+  sDebugIODescriptors[CLEM_MMIO_REG_EMULATOR] = ClemensIODescriptor{
+    "EMULATOR", "", "Emulator detection byte", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_TXTCLR] = ClemensIODescriptor{
+    "TXTCLR", "TXTCLR", "Switch to graphics mode", "Switch to graphics mode", };
+  sDebugIODescriptors[CLEM_MMIO_REG_TXTSET] = ClemensIODescriptor{
+    "TXTSET", "TXTSET", "Switch to text mode", "Switch to text mode", };
+  sDebugIODescriptors[CLEM_MMIO_REG_MIXCLR] = ClemensIODescriptor{
+    "MIXCLR", "MIXCLR", "Clear mixed graphics+text", "Clear mixed graphics+text", };
+  sDebugIODescriptors[CLEM_MMIO_REG_MIXSET] = ClemensIODescriptor{
+    "MIXSET", "MIXSET", "Sets mixed graphics+text", "Sets mixed graphics+text", };
+  sDebugIODescriptors[CLEM_MMIO_REG_TXTPAGE1] = ClemensIODescriptor{
+    "MIXSET", "MIXSET", "Sets text page 1", "Sets text page 1", };
+  sDebugIODescriptors[CLEM_MMIO_REG_TXTPAGE2] = ClemensIODescriptor{
+    "MIXSET", "MIXSET", "Sets text page 2", "Sets text page 2", };
+  sDebugIODescriptors[CLEM_MMIO_REG_LORES] = ClemensIODescriptor{
+    "LORES", "LORES", "Sets lo-res graphics mode", "Sets lo-res graphics mode", };
+  sDebugIODescriptors[CLEM_MMIO_REG_HIRES] = ClemensIODescriptor{
+    "HIRES", "HIRES", "Sets hi-res graphics mode", "Sets hi-res graphics mode", };
+  //  TODO: 0x58 - 0x5F
+  sDebugIODescriptors[CLEM_MMIO_REG_BTN3] = ClemensIODescriptor{
+    "BUTN3", "", "Reads switch 3", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_BTN0] = ClemensIODescriptor{
+    "BUTN0", "", "Reads switch 0 open apple", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_BTN1] = ClemensIODescriptor{
+    "BUTN1", "", "Reads switch 1 closed apple", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_BTN2] = ClemensIODescriptor{
+    "BUTN2", "", "Reads switch 2", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_PADDL0] = ClemensIODescriptor{
+    "PADDL0", "", "Reads paddle axis port 0", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_PADDL1] = ClemensIODescriptor{
+    "PADDL1", "", "Reads paddle axis port 1", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_PADDL2] = ClemensIODescriptor{
+    "PADDL2", "", "Reads paddle axis port 2", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_PADDL3] = ClemensIODescriptor{
+    "PADDL3", "", "Reads paddle axis port 3", "", };
+  sDebugIODescriptors[CLEM_MMIO_REG_STATEREG] = ClemensIODescriptor{
+    "STATEREG", "STATEREG", "IIGS multi-purpose state register",
+    "IIGS multi-purpose state register",  };
+
+}
+
+} // namespace anon
 
 #define CLEM_TERM_COUT FormatView<decltype(ClemensFrontend::terminalLines_)>(terminalLines_)
 
@@ -104,13 +270,20 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
       diskLibraryRootPath_{
           (std::filesystem::current_path() / std::filesystem::path(CLEM_HOST_LIBRARY_DIR))
               .string()},
-      diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0) {
+      diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0) ,
+      debugIOMode_(DebugIOMode::Core) {
+
+  initDebugIODescriptors();
+
   lastCommandState_.logNode = lastCommandState_.logNodeTail = nullptr;
 
   audio_.start();
   config_.type = ClemensBackend::Config::Type::Apple2GS;
   config_.audioSamplesPerSecond = audio_.getAudioFrequency();
   createBackend();
+
+  debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;
+  debugMemoryEditor_.WriteFn = &ClemensFrontend::imguiMemoryEditorWrite;
 
   CLEM_TERM_COUT.print(TerminalLine::Info, "Welcome to the Clemens IIgs Emulator");
 }
@@ -168,6 +341,24 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
     auto audioBufferSize = int32_t(state.audio.frame_total * state.audio.frame_stride);
     frameWriteState_.audioBuffer = (uint8_t *)frameWriteMemory_.allocate(audioBufferSize);
     memcpy(frameWriteState_.audioBuffer, state.audio.data, audioBufferSize);
+
+    frameWriteState_.ioPage = (uint8_t *)frameWriteMemory_.allocate(256);
+    memcpy(frameWriteState_.ioPage, state.ioPageValues, 256);
+
+    frameWriteState_.memoryViewBank = state.debugMemoryPage;
+    if (!state.isRunning) {
+      frameWriteState_.memoryView = (uint8_t*)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
+      //  read every byte from the memory controller - which can be 'slow' enough
+      //  to effect framerate on some systems.   so we only update memory state
+      //  when the emulator isn't actively running instructions
+      uint8_t* memoryView = reinterpret_cast<uint8_t*>(frameWriteState_.memoryView);
+      for (unsigned addr = 0; addr < 0x10000; ++addr) {
+        clem_read(state.machine, &memoryView[addr], addr, state.debugMemoryPage,
+                  CLEM_MEM_FLAG_NULL);
+      }
+    } else {
+      frameWriteState_.memoryView = nullptr;
+    }
 
     const ClemensBackendDiskDriveState *driveState = state.diskDrives;
     for (auto &diskDrive : frameWriteState_.diskDrives) {
@@ -236,7 +427,9 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
     lastFrameCPUPins_ = frameReadState_.cpu.pins;
     lastFrameIRQs_ = frameReadState_.irqs;
     lastFrameNMIs_ = frameReadState_.nmis;
-
+    if (frameReadState_.ioPage) {
+      memcpy(lastFrameIORegs_, frameReadState_.ioPage, 256);
+    }
     std::swap(frameWriteMemory_, frameReadMemory_);
     std::swap(frameWriteState_, frameReadState_);
 
@@ -344,7 +537,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
 
   const int kLineSpacing = ImGui::GetTextLineHeightWithSpacing();
   const int kTerminalViewHeight = std::max(kLineSpacing * 6, int(height * 0.33f));
-  const int kMachineStateViewWidth = std::max(int(width * 0.33f), 480);
+  const int kMachineStateViewWidth = std::max(int(width * 0.40f), 480);
   const int kMonitorX = kMachineStateViewWidth;
   const int kMonitorViewWidth = width - kMonitorX;
   const int kMonitorViewHeight = height - kTerminalViewHeight;
@@ -413,6 +606,13 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
   ImGui::Separator();
   doMachineCPUInfoDisplay();
   ImGui::Separator();
+  switch (debugIOMode_) {
+    case DebugIOMode::Core:
+      doMachineDebugCoreIODisplay();
+      break;
+  }
+  ImGui::Separator();
+  doMachineDebugMemoryDisplay();
 
   ImGui::End();
 }
@@ -561,13 +761,13 @@ void ClemensFrontend::doMachineCPUInfoDisplay() {
   // Registers
   ImGui::TableSetupColumn("Registers", ImGuiTableColumnFlags_WidthStretch);
   // Signals
-  ImGui::TableSetupColumn("Pins", ImGuiTableColumnFlags_WidthStretch);
+  ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
   // I/O
-  ImGui::TableSetupColumn("I/O", ImGuiTableColumnFlags_WidthStretch);
+  ImGui::TableSetupColumn("Pins", ImGuiTableColumnFlags_WidthStretch);
   ImGui::TableHeadersRow();
   //  Registers Column
   ImGui::TableNextColumn();
-  ImGui::BeginTable("Registers", 1);
+  ImGui::BeginTable("Reg1Inner", 1);
   ImGui::TableNextColumn();
   ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(PBR), "PBR  =%02X  ",
                      frameReadState_.cpu.regs.PBR);
@@ -582,21 +782,6 @@ void ClemensFrontend::doMachineCPUInfoDisplay() {
   ImGui::TableNextColumn();
   ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(DBR), "DBR  =%02X  ",
                      frameReadState_.cpu.regs.DBR);
-  ImGui::TableNextRow();
-  ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(S), "S    =%04X", frameReadState_.cpu.regs.S);
-  ImGui::TableNextRow();
-  ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(D), "D    =%04X", frameReadState_.cpu.regs.D);
-  ImGui::TableNextRow();
-  ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(A), "A    =%04X  ", frameReadState_.cpu.regs.A);
-  ImGui::TableNextRow();
-  ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(X), "X    =%04X", frameReadState_.cpu.regs.X);
-  ImGui::TableNextRow();
-  ImGui::TableNextColumn();
-  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(Y), "Y    =%04X", frameReadState_.cpu.regs.Y);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
   ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
@@ -633,6 +818,24 @@ void ClemensFrontend::doMachineCPUInfoDisplay() {
   ImGui::EndTable();
 
   ImGui::TableNextColumn();
+  ImGui::BeginTable("Reg2Inner", 1);
+  ImGui::TableNextColumn();
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(S), "S    =%04X", frameReadState_.cpu.regs.S);
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(D), "D    =%04X", frameReadState_.cpu.regs.D);
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(A), "A    =%04X  ", frameReadState_.cpu.regs.A);
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(X), "X    =%04X", frameReadState_.cpu.regs.X);
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::TextColored(CLEM_HOST_GUI_CPU_FIELD_COLOR(Y), "Y    =%04X", frameReadState_.cpu.regs.Y);
+  ImGui::EndTable();
+
+  ImGui::TableNextColumn();
   ImGui::BeginTable("Pins", 1);
   ImGui::TableNextColumn();
   ImGui::TextColored(CLEM_HOST_GUI_CPU_PINS_COLOR(readyOut), "RDY");
@@ -650,12 +853,100 @@ void ClemensFrontend::doMachineCPUInfoDisplay() {
   ImGui::TextColored(CLEM_HOST_GUI_CPU_PINS_INV_COLOR(nmibIn), "NMI");
   ImGui::EndTable();
 
+  ImGui::EndTable();
+}
+
+void ClemensFrontend::doMachineDebugMemoryDisplay() {
+  float localContentWidth = ImGui::GetWindowContentRegionWidth();
+  if (!frameReadState_.memoryView) return;
+  uint8_t bank = frameReadState_.memoryViewBank;
+  if (ImGui::InputScalar("Bank", ImGuiDataType_U8,  &bank, NULL, NULL, "%02X", ImGuiInputTextFlags_CharsHexadecimal)) {
+    backend_->debugMemoryPage((uint8_t)(bank & 0xff));
+  }
+  debugMemoryEditor_.OptAddrDigitsCount = 4;
+  debugMemoryEditor_.Cols = 8;
+  debugMemoryEditor_.DrawContents(this, CLEM_IIGS_BANK_SIZE, (size_t)(bank) << 16);
+}
+
+ImU8 ClemensFrontend::imguiMemoryEditorRead(const ImU8* mem_ptr, size_t off) {
+  const auto* self = reinterpret_cast<const ClemensFrontend*>(mem_ptr);
+  if (!self->frameReadState_.memoryView) return 0x00;
+  return self->frameReadState_.memoryView[off & 0xffff];
+}
+
+void ClemensFrontend::imguiMemoryEditorWrite(ImU8* mem_ptr, size_t off, ImU8 value) {
+  auto* self = reinterpret_cast<ClemensFrontend*>(mem_ptr);
+  self->backend_->debugMemoryWrite((uint16_t)(off & 0xffff), value);
+}
+
+static void doMachineDebugIORegister(uint8_t* ioregsold, uint8_t* ioregs, uint8_t reg) {
+  auto& desc = sDebugIODescriptors[reg];
+  bool changed = ioregsold[reg] != ioregs[reg];
   ImGui::TableNextColumn();
-  ImGui::BeginTable("Mega2", 1);
+  ImGui::TextColored(changed ? getModifiedColor(true) : getDefaultColor(true), desc.readLabel);
+  ImGui::TableNextColumn();
+  ImGui::TextColored(changed ? getModifiedColor(true) : getDefaultColor(true),
+                    "%04X", 0xc000 + reg);
+  ImGui::TableNextColumn();
+  ImGui::TextColored(changed ? getModifiedColor(true) : getDefaultColor(true),
+                    "%02X", ioregs[reg]);
+}
+
+void ClemensFrontend::doMachineDebugCoreIODisplay() {
+  //  name  , addr, value
+  //  KBD   , c000, xx
+  auto* ioregs = frameReadState_.ioPage;
+  if (!ioregs) return;
+
+  ImGui::BeginTable("IODEBUG", 2);
+  ImGui::TableSetupColumn("Col1");
+  ImGui::TableSetupColumn("Col2");
+  ImGui::TableNextRow();
+
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("IOREGS", 3);
+  ImGui::TableSetupColumn("Symbol", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFont()->GetCharAdvance('A')*9);
+  ImGui::TableSetupColumn("Addr", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFont()->GetCharAdvance('0')*4);
+  ImGui::TableSetupColumn("Data", ImGuiTableColumnFlags_WidthFixed);
+  ImGui::TableHeadersRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_KEYB_READ);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_NEWVIDEO);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_SHADOW);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_SPEED);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_STATEREG);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_SLOTROMSEL);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_READCXROM);
+  ImGui::EndTable();
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("IOREGS", 3);
+  ImGui::TableSetupColumn("Symbol", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFont()->GetCharAdvance('A')*9);
+  ImGui::TableSetupColumn("Addr", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFont()->GetCharAdvance('0')*4);
+  ImGui::TableSetupColumn("Data", ImGuiTableColumnFlags_WidthFixed);
+  ImGui::TableHeadersRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_LC_BANK_TEST);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_ROM_RAM_TEST);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_RAMRD_TEST);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_RAMWRT_TEST);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_RDALTZP_TEST);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_80COLSTORE_TEST);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_READC3ROM);
   ImGui::EndTable();
 
   ImGui::EndTable();
 }
+
 
 void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU,
                                           float screenV) {
@@ -1153,6 +1444,13 @@ static bool parseBool(const std::string_view& token, bool& result) {
   return false;
 }
 
+static bool parseInt(const std::string_view& token, int& result) {
+  if (std::from_chars(token.data(), token.data() + token.size(), result).ec == std::errc{}) {
+    return true;
+  }
+  return false;
+}
+
 void ClemensFrontend::executeCommand(std::string_view command) {
   CLEM_TERM_COUT.format(TerminalLine::Command, "* {}", command);
   auto sep = command.find(' ');
@@ -1164,8 +1462,6 @@ void ClemensFrontend::executeCommand(std::string_view command) {
     cmdRun(operand);
   } else if (action == "break" || action == "b") {
     cmdBreak(operand);
-  } else if (action == "list" || action == "l") {
-    cmdList(operand);
   } else if (action == "reboot") {
     cmdReboot(operand);
   } else if (action == "reset") {
@@ -1196,14 +1492,52 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
                        "b]reak r:<address>          - break on data read from address");
   CLEM_TERM_COUT.print(TerminalLine::Info,
                        "b]reak w:<address>          - break on write to address");
-  CLEM_TERM_COUT.print(TerminalLine::Info, "l]ist                       - list all breakpoints");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "b]reak erase,<index>        - remove breakpoint with index");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "b]reak list                 - list all breakpoints");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "v]iew memory                - view memory browser in context area");
   CLEM_TERM_COUT.newline();
 }
 
 void ClemensFrontend::cmdBreak(std::string_view operand) {
   //  parse [r|w]<address>
+  auto sepPos = operand.find(',');
+  if (sepPos != std::string_view::npos) {
+    //  multiple parameter breakpoint expression
+    auto param = trimToken(operand, sepPos+1);
+    operand = trimToken(operand, 0, sepPos);
+    if (operand == "erase") {
+      int index = -1;
+      if (!parseInt(param, index)) {
+        CLEM_TERM_COUT.format(TerminalLine::Error, "Invalid index specified {}", param);
+        return;
+      } else if (index < 0 || index >= breakpoints_.size()) {
+        CLEM_TERM_COUT.format(TerminalLine::Error, "Breakpoint {} doesn't exist", index);
+        return;
+      }
+      backend_->removeBreakpoint(index);
+    }
+    return;
+  }
+  if (operand == "list") {
+      //  TODO: granular listing based on operand
+    static const char *bpType[] = {"unknown", "execute", "data-read", "write"};
+    if (breakpoints_.empty()) {
+      CLEM_TERM_COUT.print(TerminalLine::Info, "No breakpoints defined.");
+      return;
+    }
+    for (size_t i = 0; i < breakpoints_.size(); ++i) {
+      auto &bp = breakpoints_[i];
+      CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {:02X}/{:04X} {}", i,
+                            (bp.address >> 16) & 0xff, bp.address & 0xffff, bpType[bp.type]);
+    }
+    return;
+  }
+  //  create breakpoint
   ClemensBackendBreakpoint breakpoint{ClemensBackendBreakpoint::Undefined};
-  auto sepPos = operand.find(':');
+  sepPos = operand.find(':');
   if (sepPos != std::string_view::npos) {
     auto typeStr = operand.substr(0, sepPos);
     if (typeStr.size() == 1) {
@@ -1217,7 +1551,7 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
       CLEM_TERM_COUT.format(TerminalLine::Error, "Breakpoint type {} is invalid.", typeStr);
       return;
     }
-    operand = operand.substr(sepPos + 1);
+    operand = trimToken(operand, sepPos + 1);
     if (operand.empty()) {
       CLEM_TERM_COUT.format(TerminalLine::Error, "Breakpoint type {} is invalid.", typeStr);
       return;
@@ -1255,20 +1589,6 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
       return;
     }
     backend_->addBreakpoint(breakpoint);
-  }
-}
-
-void ClemensFrontend::cmdList(std::string_view /*operand*/) {
-  //  TODO: granular listing based on operand
-  static const char *bpType[] = {"unknown", "execute", "data-read", "write"};
-  if (breakpoints_.empty()) {
-    CLEM_TERM_COUT.print(TerminalLine::Info, "No breakpoints defined.");
-    return;
-  }
-  for (size_t i = 0; i < breakpoints_.size(); ++i) {
-    auto &bp = breakpoints_[i];
-    CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {:02X}/{:04X} {}", i,
-                          (bp.address >> 16) & 0xff, bp.address & 0xffff, bpType[bp.type]);
   }
 }
 

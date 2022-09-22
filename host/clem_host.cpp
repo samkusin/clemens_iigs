@@ -117,12 +117,10 @@ ClemensHost::ClemensHost(const cinek::ByteBuffer& systemFontLoBuffer,
   void *slabMemory = malloc(kSlabMemorySize);
   slab_ = cinek::FixedStack(kSlabMemorySize, slabMemory);
   executedInstructions_.reserve(1024);
-  memoryViewStatic_[0].HandlerContext = this;
-  memoryViewStatic_[0].ReadFn = &ClemensHost::emulatorImGuiMemoryRead;
-  memoryViewStatic_[0].WriteFn = &ClemensHost::emulatorImguiMemoryWrite;
-  memoryViewStatic_[1].HandlerContext = this;
-  memoryViewStatic_[1].ReadFn = &ClemensHost::emulatorImGuiMemoryRead;
-  memoryViewStatic_[1].WriteFn = &ClemensHost::emulatorImguiMemoryWrite;
+  memoryViewStatic_[0].editor.ReadFn = &ClemensHost::emulatorImGuiMemoryRead;
+  memoryViewStatic_[0].editor.WriteFn = &ClemensHost::emulatorImguiMemoryWrite;
+  memoryViewStatic_[1].editor.ReadFn = &ClemensHost::emulatorImGuiMemoryRead;
+  memoryViewStatic_[1].editor.WriteFn = &ClemensHost::emulatorImguiMemoryWrite;
 
   for (auto &disk : disks525_) {
     auto maxDiskDataSize = calculateMaxDiskDataSize(CLEM_DISK_TYPE_5_25);
@@ -177,31 +175,27 @@ void ClemensHost::emulatorLog(int log_level, ClemensMachine *machine,
   }
 }
 
-uint8_t ClemensHost::emulatorImGuiMemoryRead(void *ctx, const uint8_t *data,
-                                             size_t off) {
-  auto *self = reinterpret_cast<ClemensHost *>(ctx);
-  uintptr_t dataPtr = (uintptr_t)data;
-  uint8_t databank = uint8_t((dataPtr >> 16) & 0xff);
-  uint16_t offset = uint16_t(dataPtr & 0xffff);
+uint8_t ClemensHost::emulatorImGuiMemoryRead(const uint8_t *data, size_t off) {
+  auto *self = reinterpret_cast<const MemoryView *>(data);
+  uint8_t databank = self->bank;
+  uint16_t offset = uint16_t(off & 0xffff);
   uint8_t *realdata = (databank == 0xe0 || databank == 0xe1)
-                          ? (self->machine_.mega2_bank_map[databank & 0x1])
-                          : (self->machine_.fpi_bank_map[databank]);
+                          ? (self->host->machine_.mega2_bank_map[databank & 0x1])
+                          : (self->host->machine_.fpi_bank_map[databank]);
   uint8_t v;
-  clem_read(&self->machine_, &v, uint16_t((offset + off) & 0xffff), databank,
+  clem_read(&self->host->machine_, &v, uint16_t((offset + off) & 0xffff), databank,
             CLEM_MEM_FLAG_NULL);
   return v;
 }
 
-void ClemensHost::emulatorImguiMemoryWrite(void *ctx, uint8_t *data, size_t off,
-                                           uint8_t d) {
-  auto *self = reinterpret_cast<ClemensHost *>(ctx);
-  uintptr_t dataPtr = (uintptr_t)data;
-  uint8_t databank = uint8_t((dataPtr >> 16) & 0xff);
-  uint16_t offset = uint16_t(dataPtr & 0xffff);
+void ClemensHost::emulatorImguiMemoryWrite(uint8_t *data, size_t off, uint8_t d) {
+  auto *self = reinterpret_cast<MemoryView *>(data);
+  uint8_t databank = self->bank;
+  uint16_t offset = uint16_t(off & 0xffff);
   uint8_t *realdata = (databank == 0xe0 || databank == 0xe1)
-                          ? (self->machine_.mega2_bank_map[databank & 0x1])
-                          : (self->machine_.fpi_bank_map[databank]);
-  clem_write(&self->machine_, d, uint16_t((offset + off) & 0xffff), databank,
+                          ? (self->host->machine_.mega2_bank_map[databank & 0x1])
+                          : (self->host->machine_.fpi_bank_map[databank]);
+  clem_write(&self->host->machine_, d, uint16_t((offset + off) & 0xffff), databank,
              CLEM_MEM_FLAG_NULL);
 }
 
@@ -630,23 +624,21 @@ void ClemensHost::frame(int width, int height, float deltaTime) {
     ImGui::BeginChild("context_memory",
                       ImVec2(memoryViewSize.x, memoryViewSize.y / 2));
     {
-      memoryViewStatic_[0].ReadOnly = true;
+      memoryViewStatic_[0].editor.ReadOnly = true;
       if (emulationRan) {
-        memoryViewStatic_[0].GotoAddrAndHighlight(cpuPinsNext.adr,
-                                                  cpuPinsNext.adr + 1);
-        memoryViewBank_[0] = cpuPinsNext.bank;
+        memoryViewStatic_[0].bank = cpuPinsNext.bank;
+        memoryViewStatic_[0].editor.GotoAddrAndHighlight(cpuPinsNext.adr,
+                                                         cpuPinsNext.adr + 1);
       }
       ImGui::BeginTable("context_memory", 1, 0,
                         ImVec2(memoryViewSize.x, memoryViewSize.y));
       ImGui::TableNextColumn();
-      ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[0], nullptr,
+      ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewStatic_[0].bank, nullptr,
                          nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
       ImGui::TableNextRow();
       ImGui::TableNextColumn();
-      uint8_t viewBank = memoryViewBank_[0];
       if (!isRunningEmulation() || isRunningEmulationStep()) {
-        memoryViewStatic_[0].DrawContents(
-            (void *)(void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
+        memoryViewStatic_[0].editor.DrawContents(this, CLEM_IIGS_BANK_SIZE);
       }
       ImGui::EndTable();
     }
@@ -680,12 +672,10 @@ void ClemensHost::frame(int width, int height, float deltaTime) {
                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
                    ImGuiWindowFlags_NoBringToFrontOnFocus);
   if (clemens_is_initialized_simple(&machine_)) {
-    ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewBank_[1], nullptr,
+    ImGui::InputScalar("Bank", ImGuiDataType_U8, &memoryViewStatic_[1].bank, nullptr,
                        nullptr, "%02X", ImGuiInputTextFlags_CharsHexadecimal);
-    uint8_t viewBank = memoryViewBank_[1];
     if (!isRunningEmulation() || isRunningEmulationStep()) {
-      memoryViewStatic_[1].DrawContents(
-          (void *)(void *)((uintptr_t)viewBank << 16), CLEM_IIGS_BANK_SIZE);
+      memoryViewStatic_[1].editor.DrawContents(this, CLEM_IIGS_BANK_SIZE);
     }
   }
   ImGui::End();
@@ -1862,8 +1852,10 @@ bool ClemensHost::createMachine(const char *filename, MachineType machineType) {
 
   clemens_opcode_callback(&machine_, &ClemensHost::emulatorOpcodePrint);
 
-  memoryViewBank_[0] = 0x00;
-  memoryViewBank_[1] = 0x00;
+  memoryViewStatic_[0].host = this;
+  memoryViewStatic_[1].host = this;
+  memoryViewStatic_[0].bank = 0x00;
+  memoryViewStatic_[1].bank = 0x00;
 
   resetMachine();
   return success;

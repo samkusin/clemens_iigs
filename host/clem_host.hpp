@@ -114,10 +114,8 @@ private:
   static void emulatorOpcodePrint(struct ClemensInstruction *inst,
                                   const char *operand, void *this_ptr);
 
-  static uint8_t emulatorImGuiMemoryRead(void *ctx, const uint8_t *data,
-                                         size_t off);
-  static void emulatorImguiMemoryWrite(void *ctx, uint8_t *data, size_t off,
-                                       uint8_t d);
+  static uint8_t emulatorImGuiMemoryRead(const uint8_t* data, size_t off);
+  static void emulatorImguiMemoryWrite(uint8_t *data, size_t off, uint8_t d);
 
   static uint8_t *unserializeAllocate(unsigned sz, void *context);
 
@@ -187,8 +185,12 @@ private:
   std::unique_ptr<ClemensProgramTrace> programTrace_;
 
   std::vector<ClemensTraceExecutedInstruction> executedInstructions_;
-  MemoryEditor memoryViewStatic_[2];
-  uint8_t memoryViewBank_[2];
+  struct MemoryView {
+    ClemensHost* host;
+    MemoryEditor editor;
+    uint8_t bank;
+  };
+  MemoryView memoryViewStatic_[2];
 
   std::vector<char> terminalOutput_;
 

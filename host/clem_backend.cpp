@@ -2,7 +2,9 @@
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
 #include "emulator.h"
+#include "clem_mem.h"
 
+#include <charconv>
 #include <chrono>
 #include <cstdarg>
 #include <cstdlib>
@@ -77,7 +79,8 @@ void ClemensBackend::localLog(int log_level, const char* msg, Args... args) {
 ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
                                PublishStateDelegate publishDelegate) :
   config_(config),
-  slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)) {
+  slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
+  debugMemoryPage_(0x00) {
 
   initEmulatedDiskLocalStorage();
 
@@ -191,6 +194,30 @@ bool ClemensBackend::writeProtectDisk(const std::string_view& inputParam) {
   drive->disk.is_write_protected = enableParam == "1";
 
   return true;
+}
+
+void ClemensBackend::debugMemoryPage(uint8_t page) {
+  queue(Command{Command::DebugMemoryPage, std::to_string(page)});
+}
+
+void ClemensBackend::debugMemoryWrite(uint16_t addr, uint8_t value) {
+  queue(Command{Command::WriteMemory, fmt::format("{}={}", addr, value)});
+}
+
+void ClemensBackend::writeMemory(const std::string_view& inputParam) {
+  auto sepPos = inputParam.find('=');
+  if (sepPos == std::string_view::npos) {
+    return;
+  }
+  uint16_t addr;
+  if (std::from_chars(inputParam.data(), inputParam.data() + sepPos, addr).ec != std::errc{})
+    return;
+  auto valStr = inputParam.substr(sepPos+1);
+  uint8_t value;
+  if (std::from_chars(valStr.data(), valStr.data() + valStr.size(), value).ec != std::errc{})
+    return;
+
+  clem_write(&machine_, value, addr, debugMemoryPage_, CLEM_MEM_FLAG_NULL);
 }
 
 bool ClemensBackend::loadDisk(ClemensDriveType driveType) {
@@ -364,6 +391,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
   ClemensRunSampler runSampler;
 
+
   uint64_t publishSeqNo = 0;
   unsigned emulatorRefreshFrequency = 60;
   auto fixedFrameInterval =
@@ -442,6 +470,12 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         case Command::DelBreakpoint:
           if (!delBreakpoint(command.operand)) commandFailed = true;
           break;
+        case Command::DebugMemoryPage:
+          debugMemoryPage_ = (uint8_t)(std::stoul(command.operand));
+          break;
+        case Command::WriteMemory:
+          writeMemory(command.operand);
+          break;
       }
       if (commandFailed.has_value() && *commandFailed == true && !commandType.has_value()) {
         commandType = command.type;
@@ -493,10 +527,12 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         }
       } // clocksRemainingInTimeslice
 
+
       if (stepsRemaining.has_value() && *stepsRemaining == 0) {
         //  if we've finished stepping through code, we are also done with our
         //  timeslice and will wait for a new step/run request
         clocksRemainingInTimeslice = 0;
+        isRunning = false;
       }
 
       auto currentFrameTimePoint = std::chrono::high_resolution_clock::now();
@@ -562,6 +598,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         clemens_get_graphics_video(&publishedState.graphics, &machine_);
         clemens_get_audio(&publishedState.audio, &machine_);
       }
+      publishedState.isRunning = isRunning;
       publishedState.machine = &machine_;
       publishedState.seqno = publishSeqNo;
       publishedState.fps = runSampler.sampledFramesPerSecond;
@@ -579,6 +616,13 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       if (isTerminated) {
         publishedState.terminated = isTerminated;
       }
+      //  read IO memory from bank 0xe0 which ignores memory shadow settings
+      for (uint16_t ioAddr = 0xc000; ioAddr < 0xc0ff; ++ioAddr) {
+        clem_read(&machine_, &publishedState.ioPageValues[ioAddr - 0xc000],
+                  ioAddr, 0xe0, CLEM_MEM_FLAG_NULL);
+      }
+      publishedState.debugMemoryPage = debugMemoryPage_;
+
       publishDelegate(publishedState);
       if (publishedState.mmio_was_initialized) {
         clemens_audio_next_frame(&machine_, publishedState.audio.frame_count);

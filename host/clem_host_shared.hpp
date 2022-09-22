@@ -58,7 +58,9 @@ struct ClemensBackendCommand {
     Break,
     AddBreakpoint,
     DelBreakpoint,
-    WriteProtectDisk
+    WriteProtectDisk,
+    DebugMemoryPage,
+    WriteMemory
   };
   Type type = Undefined;
   std::string operand;
@@ -66,9 +68,10 @@ struct ClemensBackendCommand {
 
 
 struct ClemensBackendState {
-  const ClemensMachine* machine;
+  ClemensMachine* machine;
   double fps;
   uint64_t seqno;
+  bool isRunning;
   bool mmio_was_initialized;
   std::optional<bool> terminated;
   std::optional<bool> commandFailed;
@@ -88,6 +91,9 @@ struct ClemensBackendState {
   const ClemensBackendBreakpoint* bpBufferEnd;
   std::optional<unsigned> bpHitIndex;
   const ClemensBackendDiskDriveState* diskDrives;
+
+  uint8_t ioPageValues[256];      // 0xc000 - 0xc0ff
+  uint8_t debugMemoryPage;
 };
 
 #endif

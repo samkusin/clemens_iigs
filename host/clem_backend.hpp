@@ -61,6 +61,11 @@ public:
   void removeBreakpoint(unsigned index);
   //  Sets the write protect status on a disk in a drive
   void writeProtectDisk(ClemensDriveType driveType, bool wp);
+  //  Sets the active debug memory page that can be read from or written to by
+  //  the front end (this value is communicated on publish)
+  void debugMemoryPage(uint8_t pageIndex);
+  //  Write a single byte to machine memory at the current debugMemoryPage
+  void debugMemoryWrite(uint16_t addr, uint8_t value);
 
 private:
   using Command = ClemensBackendCommand;
@@ -73,6 +78,7 @@ private:
   bool insertDisk(const std::string_view &inputParam);
   void ejectDisk(const std::string_view &inputParam);
   bool writeProtectDisk(const std::string_view &inputParam);
+  void writeMemory(const std::string_view& inputParam);
   void inputMachine(const std::string_view &inputParam);
   bool addBreakpoint(const std::string_view &inputParam);
   bool delBreakpoint(const std::string_view &inputParam);
@@ -115,6 +121,8 @@ private:
   std::array<ClemensWOZDisk, kClemensDrive_Count> diskContainers_;
   std::array<ClemensNibbleDisk, kClemensDrive_Count> disks_;
   std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives_;
+
+  uint8_t debugMemoryPage_;
 };
 
 #endif

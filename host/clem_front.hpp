@@ -9,6 +9,7 @@
 #include "clem_display.hpp"
 #include "clem_host_shared.hpp"
 #include "imgui.h"
+#include "imgui_memory_editor.h"
 
 #include <array>
 #include <condition_variable>
@@ -60,7 +61,6 @@ private:
   void executeCommand(std::string_view command);
   void cmdHelp(std::string_view operand);
   void cmdBreak(std::string_view operand);
-  void cmdList(std::string_view operand);
   void cmdRun(std::string_view operand);
   void cmdReboot(std::string_view operand);
   void cmdReset(std::string_view operand);
@@ -91,13 +91,14 @@ private:
   // its possible to "lose" state if the emulator runs faster than the UI.
   // This is OK in most cases as the UI will only present this data per frame
   struct FrameState {
-    uint8_t *bankE0;
-    uint8_t *bankE1;
-    uint8_t *memoryView;
-    uint8_t *audioBuffer;
-    LogOutputNode *logNode;
-    ClemensBackendBreakpoint *breakpoints;
-    unsigned breakpointCount;
+    uint8_t *bankE0 = nullptr;
+    uint8_t *bankE1 = nullptr;
+    uint8_t *memoryView = nullptr;
+    uint8_t *audioBuffer = nullptr;
+    uint8_t* ioPage = nullptr;
+    LogOutputNode *logNode = nullptr;
+    ClemensBackendBreakpoint *breakpoints = nullptr;
+    unsigned breakpointCount = 0;
 
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives;
 
@@ -111,9 +112,11 @@ private:
 
     uint32_t irqs, nmis;
 
+    uint8_t memoryViewBank = 0;
+
     unsigned backendCPUID;
     float fps;
-    bool mmioWasInitialized;
+    bool mmioWasInitialized = false;
   };
 
   //  This state sticks around until processed by the UI frame - a hacky solution
@@ -136,9 +139,11 @@ private:
   FrameState frameWriteState_;
   FrameState frameReadState_;
   LastCommandState lastCommandState_;
+
   ClemensCPUPins lastFrameCPUPins_;
   ClemensCPURegs lastFrameCPURegs_;
   uint32_t lastFrameIRQs_, lastFrameNMIs_;
+  uint8_t lastFrameIORegs_[256];
   bool emulatorHasKeyboardFocus_;
 
   struct TerminalLine {
@@ -154,6 +159,25 @@ private:
   TerminalMode terminalMode_;
 
   std::vector<ClemensBackendBreakpoint> breakpoints_;
+
+  std::string diskLibraryRootPath_;
+  ClemensDiskLibrary diskLibrary_;
+
+  unsigned diskComboStateFlags_; // if opened, flag == 1 else 0
+
+private:
+  void doMachineDebugMemoryDisplay();
+  void doMachineDebugCoreIODisplay();
+
+  enum class DebugIOMode {
+    Core
+  };
+  DebugIOMode debugIOMode_;
+
+  MemoryEditor debugMemoryEditor_;
+
+  static ImU8 imguiMemoryEditorRead(const ImU8* mem_ptr, size_t off);
+  static void imguiMemoryEditorWrite(ImU8* mem_ptr, size_t off, ImU8 value);
 
 private:
   //  UI State Specific Flows
@@ -179,12 +203,6 @@ private:
   std::string importDiskSetPath_;
   std::vector<std::string> importDiskFiles_;
   std::string messageModalString_;
-
-  std::string diskLibraryRootPath_;
-
-  ClemensDiskLibrary diskLibrary_;
-
-  unsigned diskComboStateFlags_; // if opened, flag == 1 else 0
 };
 
 #endif
