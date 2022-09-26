@@ -87,6 +87,18 @@ private:
     LogOutputNode *next;
   };
 
+  struct IWMStatus {
+    int qtr_track_index;
+    unsigned track_byte_index;
+    unsigned track_bit_shift;
+    unsigned track_bit_length;
+    uint8_t buffer[4];
+    uint8_t data;
+    uint8_t latch;
+    uint8_t status;
+    uint8_t ph03;
+  };
+
   // This state comes in for any update to the emulator per frame.  As such
   // its possible to "lose" state if the emulator runs faster than the UI.
   // This is OK in most cases as the UI will only present this data per frame
@@ -107,6 +119,8 @@ private:
     ClemensVideo textFrame;
     ClemensVideo graphicsFrame;
     ClemensAudio audioFrame;
+
+    IWMStatus iwm;
 
     uint32_t vgcModeFlags;
 
@@ -142,6 +156,7 @@ private:
 
   ClemensCPUPins lastFrameCPUPins_;
   ClemensCPURegs lastFrameCPURegs_;
+  IWMStatus lastFrameIWM_;
   uint32_t lastFrameIRQs_, lastFrameNMIs_;
   uint8_t lastFrameIORegs_[256];
   bool emulatorHasKeyboardFocus_;
@@ -168,6 +183,8 @@ private:
 private:
   void doMachineDebugMemoryDisplay();
   void doMachineDebugCoreIODisplay();
+  void doMachineDebugVideoIODisplay();
+  void doMachineDebugDiskIODisplay();
 
   enum class DebugIOMode {
     Core

@@ -651,6 +651,8 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr,
     result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE) ? 0x80 : 00;
     break;
   case CLEM_MMIO_REG_VBLBAR:
+  case CLEM_MMIO_REG_VGC_VERTCNT:
+  case CLEM_MMIO_REG_VGC_HORIZCNT:
     result = clem_vgc_read_switch(&mmio->vgc, &ref_clock, ioreg, flags);
     break;
   case CLEM_MMIO_REG_TXT_TEST:

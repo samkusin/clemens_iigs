@@ -3,6 +3,7 @@
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
 #include "clem_import_disk.hpp"
+#include "clem_drive.h"
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
 
@@ -67,6 +68,15 @@ private:
 };
 
 namespace {
+
+constexpr uint8_t kIWMStatusDriveSpin = 0x01;
+constexpr uint8_t kIWMStatusDrive35   = 0x02;
+constexpr uint8_t kIWMStatusDriveAlt  = 0x04;
+constexpr uint8_t kIWMStatusDriveOn   = 0x08;
+constexpr uint8_t kIWMStatusDriveWP   = 0x10;
+constexpr uint8_t kIWMStatusDriveSel  = 0x20;
+constexpr uint8_t kIWMStatusIWMQ6     = 0x40;
+constexpr uint8_t kIWMStatusIWMQ7     = 0x80;
 
 //  TODO: move into clemens library
 struct ClemensIODescriptor {
@@ -223,6 +233,10 @@ void initDebugIODescriptors() {
     "STATEREG", "STATEREG", "IIGS multi-purpose state register",
     "IIGS multi-purpose state register",  };
 
+  for (unsigned regIndex = 0; regIndex < 256; ++regIndex) {
+    sDebugIODescriptors[regIndex].reg = regIndex;
+  }
+
 }
 
 } // namespace anon
@@ -265,9 +279,9 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
       logMemory_(kLogMemorySize, malloc(kLogMemorySize)),
       frameSeqNo_(std::numeric_limits<decltype(frameSeqNo_)>::max()),
       frameLastSeqNo_(std::numeric_limits<decltype(frameLastSeqNo_)>::max()), lastFrameCPUPins_{},
-      lastFrameCPURegs_{}, lastFrameIRQs_(0), lastFrameNMIs_(0), emulatorHasKeyboardFocus_(true),
-      terminalMode_(TerminalMode::Command), guiMode_(GUIMode::Emulator),
-      diskLibraryRootPath_{
+      lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0), lastFrameNMIs_(0),
+      emulatorHasKeyboardFocus_(true), terminalMode_(TerminalMode::Command),
+      guiMode_(GUIMode::Emulator),diskLibraryRootPath_{
           (std::filesystem::current_path() / std::filesystem::path(CLEM_HOST_LIBRARY_DIR))
               .string()},
       diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0) ,
@@ -330,6 +344,70 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
     frameWriteState_.vgcModeFlags = state.machine->mmio.vgc.mode_flags;
     frameWriteState_.irqs = state.machine->mmio.irq_line;
     frameWriteState_.nmis = state.machine->mmio.nmi_line;
+
+    const ClemensDeviceIWM& iwm = state.machine->mmio.dev_iwm;
+    const ClemensDrive* iwmDrive = nullptr;
+    frameWriteState_.iwm.status = 0;
+    if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
+      frameWriteState_.iwm.status |= kIWMStatusDriveOn;
+    }
+    if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+      frameWriteState_.iwm.status |= kIWMStatusDrive35;
+      iwmDrive = &state.machine->active_drives.slot5[0];
+    } else {
+      iwmDrive = &state.machine->active_drives.slot6[0];
+    }
+    if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_2) {
+      frameWriteState_.iwm.status |= kIWMStatusDriveAlt;
+      ++iwmDrive;
+    }
+    if (iwm.q6_switch) {
+      frameWriteState_.iwm.status |= kIWMStatusIWMQ6;
+    }
+    if (iwm.q7_switch) {
+      frameWriteState_.iwm.status |= kIWMStatusIWMQ7;
+    }
+    if (iwmDrive->is_spindle_on) {
+      frameWriteState_.iwm.status |= kIWMStatusDriveSpin;
+    }
+
+    frameWriteState_.iwm.qtr_track_index = iwmDrive->qtr_track_index;
+    frameWriteState_.iwm.track_byte_index = iwmDrive->track_byte_index;
+    frameWriteState_.iwm.track_bit_shift = iwmDrive->track_bit_shift;
+    frameWriteState_.iwm.track_bit_length = iwmDrive->track_bit_length;
+    frameWriteState_.iwm.data = iwm.data;
+    frameWriteState_.iwm.latch = iwm.latch;
+    frameWriteState_.iwm.ph03 = (uint8_t)(iwm.out_phase & 0xff);
+
+    const uint8_t* diskBits = iwmDrive->disk.bits_data;
+    unsigned diskTrackIndex = frameWriteState_.iwm.qtr_track_index;
+    constexpr auto diskBufferSize = sizeof(frameWriteState_.iwm.buffer);
+    if (iwmDrive->disk.track_initialized[diskTrackIndex]) {
+      unsigned trackByteCount = iwmDrive->disk.track_byte_count[diskTrackIndex];
+      unsigned left, right;
+      if (iwmDrive->track_byte_index > 0) {
+        left = iwmDrive->track_byte_index - 1;
+      } else {
+        left = trackByteCount - 1;
+      }
+      right = iwmDrive->track_byte_index + diskBufferSize - 1;
+      if (right >= trackByteCount) {
+        right = right - trackByteCount;
+      }
+      diskBits += iwmDrive->disk.track_byte_offset[diskTrackIndex];
+      unsigned bufferIndex = 0;
+      if (left > right) {
+        for (; left < trackByteCount; ++left, ++bufferIndex) {
+          frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];
+        }
+        left = 0;
+      }
+      for (; left <= right; ++left, ++bufferIndex) {
+        frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];
+      }
+    } else {
+      memset(frameWriteState_.iwm.buffer, 0, diskBufferSize);
+    }
 
     //  copy over memory banks as needed
     frameWriteMemory_.reset();
@@ -427,6 +505,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
     lastFrameCPUPins_ = frameReadState_.cpu.pins;
     lastFrameIRQs_ = frameReadState_.irqs;
     lastFrameNMIs_ = frameReadState_.nmis;
+    lastFrameIWM_ = frameReadState_.iwm;
     if (frameReadState_.ioPage) {
       memcpy(lastFrameIORegs_, frameReadState_.ioPage, 256);
     }
@@ -606,10 +685,21 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
   ImGui::Separator();
   doMachineCPUInfoDisplay();
   ImGui::Separator();
-  switch (debugIOMode_) {
-    case DebugIOMode::Core:
+
+  if (ImGui::BeginTabBar("IODebug")) {
+    if (ImGui::BeginTabItem("Core")) {
       doMachineDebugCoreIODisplay();
-      break;
+      ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem("Video")) {
+      doMachineDebugVideoIODisplay();
+      ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem("IWM")) {
+      doMachineDebugDiskIODisplay();
+      ImGui::EndTabItem();
+    }
+    ImGui::EndTabBar();
   }
   ImGui::Separator();
   doMachineDebugMemoryDisplay();
@@ -882,19 +972,28 @@ void ClemensFrontend::imguiMemoryEditorWrite(ImU8* mem_ptr, size_t off, ImU8 val
 static void doMachineDebugIORegister(uint8_t* ioregsold, uint8_t* ioregs, uint8_t reg) {
   auto& desc = sDebugIODescriptors[reg];
   bool changed = ioregsold[reg] != ioregs[reg];
+  bool tooltip = false;
   ImGui::TableNextColumn();
   ImGui::TextColored(changed ? getModifiedColor(true) : getDefaultColor(true), desc.readLabel);
+  tooltip = tooltip || ImGui::IsItemHovered();
   ImGui::TableNextColumn();
   ImGui::TextColored(changed ? getModifiedColor(true) : getDefaultColor(true),
                     "%04X", 0xc000 + reg);
+  tooltip = tooltip || ImGui::IsItemHovered();
   ImGui::TableNextColumn();
   ImGui::TextColored(changed ? getModifiedColor(true) : getDefaultColor(true),
                     "%02X", ioregs[reg]);
+  tooltip = tooltip || ImGui::IsItemHovered();
+  if (tooltip) {
+      ImGui::BeginTooltip();
+      ImGui::PushTextWrapPos(ImGui::GetFontSize() * 50.0f);
+      ImGui::Text("%04X - %s: %s", desc.reg + 0xc000, desc.readLabel, desc.readDesc);
+      ImGui::PopTextWrapPos();
+      ImGui::EndTooltip();
+  }
 }
 
 void ClemensFrontend::doMachineDebugCoreIODisplay() {
-  //  name  , addr, value
-  //  KBD   , c000, xx
   auto* ioregs = frameReadState_.ioPage;
   if (!ioregs) return;
 
@@ -947,6 +1046,253 @@ void ClemensFrontend::doMachineDebugCoreIODisplay() {
   ImGui::EndTable();
 }
 
+void ClemensFrontend::doMachineDebugVideoIODisplay() {
+  auto* ioregs = frameReadState_.ioPage;
+  if (!ioregs) return;
+
+  ImGui::BeginTable("IODEBUG", 2);
+  ImGui::TableSetupColumn("Col1");
+  ImGui::TableSetupColumn("Col2");
+  ImGui::TableNextRow();
+
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("IOREGS", 3);
+  ImGui::TableSetupColumn("Symbol", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFont()->GetCharAdvance('A')*9);
+  ImGui::TableSetupColumn("Addr", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFont()->GetCharAdvance('0')*4);
+  ImGui::TableSetupColumn("Data", ImGuiTableColumnFlags_WidthFixed);
+  ImGui::TableHeadersRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_NEWVIDEO);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_VGC_MONO);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_VGC_TEXT_COLOR);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_VGC_IRQ_BYTE);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_VGC_VERTCNT);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_VGC_HORIZCNT);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_80COLUMN_TEST);
+  ImGui::EndTable();
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("IOREGS", 3);
+  ImGui::TableSetupColumn("Symbol", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFont()->GetCharAdvance('A')*10);
+  ImGui::TableSetupColumn("Addr", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFont()->GetCharAdvance('0')*4);
+  ImGui::TableSetupColumn("Data", ImGuiTableColumnFlags_WidthFixed);
+  ImGui::TableHeadersRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_VBLBAR);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_ALTCHARSET_TEST);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_TXT_TEST);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_MIXED_TEST);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_TXTPAGE2_TEST);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_HIRES_TEST);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_LANGSEL);
+  ImGui::EndTable();
+
+  ImGui::EndTable();
+}
+
+#define CLEM_HOST_GUI_IWM_STATUS_CHANGED(_flag_) \
+  ((lastFrameIWM_.status & (_flag_)) != (frameReadState_.iwm.status & (_flag_)))
+
+void ClemensFrontend::doMachineDebugDiskIODisplay() {
+  auto* ioregs = frameReadState_.ioPage;
+  auto& iwmState = frameReadState_.iwm;
+
+  if (!ioregs) return;
+
+  bool driveOn = (iwmState.status & kIWMStatusDriveOn);
+  bool driveSpin = (iwmState.status & kIWMStatusDriveSpin);
+  bool drive35 = (iwmState.status & kIWMStatusDrive35);
+  ImColor fieldColor;
+
+  //  IWM (Column 1)
+  //    DiskType
+  //    Disk Drive
+  //    Q6
+  //    Q7
+  //    Read from IWM
+  //    Data register
+  //    Latch register
+  float fontCharSize = ImGui::GetFont()->GetCharAdvance('A');
+  ImGui::BeginTable("DISKDEBUG", 2);
+  ImGui::TableSetupColumn("Col1", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 15);
+  ImGui::TableSetupColumn("Col2", ImGuiTableColumnFlags_WidthStretch);
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("PARAMS", 2, ImGuiTableFlags_SizingFixedFit);
+  ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 8);
+  ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);
+  ImGui::TableHeadersRow();
+  ImGui::TableNextColumn();
+  fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDrive35) ?
+    getModifiedColor(driveOn) : getDefaultColor(driveOn);
+  ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
+  ImGui::TextUnformatted("Disk");
+  ImGui::TableNextColumn();
+  if (driveOn) {
+    if (drive35) {
+      ImGui::TextUnformatted("3.5");
+    } else {
+      ImGui::TextUnformatted("5.25");
+    }
+  } else {
+    ImGui::TextUnformatted("None");
+  }
+  ImGui::PopStyleColor();
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDriveAlt) ?
+      getModifiedColor(driveOn) : getDefaultColor(driveOn);
+  ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
+  ImGui::TextUnformatted("Drive");
+  ImGui::TableNextColumn();
+  if (driveOn) {
+    if (iwmState.status & kIWMStatusDriveAlt) {
+      ImGui::TextUnformatted("2");
+    } else {
+      ImGui::TextUnformatted("1");
+    }
+  }
+  ImGui::PopStyleColor();
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusIWMQ6) ?
+      getModifiedColor(true) : getDefaultColor(true);
+  ImGui::TextColored(fieldColor, "Q6");
+  ImGui::TableNextColumn();
+  ImGui::TextColored(fieldColor, "%d", (iwmState.status & kIWMStatusIWMQ6) ? 1 : 0);
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusIWMQ7) ?
+      getModifiedColor(true) : getDefaultColor(true);
+  ImGui::TextColored(fieldColor, "Q7");
+  ImGui::TableNextColumn();
+  ImGui::TextColored(fieldColor, "%d", (iwmState.status & kIWMStatusIWMQ7) ? 1 : 0);
+  ImGui::TableNextRow();
+  fieldColor = lastFrameIORegs_[CLEM_MMIO_REG_IWM_Q6_LO] != ioregs[CLEM_MMIO_REG_IWM_Q6_LO] ?
+    getModifiedColor(true) : getDefaultColor(true);
+  ImGui::TableNextColumn();
+  ImGui::TextColored(fieldColor, "Read");
+  ImGui::TableNextColumn();
+  ImGui::TextColored(fieldColor, "%02X", ioregs[CLEM_MMIO_REG_IWM_Q6_LO]);
+  ImGui::TableNextRow();
+  fieldColor = lastFrameIWM_.data != iwmState.data ? getModifiedColor(driveOn)
+    : getDefaultColor(driveOn);
+  ImGui::TableNextColumn();
+  ImGui::TextColored(fieldColor, "Data");
+  ImGui::TableNextColumn();
+  ImGui::TextColored(fieldColor, "%02X", iwmState.data);
+  ImGui::TableNextRow();
+  fieldColor = lastFrameIWM_.latch != iwmState.latch ? getModifiedColor(driveOn)
+    : getDefaultColor(driveOn);
+  ImGui::TableNextColumn();
+  ImGui::TextColored(fieldColor, "Latch");
+  ImGui::TableNextColumn();
+  ImGui::TextColored(fieldColor, "%02X", iwmState.latch);
+  ImGui::EndTable();
+
+  //  DRIVE (Column 2)
+  //    Motor
+  //    Phase 0-3
+  //    HeadSel
+  //    WriteProtect
+  //    TrackIndex / TrackBitCount
+  //    Buffer
+  //    HeadPos
+
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("PARAMS", 2, ImGuiTableFlags_SizingFixedFit);
+  ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 8);
+  ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 16);
+  ImGui::TableHeadersRow();
+  ImGui::TableNextColumn();
+  fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDriveSpin) ? getModifiedColor(driveOn) :
+    getDefaultColor(driveOn);
+  ImGui::TextColored(fieldColor, "Motor");
+  ImGui::TableNextColumn();
+  ImGui::TextColored(fieldColor, "%s", (iwmState.status & kIWMStatusDriveSpin) ? "on" : "off");
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  fieldColor = lastFrameIWM_.ph03 != iwmState.ph03 ? getModifiedColor(driveOn) :
+    getDefaultColor(driveOn);
+  ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
+  ImGui::TextUnformatted("Phase");
+  ImGui::TableNextColumn();
+  ImGui::Text("%u%u%u%u", (iwmState.ph03 & 1) ? 1 : 0,
+              (iwmState.ph03 & 2) ? 1 : 0, (iwmState.ph03 & 4) ? 1 : 0,
+              (iwmState.ph03 & 8) ? 1 : 0);
+  ImGui::PopStyleColor();
+  ImGui::TableNextRow();
+  fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDriveSel) ? getModifiedColor(driveOn) :
+    getDefaultColor(driveOn);
+  ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
+  ImGui::TableNextColumn();
+  ImGui::TextUnformatted("HeadSel");
+  ImGui::TableNextColumn();
+  ImGui::Text("%d", iwmState.status & kIWMStatusDriveSel ? 1 : 0);
+  ImGui::PopStyleColor();
+  ImGui::TableNextRow();
+  fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDriveWP) ? getModifiedColor(driveOn) :
+    getDefaultColor(driveOn);
+  ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
+  ImGui::TableNextColumn();
+  ImGui::TextUnformatted("Sense");
+  ImGui::TableNextColumn();
+  ImGui::Text("%d", iwmState.status & kIWMStatusDriveWP ? 1 : 0);
+  ImGui::PopStyleColor();
+  ImGui::TableNextRow();
+  fieldColor = lastFrameIWM_.qtr_track_index != iwmState.qtr_track_index ?
+    getModifiedColor(driveOn) : getDefaultColor(driveOn);
+  ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
+  ImGui::TableNextColumn();
+  ImGui::Text("Track");
+  ImGui::TableNextColumn();
+  if (driveOn) {
+    if (drive35) {
+      ImGui::Text("%02d S%d - %05d", iwmState.qtr_track_index / 2, iwmState.qtr_track_index % 2,
+                  iwmState.track_bit_length);
+    } else {
+      ImGui::Text("%02d +%d - %05d", iwmState.qtr_track_index / 4, iwmState.qtr_track_index % 4,
+                  iwmState.track_bit_length);
+    }
+  } else {
+    ImGui::Text("");
+  }
+  ImGui::PopStyleColor();
+  ImGui::TableNextRow();
+  ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
+  ImGui::TableNextColumn();
+  ImGui::TextUnformatted("Head");
+  ImGui::TableNextColumn();
+  if (driveSpin) {
+    ImGui::Text("%05d[%d]", iwmState.track_byte_index, iwmState.track_bit_shift);
+  }
+  ImGui::PopStyleColor();
+  ImGui::TableNextRow();
+  fieldColor = ((lastFrameIWM_.track_byte_index != iwmState.track_byte_index) ||
+               (lastFrameIWM_.track_bit_shift != iwmState.track_bit_shift)) ?
+    getModifiedColor(driveOn) : getDefaultColor(driveOn);
+  ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
+  ImGui::TableNextColumn();
+  ImGui::TextUnformatted("Bytes");
+  ImGui::TableNextColumn();
+  if (driveSpin) {
+    ImGui::Text("%02X [%02X] %02X %02X", iwmState.buffer[0], iwmState.buffer[1],
+                iwmState.buffer[2], iwmState.buffer[3]);
+  }
+  ImGui::PopStyleColor();
+  ImGui::EndTable();
+
+  ImGui::EndTable();
+}
 
 void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU,
                                           float screenV) {
