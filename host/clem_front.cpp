@@ -2,6 +2,7 @@
 #include "clem_backend.hpp"
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
+#include "clem_host_utils.hpp"
 #include "clem_import_disk.hpp"
 #include "clem_drive.h"
 #include "clem_mem.h"
@@ -15,7 +16,7 @@
 #include <filesystem>
 
 
-//  TODO: IO Debug Vieww
+//  TODO: Instruction step and debug out
 //  TODO: blank disk gui selection for disk set (selecting combo create will
 //        enable another input widget, unselecting will gray out that widget.)
 //  TODO: memory dump command (non-gui)
@@ -24,7 +25,7 @@
 
 //  DONE: implement all current commands documented in help
 //  DONE: memory debug gui
-
+//  DONE: IO Debug Vieww
 template <typename TBufferType> struct FormatView {
   using BufferType = TBufferType;
   using StringType = typename BufferType::ValueType;
@@ -244,7 +245,7 @@ void initDebugIODescriptors() {
 #define CLEM_TERM_COUT FormatView<decltype(ClemensFrontend::terminalLines_)>(terminalLines_)
 
 static constexpr size_t kFrameMemorySize = 8 * 1024 * 1024;
-static constexpr size_t kLogMemorySize = 256 * 1024;
+static constexpr size_t kLogMemorySize = 8 * 1024 * 1024;
 
 static std::string getCommandTypeName(ClemensBackendCommand::Type type) {
   switch (type) {
@@ -287,9 +288,9 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
       diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0) ,
       debugIOMode_(DebugIOMode::Core) {
 
-  initDebugIODescriptors();
+  ClemensTraceExecutedInstruction::initialize();
 
-  lastCommandState_.logNode = lastCommandState_.logNodeTail = nullptr;
+  initDebugIODescriptors();
 
   audio_.start();
   config_.type = ClemensBackend::Config::Type::Apple2GS;
@@ -484,6 +485,24 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
       }
       lastCommandState_.logNodeTail = logMemory;
     }
+
+    if (state.logInstructionStart != state.logInstructionEnd) {
+      size_t instructionCount = state.logInstructionEnd - state.logInstructionStart;
+      LogInstructionNode* logInstMemory = reinterpret_cast<LogInstructionNode*>(
+          logMemory_.allocate(sizeof(LogInstructionNode)));
+      logInstMemory->begin =
+        logMemory_.allocateArray<ClemensBackendExecutedInstruction>(instructionCount);
+      logInstMemory->end = logInstMemory->begin + instructionCount;
+      logInstMemory->next = nullptr;
+      memcpy(logInstMemory->begin, state.logInstructionStart,
+             instructionCount * sizeof(ClemensBackendExecutedInstruction));
+      if (!lastCommandState_.logInstructionNode) {
+        lastCommandState_.logInstructionNode = logInstMemory;
+      } else {
+        lastCommandState_.logInstructionNodeTail->next = logInstMemory;
+      }
+      lastCommandState_.logInstructionNodeTail = logInstMemory;
+    }
   }
   framePublished_.notify_one();
 }
@@ -511,7 +530,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
     }
     std::swap(frameWriteMemory_, frameReadMemory_);
     std::swap(frameWriteState_, frameReadState_);
-
+    //  display log lines
     LogOutputNode *logNode = lastCommandState_.logNode;
     while (logNode) {
       if (consoleLines_.isFull()) {
@@ -541,6 +560,21 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
       logNode = logNode->next;
     }
     lastCommandState_.logNode = lastCommandState_.logNodeTail = nullptr;
+    //  display last few log instructions
+    LogInstructionNode* logInstructionNode = lastCommandState_.logInstructionNode;
+    while (logInstructionNode) {
+      ClemensBackendExecutedInstruction* execInstruction = logInstructionNode->begin;
+      ClemensTraceExecutedInstruction instruction;
+      while (execInstruction != logInstructionNode->end) {
+        instruction.fromInstruction(execInstruction->data, execInstruction->operand);
+        CLEM_TERM_COUT.format(TerminalLine::Opcode, "({}) {:02X}/{:04X} {} {}",
+            instruction.cycles_spent, instruction.pc >> 16, instruction.pc & 0xffff,
+            instruction.opcode, instruction.operand);
+        ++execInstruction;
+      }
+      logInstructionNode = logInstructionNode->next;
+    }
+    lastCommandState_.logInstructionNode = lastCommandState_.logInstructionNodeTail = nullptr;
     logMemory_.reset();
 
     breakpoints_.clear();
@@ -1409,6 +1443,9 @@ void ClemensFrontend::layoutTerminalLines() {
     case TerminalLine::Command:
       ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(0, 255, 255, 255));
       break;
+    case TerminalLine::Opcode:
+      ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(0, 255, 0, 255));
+      break;
     }
     ImGui::TextUnformatted(terminalLines_.at(index).text.c_str());
     if (line.type != TerminalLine::Info) {
@@ -1814,6 +1851,8 @@ void ClemensFrontend::executeCommand(std::string_view command) {
     cmdReset(operand);
   } else if (action == "disk") {
     cmdDisk(operand);
+  } else if (action == "step" || action == "s") {
+    cmdStep(operand);
   } else if (!action.empty()) {
     CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
   }
@@ -1830,6 +1869,10 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
   CLEM_TERM_COUT.print(TerminalLine::Info, "disk <drive>,eject          - eject disk");
   CLEM_TERM_COUT.print(TerminalLine::Info,
                        "r]un                        - execute emulator until break");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "s]tep                       - steps one instruction");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "s]tep <count>               - step 'count' instructions");
   CLEM_TERM_COUT.print(TerminalLine::Info,
                        "b]reak                      - break execution at current PC");
   CLEM_TERM_COUT.print(TerminalLine::Info,
@@ -1939,6 +1982,19 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
 }
 
 void ClemensFrontend::cmdRun(std::string_view /*operand*/) { backend_->run(); }
+
+void ClemensFrontend::cmdStep(std::string_view operand) {
+  unsigned count = 1;
+  if (!operand.empty()) {
+    if (std::from_chars(operand.data(), operand.data() + operand.size(),
+                        count).ec != std::errc{}) {
+    CLEM_TERM_COUT.format(TerminalLine::Error, "Couldn't parse a number from '{}' for step",
+                          operand);
+      return;
+    }
+  }
+  backend_->step(count);
+}
 
 void ClemensFrontend::cmdReboot(std::string_view /*operand*/) {
   guiMode_ = GUIMode::RebootEmulator;

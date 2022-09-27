@@ -80,7 +80,10 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
                                PublishStateDelegate publishDelegate) :
   config_(config),
   slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
-  debugMemoryPage_(0x00) {
+  debugMemoryPage_(0x00),
+  areInstructionsLogged_(false) {
+
+  loggedInstructions_.reserve(10000);
 
   initEmulatedDiskLocalStorage();
 
@@ -137,6 +140,19 @@ void ClemensBackend::setRefreshFrequency(unsigned hz) {
 
 void ClemensBackend::run() {
   queue(Command{Command::RunMachine});
+}
+
+void ClemensBackend::step(unsigned count) {
+  queue(Command{Command::StepMachine, fmt::format("{}", count)});
+}
+
+unsigned ClemensBackend::stepMachine(const std::string_view &inputParam) {
+  unsigned count;
+  if (std::from_chars(inputParam.data(), inputParam.data() + inputParam.size(),
+                      count).ec != std::errc{}) {
+    return 0;
+  }
+  return count;
 }
 
 void ClemensBackend::publish() {
@@ -446,6 +462,11 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           isRunning = true;
           runSampler.reset();
           break;
+        case Command::StepMachine:
+          *stepsRemaining = stepMachine(command.operand);
+          isRunning = true;
+          runSampler.reset();
+          break;
         case Command::Publish:
           publishState = true;
           break;
@@ -502,6 +523,8 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       //  If neither mode is applicable, the emulator holds and this loop will
       //  wait for commands from the frontend
       //
+      areInstructionsLogged_ = stepsRemaining.has_value() && (*stepsRemaining > 0);
+
       int64_t clocksPerTimeslice =
         calculateClocksPerTimeslice(&machine_, emulatorRefreshFrequency);
       clocksRemainingInTimeslice += clocksPerTimeslice;
@@ -533,6 +556,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         //  timeslice and will wait for a new step/run request
         clocksRemainingInTimeslice = 0;
         isRunning = false;
+        areInstructionsLogged_ = false;
       }
 
       auto currentFrameTimePoint = std::chrono::high_resolution_clock::now();
@@ -605,6 +629,8 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       publishedState.hostCPUID = clem_host_get_processor_number();
       publishedState.logBufferStart = logOutput_.data();
       publishedState.logBufferEnd = logOutput_.data() + logOutput_.size();
+      publishedState.logInstructionStart = loggedInstructions_.data();
+      publishedState.logInstructionEnd = loggedInstructions_.data() + loggedInstructions_.size();
       publishedState.bpBufferStart = breakpoints_.data();
       publishedState.bpBufferEnd = breakpoints_.data() + breakpoints_.size();
       if (hitBreakpoint.has_value()) {
@@ -628,6 +654,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         clemens_audio_next_frame(&machine_, publishedState.audio.frame_count);
       }
       logOutput_.clear();
+      loggedInstructions_.clear();
     }
   } // !isTerminated
 }
@@ -770,4 +797,9 @@ void ClemensBackend::emulatorLog(int log_level, ClemensMachine *machine,
 void ClemensBackend::emulatorOpcodeCallback(struct ClemensInstruction *inst,
                                             const char *operand, void *this_ptr) {
   auto *host = reinterpret_cast<ClemensBackend *>(this_ptr);
+  if (!host->areInstructionsLogged_) return;
+  host->loggedInstructions_.emplace_back();
+  auto& loggedInst = host->loggedInstructions_.back();
+  loggedInst.data = *inst;
+  strncpy(loggedInst.operand, operand, sizeof(loggedInst.operand));
 }

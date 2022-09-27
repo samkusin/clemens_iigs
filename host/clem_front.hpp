@@ -65,6 +65,7 @@ private:
   void cmdReboot(std::string_view operand);
   void cmdReset(std::string_view operand);
   void cmdDisk(std::string_view operand);
+  void cmdStep(std::string_view operand);
 
 private:
   ClemensDisplayProvider displayProvider_;
@@ -85,6 +86,12 @@ private:
     int logLevel;
     unsigned sz; // size of log text following this struct in memory
     LogOutputNode *next;
+  };
+
+  struct LogInstructionNode {
+    ClemensBackendExecutedInstruction* begin;
+    ClemensBackendExecutedInstruction* end;
+    LogInstructionNode* next;
   };
 
   struct IWMStatus {
@@ -141,8 +148,10 @@ private:
     std::optional<bool> commandFailed;
     std::optional<ClemensBackendCommand::Type> commandType;
     std::optional<unsigned> hitBreakpoint;
-    LogOutputNode *logNode;
-    LogOutputNode *logNodeTail;
+    LogOutputNode *logNode = nullptr;
+    LogOutputNode *logNodeTail = nullptr;
+    LogInstructionNode* logInstructionNode = nullptr;
+    LogInstructionNode* logInstructionNodeTail = nullptr;
   };
 
   ClemensBackendConfig config_;
@@ -162,7 +171,7 @@ private:
   bool emulatorHasKeyboardFocus_;
 
   struct TerminalLine {
-    enum Type { Debug, Info, Warn, Error, Command };
+    enum Type { Debug, Info, Warn, Error, Command, Opcode };
     std::string text;
     Type type;
   };

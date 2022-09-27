@@ -15,6 +15,11 @@ struct ClemensBackendOutputText {
   std::string text;
 };
 
+struct ClemensBackendExecutedInstruction {
+  ClemensInstruction data;
+  char operand[32];
+};
+
 struct ClemensBackendBreakpoint {
   enum Type {
     Undefined,
@@ -51,6 +56,7 @@ struct ClemensBackendCommand {
     SetHostUpdateFrequency,
     ResetMachine,
     RunMachine,
+    StepMachine,
     Publish,
     InsertDisk,
     EjectDisk,
@@ -91,6 +97,8 @@ struct ClemensBackendState {
   const ClemensBackendBreakpoint* bpBufferEnd;
   std::optional<unsigned> bpHitIndex;
   const ClemensBackendDiskDriveState* diskDrives;
+  const ClemensBackendExecutedInstruction* logInstructionStart;
+  const ClemensBackendExecutedInstruction* logInstructionEnd;
 
   uint8_t ioPageValues[256];      // 0xc000 - 0xc0ff
   uint8_t debugMemoryPage;

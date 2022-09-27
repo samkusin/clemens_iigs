@@ -45,6 +45,8 @@ public:
   void setRefreshFrequency(unsigned hz);
   //  Clears step mode and enter run mode
   void run();
+  //  Steps the emulator
+  void step(unsigned count);
   //  Will issue the publish delegate on the next machine iteration
   void publish();
   //  Send host input to the emulator
@@ -75,6 +77,7 @@ private:
 
   void main(PublishStateDelegate publishDelegate);
   void resetMachine();
+  unsigned stepMachine(const std::string_view &inputParam);
   bool insertDisk(const std::string_view &inputParam);
   void ejectDisk(const std::string_view &inputParam);
   bool writeProtectDisk(const std::string_view &inputParam);
@@ -118,11 +121,13 @@ private:
 
   std::vector<ClemensBackendOutputText> logOutput_;
   std::vector<ClemensBackendBreakpoint> breakpoints_;
+  std::vector<ClemensBackendExecutedInstruction> loggedInstructions_;
   std::array<ClemensWOZDisk, kClemensDrive_Count> diskContainers_;
   std::array<ClemensNibbleDisk, kClemensDrive_Count> disks_;
   std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives_;
 
   uint8_t debugMemoryPage_;
+  bool areInstructionsLogged_;
 };
 
 #endif
