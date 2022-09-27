@@ -80,6 +80,7 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
                                PublishStateDelegate publishDelegate) :
   config_(config),
   slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
+  logLevel_(CLEM_DEBUG_LOG_INFO),
   debugMemoryPage_(0x00),
   areInstructionsLogged_(false) {
 
@@ -234,6 +235,14 @@ void ClemensBackend::writeMemory(const std::string_view& inputParam) {
     return;
 
   clem_write(&machine_, value, addr, debugMemoryPage_, CLEM_MEM_FLAG_NULL);
+}
+
+void ClemensBackend::debugLogLevel(int logLevel) {
+  queue(Command{Command::DebugLogLevel, fmt::format("{}", logLevel)});
+}
+
+void ClemensBackend::debugMessage(std::string msg) {
+  queue(Command{Command::DebugMessage, std::move(msg)});
 }
 
 bool ClemensBackend::loadDisk(ClemensDriveType driveType) {
@@ -419,6 +428,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     bool updateSeqNo = false;
     std::optional<bool> commandFailed;
     std::optional<Command::Type> commandType;
+    std::optional<std::string> debugMessage;
 
     std::unique_lock<std::mutex> queuelock(commandQueueMutex_);
     if (!isRunning) {
@@ -496,6 +506,12 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           break;
         case Command::WriteMemory:
           writeMemory(command.operand);
+          break;
+        case Command::DebugLogLevel:
+          logLevel_ = (int)(std::stol(command.operand));
+          break;
+        case Command::DebugMessage:
+          debugMessage = std::move(command.operand);
           break;
       }
       if (commandFailed.has_value() && *commandFailed == true && !commandType.has_value()) {
@@ -627,6 +643,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       publishedState.seqno = publishSeqNo;
       publishedState.fps = runSampler.sampledFramesPerSecond;
       publishedState.hostCPUID = clem_host_get_processor_number();
+      publishedState.logLevel = logLevel_;
       publishedState.logBufferStart = logOutput_.data();
       publishedState.logBufferEnd = logOutput_.data() + logOutput_.size();
       publishedState.logInstructionStart = loggedInstructions_.data();
@@ -639,6 +656,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       publishedState.diskDrives = diskDrives_.data();
       publishedState.commandFailed = std::move(commandFailed);
       publishedState.commandType = std::move(commandType);
+      publishedState.message = std::move(debugMessage);
       if (isTerminated) {
         publishedState.terminated = isTerminated;
       }
@@ -787,7 +805,9 @@ void ClemensBackend::loadBRAM() {
 void ClemensBackend::emulatorLog(int log_level, ClemensMachine *machine,
                                  const char *msg) {
   auto *host = reinterpret_cast<ClemensBackend *>(machine->debug_user_ptr);
+  if (host->logLevel_ > log_level) return;
   if (host->logOutput_.size() >= kLogOutputLineLimit) return;
+
 
   host->logOutput_.emplace_back(ClemensBackendOutputText{log_level, msg});
 }

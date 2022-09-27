@@ -470,6 +470,7 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
       lastCommandState_.terminated = state.terminated;
     }
 
+    frameWriteState_.logLevel = state.logLevel;
     for (auto *logItem = state.logBufferStart; logItem != state.logBufferEnd; ++logItem) {
       LogOutputNode *logMemory = reinterpret_cast<LogOutputNode *>(
           logMemory_.allocate(sizeof(LogOutputNode) + CK_ALIGN_SIZE_TO_ARCH(logItem->text.size())));
@@ -502,6 +503,10 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
         lastCommandState_.logInstructionNodeTail->next = logInstMemory;
       }
       lastCommandState_.logInstructionNodeTail = logInstMemory;
+    }
+
+    if (state.message.has_value()) {
+      printf("debug message: %s\n", (*state.message).c_str());
     }
   }
   framePublished_.notify_one();
@@ -1853,6 +1858,10 @@ void ClemensFrontend::executeCommand(std::string_view command) {
     cmdDisk(operand);
   } else if (action == "step" || action == "s") {
     cmdStep(operand);
+  } else if (action == "log") {
+    cmdLog(operand);
+  } else if (action == "dump") {
+    cmdDump(operand);
   } else if (!action.empty()) {
     CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
   }
@@ -1886,7 +1895,13 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
   CLEM_TERM_COUT.print(TerminalLine::Info,
                        "b]reak list                 - list all breakpoints");
   CLEM_TERM_COUT.print(TerminalLine::Info,
-                       "v]iew memory                - view memory browser in context area");
+                       "v]iew {memory|doc}          - view browser in context area");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "log {DEBUG|INFO|WARN|UNIMPL}- set the emulator log level");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "dump <bank_begin>,          - dump memory from selected banks\n"
+                       "     <bank_end>,              to a file with the specified\n"
+                       "     <filename>, {bin|hex}    output format");
   CLEM_TERM_COUT.newline();
 }
 
@@ -2066,4 +2081,72 @@ void ClemensFrontend::cmdDisk(std::string_view operand) {
     CLEM_TERM_COUT.format(TerminalLine::Error, "Invalid or unsupported operation {}.", diskOpExpr);
     return;
   }
+}
+
+void ClemensFrontend::cmdLog(std::string_view operand) {
+  static std::array<const char*, 5> logLevelNames = {
+    "DEBUG", "INFO", "WARN", "UNIMPL", "FATAL"
+  };
+  if (operand.empty()) {
+    CLEM_TERM_COUT.format(TerminalLine::Info, "Log level set to {}.",
+                          logLevelNames[frameReadState_.logLevel]);
+    return;
+  }
+  auto levelName = std::find_if(
+    logLevelNames.begin(), logLevelNames.end(), [&operand](const char* name) {
+      return operand == name;
+    });
+  if (levelName == logLevelNames.end()) {
+    CLEM_TERM_COUT.format(TerminalLine::Error,
+      "Log level '{}' is not one of the following: DEBUG, INFO, WARN, UNIMPL or FATAL",
+      operand);
+    return;
+  }
+  backend_->debugLogLevel(int(levelName - logLevelNames.begin()));
+}
+
+void ClemensFrontend::cmdDump(std::string_view operand) {
+  //  parse out parameters <start>, <end>, <filename>, <format>
+  //  if format is absent, dumps to binary
+  std::array<std::string_view, 4> params;
+  size_t paramIdx = 0;
+  while (!operand.empty() && paramIdx < params.size()) {
+    auto sepPos = operand.find(',');
+    params[paramIdx++] = trimToken(operand.substr(0, sepPos));
+    if (sepPos == std::string_view::npos) break;
+    operand = operand.substr(sepPos + 1);
+  }
+  if (paramIdx < 3) {
+    CLEM_TERM_COUT.print(TerminalLine::Error,
+                         "Command requires <start_bank>, <end_bank>, <filename>");
+    return;
+  }
+  uint8_t bankl, bankr;
+  if (std::from_chars(params[0].data(), params[0].data() + params[0].size(), bankl, 16).ec
+        != std::errc{}) {
+    CLEM_TERM_COUT.format(TerminalLine::Error,
+                          "Command start bank '{}' is invalid", params[0]);
+    return;
+  }
+  if (std::from_chars(params[1].data(), params[1].data() + params[1].size(), bankr, 16).ec
+        != std::errc{} || bankl > bankr) {
+    CLEM_TERM_COUT.format(TerminalLine::Error,
+                          "Command end bank '{}' is invalid", params[1]);
+    return;
+  }
+  if (paramIdx == 3) {
+    params[3] = "bin";
+  }
+  if (paramIdx == 4 && params[3] != "hex" && params[3] != "bin") {
+    CLEM_TERM_COUT.print(TerminalLine::Error,
+                         "Command format type must be 'hex' or 'bin'");
+    return;
+  }
+  std::string message;
+  for (auto& param: params) {
+    message += param;
+    message += ",";
+  }
+  message.pop_back();
+  backend_->debugMessage(std::move(message));
 }

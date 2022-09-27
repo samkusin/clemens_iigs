@@ -66,6 +66,8 @@ private:
   void cmdReset(std::string_view operand);
   void cmdDisk(std::string_view operand);
   void cmdStep(std::string_view operand);
+  void cmdLog(std::string_view operand);
+  void cmdDump(std::string_view operand);
 
 private:
   ClemensDisplayProvider displayProvider_;
@@ -118,6 +120,7 @@ private:
     LogOutputNode *logNode = nullptr;
     ClemensBackendBreakpoint *breakpoints = nullptr;
     unsigned breakpointCount = 0;
+    int logLevel;
 
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives;
 

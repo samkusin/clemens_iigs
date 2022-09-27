@@ -68,6 +68,10 @@ public:
   void debugMemoryPage(uint8_t pageIndex);
   //  Write a single byte to machine memory at the current debugMemoryPage
   void debugMemoryWrite(uint16_t addr, uint8_t value);
+  //  Set logging level
+  void debugLogLevel(int logLevel);
+  //  Send a message to the publish delegate from the frontend
+  void debugMessage(std::string msg);
 
 private:
   using Command = ClemensBackendCommand;
@@ -126,6 +130,7 @@ private:
   std::array<ClemensNibbleDisk, kClemensDrive_Count> disks_;
   std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives_;
 
+  int logLevel_;
   uint8_t debugMemoryPage_;
   bool areInstructionsLogged_;
 };

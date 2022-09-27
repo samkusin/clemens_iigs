@@ -66,7 +66,9 @@ struct ClemensBackendCommand {
     DelBreakpoint,
     WriteProtectDisk,
     DebugMemoryPage,
-    WriteMemory
+    WriteMemory,
+    DebugLogLevel,
+    DebugMessage
   };
   Type type = Undefined;
   std::string operand;
@@ -83,6 +85,8 @@ struct ClemensBackendState {
   std::optional<bool> commandFailed;
   // valid if commandFailed
   std::optional<ClemensBackendCommand::Type> commandType;
+  // valid if a debugMessage() command was issued from the frontend
+  std::optional<std::string> message;
 
   ClemensMonitor monitor;
   ClemensVideo text;
@@ -90,6 +94,7 @@ struct ClemensBackendState {
   ClemensAudio audio;
 
   unsigned hostCPUID;
+  int logLevel;
 
   const ClemensBackendOutputText* logBufferStart;
   const ClemensBackendOutputText* logBufferEnd;
