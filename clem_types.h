@@ -618,6 +618,7 @@ typedef struct {
   int scanline_byte_cnt;
   int scanline_start;
   int scanline_count;
+  int scanline_limit;
   enum ClemensVideoFormat format;
   uint32_t rgba[256]; /**< Superhires palette data (16 x 16) rgba */
 } ClemensVideo;

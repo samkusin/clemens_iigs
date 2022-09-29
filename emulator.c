@@ -1256,15 +1256,15 @@ ClemensVideo *clemens_get_text_video(ClemensVideo *video,
                                      ClemensMachine *clem) {
   struct ClemensVGC *vgc = &clem->mmio.vgc;
   if (!(vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE)) {
-    video->scanline_count = 24;
     video->scanline_start = 0;
   } else if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
-    video->scanline_count = 4;
     video->scanline_start = 20;
   } else {
     video->format = kClemensVideoFormat_None;
     return NULL;
   }
+  video->scanline_count = CLEM_VGC_TEXT_SCANLINE_COUNT - video->scanline_start;
+  video->scanline_limit = CLEM_VGC_TEXT_SCANLINE_COUNT;
   video->format = kClemensVideoFormat_Text;
   video->scanline_byte_cnt = 40;
   if ((clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
@@ -1305,8 +1305,9 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video,
                     !(clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE);
   if (vgc->mode_flags & CLEM_VGC_SUPER_HIRES) {
     video->format = kClemensVideoFormat_Super_Hires;
-    video->scanline_count = 200;
+    video->scanline_count = CLEM_VGC_SHGR_SCANLINE_COUNT;
     video->scanline_byte_cnt = 160;
+    video->scanline_limit = CLEM_VGC_SHGR_SCANLINE_COUNT;
     video->scanlines = vgc->shgr_scanlines;
     _clem_build_rgba_palettes(video, clem->mega2_bank_map[1]);
     return video;
@@ -1320,10 +1321,11 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video,
         video->format = kClemensVideoFormat_Hires;
       }
       if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
-        video->scanline_count = 160;
+        video->scanline_count = CLEM_VGC_HGR_SCANLINE_COUNT - 32;
       } else {
-        video->scanline_count = 192;
+        video->scanline_count = CLEM_VGC_HGR_SCANLINE_COUNT;
       }
+      video->scanline_limit = CLEM_VGC_HGR_SCANLINE_COUNT;
     } else {
       if (vgc->mode_flags & CLEM_VGC_DBLHIRES_MASK) {
         video->format = kClemensVideoFormat_Double_Lores;
@@ -1331,10 +1333,11 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video,
         video->format = kClemensVideoFormat_Lores;
       }
       if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
-        video->scanline_count = 20;
+        video->scanline_count = CLEM_VGC_TEXT_SCANLINE_COUNT - 4;
       } else {
-        video->scanline_count = 24;
+        video->scanline_count = CLEM_VGC_TEXT_SCANLINE_COUNT;
       }
+      video->scanline_limit = CLEM_VGC_TEXT_SCANLINE_COUNT;
     }
     video->scanline_byte_cnt = 40;
   } else {

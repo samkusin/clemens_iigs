@@ -36,7 +36,7 @@ public:
 private:
   template <typename TBufferType> friend struct FormatView;
 
-  void createBackend();
+  std::unique_ptr<ClemensBackend> createBackend();
 
   //  the backend state delegate is run on a separate thread and notifies
   //  when a frame has been published

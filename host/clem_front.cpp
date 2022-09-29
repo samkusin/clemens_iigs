@@ -16,16 +16,22 @@
 #include <filesystem>
 #include <tuple>
 
-//  TODO: Instruction step and debug out
 //  TODO: blank disk gui selection for disk set (selecting combo create will
 //        enable another input widget, unselecting will gray out that widget.)
-//  TODO: memory dump command (non-gui)
 //  TODO: instruction trace (improved)
-//
+//  TODO: Fix reboot so that publish() copies *everything*
+//  TODO: Fix sound clipping/starvation
+//  TODO: Fix 80 column mode and card vs internal slot 3 ram mapping
+//  TODO: Insert card to slot (non-gui)
+//  TODO: Save/Load snapshot
 
 //  DONE: implement all current commands documented in help
 //  DONE: memory debug gui
-//  DONE: IO Debug Vieww
+//  DONE: IO Debug View
+//  DONE: Instruction step and debug out
+//  DONE: memory dump command (non-gui)
+
+
 template <typename TBufferType> struct FormatView {
   using BufferType = TBufferType;
   using StringType = typename BufferType::ValueType;
@@ -295,7 +301,7 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
   audio_.start();
   config_.type = ClemensBackend::Config::Type::Apple2GS;
   config_.audioSamplesPerSecond = audio_.getAudioFrequency();
-  createBackend();
+  backend_ = createBackend();
 
   debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;
   debugMemoryEditor_.WriteFn = &ClemensFrontend::imguiMemoryEditorWrite;
@@ -316,14 +322,17 @@ void ClemensFrontend::input(const ClemensInputEvent &input) {
   }
 }
 
-void ClemensFrontend::createBackend() {
-  backend_ = std::make_unique<ClemensBackend>(
+std::unique_ptr<ClemensBackend> ClemensFrontend::createBackend() {
+  constexpr unsigned refreshFrequency_ = 60;
+  auto backend = std::make_unique<ClemensBackend>(
       "gs_rom_3.rom", config_,
       std::bind(&ClemensFrontend::backendStateDelegate, this, std::placeholders::_1));
-  backend_->setRefreshFrequency(60);
-  backend_->reset();
-  backend_->run();
+  backend->setRefreshFrequency(refreshFrequency_);
+  backend->reset();
+  backend->run();
   guiMode_ = GUIMode::Emulator;
+  printf("Creating new backend emulator refreshing @ %u Hz.\n", refreshFrequency_);
+  return backend;
 }
 
 void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
@@ -331,11 +340,28 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
     std::lock_guard<std::mutex> frameLock(frameMutex_);
 
     frameSeqNo_ = state.seqno;
+    frameWriteMemory_.reset();
 
     frameWriteState_.cpu = state.machine->cpu;
     frameWriteState_.monitorFrame = state.monitor;
+
+    //  copy scanlines as this data may become invalid on a frame-to-frame
+    //  basis
     frameWriteState_.textFrame = state.text;
+    if (frameWriteState_.textFrame.format != kClemensVideoFormat_None) {
+      frameWriteState_.textFrame.scanlines = frameWriteMemory_.allocateArray<ClemensScanline>(
+        state.text.scanline_limit);
+      memcpy(frameWriteState_.textFrame.scanlines, state.text.scanlines,
+             sizeof(ClemensScanline) * state.text.scanline_limit);
+    }
     frameWriteState_.graphicsFrame = state.graphics;
+    if (frameWriteState_.graphicsFrame.format != kClemensVideoFormat_None) {
+      frameWriteState_.graphicsFrame.scanlines = frameWriteMemory_.allocateArray<ClemensScanline>(
+        state.graphics.scanline_limit);
+      memcpy(frameWriteState_.graphicsFrame.scanlines, state.graphics.scanlines,
+             sizeof(ClemensScanline) * state.graphics.scanline_limit);
+
+    }
     frameWriteState_.audioFrame = state.audio;
     frameWriteState_.backendCPUID = state.hostCPUID;
     frameWriteState_.fps = state.fps;
@@ -411,7 +437,6 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
     }
 
     //  copy over memory banks as needed
-    frameWriteMemory_.reset();
     frameWriteState_.bankE0 = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
     memcpy(frameWriteState_.bankE0, state.machine->mega2_bank_map[0], CLEM_IIGS_BANK_SIZE);
     frameWriteState_.bankE1 = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
@@ -442,9 +467,6 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
     const ClemensBackendDiskDriveState *driveState = state.diskDrives;
     for (auto &diskDrive : frameWriteState_.diskDrives) {
       diskDrive = *driveState;
-      if (state.terminated.has_value() && *state.terminated) {
-        config_.diskDriveStates[size_t(driveState - state.diskDrives)] = *driveState;
-      }
       ++driveState;
     }
 
@@ -614,16 +636,20 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
       isBackendTerminated = *lastCommandState_.terminated;
       lastCommandState_.terminated = std::nullopt;
     }
+
+    for (size_t driveIndex = 0; driveIndex < frameReadState_.diskDrives.size(); ++driveIndex) {
+      config_.diskDriveStates[driveIndex] = frameReadState_.diskDrives[driveIndex];
+    }
+
     frameLastSeqNo_ = frameSeqNo_;
   }
   frameLock.unlock();
-
   //  render video
   constexpr int kClemensScreenWidth = 720;
   constexpr int kClemensScreenHeight = 480;
   float screenUVs[2]{0.0f, 0.0f};
 
-  if (frameReadState_.mmioWasInitialized) {
+  if (frameReadState_.mmioWasInitialized && guiMode_ != GUIMode::RebootEmulator) {
     const uint8_t *e0mem = frameReadState_.bankE0;
     const uint8_t *e1mem = frameReadState_.bankE1;
     display_.start(frameReadState_.monitorFrame, kClemensScreenWidth, kClemensScreenHeight);
@@ -692,8 +718,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
     break;
   case GUIMode::RebootEmulator:
     if (isBackendTerminated) {
-      backend_ = nullptr;
-      createBackend();
+      backend_ = createBackend();
     }
     break;
   default:
@@ -2021,6 +2046,7 @@ void ClemensFrontend::cmdStep(std::string_view operand) {
 void ClemensFrontend::cmdReboot(std::string_view /*operand*/) {
   guiMode_ = GUIMode::RebootEmulator;
   backend_->terminate();
+  CLEM_TERM_COUT.print(TerminalLine::Info, "Rebooting machine...");
 }
 
 void ClemensFrontend::cmdReset(std::string_view /*operand*/) { backend_->reset(); }

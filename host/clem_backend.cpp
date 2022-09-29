@@ -101,13 +101,20 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
 
   //  TODO: Only use this when opcode debugging is enabled
   clemens_opcode_callback(&machine_, &ClemensBackend::emulatorOpcodeCallback);
-  /*
-  diskDrives_[kClemensDrive_5_25_D1].imagePath = "dos_3_3_master.woz";
-  if (!loadDisk(kClemensDrive_5_25_D1) ||
-      !clemens_assign_disk(&machine_, kClemensDrive_5_25_D1, &disks_[kClemensDrive_5_25_D1])) {
-    diskDrives_[kClemensDrive_5_25_D1].imagePath.clear();
+
+  for (size_t driveIndex = 0; driveIndex < diskDrives_.size(); ++driveIndex) {
+    if (diskDrives_[driveIndex].imagePath.empty()) continue;
+    auto driveType = static_cast<ClemensDriveType>(driveIndex);
+    if (!loadDisk(driveType)) {
+      fmt::print("Failed to load image '{}' into drive {}\n",
+                 diskDrives_[driveIndex].imagePath,
+                 ClemensDiskUtilities::getDriveName(driveType));
+    } else {
+      printf("Failed to load image '{}' into drive {}\n",
+             diskDrives_[driveIndex].imagePath,
+             ClemensDiskUtilities::getDriveName(driveType));
+    }
   }
-  */
 
   //  Everything is ready for the main thread
   runner_ = std::thread(&ClemensBackend::main, this, std::move(publishDelegate));
@@ -174,13 +181,7 @@ bool ClemensBackend::insertDisk(const std::string_view& inputParam) {
   if (driveType == kClemensDrive_Invalid) return false;
 
   diskDrives_[driveType].imagePath = imagePath;
-  if (!loadDisk(driveType) ||
-      !clemens_assign_disk(&machine_, driveType, &disks_[driveType])) {
-    diskDrives_[driveType].imagePath.clear();
-    return false;
-  }
-
-  return true;
+  return loadDisk(driveType);
 }
 
 void ClemensBackend::ejectDisk(ClemensDriveType driveType) {
@@ -250,24 +251,26 @@ bool ClemensBackend::loadDisk(ClemensDriveType driveType) {
 
   std::ifstream input(diskDrives_[driveType].imagePath,
                       std::ios_base::in | std::ios_base::binary);
-  if (input.fail()) return false;
-
-  input.seekg(0, std::ios_base::end);
-  size_t inputImageSize = input.tellg();
-  if (inputImageSize > diskBuffer_.getCapacity()) return false;
-
-  auto bits = diskBuffer_.forwardSize(inputImageSize);
-  input.seekg(0);
-  input.read((char *)bits.first, inputImageSize);
-  if (input.fail() || input.bad()) return false;
-
-  diskContainers_[driveType].nib = &disks_[driveType];
-  auto parseBuffer = cinek::ConstCastRange<uint8_t>(bits);
-  if (!ClemensDiskUtilities::parseWOZ(&diskContainers_[driveType], parseBuffer)) {
-    return false;
+  if (input.is_open()) {
+    input.seekg(0, std::ios_base::end);
+    size_t inputImageSize = input.tellg();
+    if (inputImageSize <= diskBuffer_.getCapacity()) {
+      auto bits = diskBuffer_.forwardSize(inputImageSize);
+      input.seekg(0);
+      input.read((char *)bits.first, inputImageSize);
+      if (input.good()) {
+        diskContainers_[driveType].nib = &disks_[driveType];
+        auto parseBuffer = cinek::ConstCastRange<uint8_t>(bits);
+        if (ClemensDiskUtilities::parseWOZ(&diskContainers_[driveType], parseBuffer)) {
+          if (clemens_assign_disk(&machine_, driveType, &disks_[driveType])) {
+            return true;
+          }
+        }
+      }
+    }
   }
-
-  return true;
+  diskDrives_[driveType].imagePath.clear();
+  return false;
 }
 
 bool ClemensBackend::saveDisk(ClemensDriveType driveType) {
@@ -675,6 +678,8 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       loggedInstructions_.clear();
     }
   } // !isTerminated
+
+  printf("Terminated backend refresh thread.\n");
 }
 
 std::optional<unsigned> ClemensBackend::checkHitBreakpoint() {
@@ -730,11 +735,13 @@ void ClemensBackend::initEmulatedDiskLocalStorage() {
     disks_[kClemensDrive_5_25_D2].bits_data + CLEM_DISK_525_MAX_DATA_SIZE;
 
   //  some sanity values to initialize
-  for (auto& diskDrive : diskDrives_) {
+  for (size_t driveIndex = 0; driveIndex < diskDrives_.size(); ++driveIndex) {
+    auto& diskDrive = diskDrives_[driveIndex];
     diskDrive.isEjecting = false;
     diskDrive.isSpinning = false;
     diskDrive.isWriteProtected = true;
     diskDrive.saveFailed = false;
+    diskDrive.imagePath = config_.diskDriveStates[driveIndex].imagePath;
   }
 }
 
