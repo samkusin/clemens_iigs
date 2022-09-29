@@ -1076,21 +1076,13 @@ bool clemens_load_hex(ClemensMachine *clem, const char *hex,
   return true;
 }
 
-unsigned clemens_out_hex_data_body(ClemensMachine *clem, char *hex,
-                                   unsigned out_hex_byte_limit, unsigned bank,
-                                   unsigned adr) {
+unsigned clemens_out_hex_data_from_memory(char *hex, const uint8_t* memory,
+                                         unsigned out_hex_byte_limit,
+                                         unsigned adr) {
   unsigned byte_amt = out_hex_byte_limit >> 1; /* 2 digits per byte */
   unsigned byte_idx;
   unsigned chksum = 0;
-  const uint8_t *memory;
-  if (bank == 0xe0 || bank == 0xe1) {
-    memory = clem->mega2_bank_map[bank & 0x1];
-  } else {
-    memory = clem->fpi_bank_map[bank & 0xff];
-  }
 
-  if (!memory)
-    return UINT_MAX;
   if (!byte_amt)
     return UINT_MAX;
 
@@ -1108,6 +1100,45 @@ unsigned clemens_out_hex_data_body(ClemensMachine *clem, char *hex,
   }
   hex[byte_idx * 2] = '\0';
   return chksum;
+}
+
+unsigned clemens_out_hex_data_body(const ClemensMachine *clem, char *hex,
+                                   unsigned out_hex_byte_limit, unsigned bank,
+                                   unsigned adr) {
+  const uint8_t *memory;
+  if (bank == 0xe0 || bank == 0xe1) {
+    memory = clem->mega2_bank_map[bank & 0x1];
+  } else {
+    memory = clem->fpi_bank_map[bank & 0xff];
+  }
+
+  return clemens_out_hex_data_from_memory(hex, memory, out_hex_byte_limit, adr);
+}
+
+void clemens_out_bin_data(const ClemensMachine* clem, uint8_t* out,
+                          unsigned out_byte_cnt, uint8_t bank, uint16_t adr) {
+  const uint8_t *memory;
+  unsigned left0, right0;
+  if (bank == 0xe0 || bank == 0xe1) {
+    memory = clem->mega2_bank_map[bank & 0x1];
+  } else {
+    memory = clem->fpi_bank_map[bank & 0xff];
+  }
+
+  if (out_byte_cnt > 0x10000) {
+    out_byte_cnt = 0x10000; /* one bank maximum byte copy */
+  }
+
+  /* extreme edge case, but the API allows this - wraparound */
+  left0 = adr;
+  right0 = (unsigned)adr + out_byte_cnt;
+  if (right0 > 0x10000) {
+    unsigned left1 = 0;
+    unsigned right1 = right0 - 0x10000;
+    right0 &= 0xffff;
+    memcpy(out + right1, memory + left1, right1 - left1);
+  }
+  memcpy(out, memory + left0, right0 - left0);
 }
 
 struct ClemensDrive *clemens_drive_get(ClemensMachine *clem,

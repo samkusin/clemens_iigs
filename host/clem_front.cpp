@@ -4,9 +4,9 @@
 #include "clem_host_platform.h"
 #include "clem_host_utils.hpp"
 #include "clem_import_disk.hpp"
-#include "clem_drive.h"
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
+#include "emulator.h"
 
 #include "cinek/encode.h"
 #include "fmt/format.h"
@@ -14,7 +14,7 @@
 
 #include <charconv>
 #include <filesystem>
-
+#include <tuple>
 
 //  TODO: Instruction step and debug out
 //  TODO: blank disk gui selection for disk set (selecting combo create will
@@ -460,6 +460,9 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
         }
       }
     }
+    if (!lastCommandState_.message.has_value() && state.message.has_value()) {
+      lastCommandState_.message = cmdMessageFromBackend(*state.message, state.machine);
+    }
     if (!lastCommandState_.commandFailed.has_value()) {
       lastCommandState_.commandFailed = state.commandFailed;
     }
@@ -602,6 +605,10 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
                             (breakpoints_[bpIndex].address >> 16) & 0xff,
                             breakpoints_[bpIndex].address & 0xffff);
       lastCommandState_.hitBreakpoint = std::nullopt;
+    }
+    if (lastCommandState_.message.has_value()) {
+      cmdMessageLocal(*lastCommandState_.message);
+      lastCommandState_.message = std::nullopt;
     }
     if (lastCommandState_.terminated.has_value()) {
       isBackendTerminated = *lastCommandState_.terminated;
@@ -2113,8 +2120,11 @@ void ClemensFrontend::cmdDump(std::string_view operand) {
   while (!operand.empty() && paramIdx < params.size()) {
     auto sepPos = operand.find(',');
     params[paramIdx++] = trimToken(operand.substr(0, sepPos));
-    if (sepPos == std::string_view::npos) break;
-    operand = operand.substr(sepPos + 1);
+    if (sepPos == std::string_view::npos) {
+      operand = "";
+    } else {
+      operand = operand.substr(sepPos + 1);
+    }
   }
   if (paramIdx < 3) {
     CLEM_TERM_COUT.print(TerminalLine::Error,
@@ -2142,11 +2152,130 @@ void ClemensFrontend::cmdDump(std::string_view operand) {
                          "Command format type must be 'hex' or 'bin'");
     return;
   }
-  std::string message;
+  std::string message = "dump ";
   for (auto& param: params) {
     message += param;
     message += ",";
   }
   message.pop_back();
   backend_->debugMessage(std::move(message));
+}
+
+static std::tuple<std::array<std::string_view, 8>, std::string_view, size_t>
+  gatherMessageParams(std::string_view& message) {
+  std::array<std::string_view, 8> params;
+  size_t paramCount = 0;
+
+  auto sepPos = message.find(' ');
+  auto cmd = message.substr(0, sepPos);
+  if (sepPos != std::string_view::npos) {
+    message = message.substr(sepPos+1);
+    while (!message.empty() && paramCount < params.size()) {
+      sepPos = message.find(',');
+      params[paramCount++] = message.substr(0, sepPos);
+      if (sepPos != std::string_view::npos) {
+        message = message.substr(sepPos+1);
+      } else {
+        message = "";
+      }
+    }
+  }
+  return {params, cmd, paramCount};
+}
+
+std::string ClemensFrontend::cmdMessageFromBackend(std::string_view message,
+                                                   const ClemensMachine* machine) {
+  auto [params, cmd, paramCount] = gatherMessageParams(message);
+  if (cmd == "dump") {
+    unsigned startBank, endBank;
+    if (std::from_chars(params[0].data(), params[0].data() + params[0].size(), startBank, 16).ec
+          != std::errc{}) {
+      return fmt::format("FAIL:{} {},{}", cmd, params[2], params[3]);
+    }
+    if (std::from_chars(params[1].data(), params[1].data() + params[1].size(), endBank, 16).ec
+          != std::errc{}) {
+      return fmt::format("FAIL:{} {},{}", cmd, params[2], params[3]);
+    }
+    startBank &= 0xff;
+    endBank &= 0xff;
+    lastCommandState_.memoryCaptureAddress = startBank << 16;
+    lastCommandState_.memoryCaptureSize = (endBank - startBank) + 1;
+    lastCommandState_.memoryCaptureSize <<= 16;
+    lastCommandState_.memory = new uint8_t[lastCommandState_.memoryCaptureSize];
+    uint8_t* memoryOut = lastCommandState_.memory;
+    for (; startBank <= endBank; ++startBank, memoryOut += 0x10000) {
+      clemens_out_bin_data(machine, memoryOut, 0x10000, startBank, 0);
+    }
+    return fmt::format("OK:{} {},{}", cmd, params[2], params[3]);
+  }
+
+  return fmt::format("UNK:{}", cmd);
+}
+
+bool ClemensFrontend::cmdMessageLocal(std::string_view message) {
+  auto [params, cmd, paramCount] = gatherMessageParams(message);
+  auto setPos = cmd.find(':');
+  std::string_view status;
+  if (setPos != std::string_view::npos) {
+    status = cmd.substr(0, setPos);
+    cmd = cmd.substr(setPos + 1);
+  }
+  if (status == "UNK") {
+    CLEM_TERM_COUT.format(TerminalLine::Error, "Message command '{}' failure.", cmd);
+    return false;
+  } else if (status == "FAIL") {
+    std::string paramLine;
+    for (auto& param : params) {
+      paramLine += param;
+      paramLine.push_back(',');
+    }
+    paramLine.pop_back();
+    CLEM_TERM_COUT.format(TerminalLine::Error, "Message '{}' error with params {}.",
+                          cmd, paramLine);
+    return false;
+  } else if (cmd == "dump") {
+    bool isOk = true;
+    std::filesystem::path outPath = params[0];
+    std::ios_base::openmode flags = std::ios_base::out | std::ios_base::binary;
+    std::ofstream outstream(outPath, flags);
+    if (outstream.is_open()) {
+      if (params[1] == "bin") {
+        outstream.write((char *)lastCommandState_.memory, lastCommandState_.memoryCaptureSize);
+        outstream.close();
+      } else {
+        constexpr unsigned kHexByteCountPerLine = 64;
+        char hexDump[kHexByteCountPerLine * 2 + 8 + 1];
+        unsigned adrBegin = lastCommandState_.memoryCaptureAddress;
+        unsigned adrEnd =
+          lastCommandState_.memoryCaptureAddress + lastCommandState_.memoryCaptureSize;
+        uint8_t* memoryOut = lastCommandState_.memory;
+        while (adrBegin < adrEnd) {
+          snprintf(hexDump, sizeof(hexDump), "%06X: ", adrBegin);
+          clemens_out_hex_data_from_memory(hexDump + 8, memoryOut, kHexByteCountPerLine * 2,
+                                           adrBegin);
+          hexDump[sizeof(hexDump)-1] = '\n';
+          outstream.write(hexDump, sizeof(hexDump));
+          adrBegin += 0x40;
+          memoryOut += 0x40;
+        }
+        outstream.close();
+      }
+    }
+    if (outstream.fail()) {
+      CLEM_TERM_COUT.format(TerminalLine::Error, "Dump memory failed to open output file {}",
+                            outPath.string());
+      isOk = false;
+    } else {
+      CLEM_TERM_COUT.format(TerminalLine::Info, "Dump memory to file {}", outPath.string());
+    }
+    delete[] lastCommandState_.memory;
+    lastCommandState_.memory = nullptr;
+    lastCommandState_.memoryCaptureAddress = 0;
+    lastCommandState_.memoryCaptureSize = 0;
+    return isOk;
+  } else {
+    CLEM_TERM_COUT.format(TerminalLine::Error, "Message command '{}' unrecogized.", cmd);
+    return false;
+  }
+  return false;
 }

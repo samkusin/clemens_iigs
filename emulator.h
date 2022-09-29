@@ -167,9 +167,40 @@ bool clemens_load_hex(ClemensMachine* clem, const char* hex, const char* hex_end
  * @param bank
  * @param adr
  */
-unsigned clemens_out_hex_data_body(ClemensMachine* clem, char* hex,
+unsigned clemens_out_hex_data_body(const ClemensMachine* clem, char* hex,
                                    unsigned out_hex_byte_limit,
                                    unsigned bank, unsigned adr);
+
+/**
+ * @brief
+ *
+ * @param hex
+ * @param memory
+ * @param out_hex_byte_limit
+ * @param adr
+ * @return unsigned
+ */
+unsigned clemens_out_hex_data_from_memory(char *hex, const uint8_t* memory,
+                                          unsigned out_hex_byte_limit,
+                                          unsigned adr);
+
+/**
+ * @brief Writes memory from the machine to the output buffer in raw bytes
+ *
+ * Note, adr is almost always 0 unless copying a portial bank.   In that case
+ * if adr + out_byte_cnt > 64K, this API will copy the data into the out buffer
+ * sequentially (out = data at adr + out_byte_cnt, and the data in the bank
+ * preceeding the data at adr will be copied after that - essentially wrapping
+ * around the bank boundary*)
+ *
+ * @param clem
+ * @param out
+ * @param out_byte_cnt
+ * @param bank
+ * @param adr
+ */
+void clemens_out_bin_data(const ClemensMachine* clem, uint8_t* out,
+                          unsigned out_byte_cnt, uint8_t bank, uint16_t adr);
 
 /**
  * @brief

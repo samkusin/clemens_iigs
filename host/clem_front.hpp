@@ -68,6 +68,8 @@ private:
   void cmdStep(std::string_view operand);
   void cmdLog(std::string_view operand);
   void cmdDump(std::string_view operand);
+  std::string cmdMessageFromBackend(std::string_view operand, const ClemensMachine* machine);
+  bool cmdMessageLocal(std::string_view operand);
 
 private:
   ClemensDisplayProvider displayProvider_;
@@ -151,10 +153,14 @@ private:
     std::optional<bool> commandFailed;
     std::optional<ClemensBackendCommand::Type> commandType;
     std::optional<unsigned> hitBreakpoint;
+    std::optional<std::string> message;
     LogOutputNode *logNode = nullptr;
     LogOutputNode *logNodeTail = nullptr;
     LogInstructionNode* logInstructionNode = nullptr;
     LogInstructionNode* logInstructionNodeTail = nullptr;
+    uint32_t memoryCaptureAddress = 0;
+    uint32_t memoryCaptureSize = 0;
+    uint8_t* memory = nullptr;
   };
 
   ClemensBackendConfig config_;
