@@ -95,6 +95,7 @@ static void initDirectories() {
 #ifdef CLEMENS_NEW_GUI
   std::filesystem::create_directory(CLEM_HOST_LIBRARY_DIR);
   std::filesystem::create_directory(CLEM_HOST_SNAPSHOT_DIR);
+  std::filesystem::create_directory(CLEM_HOST_TRACES_DIR);
 #endif
 }
 

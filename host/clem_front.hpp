@@ -68,6 +68,7 @@ private:
   void cmdStep(std::string_view operand);
   void cmdLog(std::string_view operand);
   void cmdDump(std::string_view operand);
+  void cmdTrace(std::string_view operand);
   std::string cmdMessageFromBackend(std::string_view operand, const ClemensMachine* machine);
   bool cmdMessageLocal(std::string_view operand);
 
@@ -143,6 +144,7 @@ private:
     unsigned backendCPUID;
     float fps;
     bool mmioWasInitialized = false;
+    bool isTracing = false;
   };
 
   //  This state sticks around until processed by the UI frame - a hacky solution

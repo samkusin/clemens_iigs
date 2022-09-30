@@ -18,13 +18,13 @@
 
 //  TODO: blank disk gui selection for disk set (selecting combo create will
 //        enable another input widget, unselecting will gray out that widget.)
-//  TODO: instruction trace (improved)
-//  TODO: Fix reboot so that publish() copies *everything*
 //  TODO: Fix sound clipping/starvation
 //  TODO: Fix 80 column mode and card vs internal slot 3 ram mapping
 //  TODO: Insert card to slot (non-gui)
 //  TODO: Save/Load snapshot
 
+//  DONE: instruction trace (improved)
+//  DONE: Fix reboot so that publish() copies *everything*
 //  DONE: implement all current commands documented in help
 //  DONE: memory debug gui
 //  DONE: IO Debug View
@@ -366,6 +366,7 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
     frameWriteState_.backendCPUID = state.hostCPUID;
     frameWriteState_.fps = state.fps;
     frameWriteState_.mmioWasInitialized = state.mmio_was_initialized;
+    frameWriteState_.isTracing = state.isTracing;
 
     //  copy over component state as needed
     frameWriteState_.vgcModeFlags = state.machine->mmio.vgc.mode_flags;
@@ -1894,6 +1895,8 @@ void ClemensFrontend::executeCommand(std::string_view command) {
     cmdLog(operand);
   } else if (action == "dump") {
     cmdDump(operand);
+  } else if (action == "trace") {
+    cmdTrace(operand);
   } else if (!action.empty()) {
     CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
   }
@@ -2138,20 +2141,36 @@ void ClemensFrontend::cmdLog(std::string_view operand) {
   backend_->debugLogLevel(int(levelName - logLevelNames.begin()));
 }
 
+static std::tuple<std::array<std::string_view, 8>, std::string_view, size_t>
+  gatherMessageParams(std::string_view& message, bool with_cmd = false) {
+  std::array<std::string_view, 8> params;
+  size_t paramCount = 0;
+
+  size_t sepPos = std::string_view::npos;
+  std::string_view cmd;
+  if (with_cmd) {
+    sepPos = message.find(' ');
+    cmd = message.substr(0, sepPos);
+  }
+  if (sepPos != std::string_view::npos) {
+    message = message.substr(sepPos+1);
+  }
+  while (!message.empty() && paramCount < params.size()) {
+    sepPos = message.find(',');
+    params[paramCount++] = trimToken(message.substr(0, sepPos));
+    if (sepPos != std::string_view::npos) {
+      message = message.substr(sepPos+1);
+    } else {
+      message = "";
+    }
+  }
+  return {params, cmd, paramCount};
+}
+
 void ClemensFrontend::cmdDump(std::string_view operand) {
   //  parse out parameters <start>, <end>, <filename>, <format>
   //  if format is absent, dumps to binary
-  std::array<std::string_view, 4> params;
-  size_t paramIdx = 0;
-  while (!operand.empty() && paramIdx < params.size()) {
-    auto sepPos = operand.find(',');
-    params[paramIdx++] = trimToken(operand.substr(0, sepPos));
-    if (sepPos == std::string_view::npos) {
-      operand = "";
-    } else {
-      operand = operand.substr(sepPos + 1);
-    }
-  }
+  auto [params, cmd, paramIdx] = gatherMessageParams(operand);
   if (paramIdx < 3) {
     CLEM_TERM_COUT.print(TerminalLine::Error,
                          "Command requires <start_bank>, <end_bank>, <filename>");
@@ -2187,26 +2206,41 @@ void ClemensFrontend::cmdDump(std::string_view operand) {
   backend_->debugMessage(std::move(message));
 }
 
-static std::tuple<std::array<std::string_view, 8>, std::string_view, size_t>
-  gatherMessageParams(std::string_view& message) {
-  std::array<std::string_view, 8> params;
-  size_t paramCount = 0;
+void ClemensFrontend::cmdTrace(std::string_view operand) {
+  auto [params, cmd, paramCount] = gatherMessageParams(operand);
+  if (paramCount > 2) {
+    CLEM_TERM_COUT.format(TerminalLine::Error, "Trace command doesn't recognize parameter {}", params[paramCount]);
+    return;
+  }
+  if (paramCount == 0) {
+    CLEM_TERM_COUT.format(TerminalLine::Info, "Trace is {}", frameReadState_.isTracing ? "active" : "inactive");
+    return;
+  }
+  bool enable = params[0] == "on";
 
-  auto sepPos = message.find(' ');
-  auto cmd = message.substr(0, sepPos);
-  if (sepPos != std::string_view::npos) {
-    message = message.substr(sepPos+1);
-    while (!message.empty() && paramCount < params.size()) {
-      sepPos = message.find(',');
-      params[paramCount++] = message.substr(0, sepPos);
-      if (sepPos != std::string_view::npos) {
-        message = message.substr(sepPos+1);
-      } else {
-        message = "";
+  std::string path;
+  if (paramCount > 1) {
+    path = params[1];
+  }
+  if (!frameReadState_.isTracing) {
+    if (!enable) {
+      CLEM_TERM_COUT.print(TerminalLine::Info, "Not tracing.");
+    } else {
+      CLEM_TERM_COUT.print(TerminalLine::Info, "Enabling trace.");
+    }
+  } else {
+    if (!enable) {
+      if (path.empty()) {
+        CLEM_TERM_COUT.print(TerminalLine::Warn,
+                             "Trace will be lost as tracing was active but no output file"
+                             " was specified");
       }
     }
+    if (!path.empty()) {
+      CLEM_TERM_COUT.format(TerminalLine::Info, "Trace will be saved to {}", path);
+    }
   }
-  return {params, cmd, paramCount};
+  backend_->debugProgramTrace(enable, path);
 }
 
 std::string ClemensFrontend::cmdMessageFromBackend(std::string_view message,
@@ -2239,7 +2273,7 @@ std::string ClemensFrontend::cmdMessageFromBackend(std::string_view message,
 }
 
 bool ClemensFrontend::cmdMessageLocal(std::string_view message) {
-  auto [params, cmd, paramCount] = gatherMessageParams(message);
+  auto [params, cmd, paramCount] = gatherMessageParams(message, true);
   auto setPos = cmd.find(':');
   std::string_view status;
   if (setPos != std::string_view::npos) {

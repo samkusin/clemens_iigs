@@ -17,6 +17,9 @@
 #include <thread>
 #include <vector>
 
+
+class ClemensProgramTrace;
+
 //  TODO: Machine type logic could be subclassed into an Apple2GS backend, etc.
 class ClemensBackend {
 public:
@@ -72,6 +75,8 @@ public:
   void debugLogLevel(int logLevel);
   //  Send a message to the publish delegate from the frontend
   void debugMessage(std::string msg);
+  //  Enable a program trace
+  void debugProgramTrace(bool enable, std::string path);
 
 private:
   using Command = ClemensBackendCommand;
@@ -89,6 +94,8 @@ private:
   void inputMachine(const std::string_view &inputParam);
   bool addBreakpoint(const std::string_view &inputParam);
   bool delBreakpoint(const std::string_view &inputParam);
+  bool programTrace(const std::string_view &inputParam);
+
   std::optional<unsigned> checkHitBreakpoint();
 
   void initEmulatedDiskLocalStorage();
@@ -129,6 +136,8 @@ private:
   std::array<ClemensWOZDisk, kClemensDrive_Count> diskContainers_;
   std::array<ClemensNibbleDisk, kClemensDrive_Count> disks_;
   std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives_;
+
+  std::unique_ptr<ClemensProgramTrace> programTrace_;
 
   int logLevel_;
   uint8_t debugMemoryPage_;

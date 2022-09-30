@@ -9,6 +9,7 @@
 
 #define CLEM_HOST_LIBRARY_DIR "library"
 #define CLEM_HOST_SNAPSHOT_DIR "snapshots"
+#define CLEM_HOST_TRACES_DIR "traces"
 
 struct ClemensBackendOutputText {
   int level;
@@ -68,7 +69,8 @@ struct ClemensBackendCommand {
     DebugMemoryPage,
     WriteMemory,
     DebugLogLevel,
-    DebugMessage
+    DebugMessage,
+    DebugProgramTrace
   };
   Type type = Undefined;
   std::string operand;
@@ -80,6 +82,7 @@ struct ClemensBackendState {
   double fps;
   uint64_t seqno;
   bool isRunning;
+  bool isTracing;
   bool mmio_was_initialized;
   std::optional<bool> terminated;
   std::optional<bool> commandFailed;

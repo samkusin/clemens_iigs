@@ -1,3 +1,4 @@
+#include "clem_program_trace.hpp"
 #include "clem_backend.hpp"
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
@@ -8,6 +9,7 @@
 #include <chrono>
 #include <cstdarg>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <optional>
 
@@ -99,7 +101,8 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
       break;
   }
 
-  //  TODO: Only use this when opcode debugging is enabled
+  //  TODO: Only use this when opcode debugging is enabled to save the no-op
+  //        callback overhead
   clemens_opcode_callback(&machine_, &ClemensBackend::emulatorOpcodeCallback);
 
   for (size_t driveIndex = 0; driveIndex < diskDrives_.size(); ++driveIndex) {
@@ -244,6 +247,48 @@ void ClemensBackend::debugLogLevel(int logLevel) {
 
 void ClemensBackend::debugMessage(std::string msg) {
   queue(Command{Command::DebugMessage, std::move(msg)});
+}
+
+void ClemensBackend::debugProgramTrace(bool enable, std::string path) {
+  queue(Command{Command::DebugProgramTrace,
+                fmt::format("{},{}", enable ? 1 : 0, path.empty() ? "#" : path.c_str())});
+}
+
+bool ClemensBackend::programTrace(const std::string_view &inputParam) {
+  auto sepPos = inputParam.find(',');
+  auto param = inputParam.substr(0, sepPos);
+  bool enable = param[0] == '1';
+  if (sepPos != std::string_view::npos) {
+    param = inputParam.substr(sepPos+1);
+    if (param == "#") param = std::string_view();
+  } else {
+    param = std::string_view();
+  }
+  auto path = param;
+  if (programTrace_ == nullptr && enable) {
+    programTrace_ = std::make_unique<ClemensProgramTrace>();
+    programTrace_->enableToolboxLogging(true);
+    fmt::print("Program trace enabled\n");
+    return true;
+  }
+  bool ok = true;
+  if (programTrace_ != nullptr && !path.empty()) {
+    //  save if a path was supplied
+    auto exportPath = std::filesystem::path(CLEM_HOST_TRACES_DIR) / path;
+    ok = programTrace_->exportTrace(exportPath.string().c_str());
+    if (ok) {
+      programTrace_->reset();
+      fmt::print("Exported program trace to '{}'.\n", exportPath.string());
+    } else {
+      fmt::print("ERROR: failed to export program trace to '{}'.  Trace not cleared.\n",
+                  exportPath.string());
+    }
+  }
+  if (programTrace_ != nullptr && !enable) {
+    fmt::print("Program trace disabled");
+    programTrace_ = nullptr;
+  }
+  return ok;
 }
 
 bool ClemensBackend::loadDisk(ClemensDriveType driveType) {
@@ -516,6 +561,9 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         case Command::DebugMessage:
           debugMessage = std::move(command.operand);
           break;
+        case Command::DebugProgramTrace:
+          if (!programTrace(command.operand)) commandFailed = true;
+          break;
       }
       if (commandFailed.has_value() && *commandFailed == true && !commandType.has_value()) {
         commandType = command.type;
@@ -642,6 +690,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         clemens_get_audio(&publishedState.audio, &machine_);
       }
       publishedState.isRunning = isRunning;
+      publishedState.isTracing = programTrace_ != nullptr;
       publishedState.machine = &machine_;
       publishedState.seqno = publishSeqNo;
       publishedState.fps = runSampler.sampledFramesPerSecond;
@@ -820,10 +869,13 @@ void ClemensBackend::emulatorLog(int log_level, ClemensMachine *machine,
 }
 
 //  If enabled, this emulator issues this callback per instruction
-//  This is great for debugging but should be disabled otherwise
+//  This is great for debugging but should be disabled otherwise (see TODO)
 void ClemensBackend::emulatorOpcodeCallback(struct ClemensInstruction *inst,
                                             const char *operand, void *this_ptr) {
   auto *host = reinterpret_cast<ClemensBackend *>(this_ptr);
+  if (host->programTrace_) {
+    host->programTrace_->addExecutedInstruction(*inst, operand, host->machine_);
+  }
   if (!host->areInstructionsLogged_) return;
   host->loggedInstructions_.emplace_back();
   auto& loggedInst = host->loggedInstructions_.back();

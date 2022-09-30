@@ -115,7 +115,7 @@ void ClemensProgramTrace::reset()
   actions_[actionAnchor_].seq = UINT64_MAX;
 }
 
-void ClemensProgramTrace::exportTrace(const char* filename)
+bool ClemensProgramTrace::exportTrace(const char* filename)
 {
   const Action& anchor = actions_[actionAnchor_];
   unsigned actionIndex = anchor.next;
@@ -208,4 +208,5 @@ void ClemensProgramTrace::exportTrace(const char* filename)
     }
     fclose(fp);
   }
+  return fp != NULL;
 }

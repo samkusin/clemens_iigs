@@ -23,7 +23,7 @@ public:
 
   void reset();
 
-  void exportTrace(const char* filename);
+  bool exportTrace(const char* filename);
 
 private:
   uint64_t nextSeq_ = 0;
