@@ -1897,6 +1897,10 @@ void ClemensFrontend::executeCommand(std::string_view command) {
     cmdDump(operand);
   } else if (action == "trace") {
     cmdTrace(operand);
+  } else if (action == "save") {
+    cmdSave(operand);
+  } else if (action == "load") {
+    cmdLoad(operand);
   } else if (!action.empty()) {
     CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
   }
@@ -1937,6 +1941,12 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
                        "dump <bank_begin>,          - dump memory from selected banks\n"
                        "     <bank_end>,              to a file with the specified\n"
                        "     <filename>, {bin|hex}    output format");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "trace {on|off},<pathname>   - toggle program tracing and output to file");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "save <pathname>             - saves a snapshot into the snapshots folder");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "load <pathname>             - loads a snapshot into the snapshots folder");
   CLEM_TERM_COUT.newline();
 }
 
@@ -2338,4 +2348,22 @@ bool ClemensFrontend::cmdMessageLocal(std::string_view message) {
     return false;
   }
   return false;
+}
+
+void ClemensFrontend::cmdSave(std::string_view operand) {
+  auto [params, cmd, paramCount] = gatherMessageParams(operand);
+  if (paramCount != 1) {
+    CLEM_TERM_COUT.print(TerminalLine::Error, "Save requires a filename.");
+    return;
+  }
+  backend_->saveMachine(std::string(params[0]));
+}
+
+void ClemensFrontend::cmdLoad(std::string_view operand) {
+  auto [params, cmd, paramCount] = gatherMessageParams(operand);
+  if (paramCount != 1) {
+    CLEM_TERM_COUT.print(TerminalLine::Error, "Load requires a filename.");
+    return;
+  }
+  backend_->loadMachine(std::string(params[0]));
 }

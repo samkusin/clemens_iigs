@@ -70,7 +70,9 @@ struct ClemensBackendCommand {
     WriteMemory,
     DebugLogLevel,
     DebugMessage,
-    DebugProgramTrace
+    DebugProgramTrace,
+    SaveMachine,
+    LoadMachine
   };
   Type type = Undefined;
   std::string operand;

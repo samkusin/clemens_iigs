@@ -77,6 +77,9 @@ public:
   void debugMessage(std::string msg);
   //  Enable a program trace
   void debugProgramTrace(bool enable, std::string path);
+  //  Save and load the machine
+  void saveMachine(std::string path);
+  void loadMachine(std::string path);
 
 private:
   using Command = ClemensBackendCommand;
@@ -95,6 +98,8 @@ private:
   bool addBreakpoint(const std::string_view &inputParam);
   bool delBreakpoint(const std::string_view &inputParam);
   bool programTrace(const std::string_view &inputParam);
+  bool saveSnapshot(const std::string_view &inputParam);
+  bool loadSnapshot(const std::string_view &inputParam);
 
   std::optional<unsigned> checkHitBreakpoint();
 
@@ -114,6 +119,7 @@ private:
   static void emulatorLog(int log_level, ClemensMachine *machine, const char *msg);
   static void emulatorOpcodeCallback(struct ClemensInstruction *inst, const char *operand,
                                      void *this_ptr);
+  static uint8_t *unserializeAllocate(unsigned sz, void *context);
 
 private:
   Config config_;

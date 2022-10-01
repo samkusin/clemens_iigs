@@ -71,6 +71,8 @@ private:
   void cmdTrace(std::string_view operand);
   std::string cmdMessageFromBackend(std::string_view operand, const ClemensMachine* machine);
   bool cmdMessageLocal(std::string_view operand);
+  void cmdSave(std::string_view operand);
+  void cmdLoad(std::string_view operand);
 
 private:
   ClemensDisplayProvider displayProvider_;

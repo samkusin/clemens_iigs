@@ -2,6 +2,7 @@
 #include "clem_backend.hpp"
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
+#include "clem_serializer.hpp"
 #include "emulator.h"
 #include "clem_mem.h"
 
@@ -291,6 +292,38 @@ bool ClemensBackend::programTrace(const std::string_view &inputParam) {
   return ok;
 }
 
+void ClemensBackend::saveMachine(std::string path) {
+  queue(Command{Command::SaveMachine, std::move(path)});
+}
+
+bool ClemensBackend::saveSnapshot(const std::string_view &inputParam) {
+  auto outputPath = std::filesystem::path(CLEM_HOST_SNAPSHOT_DIR) / inputParam;
+  return ClemensSerializer::save(outputPath.string(), &machine_, diskContainers_.size(),
+                                 diskContainers_.data(), diskDrives_.data());
+}
+
+void ClemensBackend::loadMachine(std::string path) {
+  queue(Command{Command::LoadMachine, std::move(path)});
+}
+
+bool ClemensBackend::loadSnapshot(const std::string_view &inputParam) {
+  auto outputPath = std::filesystem::path(CLEM_HOST_SNAPSHOT_DIR) / inputParam;
+  bool res = ClemensSerializer::load(outputPath.string(), &machine_, diskContainers_.size(),
+                                     diskContainers_.data(), diskDrives_.data(),
+                                     &ClemensBackend::unserializeAllocate, this);
+  saveBRAM();
+  return res;
+}
+
+uint8_t *ClemensBackend::unserializeAllocate(unsigned sz, void *context) {
+  //  TODO: allocation from a slab that doesn't reset may cause problems if the
+  //        snapshots require allocation per load - take a look at how to fix
+  //        this (like a separate slab for data that is unserialized requiring
+  //        allocation like memory banks, mix buffers, etc (see serializer.h))
+  auto *host = reinterpret_cast<ClemensBackend *>(context);
+  return (uint8_t *)host->slabMemory_.allocate(sz);
+}
+
 bool ClemensBackend::loadDisk(ClemensDriveType driveType) {
   diskBuffer_.reset();
 
@@ -563,6 +596,12 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           break;
         case Command::DebugProgramTrace:
           if (!programTrace(command.operand)) commandFailed = true;
+          break;
+        case Command::SaveMachine:
+          if (!saveSnapshot(command.operand)) commandFailed = true;
+          break;
+        case Command::LoadMachine:
+          if (!loadSnapshot(command.operand)) commandFailed = true;
           break;
       }
       if (commandFailed.has_value() && *commandFailed == true && !commandType.has_value()) {
