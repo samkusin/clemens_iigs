@@ -23,10 +23,10 @@ typedef uint8_t*(*ClemensSerializerAllocateCb)(unsigned, void*);
  *  If you divide the CLEM_CLOCKS_MEGA2_CYCLE by the CLEM_CLOCKS_FAST_CYCLE
  *  the value will be the effective maximum clock speed in Mhz of the CPU.
  */
-#define CLEM_CLOCKS_FAST_CYCLE 1023
-#define CLEM_CLOCKS_MEGA2_CYCLE 2864
+#define CLEM_CLOCKS_FAST_CYCLE 1023U
+#define CLEM_CLOCKS_MEGA2_CYCLE 2864U
 #define CLEM_MEGA2_CYCLE_NS 978
-#define CLEM_MEGA2_CYCLES_PER_SECOND 1023000
+#define CLEM_MEGA2_CYCLES_PER_SECOND 1023000U
 
 /* Attempt to mimic VDA and VPA per memory access */
 #define CLEM_MEM_FLAG_BUS_IO (0x4)

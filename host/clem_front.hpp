@@ -128,7 +128,7 @@ private:
 
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives;
 
-    std::optional<ClemensEmulatorStats> emulatorStats;
+    float emulatorSpeedMhz;
 
     Clemens65C816 cpu;
     ClemensMonitor monitorFrame;

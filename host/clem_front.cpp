@@ -373,7 +373,7 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
     frameWriteState_.fps = state.fps;
     frameWriteState_.mmioWasInitialized = state.mmio_was_initialized;
     frameWriteState_.isTracing = state.isTracing;
-    frameWriteState_.emulatorStats = state.emulatorStats;
+    frameWriteState_.emulatorSpeedMhz = state.emulatorSpeedMhz;
 
     //  copy over component state as needed
     frameWriteState_.vgcModeFlags = state.machine->mmio.vgc.mode_flags;
@@ -814,6 +814,15 @@ void ClemensFrontend::doMachineDiagnosticsDisplay() {
   ImGui::Text("%0.1f", frameReadState_.fps);
   ImGui::TableNextColumn();
   ImGui::Text("fps");
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::Text("");
+  ImGui::TableNextColumn();
+  ImGui::Text("RUN");
+  ImGui::TableNextColumn();
+  ImGui::Text("%0.3f", frameReadState_.emulatorSpeedMhz);
+  ImGui::TableNextColumn();
+  ImGui::Text("mhz");
   ImGui::EndTable();
 }
 

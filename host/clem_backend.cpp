@@ -31,9 +31,17 @@ struct ClemensRunSampler {
   std::chrono::microseconds fixedTimeInterval;
   std::chrono::microseconds actualTimeInterval;
   std::chrono::microseconds sampledFrameTime;
+
   double sampledFramesPerSecond;
 
-  cinek::CircularBuffer<std::chrono::microseconds, 60> frameTimeBuffer;
+  cinek::CircularBuffer<std::chrono::microseconds, 120> frameTimeBuffer;
+
+  clem_clocks_time_t sampledClocksSpent;
+  uint64_t sampledCyclesSpent;
+  cinek::CircularBuffer<clem_clocks_duration_t, 120> clocksBuffer;
+  cinek::CircularBuffer<clem_clocks_duration_t, 120> cyclesBuffer;
+
+  double sampledEmulatorSpeedMhz;
 
   ClemensRunSampler() {
     reset();
@@ -43,11 +51,16 @@ struct ClemensRunSampler {
     fixedTimeInterval = std::chrono::microseconds::zero();
     actualTimeInterval = std::chrono::microseconds::zero();
     sampledFrameTime = std::chrono::microseconds::zero();
+    sampledClocksSpent = 0;
+    sampledCyclesSpent = 0;
     sampledFramesPerSecond = 0.0f;
+    sampledEmulatorSpeedMhz = 0.0f;
   }
 
   void update(std::chrono::microseconds fixedFrameInterval,
-              std::chrono::microseconds actualFrameInterval) {
+              std::chrono::microseconds actualFrameInterval,
+              clem_clocks_duration_t clocksSpent,
+              unsigned cyclesSpent) {
     fixedTimeInterval += fixedFrameInterval;
     actualTimeInterval += actualFrameInterval;
     //  see notes at the head of this class for how delta times are calculated
@@ -72,29 +85,36 @@ struct ClemensRunSampler {
     frameTimeBuffer.push(actualFrameInterval);
     sampledFrameTime += actualFrameInterval;
 
-    if (sampledFrameTime >= std::chrono::microseconds(500000)) {
+    if (sampledFrameTime >= std::chrono::microseconds(100000)) {
       sampledFramesPerSecond = frameTimeBuffer.size() * 1e6 / sampledFrameTime.count();
+    }
+
+    //  calculate emulator speed by using cycles_spent * CLEM_CLOCKS_MEGA2_CYCLE
+    //  as a reference for 1.023mhz where
+    //    reference_clocks = cycles_spent * CLEM_CLOCKS_MEGA2_CYCLE
+    //    acutal_clocks = sampledClocksSpent
+    //    (reference / actual) * 1.023mhz is the emulator speed
+    if (clocksBuffer.isFull()) {
+      decltype(clocksBuffer)::ValueType lruClocksSpent;
+      clocksBuffer.pop(lruClocksSpent);
+      sampledClocksSpent -= lruClocksSpent;
+    }
+    clocksBuffer.push(clocksSpent);
+    sampledClocksSpent += clocksSpent;
+
+    if (cyclesBuffer.isFull()) {
+      decltype(cyclesBuffer)::ValueType lruCycles;
+      cyclesBuffer.pop(lruCycles);
+      sampledCyclesSpent -= lruCycles;
+    }
+    cyclesBuffer.push(cyclesSpent);
+    sampledCyclesSpent += cyclesSpent;
+    if (sampledClocksSpent > (CLEM_CLOCKS_MEGA2_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND / 10)) {
+      sampledEmulatorSpeedMhz =
+       1.023 * double(CLEM_CLOCKS_MEGA2_CYCLE * sampledCyclesSpent) /  sampledClocksSpent;
     }
   }
 };
-
-
-void ClemensEmulatorDiagnostics::reset(std::chrono::microseconds displayInterval) {
-  stats.clocksSpent = 0;
-  stats.deltaTime = 0.0;
-  deltaTime = std::chrono::microseconds::zero();
-  frameTime = displayInterval;
-}
-
-bool ClemensEmulatorDiagnostics::update(std::chrono::microseconds deltaInterval) {
-  deltaTime += deltaInterval;
-  if (deltaTime >= frameTime) {
-    using IntervalType = std::chrono::duration<double>;
-    stats.deltaTime = std::chrono::duration_cast<IntervalType>(deltaTime).count();
-    return true;
-  }
-  return false;
-}
 
 
 template<typename ...Args>
@@ -109,7 +129,6 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
                                PublishStateDelegate publishDelegate) :
   config_(config),
   slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
-  diagnosticsInterval_(std::chrono::microseconds(5 * 1000000)),
   logLevel_(CLEM_DEBUG_LOG_INFO),
   debugMemoryPage_(0x00),
   areInstructionsLogged_(false) {
@@ -537,7 +556,6 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     std::optional<bool> commandFailed;
     std::optional<Command::Type> commandType;
     std::optional<std::string> debugMessage;
-    std::optional<ClemensEmulatorStats> emulatorStats;
 
     std::unique_lock<std::mutex> queuelock(commandQueueMutex_);
     if (!isRunning) {
@@ -580,13 +598,11 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           stepsRemaining = std::nullopt;
           isRunning = true;
           runSampler.reset();
-          diagnostics_.reset(diagnosticsInterval_);
           break;
         case Command::StepMachine:
           *stepsRemaining = stepMachine(command.operand);
           isRunning = true;
           runSampler.reset();
-          diagnostics_.reset(diagnosticsInterval_);
           break;
         case Command::Publish:
           publishState = true;
@@ -661,9 +677,12 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       //
       areInstructionsLogged_ = stepsRemaining.has_value() && (*stepsRemaining > 0);
 
+      auto lastClocksSpent = machine_.clocks_spent;
       int64_t clocksPerTimeslice =
         calculateClocksPerTimeslice(&machine_, emulatorRefreshFrequency);
       clocksRemainingInTimeslice += clocksPerTimeslice;
+
+      machine_.cpu.cycles_spent = 0;
       while (clocksRemainingInTimeslice > 0 &&
             (!stepsRemaining.has_value() || *stepsRemaining > 0)) {
         clem_clocks_time_t pre_emulate_time = machine_.clocks_spent;
@@ -686,7 +705,6 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         }
       } // clocksRemainingInTimeslice
 
-
       if (stepsRemaining.has_value() && *stepsRemaining == 0) {
         //  if we've finished stepping through code, we are also done with our
         //  timeslice and will wait for a new step/run request
@@ -700,7 +718,9 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         currentFrameTimePoint - lastFrameTimePoint);
       lastFrameTimePoint = currentFrameTimePoint;
 
-      runSampler.update(fixedFrameInterval, actualFrameInterval);
+      runSampler.update(fixedFrameInterval, actualFrameInterval,
+                        (clem_clocks_duration_t)(machine_.clocks_spent - lastClocksSpent),
+                        machine_.cpu.cycles_spent);
 
       for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end(); ++diskDriveIt) {
         auto& diskDrive = *diskDriveIt;
@@ -752,7 +772,6 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     if (publishState) {
       ClemensBackendState publishedState {};
       publishedState.mmio_was_initialized = clemens_is_mmio_initialized(&machine_);
-      publishedState.emulatorStats = emulatorStats;
       if (publishedState.mmio_was_initialized) {
         clemens_get_monitor(&publishedState.monitor, &machine_);
         clemens_get_text_video(&publishedState.text, &machine_);
@@ -788,6 +807,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                   ioAddr, 0xe0, CLEM_MEM_FLAG_NULL);
       }
       publishedState.debugMemoryPage = debugMemoryPage_;
+      publishedState.emulatorSpeedMhz = runSampler.sampledEmulatorSpeedMhz;
 
       publishDelegate(publishedState);
       if (publishedState.mmio_was_initialized) {
