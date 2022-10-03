@@ -120,7 +120,6 @@ private:
     uint8_t *bankE0 = nullptr;
     uint8_t *bankE1 = nullptr;
     uint8_t *memoryView = nullptr;
-    uint8_t *audioBuffer = nullptr;
     uint8_t* ioPage = nullptr;
     LogOutputNode *logNode = nullptr;
     ClemensBackendBreakpoint *breakpoints = nullptr;
@@ -128,6 +127,8 @@ private:
     int logLevel;
 
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives;
+
+    std::optional<ClemensEmulatorStats> emulatorStats;
 
     Clemens65C816 cpu;
     ClemensMonitor monitorFrame;
@@ -165,16 +166,18 @@ private:
     uint32_t memoryCaptureAddress = 0;
     uint32_t memoryCaptureSize = 0;
     uint8_t* memory = nullptr;
+    cinek::ByteBuffer audioBuffer;
   };
 
   ClemensBackendConfig config_;
 
   cinek::FixedStack frameWriteMemory_;
   cinek::FixedStack frameReadMemory_;
-  cinek::FixedStack logMemory_;
+  cinek::FixedStack frameMemory_;
   FrameState frameWriteState_;
   FrameState frameReadState_;
   LastCommandState lastCommandState_;
+  cinek::ByteBuffer thisFrameAudioBuffer_;
 
   ClemensCPUPins lastFrameCPUPins_;
   ClemensCPURegs lastFrameCPURegs_;

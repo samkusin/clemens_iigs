@@ -14,6 +14,7 @@
 #include <fstream>
 #include <optional>
 
+#include "cinek/circular_buffer.hpp"
 #include "fmt/format.h"
 
 static constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
@@ -30,8 +31,9 @@ struct ClemensRunSampler {
   std::chrono::microseconds fixedTimeInterval;
   std::chrono::microseconds actualTimeInterval;
   std::chrono::microseconds sampledFrameTime;
-  unsigned sampledFrameCount;
   double sampledFramesPerSecond;
+
+  cinek::CircularBuffer<std::chrono::microseconds, 60> frameTimeBuffer;
 
   ClemensRunSampler() {
     reset();
@@ -41,7 +43,6 @@ struct ClemensRunSampler {
     fixedTimeInterval = std::chrono::microseconds::zero();
     actualTimeInterval = std::chrono::microseconds::zero();
     sampledFrameTime = std::chrono::microseconds::zero();
-    sampledFrameCount = 0;
     sampledFramesPerSecond = 0.0f;
   }
 
@@ -49,6 +50,9 @@ struct ClemensRunSampler {
               std::chrono::microseconds actualFrameInterval) {
     fixedTimeInterval += fixedFrameInterval;
     actualTimeInterval += actualFrameInterval;
+    //  see notes at the head of this class for how delta times are calculated
+    //  in an attempt to maintain a fixed frame rate on systems where sleep()
+    //  delays can overshoot the desired sleep time (Windows especially.)
     if (actualTimeInterval < fixedTimeInterval) {
       std::this_thread::sleep_for(fixedTimeInterval - actualTimeInterval);
       fixedTimeInterval -= actualTimeInterval;
@@ -60,16 +64,38 @@ struct ClemensRunSampler {
       }
     }
 
+    if (frameTimeBuffer.isFull()) {
+      decltype(frameTimeBuffer)::ValueType lruFrametime;
+      frameTimeBuffer.pop(lruFrametime);
+      sampledFrameTime -= lruFrametime;
+    }
+    frameTimeBuffer.push(actualFrameInterval);
     sampledFrameTime += actualFrameInterval;
-    ++sampledFrameCount;
 
     if (sampledFrameTime >= std::chrono::microseconds(500000)) {
-      sampledFramesPerSecond = sampledFrameCount * 1e6 / sampledFrameTime.count();
-      sampledFrameTime = std::chrono::microseconds::zero();
-      sampledFrameCount = 0;
+      sampledFramesPerSecond = frameTimeBuffer.size() * 1e6 / sampledFrameTime.count();
     }
   }
 };
+
+
+void ClemensEmulatorDiagnostics::reset(std::chrono::microseconds displayInterval) {
+  stats.clocksSpent = 0;
+  stats.deltaTime = 0.0;
+  deltaTime = std::chrono::microseconds::zero();
+  frameTime = displayInterval;
+}
+
+bool ClemensEmulatorDiagnostics::update(std::chrono::microseconds deltaInterval) {
+  deltaTime += deltaInterval;
+  if (deltaTime >= frameTime) {
+    using IntervalType = std::chrono::duration<double>;
+    stats.deltaTime = std::chrono::duration_cast<IntervalType>(deltaTime).count();
+    return true;
+  }
+  return false;
+}
+
 
 template<typename ...Args>
 void ClemensBackend::localLog(int log_level, const char* msg, Args... args) {
@@ -83,6 +109,7 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
                                PublishStateDelegate publishDelegate) :
   config_(config),
   slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
+  diagnosticsInterval_(std::chrono::microseconds(5 * 1000000)),
   logLevel_(CLEM_DEBUG_LOG_INFO),
   debugMemoryPage_(0x00),
   areInstructionsLogged_(false) {
@@ -510,6 +537,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     std::optional<bool> commandFailed;
     std::optional<Command::Type> commandType;
     std::optional<std::string> debugMessage;
+    std::optional<ClemensEmulatorStats> emulatorStats;
 
     std::unique_lock<std::mutex> queuelock(commandQueueMutex_);
     if (!isRunning) {
@@ -552,11 +580,13 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           stepsRemaining = std::nullopt;
           isRunning = true;
           runSampler.reset();
+          diagnostics_.reset(diagnosticsInterval_);
           break;
         case Command::StepMachine:
           *stepsRemaining = stepMachine(command.operand);
           isRunning = true;
           runSampler.reset();
+          diagnostics_.reset(diagnosticsInterval_);
           break;
         case Command::Publish:
           publishState = true;
@@ -722,6 +752,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     if (publishState) {
       ClemensBackendState publishedState {};
       publishedState.mmio_was_initialized = clemens_is_mmio_initialized(&machine_);
+      publishedState.emulatorStats = emulatorStats;
       if (publishedState.mmio_was_initialized) {
         clemens_get_monitor(&publishedState.monitor, &machine_);
         clemens_get_text_video(&publishedState.text, &machine_);

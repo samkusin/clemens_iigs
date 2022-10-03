@@ -78,6 +78,11 @@ struct ClemensBackendCommand {
   std::string operand;
 };
 
+struct ClemensEmulatorStats {
+  clem_clocks_time_t clocksSpent;
+  double deltaTime;
+};
+
 
 struct ClemensBackendState {
   ClemensMachine* machine;
@@ -92,6 +97,8 @@ struct ClemensBackendState {
   std::optional<ClemensBackendCommand::Type> commandType;
   // valid if a debugMessage() command was issued from the frontend
   std::optional<std::string> message;
+
+  std::optional<ClemensEmulatorStats> emulatorStats;
 
   ClemensMonitor monitor;
   ClemensVideo text;
@@ -112,6 +119,8 @@ struct ClemensBackendState {
 
   uint8_t ioPageValues[256];      // 0xc000 - 0xc0ff
   uint8_t debugMemoryPage;
+
+
 };
 
 #endif

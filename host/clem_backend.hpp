@@ -20,6 +20,16 @@
 
 class ClemensProgramTrace;
 
+struct ClemensEmulatorDiagnostics {
+  ClemensEmulatorStats stats;
+
+  std::chrono::microseconds deltaTime; //  diagnostics current delta time from frame start
+  std::chrono::microseconds frameTime; //  display diagnostics every frameTime seconds
+
+  void reset(std::chrono::microseconds displayInterval);
+  bool update(std::chrono::microseconds deltaInterval);
+};
+
 //  TODO: Machine type logic could be subclassed into an Apple2GS backend, etc.
 class ClemensBackend {
 public:
@@ -145,6 +155,8 @@ private:
 
   std::unique_ptr<ClemensProgramTrace> programTrace_;
 
+  ClemensEmulatorDiagnostics diagnostics_;
+  std::chrono::microseconds diagnosticsInterval_;
   int logLevel_;
   uint8_t debugMemoryPage_;
   bool areInstructionsLogged_;

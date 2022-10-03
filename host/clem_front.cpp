@@ -16,13 +16,15 @@
 #include <filesystem>
 #include <tuple>
 
+//  TODO: Diagnostics
 //  TODO: blank disk gui selection for disk set (selecting combo create will
 //        enable another input widget, unselecting will gray out that widget.)
 //  TODO: Fix sound clipping/starvation
 //  TODO: Fix 80 column mode and card vs internal slot 3 ram mapping
 //  TODO: Insert card to slot (non-gui)
-//  TODO: Save/Load snapshot
 
+
+//  DONE: Save/Load snapshot
 //  DONE: instruction trace (improved)
 //  DONE: Fix reboot so that publish() copies *everything*
 //  DONE: implement all current commands documented in help
@@ -283,7 +285,7 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
     : displayProvider_(systemFontLoBuffer, systemFontHiBuffer), display_(displayProvider_),
       audio_(), frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
-      logMemory_(kLogMemorySize, malloc(kLogMemorySize)),
+      frameMemory_(kLogMemorySize, malloc(kLogMemorySize)),
       frameSeqNo_(std::numeric_limits<decltype(frameSeqNo_)>::max()),
       frameLastSeqNo_(std::numeric_limits<decltype(frameLastSeqNo_)>::max()), lastFrameCPUPins_{},
       lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0), lastFrameNMIs_(0),
@@ -301,6 +303,10 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
   audio_.start();
   config_.type = ClemensBackend::Config::Type::Apple2GS;
   config_.audioSamplesPerSecond = audio_.getAudioFrequency();
+  auto audioBufferSize = config_.audioSamplesPerSecond * audio_.getBufferStride() / 2;
+  lastCommandState_.audioBuffer = cinek::ByteBuffer( new uint8_t[audioBufferSize], audioBufferSize);
+  thisFrameAudioBuffer_ = cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
+
   backend_ = createBackend();
 
   debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;
@@ -367,6 +373,7 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
     frameWriteState_.fps = state.fps;
     frameWriteState_.mmioWasInitialized = state.mmio_was_initialized;
     frameWriteState_.isTracing = state.isTracing;
+    frameWriteState_.emulatorStats = state.emulatorStats;
 
     //  copy over component state as needed
     frameWriteState_.vgcModeFlags = state.machine->mmio.vgc.mode_flags;
@@ -443,10 +450,6 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
     frameWriteState_.bankE1 = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
     memcpy(frameWriteState_.bankE1, state.machine->mega2_bank_map[1], CLEM_IIGS_BANK_SIZE);
 
-    auto audioBufferSize = int32_t(state.audio.frame_total * state.audio.frame_stride);
-    frameWriteState_.audioBuffer = (uint8_t *)frameWriteMemory_.allocate(audioBufferSize);
-    memcpy(frameWriteState_.audioBuffer, state.audio.data, audioBufferSize);
-
     frameWriteState_.ioPage = (uint8_t *)frameWriteMemory_.allocate(256);
     memcpy(frameWriteState_.ioPage, state.ioPageValues, 256);
 
@@ -496,10 +499,14 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
       lastCommandState_.terminated = state.terminated;
     }
 
+    auto audioBufferSize = int32_t(state.audio.frame_count * state.audio.frame_stride);
+    auto audioBufferRange = lastCommandState_.audioBuffer.forwardSize(audioBufferSize);
+    memcpy(audioBufferRange.first, state.audio.data, cinek::length(audioBufferRange));
+
     frameWriteState_.logLevel = state.logLevel;
     for (auto *logItem = state.logBufferStart; logItem != state.logBufferEnd; ++logItem) {
       LogOutputNode *logMemory = reinterpret_cast<LogOutputNode *>(
-          logMemory_.allocate(sizeof(LogOutputNode) + CK_ALIGN_SIZE_TO_ARCH(logItem->text.size())));
+          frameMemory_.allocate(sizeof(LogOutputNode) + CK_ALIGN_SIZE_TO_ARCH(logItem->text.size())));
       logMemory->logLevel = logItem->level;
       logMemory->sz = unsigned(logItem->text.size());
       logItem->text.copy(reinterpret_cast<char *>(logMemory) + sizeof(LogOutputNode),
@@ -516,9 +523,9 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
     if (state.logInstructionStart != state.logInstructionEnd) {
       size_t instructionCount = state.logInstructionEnd - state.logInstructionStart;
       LogInstructionNode* logInstMemory = reinterpret_cast<LogInstructionNode*>(
-          logMemory_.allocate(sizeof(LogInstructionNode)));
+          frameMemory_.allocate(sizeof(LogInstructionNode)));
       logInstMemory->begin =
-        logMemory_.allocateArray<ClemensBackendExecutedInstruction>(instructionCount);
+        frameMemory_.allocateArray<ClemensBackendExecutedInstruction>(instructionCount);
       logInstMemory->end = logInstMemory->begin + instructionCount;
       logInstMemory->next = nullptr;
       memcpy(logInstMemory->begin, state.logInstructionStart,
@@ -606,7 +613,6 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
       logInstructionNode = logInstructionNode->next;
     }
     lastCommandState_.logInstructionNode = lastCommandState_.logInstructionNodeTail = nullptr;
-    logMemory_.reset();
 
     breakpoints_.clear();
     for (unsigned bpIndex = 0; bpIndex < frameReadState_.breakpointCount; ++bpIndex) {
@@ -642,6 +648,10 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
       config_.diskDriveStates[driveIndex] = frameReadState_.diskDrives[driveIndex];
     }
 
+    frameMemory_.reset();
+
+    std::swap(lastCommandState_.audioBuffer, thisFrameAudioBuffer_);
+
     frameLastSeqNo_ = frameSeqNo_;
   }
   frameLock.unlock();
@@ -674,8 +684,13 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
     display_.finish(screenUVs);
 
     // render audio
-    auto &audioFrame = frameReadState_.audioFrame;
-    if (isNewFrame && audioFrame.frame_count > 0) {
+    if (isNewFrame && thisFrameAudioBuffer_.getSize() > 0) {
+      ClemensAudio audioFrame;
+      audioFrame.data = thisFrameAudioBuffer_.getHead();
+      audioFrame.frame_stride = frameReadState_.audioFrame.frame_stride;
+      audioFrame.frame_start = 0;
+      audioFrame.frame_count = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
+      audioFrame.frame_total = thisFrameAudioBuffer_.getCapacity() / audioFrame.frame_stride;
       float *audio_frame_head = reinterpret_cast<float *>(
           audioFrame.data + audioFrame.frame_start * audioFrame.frame_stride);
       /*
@@ -684,6 +699,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
                            audio_->getAudioFrequency());
       */
       unsigned consumedFrames = audio_.queue(audioFrame, deltaTime);
+      thisFrameAudioBuffer_.reset();
     }
   }
 
