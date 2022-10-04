@@ -105,16 +105,6 @@ auto ClemensDiskImporter::parse2IMG(uint8_t *bits_data, uint8_t *bits_data_end) 
   disk.nib = memory_.newItem<ClemensNibbleDisk>();
   if (!clem_2img_parse_header(&disk, bits_data, bits_data_end))
     return nullptr;
-  size_t bits_size = ClemensDiskUtilities::calculateNibRequiredMemory(driveType_);
-  disk.nib->bits_data = (uint8_t *)memory_.allocate(bits_size);
-  disk.nib->bits_data_end = disk.nib->bits_data + bits_size;
-  if (disk.block_count <= 280 || (disk.data_end - disk.data) <= 140 * 1024) {
-    disk.nib->disk_type = CLEM_DISK_TYPE_5_25;
-  } else if (disk.block_count <= 1600 || (disk.data_end - disk.data) <= 800 * 1024) {
-    disk.nib->disk_type = CLEM_DISK_TYPE_3_5;
-  } else {
-    disk.nib->disk_type = CLEM_DISK_TYPE_NONE;
-  }
 
   return nibblizeImage(&disk);
 }
@@ -125,15 +115,25 @@ auto ClemensDiskImporter::parseImage(uint8_t *bits_data, uint8_t *bits_data_end,
   disk.nib = memory_.newItem<ClemensNibbleDisk>();
   if (!clem_2img_generate_header(&disk, type, bits_data, bits_data_end))
     return nullptr;
-  size_t bits_size = ClemensDiskUtilities::calculateNibRequiredMemory(driveType_);
-  disk.nib->bits_data = (uint8_t *)memory_.allocate(bits_size);
-  disk.nib->bits_data_end = disk.nib->bits_data + bits_size;
+
   return nibblizeImage(&disk);
 }
 
 auto ClemensDiskImporter::nibblizeImage(Clemens2IMGDisk *disk) -> DiskRecord * {
   if (!disk->nib)
     return nullptr;
+
+  size_t bits_size = ClemensDiskUtilities::calculateNibRequiredMemory(driveType_);
+  disk->nib->bits_data = (uint8_t *)memory_.allocate(bits_size);
+  disk->nib->bits_data_end = disk->nib->bits_data + bits_size;
+  if (disk->block_count <= 280 || (disk->data_end - disk->data) <= 140 * 1024) {
+    disk->nib->disk_type = CLEM_DISK_TYPE_5_25;
+  } else if (disk->block_count <= 1600 || (disk->data_end - disk->data) <= 800 * 1024) {
+    disk->nib->disk_type = CLEM_DISK_TYPE_3_5;
+  } else {
+    disk->nib->disk_type = CLEM_DISK_TYPE_NONE;
+  }
+
   if (!clem_2img_nibblize_data(disk))
     return nullptr;
 

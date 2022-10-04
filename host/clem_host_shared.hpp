@@ -12,6 +12,8 @@
 #define CLEM_HOST_SNAPSHOT_DIR "snapshots"
 #define CLEM_HOST_TRACES_DIR "traces"
 
+constexpr const char* kClemensCardMockingboardName = "mockingboard_c";
+
 struct ClemensBackendOutputText {
   int level;
   std::string text;
@@ -47,6 +49,7 @@ struct ClemensBackendConfig {
   };
 
   std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDriveStates;
+  std::array<std::string, 7> cardNames;
   unsigned audioSamplesPerSecond;
   Type type;
 };

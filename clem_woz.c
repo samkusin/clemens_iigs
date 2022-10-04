@@ -211,7 +211,6 @@ clem_woz_parse_info_chunk(struct ClemensWOZDisk *disk,
   disk->flags = 0;
   if (_clem_woz_read_u8(&woz_iter) != 0) {
     disk->flags |= CLEM_WOZ_IMAGE_WRITE_PROTECT;
-    if (disk->nib) disk->nib->is_write_protected = true;
   }
   if (_clem_woz_read_u8(&woz_iter) != 0) {
     disk->flags |= CLEM_WOZ_IMAGE_SYNCHRONIZED;
@@ -219,8 +218,14 @@ clem_woz_parse_info_chunk(struct ClemensWOZDisk *disk,
   if (_clem_woz_read_u8(&woz_iter) != 0) {
     disk->flags |= CLEM_WOZ_IMAGE_CLEANED;
   }
+  if (disk->nib) {
+    disk->nib->is_write_protected = false;
+    disk->nib->is_double_sided = false;
+    if (disk->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) {
+      disk->nib->is_write_protected = true;
+    }
+  }
   _clem_woz_read_bytes(&woz_iter, disk->creator, sizeof(disk->creator));
-
   if (disk->version > 1) {
     if (_clem_woz_read_u8(&woz_iter) == 2) {
       disk->flags |= CLEM_WOZ_IMAGE_DOUBLE_SIDED;

@@ -19,4 +19,7 @@ struct ClemensTraceExecutedInstruction {
     const char* operand);
 };
 
+ClemensCard* createCard(const char* name);
+void destroyCard(ClemensCard* card);
+
 #endif

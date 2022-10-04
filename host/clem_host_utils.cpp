@@ -1,4 +1,6 @@
 #include "clem_host_utils.hpp"
+#include "clem_host_shared.hpp"
+#include "iocards/mockingboard.h"
 
 #include <cstring>
 
@@ -49,4 +51,25 @@ ClemensTraceExecutedInstruction& ClemensTraceExecutedInstruction::fromInstructio
   size = kAddrModeSizes[instruction.desc->addr_mode];
 
   return *this;
+}
+
+
+ClemensCard* createCard(const char* name) {
+  ClemensCard* card = NULL;
+  if (!strcmp(name, kClemensCardMockingboardName)) {
+    card = new ClemensCard;
+    memset(card, 0, sizeof(*card));
+    clem_card_mockingboard_initialize(card);
+  }
+  return card;
+}
+
+void destroyCard(ClemensCard* card) {
+  //  use card->io_name() to identify
+  if (!card) return;
+  const char* name = card->io_name(card->context);
+  if (!strcmp(name, kClemensCardMockingboardName)) {
+    clem_card_mockingboard_uninitialize(card);
+  }
+  delete card;
 }

@@ -1104,6 +1104,10 @@ struct ClemensSerializerRecord kVIA[] = {
     CLEM_SERIALIZER_RECORD_EMPTY()
 };
 
+static const char* io_name(void* context) {
+  return "mockingboard_c";
+}
+
 struct ClemensSerializerRecord kCard[] = {
     CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(ClemensMockingboardContext, via, 2, struct ClemensVIA6522, kVIA),
     CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(ClemensMockingboardContext, ay3, 2, struct ClemensAY38913, kAY3),
@@ -1120,6 +1124,7 @@ void clem_card_mockingboard_initialize(ClemensCard *card) {
   card->io_sync = &io_sync;
   card->io_read = &io_read;
   card->io_write = &io_write;
+  card->io_name = &io_name;
 }
 
 void clem_card_mockingboard_uninitialize(ClemensCard *card) {

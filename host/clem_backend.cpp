@@ -5,6 +5,7 @@
 #include "clem_serializer.hpp"
 #include "emulator.h"
 #include "clem_mem.h"
+#include "iocards/mockingboard.h"
 
 #include <charconv>
 #include <chrono>
@@ -173,8 +174,6 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
 ClemensBackend::~ClemensBackend() {
   terminate();
   runner_.join();
-
-  saveBRAM();
 
   free(slabMemory_.getHead());
 }
@@ -361,6 +360,19 @@ bool ClemensBackend::loadSnapshot(const std::string_view &inputParam) {
   return res;
 }
 
+static ClemensCard* findMockingboardCard(ClemensMachine* machine) {
+  for (int cardIdx = 0; cardIdx < 7; ++cardIdx) {
+    if (machine->card_slot[cardIdx]) {
+      const char* cardName =
+        machine->card_slot[cardIdx]->io_name(machine->card_slot[cardIdx]->context);
+      if (!strcmp(cardName, kClemensCardMockingboardName)) {
+        return machine->card_slot[cardIdx];
+      }
+    }
+  }
+  return NULL;
+}
+
 uint8_t *ClemensBackend::unserializeAllocate(unsigned sz, void *context) {
   //  TODO: allocation from a slab that doesn't reset may cause problems if the
   //        snapshots require allocation per load - take a look at how to fix
@@ -543,7 +555,16 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
   ClemensRunSampler runSampler;
 
+  for (size_t cardIdx = 0; cardIdx < config_.cardNames.size(); ++cardIdx) {
+    auto& cardName = config_.cardNames[cardIdx];
+    if (!cardName.empty()) {
+      machine_.card_slot[cardIdx] = createCard(cardName.c_str());
+    } else {
+      machine_.card_slot[cardIdx] = NULL;
+    }
+  }
 
+  ClemensCard* mockingboard = findMockingboardCard(&machine_);
   uint64_t publishSeqNo = 0;
   unsigned emulatorRefreshFrequency = 60;
   auto fixedFrameInterval =
@@ -584,6 +605,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         case Command::ResetMachine:
           resetMachine();
           isMachineReady = true;
+          mockingboard = findMockingboardCard(&machine_);
           break;
         case Command::SetHostUpdateFrequency:
           emulatorRefreshFrequency = std::stoul(command.operand);
@@ -648,6 +670,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           break;
         case Command::LoadMachine:
           if (!loadSnapshot(command.operand)) commandFailed = true;
+          mockingboard = findMockingboardCard(&machine_);
           break;
       }
       if (commandFailed.has_value() && *commandFailed == true && !commandType.has_value()) {
@@ -676,6 +699,13 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       //  wait for commands from the frontend
       //
       areInstructionsLogged_ = stepsRemaining.has_value() && (*stepsRemaining > 0);
+
+      const time_t kEpoch1904To1970Seconds = 2082844800;
+      auto epoch_time_1904 =
+        (std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) +
+        kEpoch1904To1970Seconds);
+
+      clemens_rtc_set(&machine_, (unsigned)epoch_time_1904);
 
       auto lastClocksSpent = machine_.clocks_spent;
       int64_t clocksPerTimeslice =
@@ -776,7 +806,16 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         clemens_get_monitor(&publishedState.monitor, &machine_);
         clemens_get_text_video(&publishedState.text, &machine_);
         clemens_get_graphics_video(&publishedState.graphics, &machine_);
-        clemens_get_audio(&publishedState.audio, &machine_);
+        if (clemens_get_audio(&publishedState.audio, &machine_)) {
+          if (mockingboard) {
+            auto& audio = publishedState.audio;
+            float *audio_frame_head = reinterpret_cast<float *>(
+            audio.data + audio.frame_start * audio.frame_stride);
+            clem_card_ay3_render(mockingboard, audio_frame_head, audio.frame_count,
+                           audio.frame_stride / sizeof(float),
+                           config_.audioSamplesPerSecond);
+          }
+        }
       }
       publishedState.isRunning = isRunning;
       publishedState.isTracing = programTrace_ != nullptr;
@@ -817,6 +856,13 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       loggedInstructions_.clear();
     }
   } // !isTerminated
+
+  saveBRAM();
+
+  for (int i = 0; i < 7; ++i) {
+    destroyCard(machine_.card_slot[i]);
+    machine_.card_slot[i] = NULL;
+  }
 
   printf("Terminated backend refresh thread.\n");
 }

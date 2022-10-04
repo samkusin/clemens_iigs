@@ -99,7 +99,7 @@ typedef struct {
   void (*io_write)(struct ClemensClock *clock, uint8_t data, uint8_t adr,
                    uint8_t flags, void *context);
   uint32_t (*io_sync)(struct ClemensClock *clock, void *context);
-
+  const char* (*io_name)(void* context);
 } ClemensCard;
 
 #ifdef __cplusplus

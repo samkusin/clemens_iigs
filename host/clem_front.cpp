@@ -16,14 +16,16 @@
 #include <filesystem>
 #include <tuple>
 
-//  TODO: Diagnostics
+//  TODO: Insert card to slot (non-gui)
 //  TODO: blank disk gui selection for disk set (selecting combo create will
 //        enable another input widget, unselecting will gray out that widget.)
-//  TODO: Fix sound clipping/starvation
 //  TODO: Fix 80 column mode and card vs internal slot 3 ram mapping
-//  TODO: Insert card to slot (non-gui)
+//  TODO: preroll audio for some buffer on to handle sound clipping on lower end
+//        systems
 
-
+//  DONE: restored mockingboard support
+//  DONE: Fix sound clipping/starvation
+//  DONE: Diagnostics
 //  DONE: Save/Load snapshot
 //  DONE: instruction trace (improved)
 //  DONE: Fix reboot so that publish() copies *everything*
@@ -303,9 +305,12 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
   audio_.start();
   config_.type = ClemensBackend::Config::Type::Apple2GS;
   config_.audioSamplesPerSecond = audio_.getAudioFrequency();
+
   auto audioBufferSize = config_.audioSamplesPerSecond * audio_.getBufferStride() / 2;
   lastCommandState_.audioBuffer = cinek::ByteBuffer( new uint8_t[audioBufferSize], audioBufferSize);
   thisFrameAudioBuffer_ = cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
+
+  config_.cardNames[3] = kClemensCardMockingboardName;    // load the mockingboard
 
   backend_ = createBackend();
 

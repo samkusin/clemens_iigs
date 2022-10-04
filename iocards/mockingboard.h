@@ -7,7 +7,6 @@ typedef struct mpack_writer_t mpack_writer_t;
 typedef struct mpack_reader_t mpack_reader_t;
 
 
-
 /* these are here for references - the actual functions are determined
    by which bits in the address register are set on io_read and io_write
 */
