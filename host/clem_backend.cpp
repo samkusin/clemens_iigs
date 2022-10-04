@@ -56,6 +56,9 @@ struct ClemensRunSampler {
     sampledCyclesSpent = 0;
     sampledFramesPerSecond = 0.0f;
     sampledEmulatorSpeedMhz = 0.0f;
+    frameTimeBuffer.clear();
+    clocksBuffer.clear();
+    cyclesBuffer.clear();
   }
 
   void update(std::chrono::microseconds fixedFrameInterval,

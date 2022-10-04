@@ -453,7 +453,7 @@ static uint8_t _clem_mmio_statereg_c068_set(struct ClemensMMIO *mmio,
   } else {
     /* only valid value */
   }
-  /* INTCXROM (C3ROM?) */
+  /* INTCXROM */
   if (value & 0x01) {
     mmap_register &= ~CLEM_MEM_IO_MMAP_CXROM;
   } else {
@@ -639,7 +639,7 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr,
     result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_RAMWRT) ? 0x80 : 0x00;
     break;
   case CLEM_MMIO_REG_READCXROM:
-    result = !(mmio->mmap_register & CLEM_MEM_IO_MMAP_CXROM) ? 0x80 : 00;
+    result = !(mmio->mmap_register & CLEM_MEM_IO_MMAP_CXROM) ? 0x80 : 0x00;
     break;
   case CLEM_MMIO_REG_RDALTZP_TEST:
     result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_ALTZPLC) ? 0x80 : 0x00;
@@ -1391,15 +1391,21 @@ static void _clem_mmio_memory_map(struct ClemensMMIO *mmio,
       page_B01->flags |= CLEM_MEM_PAGE_IOADDR_FLAG;
       for (page_idx = 0xC1; page_idx < 0xC8; ++page_idx) {
         unsigned slot_idx = ((page_idx - 1) & 0xf);
-        bool intcx_page =
+        bool intcx_page;
+        if (page_idx == 0xC3) {
+          intcx_page = !(memory_flags & CLEM_MEM_IO_MMAP_C3ROM);
+        } else {
+          intcx_page = !(memory_flags & CLEM_MEM_IO_MMAP_CXROM) ||
             !(memory_flags & (CLEM_MEM_IO_MMAP_C1ROM << slot_idx));
+        }
 
-        // TODO: peripheral ROM and slot 3 switch
         page_B00 = &page_map_B00->pages[page_idx];
         page_B01 = &page_map_B01->pages[page_idx];
         if (intcx_page) {
           clem_mem_create_page_mapping(page_B00, page_idx, 0xff, 0x00);
           clem_mem_create_page_mapping(page_B01, page_idx, 0xff, 0x01);
+          page_B00->flags &= ~CLEM_MEM_PAGE_CARDMEM_FLAG;
+          page_B01->flags &= ~CLEM_MEM_PAGE_CARDMEM_FLAG;
         } else {
           clem_mem_create_page_mapping(page_B00, page_idx, 0x00, 0x00);
           clem_mem_create_page_mapping(page_B01, page_idx, 0x00, 0x00);
@@ -1418,6 +1424,8 @@ static void _clem_mmio_memory_map(struct ClemensMMIO *mmio,
           /* internal ROM */
           clem_mem_create_page_mapping(page_B00, page_idx, 0xff, 0x00);
           clem_mem_create_page_mapping(page_B01, page_idx, 0xff, 0x01);
+          page_B00->flags &= ~CLEM_MEM_PAGE_CARDMEM_FLAG;
+          page_B01->flags &= ~CLEM_MEM_PAGE_CARDMEM_FLAG;
         } else {
           clem_mem_create_page_mapping(page_B00, page_idx - 0xc8, 0xcc, 0xcc);
           clem_mem_create_page_mapping(page_B01, page_idx - 0xc8, 0xcc, 0xcc);
@@ -1432,18 +1440,25 @@ static void _clem_mmio_memory_map(struct ClemensMMIO *mmio,
     if (remap_flags & CLEM_MEM_IO_MMAP_CROM) {
       for (page_idx = 0xC1; page_idx < 0xC8; ++page_idx) {
         unsigned slot_idx = ((page_idx - 1) & 0xf);
-        bool intcx_page =
+        bool intcx_page;
+        if (page_idx == 0xC3) {
+          intcx_page = !(memory_flags & CLEM_MEM_IO_MMAP_C3ROM);
+        } else {
+          intcx_page = !(memory_flags & CLEM_MEM_IO_MMAP_CXROM) ||
             !(memory_flags & (CLEM_MEM_IO_MMAP_C1ROM << slot_idx));
+        }
         page_BE0 = &page_map_BE0->pages[page_idx];
         page_BE1 = &page_map_BE1->pages[page_idx];
         if (intcx_page) {
           clem_mem_create_page_mapping(page_BE0, page_idx, 0xff, 0xe0);
           clem_mem_create_page_mapping(page_BE1, page_idx, 0xff, 0xe1);
+          page_BE0->flags &= ~CLEM_MEM_PAGE_CARDMEM_FLAG;
+          page_BE1->flags &= ~CLEM_MEM_PAGE_CARDMEM_FLAG;
         } else {
           clem_mem_create_page_mapping(page_BE0, page_idx, 0x00, 0x00);
           clem_mem_create_page_mapping(page_BE1, page_idx, 0x00, 0x00);
-          page_B00->flags |= CLEM_MEM_PAGE_CARDMEM_FLAG;
-          page_B01->flags |= CLEM_MEM_PAGE_CARDMEM_FLAG;
+          page_BE0->flags |= CLEM_MEM_PAGE_CARDMEM_FLAG;
+          page_BE1->flags |= CLEM_MEM_PAGE_CARDMEM_FLAG;
         }
         page_BE0->flags &= ~CLEM_MEM_PAGE_WRITEOK_FLAG;
         page_BE1->flags &= ~CLEM_MEM_PAGE_WRITEOK_FLAG;
@@ -1457,6 +1472,8 @@ static void _clem_mmio_memory_map(struct ClemensMMIO *mmio,
           /* internal ROM */
           clem_mem_create_page_mapping(page_BE0, page_idx, 0xff, 0xe0);
           clem_mem_create_page_mapping(page_BE1, page_idx, 0xff, 0xe1);
+          page_BE0->flags &= ~CLEM_MEM_PAGE_CARDMEM_FLAG;
+          page_BE1->flags &= ~CLEM_MEM_PAGE_CARDMEM_FLAG;
         } else {
           clem_mem_create_page_mapping(page_BE0, page_idx - 0xc8, 0xcc, 0xcc);
           clem_mem_create_page_mapping(page_BE1, page_idx - 0xc8, 0xcc, 0xcc);

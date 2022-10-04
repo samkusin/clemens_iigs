@@ -43,6 +43,7 @@ public:
 
   CircularBuffer() : _tail(0), _head(0){}
 
+  void clear() { _tail = 0; _head = 0; }
   bool push(const Element& item);
   bool push(Element&& item);
   Element* acquireTail();
