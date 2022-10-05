@@ -285,6 +285,12 @@ static void onEvent(const sapp_event* evt)
         clemInput.value |= 0x01;
       }
       break;
+    case SAPP_EVENTTYPE_MOUSE_MOVE:
+      clemInput.type = kClemensInputType_MouseMove;
+      clemInput.value = (int16_t)(std::round(evt->mouse_dy));
+      clemInput.value <<= 16;
+      clemInput.value |= (int16_t)(std::round(evt->mouse_dx));
+      break;
     default:
       clemInput.type = kClemensInputType_None;
       break;

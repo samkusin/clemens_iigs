@@ -8,7 +8,7 @@
 * Lores and double lores graphics support
 * Alternate character set support
 * Linux builds (Clang or GCC)
-* WOZ conversion to 2mg on disk insert for writable disks
+* Import to WOZ / Nibblized disk and save on disk eject for writable disks
 * Improved 3.5" emulated disk speeds
 
 ## Version 0.3

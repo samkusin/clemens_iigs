@@ -327,8 +327,15 @@ ClemensFrontend::~ClemensFrontend() {
   free(frameReadMemory_.getHead());
 }
 
-void ClemensFrontend::input(const ClemensInputEvent &input) {
+void ClemensFrontend::input(ClemensInputEvent input) {
   if (emulatorHasKeyboardFocus_) {
+    if (input.type == kClemensInputType_MouseMove) {
+      int16_t my = (int16_t)(input.value >> 16);
+      int16_t mx = (int16_t)(input.value & 0xffff);
+      my = std::clamp(my, (int16_t)(-63), (int16_t)(63));
+      mx = std::clamp(my, (int16_t)(-63), (int16_t)(63));
+      input.value = ((unsigned)my << 16) | mx;
+    }
     backend_->inputEvent(input);
   }
 }

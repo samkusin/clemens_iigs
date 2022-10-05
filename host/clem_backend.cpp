@@ -434,6 +434,7 @@ static const char* sInputKeys[] = {
   "keyU",
   "mouseD",
   "mouseU",
+  "mouse",
   NULL
 };
 

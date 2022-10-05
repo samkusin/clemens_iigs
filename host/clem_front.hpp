@@ -31,7 +31,7 @@ public:
   //  application rendering hook
   void frame(int width, int height, float deltaTime);
   //  application input from OS
-  void input(const ClemensInputEvent &input);
+  void input(ClemensInputEvent input);
 
 private:
   template <typename TBufferType> friend struct FormatView;

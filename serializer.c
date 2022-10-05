@@ -68,8 +68,11 @@ struct ClemensSerializerRecord kADBKeyboard[] = {
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 struct ClemensSerializerRecord kADBMouse[] = {
-    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceMouse, x),
-    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceMouse, y),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceMouse,
+                                 kClemensSerializerTypeUInt32, pos,
+                                 CLEM_ADB_KEYB_BUFFER_LIMIT, 0),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceMouse, size),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceMouse, btn_down),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 struct ClemensSerializerRecord kGameport[] = {
@@ -187,6 +190,7 @@ struct ClemensSerializerRecord kADB[] = {
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, is_keypad_down),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, is_asciikey_down),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, has_modkey_changed),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, mouse_irq_on),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceADB, io_key_last_ascii),
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceADB,
                                  kClemensSerializerTypeUInt16, keyb_reg, 4, 0),

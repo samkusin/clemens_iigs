@@ -1,9 +1,44 @@
 #include "clem_program_trace.hpp"
 
+#include <array>
 #include <cstdio>
 #include <cstdint>
 
 #include <inttypes.h>
+
+static std::array<const char*, 0x20> kToolsetNames = {
+  "Tool Locator",
+  "Memory Manager",
+  "Miscellaneous",
+  "QuickDraw II",
+  "Desk Manager",
+  "Event Manager",
+  "Scheduler",
+  "Sound",
+  "Apple Desktop Bus",
+  "SANE",
+  "Integer Math",
+  "Text Tool",
+  "Reserved for Apple use",
+  "Window Manager",
+  "Menu Manager",
+  "Control Manager",
+  "Loader",
+  "QuickDraw II Auxillary",
+  "Print Manager",
+  "LineEdit",
+  "Dialog Manager",
+  "Scrap Manager",
+  "Standard File Operations",
+  "Disk Utilities",
+  "Note Synthensizer",
+  "Note Sequencer",
+  "Font Manager",
+  "List Manager",
+  "Unknown",
+  "Unknown",
+  "Unknown"
+};
 
 ClemensProgramTrace::ClemensProgramTrace() :
   enableToolboxLogging_(false)
@@ -198,7 +233,14 @@ bool ClemensProgramTrace::exportTrace(const char* filename)
       for (auto& tbc: toolboxCalls_) {
         char* out = &line[0];
         size_t outLeft = sizeof(line);
-        int amt = snprintf(out, outLeft, "%02X:%04X CALL #%04X", tbc.pbr, tbc.pc, tbc.call);
+        int amt;
+        if ((tbc.call & 0xff) >= kToolsetNames.size()) {
+          amt = snprintf(out, outLeft, "%02X:%04X CALL #%04X ???", tbc.pbr, tbc.pc, tbc.call);
+        } else {
+          amt = snprintf(out, outLeft, "%02X:%04X CALL #%04X %s", tbc.pbr, tbc.pc, tbc.call,
+                         kToolsetNames[tbc.call & 0xff]);
+
+        }
         outLeft -= amt;
         out += amt;
         out[0] = '\n';
