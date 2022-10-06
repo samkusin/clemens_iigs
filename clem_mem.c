@@ -620,6 +620,8 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr,
   case CLEM_MMIO_REG_KEYB_READ + 14:
   case CLEM_MMIO_REG_KEYB_READ + 15:
   case CLEM_MMIO_REG_ANYKEY_STROBE:
+    result = clem_adb_read_mega2_switch(&mmio->dev_adb, ioreg, flags);
+    break;
   case CLEM_MMIO_REG_ADB_MOUSE_DATA:
   case CLEM_MMIO_REG_ADB_MODKEY:
   case CLEM_MMIO_REG_ADB_CMD_DATA:
@@ -734,6 +736,10 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr,
     break;
   case CLEM_MMIO_REG_MEGA2_INTEN:
     result = _clem_mmio_mega2_inten_get(mmio);
+    break;
+  case CLEM_MMIO_REG_MEGA2_MOUSE_DX:
+  case CLEM_MMIO_REG_MEGA2_MOUSE_DY:
+    result = clem_adb_read_mega2_switch(&mmio->dev_adb, ioreg, flags);
     break;
   case CLEM_MMIO_REG_DIAG_INTTYPE:
     result = _clem_mmio_inttype_c046(mmio);

@@ -190,7 +190,6 @@ struct ClemensSerializerRecord kADB[] = {
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, is_keypad_down),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, is_asciikey_down),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, has_modkey_changed),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, mouse_irq_on),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceADB, io_key_last_ascii),
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceADB,
                                  kClemensSerializerTypeUInt16, keyb_reg, 4, 0),

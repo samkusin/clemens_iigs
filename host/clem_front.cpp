@@ -799,6 +799,10 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
       doMachineDebugDiskIODisplay();
       ImGui::EndTabItem();
     }
+    if (ImGui::BeginTabItem("ADB")) {
+      doMachineDebugADBDisplay();
+      ImGui::EndTabItem();
+    }
     ImGui::EndTabBar();
   }
   ImGui::Separator();
@@ -1398,6 +1402,37 @@ void ClemensFrontend::doMachineDebugDiskIODisplay() {
                 iwmState.buffer[2], iwmState.buffer[3]);
   }
   ImGui::PopStyleColor();
+  ImGui::EndTable();
+
+  ImGui::EndTable();
+}
+
+void ClemensFrontend::doMachineDebugADBDisplay() {
+  auto* ioregs = frameReadState_.ioPage;
+  //auto& iwmState = frameReadState_.iwm;
+
+  if (!ioregs) return;
+
+  auto fontCharSize = ImGui::GetFont()->GetCharAdvance('A');
+
+  ImGui::BeginTable("IODEBUG", 2);
+  ImGui::TableSetupColumn("Col1");
+  ImGui::TableSetupColumn("Col2");
+  ImGui::TableNextRow();
+
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("IOREGS", 3);
+  ImGui::TableSetupColumn("Symbol", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 9);
+  ImGui::TableSetupColumn("Addr", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
+  ImGui::TableSetupColumn("Data", ImGuiTableColumnFlags_WidthFixed);
+  ImGui::TableHeadersRow();
+  ImGui::EndTable();
+
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("PARAMS", 2, ImGuiTableFlags_SizingFixedFit);
+  ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 8);
+  ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);
+  ImGui::TableHeadersRow();
   ImGui::EndTable();
 
   ImGui::EndTable();

@@ -210,6 +210,7 @@ private:
   void doMachineDebugCoreIODisplay();
   void doMachineDebugVideoIODisplay();
   void doMachineDebugDiskIODisplay();
+  void doMachineDebugADBDisplay();
 
   enum class DebugIOMode {
     Core

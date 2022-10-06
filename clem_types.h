@@ -90,7 +90,6 @@ struct ClemensDeviceADB {
   bool is_keypad_down;     /* Used to determine keypad modifier status */
   bool is_asciikey_down;   /* Used to determine c010 anykey down status */
   bool has_modkey_changed; /* FIXME: Used for modifier key latch? */
-  bool mouse_irq_on;       /* Enables mouse interrupts if requested */
 
   uint8_t io_key_last_ascii; /* The last ascii key pressed, bit 7 strobe */
 

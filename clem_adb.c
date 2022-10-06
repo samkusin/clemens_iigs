@@ -80,8 +80,10 @@
 
 /* c027 status flags */
 #define CLEM_ADB_C027_CMD_FULL 0x01
-#define CLEM_ADB_C027_MOUSE_X  0x02
+/* HWRef says this is X, firmware ref and testing say this is Y */
+#define CLEM_ADB_C027_MOUSE_Y  0x02
 /* 0x04 - keyboard interrupts not supported */
+#define CLEM_ADB_C027_KEY_IRQ  0x04
 #define CLEM_ADB_C027_KEY_FULL 0x08
 #define CLEM_ADB_C027_DATA_IRQ 0x10
 #define CLEM_ADB_C027_DATA_FULL 0x20
@@ -130,7 +132,6 @@ void clem_adb_reset(struct ClemensDeviceADB *adb) {
   adb->version = CLEM_ADB_ROM_3; /* TODO - input to reset? */
   adb->mode_flags = CLEM_ADB_MODE_AUTOPOLL_KEYB | CLEM_ADB_MODE_AUTOPOLL_MOUSE;
   adb->keyb.reset_key = false;
-  adb->mouse_irq_on = false;
   adb->keyb.size = 0;
   adb->mouse.size = 0;
 }
@@ -1368,8 +1369,6 @@ static void _clem_adb_glu_keyb_talk(struct ClemensDeviceADB *adb) {
   uint8_t key_event;
   bool is_key_down;
 
-  adb->keyb_reg[0] = 0x0000;
-
   //  handle repeat logic here so that we can queue repeated keys before
   //      consuming them
 
@@ -1492,16 +1491,33 @@ static void _clem_adb_glu_mouse_talk(struct ClemensDeviceADB *adb) {
   //  populate our mouse data register - this will pull all events from the
   //  queue, compressing multiple events over the frame into a single event
   //  to be saved onto the data register.
+  //  if mouse interrupts are enabled *and* a valid mouse event is avaiable,
+  //  then issue the IRQ (CLEM_IRQ_ADB_MOUSE_EVT)
+
+  if (adb->mouse.size <= 0)
+    return;
+
+  /* TODO: some compression of mouse button + position events */
+  adb->mouse_reg[0] = _clem_adb_glu_unqueue_mouse(adb);
+  adb->cmd_status |= CLEM_ADB_C027_MOUSE_FULL;
+
+  if (adb->cmd_status & CLEM_ADB_C027_MOUSE_IRQ) {
+    adb->irq_line |= CLEM_IRQ_ADB_MOUSE_EVT;
+  }
 }
 
 static void _clem_adb_glu_set_mode_flags(struct ClemensDeviceADB *adb,
                                          unsigned mode_flags) {
   if (mode_flags & 0x01) {
     adb->mode_flags &= ~CLEM_ADB_MODE_AUTOPOLL_KEYB;
+    adb->keyb_reg[0] = 0x0000;
+    adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
     CLEM_LOG("ADB: Disable Keyboard Autopoll");
   }
   if (mode_flags & 0x02) {
     adb->mode_flags &= ~CLEM_ADB_MODE_AUTOPOLL_MOUSE;
+    adb->mouse_reg[0] = 0x0000;
+    adb->cmd_status &= ~CLEM_ADB_C027_MOUSE_FULL;
     CLEM_LOG("ADB: Disable Mouse Autopoll");
   }
   if (mode_flags & 0x000000fc) {
@@ -2011,20 +2027,27 @@ void clem_adb_write_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
     adb->io_key_last_ascii &= ~0x80;
     break;
   case CLEM_MMIO_REG_ADB_MODKEY:
-    CLEM_LOG("ADB: IO Write %02X", ioreg);
+    CLEM_WARN("ADB: IO Write %02X (MODKEY)", ioreg);
     break;
   case CLEM_MMIO_REG_ADB_STATUS:
-    /* TODO: support enabling mouse interrupts when mouse data reg is
-             filled
-       TODO: Throw a warning if keyboard data interrupt enabled - not
+    /* TODO: Throw a warning if keyboard data interrupt enabled - not
              supported according to docs
-       TODO: support command data interrupts
     */
     if (value & CLEM_ADB_C027_DATA_IRQ) {
       adb->cmd_status |= CLEM_ADB_C027_DATA_IRQ;
     } else {
       adb->cmd_status &= ~CLEM_ADB_C027_DATA_IRQ;
       adb->irq_line &= ~CLEM_IRQ_ADB_DATA;
+    }
+    if (value & CLEM_ADB_C027_MOUSE_IRQ) {
+      adb->cmd_status |= CLEM_ADB_C027_MOUSE_IRQ;
+    } else {
+      adb->cmd_status &= ~CLEM_ADB_C027_MOUSE_IRQ;
+      adb->irq_line &= ~CLEM_IRQ_ADB_MOUSE_EVT;
+    }
+    if (value & CLEM_ADB_C027_KEY_IRQ) {
+      CLEM_WARN("ADB: Unimplemented keyboard interrupts! write %02X,%02X",
+                ioreg, value);;
     }
     break;
   case CLEM_MMIO_REG_ADB_CMD_DATA:
@@ -2099,10 +2122,29 @@ static uint8_t _clem_adb_read_modkeys(struct ClemensDeviceADB *adb) {
   return modkeys;
 }
 
-uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
-                             uint8_t flags) {
+static uint8_t _clem_adb_read_mouse_data(struct ClemensDeviceADB* adb,
+                                         uint8_t flags) {
+  //  alternate readying X and Y based on the current status flags
+  uint8_t result =
+    (adb->mouse_reg[0] & CLEM_ADB_GLU_REG0_MOUSE_BTN) ? 0x80 : 0x00;
+  if (adb->cmd_status & CLEM_ADB_C027_MOUSE_Y) {
+    result |= ((adb->mouse_reg[0] & CLEM_ADB_GLU_REG0_MOUSE_Y_DIR) >> 8);
+    result |= ((adb->mouse_reg[0] & CLEM_ADB_GLU_REG0_MOUSE_Y_DELTA) >> 8);
+  } else {
+    result |= (adb->mouse_reg[0] & CLEM_ADB_GLU_REG0_MOUSE_X_DIR);
+    result |= (adb->mouse_reg[0] & CLEM_ADB_GLU_REG0_MOUSE_X_DELTA);
+  }
+  if (!(flags & CLEM_OP_IO_NO_OP)) {
+    adb->cmd_status ^= CLEM_ADB_C027_MOUSE_Y;
+    adb->irq_line &= ~CLEM_IRQ_ADB_MOUSE_EVT;
+    adb->cmd_status &= ~CLEM_ADB_C027_MOUSE_FULL;
+  }
+  return result;
+}
+
+uint8_t clem_adb_read_mega2_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
+                                   uint8_t flags) {
   bool is_noop = (flags & CLEM_OP_IO_NO_OP) != 0;
-  uint8_t tmp;
   if (ioreg > CLEM_MMIO_REG_KEYB_READ && ioreg < CLEM_MMIO_REG_ANYKEY_STROBE) {
     ioreg = CLEM_MMIO_REG_KEYB_READ;
   }
@@ -2122,16 +2164,31 @@ uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
     }
     return (adb->is_asciikey_down ? 0x80 : 0x00) |
            (adb->io_key_last_ascii & 0x7f);
-  case CLEM_MMIO_REG_ADB_MOUSE_DATA:
-
+  case CLEM_MMIO_REG_MEGA2_MOUSE_DX:
+  case CLEM_MMIO_REG_MEGA2_MOUSE_DY:
+  default:
+    if (!CLEM_IS_IO_NO_OP(flags)) {
+      CLEM_WARN("ADB: Unimplemented read %02X", ioreg);
+    }
     break;
+  };
+  return 0;
+}
+
+uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
+                             uint8_t flags) {
+  bool is_noop = (flags & CLEM_OP_IO_NO_OP) != 0;
+  uint8_t tmp;
+  switch (ioreg) {
+  case CLEM_MMIO_REG_ADB_MOUSE_DATA:
+    return _clem_adb_read_mouse_data(adb, flags);
   case CLEM_MMIO_REG_ADB_MODKEY:
     return _clem_adb_read_modkeys(adb);
   case CLEM_MMIO_REG_ADB_CMD_DATA:
     return _clem_adb_read_cmd(adb, flags);
   case CLEM_MMIO_REG_ADB_STATUS:
     /* FIXME: HWRef docs are vague here - which bits are actually
-       cleared? eyboard data bit only according to the HWRef.  But FW
+       cleared? keyboard data bit only according to the HWRef.  But FW
        Ref says 'never use, won't work' for the keyboard bits here...
     */
     tmp = adb->cmd_status;
