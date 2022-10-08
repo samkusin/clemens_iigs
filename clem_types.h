@@ -233,7 +233,8 @@ struct ClemensInputEvent {
      in the range of +- 64 and are packed into the value (upper + lower 16 bits
      for Y and X respectively.)
   */
-  unsigned value;
+  int16_t value_a;
+  int16_t value_b;
   /* Key toggle mask */
   unsigned adb_key_toggle_mask;
 };

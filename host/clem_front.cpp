@@ -330,11 +330,8 @@ ClemensFrontend::~ClemensFrontend() {
 void ClemensFrontend::input(ClemensInputEvent input) {
   if (emulatorHasKeyboardFocus_) {
     if (input.type == kClemensInputType_MouseMove) {
-      int16_t my = (int16_t)(input.value >> 16);
-      int16_t mx = (int16_t)(input.value & 0xffff);
-      my = std::clamp(my, (int16_t)(-63), (int16_t)(63));
-      mx = std::clamp(my, (int16_t)(-63), (int16_t)(63));
-      input.value = ((unsigned)my << 16) | mx;
+      input.value_a = std::clamp(input.value_a, (int16_t)(-63), (int16_t)(63));
+      input.value_b = std::clamp(input.value_b, (int16_t)(-63), (int16_t)(63));
     }
     backend_->inputEvent(input);
   }
@@ -1426,6 +1423,19 @@ void ClemensFrontend::doMachineDebugADBDisplay() {
   ImGui::TableSetupColumn("Addr", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
   ImGui::TableSetupColumn("Data", ImGuiTableColumnFlags_WidthFixed);
   ImGui::TableHeadersRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_KEYB_READ);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_ANYKEY_STROBE);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_ADB_MOUSE_DATA);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_ADB_MODKEY);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_ADB_STATUS);
+  ImGui::TableNextRow();
+  ImGui::TextUnformatted("");
+  ImGui::TableNextRow();
+  ImGui::TextUnformatted("");
   ImGui::EndTable();
 
   ImGui::TableNextColumn();

@@ -442,7 +442,7 @@ void ClemensBackend::inputEvent(const ClemensInputEvent& input) {
   CK_ASSERT_RETURN(*sInputKeys[input.type] != '\0');
   queue(Command{
     Command::Input,
-    fmt::format("{}={},{}", sInputKeys[input.type], input.value,
+    fmt::format("{}={},{},{}", sInputKeys[input.type], input.value_a, input.value_b,
                 input.adb_key_toggle_mask)}
   );
 }
@@ -461,9 +461,13 @@ void ClemensBackend::inputMachine(const std::string_view& inputParam) {
       //  oh why, oh why no straightforward C++ conversion from std::string_view
       //  to number
       auto commaPos = value.find(',');
-      auto inputValue = value.substr(0, commaPos);
-      auto inputModifiers = value.substr(commaPos + 1);
-      inputEvent.value = std::stoul(std::string(inputValue));
+      auto inputValueA = value.substr(0, commaPos);
+      auto inputValueB = value.substr(commaPos + 1);
+      commaPos = inputValueB.find(',');
+      auto inputModifiers = inputValueB.substr(commaPos + 1);
+      inputValueB = inputValueB.substr(0, commaPos);
+      inputEvent.value_a = (int16_t)std::stol(std::string(inputValueA));
+      inputEvent.value_b = (int16_t)std::stol(std::string(inputValueB));
       inputEvent.adb_key_toggle_mask = std::stoul(std::string(inputModifiers));
       clemens_input(&machine_, &inputEvent);
     }

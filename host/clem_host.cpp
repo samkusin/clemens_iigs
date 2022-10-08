@@ -205,14 +205,14 @@ void ClemensHost::input(const ClemensInputEvent &input) {
       clemens_input(&machine_, &input);
     } else if (machine_.mmio_bypass) {
       if (input.type == kClemensInputType_KeyDown) {
-        simpleMachineIO_.eventKeybA2 = input.value;
-        if (input.value == CLEM_ADB_KEY_LSHIFT ||
-            input.value == CLEM_ADB_KEY_RSHIFT) {
+        simpleMachineIO_.eventKeybA2 = input.value_a;
+        if (input.value_a == CLEM_ADB_KEY_LSHIFT ||
+            input.value_a == CLEM_ADB_KEY_RSHIFT) {
           simpleMachineIO_.modShift = true;
         }
       } else if (input.type == kClemensInputType_KeyUp) {
-        if (input.value == CLEM_ADB_KEY_LSHIFT ||
-            input.value == CLEM_ADB_KEY_RSHIFT) {
+        if (input.value_a == CLEM_ADB_KEY_LSHIFT ||
+            input.value_b == CLEM_ADB_KEY_RSHIFT) {
           simpleMachineIO_.modShift = false;
         }
       }

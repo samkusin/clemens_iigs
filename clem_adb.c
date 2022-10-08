@@ -99,11 +99,9 @@
 
 /* GLU register flags */
 #define CLEM_ADB_GLU_REG0_MOUSE_BTN 0x8000
-#define CLEM_ADB_GLU_REG0_MOUSE_Y_DIR 0x4000
-#define CLEM_ADB_GLU_REG0_MOUSE_Y_DELTA 0x3f00
+#define CLEM_ADB_GLU_REG0_MOUSE_Y_DELTA 0x7f00
 #define CLEM_ADB_GLU_REG0_MOUSE_ALWAYS_1 0x0080   /* Table 6-11 HWRef */
-#define CLEM_ADB_GLU_REG0_MOUSE_X_DIR 0x0040
-#define CLEM_ADB_GLU_REG0_MOUSE_X_DELTA 0x003f
+#define CLEM_ADB_GLU_REG0_MOUSE_X_DELTA 0x007f
 #define CLEM_ADB_GLU_REG2_KEY_CAPS_TOGGLE 0x0002
 #define CLEM_ADB_GLU_REG2_KEY_CLEAR_NUMLOCK 0x0080
 #define CLEM_ADB_GLU_REG2_KEY_APPLE 0x0100
@@ -1448,28 +1446,24 @@ static void _clem_adb_glu_queue_mouse(struct ClemensDeviceADB *adb, int16_t dx,
   if (adb->mouse.size >= CLEM_ADB_KEYB_BUFFER_LIMIT) {
     return;
   }
-  /*  Conversion to unsigned 6-bit values with the sign indicated by the 'DIR'
-      bit masks */
-  if (dy < 0) {
-    mouse |= CLEM_ADB_GLU_REG0_MOUSE_Y_DIR;
-    dy = (int16_t)(0x10000 - dy);
-  }
-  dy &= 0x3f;      /* clip to 6-bits */
-  mouse |= ((uint16_t)(dy) << 8);
-  if (dx < 0) {
-    mouse |= CLEM_ADB_GLU_REG0_MOUSE_X_DIR;
-    dx = (int16_t)(0x10000 - dx);
-  }
-  dx &= 0x3f;      /* clip to 6-bits  */
-  mouse |= dx;
 
-  if (adb->mouse.btn_down) mouse |= CLEM_ADB_GLU_REG0_MOUSE_BTN;
+  /*  Conversion to signed 7-bit values with limits +-63 */
+  if (dy < -63) {
+    dy = -63;
+  } else if (dy > 63) {
+    dy = 63;
+  }
+  mouse |= ((uint16_t)(dy & 0x7f) << 8);
+  if (dx < -63) {
+    dx = -63;
+  } else if (dx > 63) {
+    dx = 63;
+  }
+  mouse |= (dx & 0x7f);
 
-  /*
-  printf("mxy = %c:%u, %c:%u\n",
-    (mouse & CLEM_ADB_GLU_REG0_MOUSE_X_DIR) ? '-' : '+', dx,
-    (mouse & CLEM_ADB_GLU_REG0_MOUSE_Y_DIR) ? '-' : '+', dy);
-  */
+  if (adb->mouse.btn_down) mouse &= ~CLEM_ADB_GLU_REG0_MOUSE_BTN;
+  else mouse |= CLEM_ADB_GLU_REG0_MOUSE_BTN;
+
   adb->mouse.pos[adb->mouse.size++] = mouse;
 }
 
@@ -1493,12 +1487,21 @@ static void _clem_adb_glu_mouse_talk(struct ClemensDeviceADB *adb) {
   //  to be saved onto the data register.
   //  if mouse interrupts are enabled *and* a valid mouse event is avaiable,
   //  then issue the IRQ (CLEM_IRQ_ADB_MOUSE_EVT)
+  uint16_t mouse_reg;
 
-  if (adb->mouse.size <= 0)
+  //  this approach will result in lost events if they are not consumed
+  //  fase enough.  reevaluate
+  if (adb->mouse.size <= 0) {
+    _clem_adb_glu_queue_mouse(adb, 0, 0);
+  }
+  mouse_reg = _clem_adb_glu_unqueue_mouse(adb);
+  //  do not populate the data register until our client has had some time
+  //  to read in the X,Y.
+  if (adb->cmd_status & CLEM_ADB_C027_MOUSE_FULL)
     return;
 
-  /* TODO: some compression of mouse button + position events */
-  adb->mouse_reg[0] = _clem_adb_glu_unqueue_mouse(adb);
+  adb->mouse_reg[0] = mouse_reg;
+
   adb->cmd_status |= CLEM_ADB_C027_MOUSE_FULL;
 
   if (adb->cmd_status & CLEM_ADB_C027_MOUSE_IRQ) {
@@ -1843,10 +1846,10 @@ void clem_adb_device_input(struct ClemensDeviceADB *adb,
   //      and picking by the host.
   //      mouse events are polled
   //
-  unsigned key_index = input->value & 0x7f;
+  int16_t key_index = input->value_a & 0x7f;
   switch (input->type) {
   case kClemensInputType_KeyDown:
-    if (input->value == key_index) { /* filter unsupported keys */
+    if (input->value_a == key_index) { /* filter unsupported keys */
       // CLEM_LOG("Key Dn: %02X", key_index);
       if (!adb->keyb.states[key_index]) {
         _clem_adb_glu_queue_key(adb, key_index);
@@ -1855,7 +1858,7 @@ void clem_adb_device_input(struct ClemensDeviceADB *adb,
     }
     break;
   case kClemensInputType_KeyUp:
-    if (input->value == key_index) { /* filter unsupported keys */
+    if (input->value_a == key_index) { /* filter unsupported keys */
       // CLEM_LOG("Key Up: %02X", key_index);
       if (adb->keyb.states[key_index]) {
         _clem_adb_glu_queue_key(adb, 0x80 | key_index);
@@ -1872,8 +1875,7 @@ void clem_adb_device_input(struct ClemensDeviceADB *adb,
     _clem_adb_glu_queue_mouse(adb, 0, 0);
     break;
   case kClemensInputType_MouseMove:
-    _clem_adb_glu_queue_mouse(adb, (int16_t)(input->value & 0xffff),
-                              (int16_t)(input->value >> 16));
+    _clem_adb_glu_queue_mouse(adb, input->value_a, input->value_b);
     break;
   }
 
@@ -2125,19 +2127,20 @@ static uint8_t _clem_adb_read_modkeys(struct ClemensDeviceADB *adb) {
 static uint8_t _clem_adb_read_mouse_data(struct ClemensDeviceADB* adb,
                                          uint8_t flags) {
   //  alternate readying X and Y based on the current status flags
-  uint8_t result =
-    (adb->mouse_reg[0] & CLEM_ADB_GLU_REG0_MOUSE_BTN) ? 0x80 : 0x00;
+  uint8_t result = 0x00;
   if (adb->cmd_status & CLEM_ADB_C027_MOUSE_Y) {
-    result |= ((adb->mouse_reg[0] & CLEM_ADB_GLU_REG0_MOUSE_Y_DIR) >> 8);
-    result |= ((adb->mouse_reg[0] & CLEM_ADB_GLU_REG0_MOUSE_Y_DELTA) >> 8);
+    result |= (adb->mouse_reg[0] >> 8);
   } else {
-    result |= (adb->mouse_reg[0] & CLEM_ADB_GLU_REG0_MOUSE_X_DIR);
-    result |= (adb->mouse_reg[0] & CLEM_ADB_GLU_REG0_MOUSE_X_DELTA);
+    result |= (adb->mouse_reg[0] & 0xff);
   }
   if (!(flags & CLEM_OP_IO_NO_OP)) {
     adb->cmd_status ^= CLEM_ADB_C027_MOUSE_Y;
-    adb->irq_line &= ~CLEM_IRQ_ADB_MOUSE_EVT;
-    adb->cmd_status &= ~CLEM_ADB_C027_MOUSE_FULL;
+    if (!(adb->cmd_status & CLEM_ADB_C027_MOUSE_Y)) {
+      adb->cmd_status &= ~CLEM_ADB_C027_MOUSE_FULL;
+    }
+    if (adb->mouse_reg[0] != 0x8080) {
+      printf("c024: %c=%02X\n", (adb->cmd_status & CLEM_ADB_C027_MOUSE_Y) ? 'Y' : 'X', result);
+    }
   }
   return result;
 }
@@ -2194,6 +2197,7 @@ uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
     tmp = adb->cmd_status;
     if (!is_noop) {
       adb->cmd_status &= ~(CLEM_ADB_C027_KEY_FULL);
+      adb->irq_line &= ~(CLEM_IRQ_ADB_MOUSE_EVT);
     }
     return tmp;
   case CLEM_MMIO_REG_BTN0:
