@@ -482,7 +482,8 @@ void ClemensBackend::addBreakpoint(const ClemensBackendBreakpoint& breakpoint) {
   Command cmd;
   cmd.operand = fmt::format("{:s}:{:06X}",
     breakpoint.type == ClemensBackendBreakpoint::DataRead ? "r" :
-    breakpoint.type == ClemensBackendBreakpoint::Write ? "w" : "", breakpoint.address);
+    breakpoint.type == ClemensBackendBreakpoint::Write ? "w" :
+    breakpoint.type == ClemensBackendBreakpoint::IRQ ? "i" : "", breakpoint.address);
   cmd.type = Command::AddBreakpoint;
   queue(std::move(cmd));
 }
@@ -497,6 +498,8 @@ bool ClemensBackend::addBreakpoint(const std::string_view& inputParam) {
     bp.type = ClemensBackendBreakpoint::DataRead;
   } else if (type == "w") {
     bp.type = ClemensBackendBreakpoint::Write;
+  } else if (type == "i") {
+    bp.type = ClemensBackendBreakpoint::IRQ;
   } else {
     bp.type = ClemensBackendBreakpoint::Execute;
   }
@@ -898,6 +901,11 @@ std::optional<unsigned> ClemensBackend::checkHitBreakpoint() {
               return index;
             }
           }
+        }
+        break;
+      case ClemensBackendBreakpoint::IRQ:
+        if (machine_.cpu.state_type ==  kClemensCPUStateType_IRQ) {
+          return index;
         }
         break;
     }

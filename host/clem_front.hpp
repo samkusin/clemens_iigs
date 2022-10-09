@@ -73,6 +73,7 @@ private:
   bool cmdMessageLocal(std::string_view operand);
   void cmdSave(std::string_view operand);
   void cmdLoad(std::string_view operand);
+  void cmdGet(std::string_view operand);
 
 private:
   ClemensDisplayProvider displayProvider_;

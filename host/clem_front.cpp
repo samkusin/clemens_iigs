@@ -16,13 +16,18 @@
 #include <filesystem>
 #include <tuple>
 
+//  TODO: Break on IRQ
+//  TODO: List IRQ flags from emulator
+//  TODO: Mouse lock and release (via keyboard combo ctl-f12?)
+//  TODO: Mouse x,y scaling based on display view size vs desktop size
 //  TODO: Insert card to slot (non-gui)
+//  TODO: Mouse issues - in emulator - may be related to VGCINT?
 //  TODO: blank disk gui selection for disk set (selecting combo create will
 //        enable another input widget, unselecting will gray out that widget.)
-//  TODO: Fix 80 column mode and card vs internal slot 3 ram mapping
 //  TODO: preroll audio for some buffer on to handle sound clipping on lower end
 //        systems
 
+//  DONE: Fix 80 column mode and card vs internal slot 3 ram mapping
 //  DONE: restored mockingboard support
 //  DONE: Fix sound clipping/starvation
 //  DONE: Diagnostics
@@ -1983,6 +1988,8 @@ void ClemensFrontend::executeCommand(std::string_view command) {
     cmdSave(operand);
   } else if (action == "load") {
     cmdLoad(operand);
+  } else if (action == "get" || action == "g") {
+    cmdGet(operand);
   } else if (!action.empty()) {
     CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
   }
@@ -2014,7 +2021,11 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
   CLEM_TERM_COUT.print(TerminalLine::Info,
                        "b]reak erase,<index>        - remove breakpoint with index");
   CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "b]reak irq                  - break on IRQ");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
                        "b]reak list                 - list all breakpoints");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "g]et <register>             - return the current value of a register");
   CLEM_TERM_COUT.print(TerminalLine::Info,
                        "v]iew {memory|doc}          - view browser in context area");
   CLEM_TERM_COUT.print(TerminalLine::Info,
@@ -2054,15 +2065,19 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
   }
   if (operand == "list") {
       //  TODO: granular listing based on operand
-    static const char *bpType[] = {"unknown", "execute", "data-read", "write"};
+    static const char *bpType[] = {"unknown", "execute", "data-read", "write", "IRQ"};
     if (breakpoints_.empty()) {
       CLEM_TERM_COUT.print(TerminalLine::Info, "No breakpoints defined.");
       return;
     }
     for (size_t i = 0; i < breakpoints_.size(); ++i) {
       auto &bp = breakpoints_[i];
-      CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {:02X}/{:04X} {}", i,
-                            (bp.address >> 16) & 0xff, bp.address & 0xffff, bpType[bp.type]);
+      if (bp.type == ClemensBackendBreakpoint::IRQ) {
+        CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {}", i, bpType[bp.type]);
+      } else {
+        CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {:02X}/{:04X} {}", i,
+                              (bp.address >> 16) & 0xff, bp.address & 0xffff, bpType[bp.type]);
+      }
     }
     return;
   }
@@ -2087,6 +2102,11 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
       CLEM_TERM_COUT.format(TerminalLine::Error, "Breakpoint type {} is invalid.", typeStr);
       return;
     }
+  } else if (operand == "irq") {
+    breakpoint.type = ClemensBackendBreakpoint::IRQ;
+    breakpoint.address = 0x0;
+    backend_->addBreakpoint(breakpoint);
+    return;
   } else {
     breakpoint.type = ClemensBackendBreakpoint::Execute;
   }
@@ -2337,7 +2357,7 @@ void ClemensFrontend::cmdTrace(std::string_view operand) {
 
 std::string ClemensFrontend::cmdMessageFromBackend(std::string_view message,
                                                    const ClemensMachine* machine) {
-  auto [params, cmd, paramCount] = gatherMessageParams(message);
+  auto [params, cmd, paramCount] = gatherMessageParams(message, true);
   if (cmd == "dump") {
     unsigned startBank, endBank;
     if (std::from_chars(params[0].data(), params[0].data() + params[0].size(), startBank, 16).ec
@@ -2448,4 +2468,15 @@ void ClemensFrontend::cmdLoad(std::string_view operand) {
     return;
   }
   backend_->loadMachine(std::string(params[0]));
+}
+
+void ClemensFrontend::cmdGet(std::string_view operand) {
+  if (operand.empty()) {
+    CLEM_TERM_COUT.print(TerminalLine::Error, "Get requires a register name.");
+    return;
+  }
+  if (operand == "irqs") {
+    CLEM_TERM_COUT.format(TerminalLine::Info, "IRQ: {:08X}", frameReadState_.irqs);
+    return;
+  }
 }

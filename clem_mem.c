@@ -1017,9 +1017,8 @@ static void _clem_mmio_write(ClemensMachine *clem, uint8_t data, uint16_t addr,
   case CLEM_MMIO_REG_RTC_VGC_SCANINT:
     if (!(data & 0x40)) {
       _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_RTC_1SEC);
-    } else {
-      clem_vgc_write_switch(&mmio->vgc, &ref_clock, ioreg, data & ~0x40);
     }
+    clem_vgc_write_switch(&mmio->vgc, &ref_clock, ioreg, data & ~0x40);
     break;
   case CLEM_MMIO_REG_RTC_CTL:
     mmio->dev_rtc.ctl_c034 = data;

@@ -2138,9 +2138,6 @@ static uint8_t _clem_adb_read_mouse_data(struct ClemensDeviceADB* adb,
     if (!(adb->cmd_status & CLEM_ADB_C027_MOUSE_Y)) {
       adb->cmd_status &= ~CLEM_ADB_C027_MOUSE_FULL;
     }
-    if (adb->mouse_reg[0] != 0x8080) {
-      printf("c024: %c=%02X\n", (adb->cmd_status & CLEM_ADB_C027_MOUSE_Y) ? 'Y' : 'X', result);
-    }
   }
   return result;
 }
