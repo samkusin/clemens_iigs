@@ -287,6 +287,14 @@ static std::string getCommandTypeName(ClemensBackendCommand::Type type) {
   }
 }
 
+void ClemensFrontend::DOCStatus::copyFrom(const ClemensDeviceEnsoniq& doc) {
+  memcpy(voice, doc.voice, sizeof(voice));
+  memcpy(reg, doc.reg, sizeof(reg));
+  memcpy(acc, doc.acc, sizeof(acc));
+  memcpy(ptr, doc.ptr, sizeof(ptr));
+  memcpy(osc_flags, doc.osc_flags, sizeof(osc_flags));
+}
+
 ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
     : displayProvider_(systemFontLoBuffer, systemFontHiBuffer), display_(displayProvider_),
@@ -388,7 +396,8 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
     frameWriteState_.mmioWasInitialized = state.mmio_was_initialized;
     frameWriteState_.isTracing = state.isTracing;
     frameWriteState_.emulatorSpeedMhz = state.emulatorSpeedMhz;
-
+    frameWriteState_.emulatorClock.ts = state.machine->clocks_spent;
+    frameWriteState_.emulatorClock.ref_step = CLEM_CLOCKS_MEGA2_CYCLE;
     //  copy over component state as needed
     frameWriteState_.vgcModeFlags = state.machine->mmio.vgc.mode_flags;
     frameWriteState_.irqs = state.machine->mmio.irq_line;
@@ -478,9 +487,17 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
         clem_read(state.machine, &memoryView[addr], addr, state.debugMemoryPage,
                   CLEM_MEM_FLAG_NULL);
       }
+
+      constexpr size_t kDOCRAMSize = 65536;
+
+      frameWriteState_.docRAM = (uint8_t*)frameWriteMemory_.allocate(kDOCRAMSize);
+      memcpy(frameWriteState_.docRAM, &state.machine->mmio.dev_audio.doc.sound_ram,
+             kDOCRAMSize);
     } else {
       frameWriteState_.memoryView = nullptr;
+      frameWriteState_.docRAM = nullptr;
     }
+    frameWriteState_.doc.copyFrom(state.machine->mmio.dev_audio.doc);
 
     const ClemensBackendDiskDriveState *driveState = state.diskDrives;
     for (auto &diskDrive : frameWriteState_.diskDrives) {
@@ -780,7 +797,7 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
   ImGui::Begin("Status", nullptr,
                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                    ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                   ImGuiWindowFlags_NoMove);
+                   ImGuiWindowFlags_NoMove );
   doMachineDiagnosticsDisplay();
   ImGui::Separator();
   doMachineDiskDisplay();
@@ -801,46 +818,72 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
       doMachineDebugDiskIODisplay();
       ImGui::EndTabItem();
     }
-    if (ImGui::BeginTabItem("ADB")) {
+    if (ImGui::BeginTabItem("Input")) {
       doMachineDebugADBDisplay();
+      ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem("Sound")) {
+      doMachineDebugSoundDisplay();
       ImGui::EndTabItem();
     }
     ImGui::EndTabBar();
   }
   ImGui::Separator();
-  doMachineDebugMemoryDisplay();
-
+  ImGui::BeginChild("MachineStateLower", ImGui::GetContentRegionAvail());
+  if (ImGui::BeginTabBar("CompDebug")) {
+    if (ImGui::BeginTabItem("Memory")) {
+      doMachineDebugMemoryDisplay();
+      ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem("DOC")) {
+      doMachineDebugDOCDisplay();
+      ImGui::EndTabItem();
+    }
+    ImGui::EndTabBar();
+  }
+  ImGui::EndChild();
   ImGui::End();
 }
 
 void ClemensFrontend::doMachineDiagnosticsDisplay() {
-  ImGui::BeginTable("Diagnostics", 4);
+  auto fontCharSize = ImGui::GetFont()->GetCharAdvance('A');
+  auto emulatorTime = (uint64_t)(clem_calc_secs_from_clocks(&frameReadState_.emulatorClock) * 1000);
+  ImGui::BeginTable("Diagnostics", 3);
+  ImGui::TableSetupColumn("CPU", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 10);
+  ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);
+  ImGui::TableSetupColumn("Value");
+  ImGui::TableNextRow();
   ImGui::TableNextColumn();
   ImGui::Text("CPU %02u", clem_host_get_processor_number());
   ImGui::TableNextColumn();
   ImGui::Text("GUI");
   ImGui::TableNextColumn();
-  ImGui::Text("%0.1f", ImGui::GetIO().Framerate);
-  ImGui::TableNextColumn();
-  ImGui::Text("fps");
+  ImGui::Text("%3.1f fps", ImGui::GetIO().Framerate);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
   ImGui::Text("CPU %02u", frameReadState_.backendCPUID);
   ImGui::TableNextColumn();
   ImGui::Text("EMU");
   ImGui::TableNextColumn();
-  ImGui::Text("%0.1f", frameReadState_.fps);
-  ImGui::TableNextColumn();
-  ImGui::Text("fps");
+  ImGui::Text("%3.1f fps", frameReadState_.fps);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
   ImGui::Text("");
   ImGui::TableNextColumn();
   ImGui::Text("RUN");
   ImGui::TableNextColumn();
-  ImGui::Text("%0.3f", frameReadState_.emulatorSpeedMhz);
+  ImGui::Text("%3.3f mhz", frameReadState_.emulatorSpeedMhz);
+  ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::Text("mhz");
+  ImGui::Text("");
+  ImGui::TableNextColumn();
+  ImGui::Text("TIME");
+  ImGui::TableNextColumn();
+  unsigned hours = emulatorTime / 3600000;
+  unsigned minutes = (emulatorTime % 3600000) / 60000;
+  unsigned seconds = ((emulatorTime % 3600000) % 60000) / 1000;
+  unsigned milliseconds = ((emulatorTime % 3600000) % 60000) % 1000;
+  ImGui::Text("%02u:%02u:%02u.%03u", hours, minutes, seconds, milliseconds);
   ImGui::EndTable();
 }
 
@@ -1071,6 +1114,81 @@ void ClemensFrontend::doMachineDebugMemoryDisplay() {
   debugMemoryEditor_.OptAddrDigitsCount = 4;
   debugMemoryEditor_.Cols = 8;
   debugMemoryEditor_.DrawContents(this, CLEM_IIGS_BANK_SIZE, (size_t)(bank) << 16);
+}
+
+void ClemensFrontend::doMachineDebugDOCDisplay() {
+
+  auto& doc = frameReadState_.doc;
+
+  ImGui::BeginTable("MMIO_Ensoniq_Global", 3);
+  {
+    ImGui::TableSetupColumn("OIR");
+    ImGui::TableSetupColumn("OSC");
+    ImGui::TableSetupColumn("ADC");
+    ImGui::TableHeadersRow();
+    ImGui::TableNextColumn();
+    ImGui::Text("%c:%u", doc.reg[CLEM_ENSONIQ_REG_OSC_OIR] & 0x80 ? '-' : 'I',
+                         (doc.reg[CLEM_ENSONIQ_REG_OSC_OIR] >> 1) & 0x1f);
+    ImGui::TableNextColumn();
+    ImGui::Text("%u", doc.reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1);
+    ImGui::TableNextColumn();
+    ImGui::Text("%02X", doc.reg[CLEM_ENSONIQ_REG_OSC_ADC]);
+  }
+  ImGui::EndTable();
+
+  //  OSC 0, 1, ... N
+  //  Per OSC: Control: Halt, Mode, Channel, IE, IRQ
+  //           Data, ACC, PTR
+  //
+  auto contentAvail = ImGui::GetContentRegionAvail();
+  auto fontCharSize = ImGui::GetFont()->GetCharAdvance('A');
+  unsigned oscCount = doc.reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1;
+  ImGui::BeginTable("MMIO_Ensoniq_OSC", 10, ImGuiTableFlags_ScrollY, contentAvail);
+  {
+    ImGui::TableSetupColumn("OSC");
+    ImGui::TableSetupColumn("IE");
+    ImGui::TableSetupColumn("IR");
+    ImGui::TableSetupColumn("M1");
+    ImGui::TableSetupColumn("M0");
+    ImGui::TableSetupColumn("CH");
+    ImGui::TableSetupColumn("FC", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
+    ImGui::TableSetupColumn("ACC", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);
+    ImGui::TableSetupColumn("TBL", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
+    ImGui::TableSetupColumn("PTR", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
+    ImGui::TableHeadersRow();
+    ImColor oscActiveColor(0, 255, 255);
+    ImColor oscHalted(64, 64, 64);
+    for (unsigned oscIndex = 0; oscIndex < oscCount; ++oscIndex) {
+      auto ctl = doc.reg[CLEM_ENSONIQ_REG_OSC_CTRL + oscIndex];
+      uint16_t fc =
+        ((uint16_t)doc.reg[CLEM_ENSONIQ_REG_OSC_FCHI + oscIndex] << 8) |
+          doc.reg[CLEM_ENSONIQ_REG_OSC_FCLOW + oscIndex];
+      auto flags = doc.osc_flags[oscIndex];
+      const ImColor& col = (ctl & CLEM_ENSONIQ_OSC_CTL_HALT) ? oscHalted : oscActiveColor;
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%u", oscIndex);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_IE) ? '1' : '0');
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%c", (flags & CLEM_ENSONIQ_OSC_FLAG_IRQ) ? 'I' : ' ');
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_SYNC) ? '1' : '0');
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_M0) ? '1' : '0');
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%u", (ctl >> 4));
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%04X", fc);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%06X", doc.acc[oscIndex] & 0x00ffffff);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%04X", (uint16_t)doc.reg[CLEM_ENSONIQ_REG_OSC_PTR + oscIndex] << 8);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%04X",  doc.ptr[oscIndex]);
+      ImGui::TableNextRow();
+    }
+  }
+  ImGui::EndTable();
 }
 
 ImU8 ClemensFrontend::imguiMemoryEditorRead(const ImU8* mem_ptr, size_t off) {
@@ -1438,9 +1556,57 @@ void ClemensFrontend::doMachineDebugADBDisplay() {
   ImGui::TableNextRow();
   doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_ADB_STATUS);
   ImGui::TableNextRow();
-  ImGui::TextUnformatted("");
+  ImGui::TableNextColumn();
+  ImGui::TextUnformatted(" ");
   ImGui::TableNextRow();
-  ImGui::TextUnformatted("");
+  ImGui::TableNextColumn();
+  ImGui::TextUnformatted(" ");
+  ImGui::EndTable();
+
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("PARAMS", 2, ImGuiTableFlags_SizingFixedFit);
+  ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 8);
+  ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);
+  ImGui::TableHeadersRow();
+  ImGui::EndTable();
+
+  ImGui::EndTable();
+}
+
+void ClemensFrontend::doMachineDebugSoundDisplay() {
+  auto* ioregs = frameReadState_.ioPage;
+  //auto& iwmState = frameReadState_.iwm;
+
+  if (!ioregs) return;
+
+  auto fontCharSize = ImGui::GetFont()->GetCharAdvance('A');
+
+  ImGui::BeginTable("IODEBUG", 2);
+  ImGui::TableSetupColumn("Col1");
+  ImGui::TableSetupColumn("Col2");
+  ImGui::TableNextRow();
+
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("IOREGS", 3);
+  ImGui::TableSetupColumn("Symbol", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 9);
+  ImGui::TableSetupColumn("Addr", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
+  ImGui::TableSetupColumn("Data", ImGuiTableColumnFlags_WidthFixed);
+  ImGui::TableHeadersRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_AUDIO_CTL);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_AUDIO_DATA);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_AUDIO_ADRLO);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_AUDIO_ADRHI);
+  ImGui::TableNextRow();
+  ImGui::TextUnformatted(" ");
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::TextUnformatted(" ");
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::TextUnformatted(" ");
   ImGui::EndTable();
 
   ImGui::TableNextColumn();
