@@ -1130,7 +1130,7 @@ void ClemensFrontend::doMachineDebugDOCDisplay() {
     ImGui::Text("%c:%u", doc.reg[CLEM_ENSONIQ_REG_OSC_OIR] & 0x80 ? '-' : 'I',
                          (doc.reg[CLEM_ENSONIQ_REG_OSC_OIR] >> 1) & 0x1f);
     ImGui::TableNextColumn();
-    ImGui::Text("%u", doc.reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1);
+    ImGui::Text("%u + 1", (doc.reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1));
     ImGui::TableNextColumn();
     ImGui::Text("%02X", doc.reg[CLEM_ENSONIQ_REG_OSC_ADC]);
   }
@@ -1142,7 +1142,7 @@ void ClemensFrontend::doMachineDebugDOCDisplay() {
   //
   auto contentAvail = ImGui::GetContentRegionAvail();
   auto fontCharSize = ImGui::GetFont()->GetCharAdvance('A');
-  unsigned oscCount = doc.reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1;
+  unsigned oscCount = (doc.reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1) + 1;
   ImGui::BeginTable("MMIO_Ensoniq_OSC", 10, ImGuiTableFlags_ScrollY, contentAvail);
   {
     ImGui::TableSetupColumn("OSC");

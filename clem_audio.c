@@ -122,7 +122,7 @@ void clem_ensoniq_reset(struct ClemensDeviceEnsoniq* doc) {
   // ensures no interrupt triggered
   doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] = 0xff;
   // 1 oscillator x 2 at minimum enabled
-  doc->reg[CLEM_ENSONIQ_REG_OSC_ENABLE] = 2;
+  doc->reg[CLEM_ENSONIQ_REG_OSC_ENABLE] = 0;
   // unsigned wave, so 0x80 == 0 signed
   doc->reg[CLEM_ENSONIQ_REG_OSC_ADC] = 0x80;
 }
@@ -215,7 +215,8 @@ uint8_t clem_ensoniq_oscillator_cycle(struct ClemensDeviceEnsoniq* doc,
 
 uint32_t clem_ensoniq_sync(struct ClemensDeviceEnsoniq* doc,
                        clem_clocks_duration_t dt_clocks) {
-  unsigned osc_cnt = doc->reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1;
+  // 1 oscillator x 2 at minimum enabled - i.e. we always enable 2 by default
+  unsigned osc_cnt = (doc->reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1) + 1;
 
   doc->dt_budget += dt_clocks;
 
@@ -248,7 +249,7 @@ unsigned clem_ensoniq_voices(struct ClemensDeviceEnsoniq* doc) {
   //  run through all enabled non-halted oscillators
   //  if the oscillator is in AM mode (sync, odd oscillator modules the lower
   //  even?) and ignore the volume setting for the oscillator
-  unsigned osc_cnt = doc->reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1;
+  unsigned osc_cnt = (doc->reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1) + 1;
   unsigned osc_max_channels = 0;
   unsigned osc_idx, voice_idx;
   for (osc_idx = 0; osc_idx < osc_cnt; ++osc_idx) {
