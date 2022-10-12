@@ -58,7 +58,9 @@ ClemensTraceExecutedInstruction& ClemensProgramTrace::addExecutedInstruction(
   //  check instruction before and after our newly added instruction to see if
   //    there's overlap
   //    if overlap, convert those actions to misc bytes
-
+  if (machineState.cpu.regs.PC == 0x125 && machineState.cpu.regs.PBR == 0xfe) {
+    printf("TBC: %04X (%s)\n", machineState.cpu.regs.X,  kToolsetNames[(machineState.cpu.regs.X & 0xff)-1]);
+  }
 
   //  find where in the action list to insert our instruction
   uint32_t newCurrentActionIdx;
@@ -234,11 +236,12 @@ bool ClemensProgramTrace::exportTrace(const char* filename)
         char* out = &line[0];
         size_t outLeft = sizeof(line);
         int amt;
-        if ((tbc.call & 0xff) >= kToolsetNames.size()) {
+        unsigned toolset = tbc.call - 1;
+        if ((toolset & 0xff) >= kToolsetNames.size()) {
           amt = snprintf(out, outLeft, "%02X:%04X CALL #%04X ???", tbc.pbr, tbc.pc, tbc.call);
         } else {
           amt = snprintf(out, outLeft, "%02X:%04X CALL #%04X %s", tbc.pbr, tbc.pc, tbc.call,
-                         kToolsetNames[tbc.call & 0xff]);
+                         kToolsetNames[toolset & 0xff]);
 
         }
         outLeft -= amt;

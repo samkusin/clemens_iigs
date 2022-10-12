@@ -304,7 +304,8 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
       frameSeqNo_(std::numeric_limits<decltype(frameSeqNo_)>::max()),
       frameLastSeqNo_(std::numeric_limits<decltype(frameLastSeqNo_)>::max()), lastFrameCPUPins_{},
       lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0), lastFrameNMIs_(0),
-      emulatorHasKeyboardFocus_(true), terminalMode_(TerminalMode::Command),
+      emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false),
+      terminalMode_(TerminalMode::Command),
       guiMode_(GUIMode::Emulator),diskLibraryRootPath_{
           (std::filesystem::current_path() / std::filesystem::path(CLEM_HOST_LIBRARY_DIR))
               .string()},
@@ -341,7 +342,14 @@ ClemensFrontend::~ClemensFrontend() {
 }
 
 void ClemensFrontend::input(ClemensInputEvent input) {
-  if (emulatorHasKeyboardFocus_) {
+  if (input.type == kClemensInputType_MouseButtonDown ||
+      input.type == kClemensInputType_MouseButtonUp ||
+      input.type == kClemensInputType_MouseMove) {
+    if (!emulatorHasMouseFocus_) {
+      input.type = kClemensInputType_None;
+    }
+  }
+  if (emulatorHasKeyboardFocus_ && input.type != kClemensInputType_None) {
     if (input.type == kClemensInputType_MouseMove) {
       input.value_a = std::clamp(input.value_a, (int16_t)(-63), (int16_t)(63));
       input.value_b = std::clamp(input.value_b, (int16_t)(-63), (int16_t)(63));
@@ -576,7 +584,8 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
   framePublished_.notify_one();
 }
 
-void ClemensFrontend::frame(int width, int height, float deltaTime) {
+void ClemensFrontend::frame(int width, int height, float deltaTime,
+                            FrameAppInterop& interop) {
   //  send commands to emulator thread
   //  get results from emulator thread
   //    video, audio, machine state, etc
@@ -774,6 +783,12 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
   }
 
   backend_->publish();
+
+  if (ImGui::IsKeyPressed(ImGuiKey_Space) && ImGui::GetIO().KeyAlt && ImGui::GetIO().KeySuper) {
+    emulatorHasMouseFocus_ = false;
+  }
+
+  interop.mouseLock = emulatorHasMouseFocus_;
 }
 
 static ImColor getModifiedColor(bool hi) {
@@ -1645,6 +1660,10 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
   } else {
     emulatorHasKeyboardFocus_ = false;
   }
+  if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    emulatorHasMouseFocus_ = ImGui::IsWindowHovered();
+  }
+
   ImGui::End();
 }
 
@@ -2156,6 +2175,8 @@ void ClemensFrontend::executeCommand(std::string_view command) {
     cmdLoad(operand);
   } else if (action == "get" || action == "g") {
     cmdGet(operand);
+  } else if (action == "mouse") {
+    cmdADBMouse(operand);
   } else if (!action.empty()) {
     CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
   }
@@ -2206,6 +2227,9 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
                        "save <pathname>             - saves a snapshot into the snapshots folder");
   CLEM_TERM_COUT.print(TerminalLine::Info,
                        "load <pathname>             - loads a snapshot into the snapshots folder");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "adbmouse <dx>,<dy>,"
+                       "         <btn{1|0}>         - injects a mouse event into the adb input stream");
   CLEM_TERM_COUT.newline();
 }
 
@@ -2573,7 +2597,7 @@ bool ClemensFrontend::cmdMessageLocal(std::string_view message) {
     return false;
   } else if (cmd == "dump") {
     bool isOk = true;
-    std::filesystem::path outPath = params[0];
+    auto outPath = std::filesystem::path(CLEM_HOST_TRACES_DIR) / params[0];
     std::ios_base::openmode flags = std::ios_base::out | std::ios_base::binary;
     std::ofstream outstream(outPath, flags);
     if (outstream.is_open()) {
@@ -2645,4 +2669,37 @@ void ClemensFrontend::cmdGet(std::string_view operand) {
     CLEM_TERM_COUT.format(TerminalLine::Info, "IRQ: {:08X}", frameReadState_.irqs);
     return;
   }
+}
+
+void ClemensFrontend::cmdADBMouse(std::string_view operand) {
+  auto [params, cmd, paramCount] = gatherMessageParams(operand);
+  ClemensInputEvent input;
+
+  if (paramCount == 2) {
+    int16_t dx, dy;
+    if (std::from_chars(params[0].data(), params[0].data() + params[0].size(), dx).ec != std::errc{}) {
+      CLEM_TERM_COUT.print(TerminalLine::Error, "ADBMouse delta X could not be parsed.");
+      return;
+    }
+    if (std::from_chars(params[0].data(), params[0].data() + params[0].size(), dy).ec != std::errc{}) {
+      CLEM_TERM_COUT.print(TerminalLine::Error, "ADBMouse delta Y could not be parsed.");
+      return;
+    }
+    input.type = kClemensInputType_MouseMove;
+    input.value_a = dx;
+    input.value_b = dy;
+  } else if (paramCount == 1) {
+    int btn;
+    if (std::from_chars(params[0].data(), params[0].data() + params[0].size(), btn).ec != std::errc{}) {
+      CLEM_TERM_COUT.print(TerminalLine::Error, "ADBMouse button state could not be parsed.");
+      return;
+    }
+    input.type = btn == 0 ? kClemensInputType_MouseButtonDown : kClemensInputType_MouseButtonUp;
+    input.value_a = 0x01;
+    input.value_b = 0x01;
+  } else {
+    CLEM_TERM_COUT.print(TerminalLine::Error, "ADBMouse invalid parameters.");
+    return;
+  }
+  backend_->inputEvent(input);
 }

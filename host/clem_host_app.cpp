@@ -12,13 +12,7 @@
 #include <cstdio>
 #include <filesystem>
 
-#define CLEMENS_NEW_GUI
-
-#ifdef CLEMENS_NEW_GUI
 #include "clem_front.hpp"
-#else
-#include "clem_host.hpp"
-#endif
 
 #define SOKOL_IMPL
 #include "sokol/sokol_app.h"
@@ -27,11 +21,7 @@
 #include "sokol/sokol_imgui.h"
 
 
-#ifdef CLEMENS_NEW_GUI
 static ClemensFrontend* g_Host = nullptr;
-#else
-static ClemensHost* g_Host = nullptr;
-#endif
 static ClemensHostTimePoint g_LastTimepoint;
 static sg_pass_action g_sgPassAction;
 static unsigned g_ADBKeyToggleMask = 0;
@@ -92,11 +82,9 @@ static void imguiFontSetup(const cinek::ByteBuffer& systemFontLoBuffer,
 }
 
 static void initDirectories() {
-#ifdef CLEMENS_NEW_GUI
   std::filesystem::create_directory(CLEM_HOST_LIBRARY_DIR);
   std::filesystem::create_directory(CLEM_HOST_SNAPSHOT_DIR);
   std::filesystem::create_directory(CLEM_HOST_TRACES_DIR);
-#endif
 }
 
 static void onInit()
@@ -116,9 +104,7 @@ static void onInit()
   g_sgPassAction.colors[0].value = { 0.0f, 0.5f, 0.75f, 1.0f };
 
   simgui_desc_t simguiDesc = {};
-#ifdef CLEMENS_NEW_GUI
   simguiDesc.no_default_font = true;
-#endif
   simgui_setup(simguiDesc);
 
   g_sokolToADBKey.fill((unsigned)(-1));
@@ -229,12 +215,8 @@ static void onInit()
 
   auto systemFontLoBuffer = loadFont("fonts/PrintChar21.ttf");
   auto systemFontHiBuffer = loadFont("fonts/PRNumber3.ttf");
-#ifdef CLEMENS_NEW_GUI
   imguiFontSetup(systemFontLoBuffer, systemFontHiBuffer);
   g_Host = new ClemensFrontend(systemFontLoBuffer, systemFontHiBuffer);
-#else
-  g_Host = new ClemensHost(systemFontLoBuffer, systemFontHiBuffer);
-#endif
   free(systemFontLoBuffer.getHead());
   free(systemFontHiBuffer.getHead());
 }
@@ -251,7 +233,10 @@ static void onFrame()
 
   simgui_new_frame(frameWidth, frameHeight, deltaTime);
 
-  g_Host->frame(frameWidth, frameHeight, deltaTime);
+  ClemensFrontend::FrameAppInterop interop;
+  interop.mouseLock = sapp_mouse_locked();
+  g_Host->frame(frameWidth, frameHeight, deltaTime, interop);
+  sapp_lock_mouse(interop.mouseLock);
 
   sg_begin_default_pass(&g_sgPassAction, frameWidth, frameHeight);
   simgui_render();

@@ -314,6 +314,7 @@ static void _clem_mmio_mega2_inten_set(struct ClemensMMIO *mmio, uint8_t data) {
   if (data & 0x07) {
     CLEM_WARN("clem_mmio: mega2 mouse not impl - set %02X", data);
   }
+  printf("SET C041 = %02X\n", data);
 }
 
 static uint8_t _clem_mmio_mega2_inten_get(struct ClemensMMIO *mmio) {

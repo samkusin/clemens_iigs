@@ -28,8 +28,12 @@ public:
                   const cinek::ByteBuffer &systemFontHiBuffer);
   ~ClemensFrontend();
 
+  struct FrameAppInterop {
+    bool mouseLock;
+  };
+
   //  application rendering hook
-  void frame(int width, int height, float deltaTime);
+  void frame(int width, int height, float deltaTime, FrameAppInterop& interop);
   //  application input from OS
   void input(ClemensInputEvent input);
 
@@ -74,6 +78,7 @@ private:
   void cmdSave(std::string_view operand);
   void cmdLoad(std::string_view operand);
   void cmdGet(std::string_view operand);
+  void cmdADBMouse(std::string_view operand);
 
 private:
   ClemensDisplayProvider displayProvider_;
@@ -201,6 +206,7 @@ private:
   uint32_t lastFrameIRQs_, lastFrameNMIs_;
   uint8_t lastFrameIORegs_[256];
   bool emulatorHasKeyboardFocus_;
+  bool emulatorHasMouseFocus_;
 
   struct TerminalLine {
     enum Type { Debug, Info, Warn, Error, Command, Opcode };
