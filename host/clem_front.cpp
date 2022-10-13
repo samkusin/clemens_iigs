@@ -16,17 +16,17 @@
 #include <filesystem>
 #include <tuple>
 
-//  TODO: Break on IRQ
-//  TODO: List IRQ flags from emulator
-//  TODO: Mouse lock and release (via keyboard combo ctl-f12?)
-//  TODO: Mouse x,y scaling based on display view size vs desktop size
 //  TODO: Insert card to slot (non-gui)
-//  TODO: Mouse issues - in emulator - may be related to VGCINT?
+//  TODO: Mouse x,y scaling based on display view size vs desktop size
 //  TODO: blank disk gui selection for disk set (selecting combo create will
 //        enable another input widget, unselecting will gray out that widget.)
 //  TODO: preroll audio for some buffer on to handle sound clipping on lower end
 //        systems
 
+//  DONE: Break on IRQ
+//  DONE: List IRQ flags from emulator
+//  DONE: Mouse lock and release (via keyboard combo ctl-f12?)
+//  DONE: Mouse issues - in emulator - may be related to VGCINT?
 //  DONE: Fix 80 column mode and card vs internal slot 3 ram mapping
 //  DONE: restored mockingboard support
 //  DONE: Fix sound clipping/starvation
@@ -673,6 +673,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime,
       CLEM_TERM_COUT.format(TerminalLine::Info, "Breakpoint {} hit {:02X}/{:04X}.", bpIndex,
                             (breakpoints_[bpIndex].address >> 16) & 0xff,
                             breakpoints_[bpIndex].address & 0xffff);
+      emulatorHasMouseFocus_ = false;
       lastCommandState_.hitBreakpoint = std::nullopt;
     }
     if (lastCommandState_.message.has_value()) {
@@ -2175,7 +2176,7 @@ void ClemensFrontend::executeCommand(std::string_view command) {
     cmdLoad(operand);
   } else if (action == "get" || action == "g") {
     cmdGet(operand);
-  } else if (action == "mouse") {
+  } else if (action == "adbmouse") {
     cmdADBMouse(operand);
   } else if (!action.empty()) {
     CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
@@ -2228,8 +2229,9 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
   CLEM_TERM_COUT.print(TerminalLine::Info,
                        "load <pathname>             - loads a snapshot into the snapshots folder");
   CLEM_TERM_COUT.print(TerminalLine::Info,
-                       "adbmouse <dx>,<dy>,"
-                       "         <btn{1|0}>         - injects a mouse event into the adb input stream");
+                       "adbmouse <dx>,<dy>          - injects a mouse move event");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "adbmouse {0|1}              - injects a mouse button event (1=up, 0=down)");
   CLEM_TERM_COUT.newline();
 }
 
@@ -2681,7 +2683,7 @@ void ClemensFrontend::cmdADBMouse(std::string_view operand) {
       CLEM_TERM_COUT.print(TerminalLine::Error, "ADBMouse delta X could not be parsed.");
       return;
     }
-    if (std::from_chars(params[0].data(), params[0].data() + params[0].size(), dy).ec != std::errc{}) {
+    if (std::from_chars(params[1].data(), params[1].data() + params[1].size(), dy).ec != std::errc{}) {
       CLEM_TERM_COUT.print(TerminalLine::Error, "ADBMouse delta Y could not be parsed.");
       return;
     }
@@ -2702,4 +2704,5 @@ void ClemensFrontend::cmdADBMouse(std::string_view operand) {
     return;
   }
   backend_->inputEvent(input);
+  CLEM_TERM_COUT.print(TerminalLine::Info, "Input sent.");
 }

@@ -566,10 +566,8 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr,
   uint8_t ioreg = addr & 0xff;
   bool is_noop = (flags & CLEM_OP_IO_NO_OP) != 0;
 
-  if (!(flags & CLEM_OP_IO_NO_OP)) {
-    /* disk motor speed registers */
-    *mega2_access = true;
-  }
+  //  TODO: some registers go through the CYA access path which runs faster
+  *mega2_access = true;
 
   ref_clock.ts = clem->clocks_spent;
   ref_clock.ref_step =
@@ -592,9 +590,6 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr,
                                          ioreg, flags | CLEM_OP_IO_DEVSEL);
       }
     }
-
-    /* TODO: assuming reads from card memory via MEGA2 are slow */
-    *mega2_access = true;
 
     return result;
   }

@@ -227,7 +227,7 @@ void clem_vgc_sync(struct ClemensVGC *vgc, struct ClemensClock *clock,
     if (frame_ns >= CLEM_VGC_NTSC_SCAN_TIME_NS) {
       vgc->ts_scanline_0 =
           clock->ts -
-          clem_calc_clocks_step_from_ns(CLEM_VGC_NTSC_SCAN_TIME_NS - frame_ns,
+          clem_calc_clocks_step_from_ns(frame_ns - CLEM_VGC_NTSC_SCAN_TIME_NS,
                                         clock->ref_step);
       vgc->vbl_started = false;
     }
@@ -247,7 +247,7 @@ uint8_t clem_vgc_read_switch(struct ClemensVGC *vgc, struct ClemensClock *clock,
                                                clock->ref_step);
   /* 65 cycles per horizontal scanline, 980 ns per horizontal count = 63.7us*/
   v_counter = _clem_vgc_calc_v_counter(scan_time_ns);
-  h_counter = _clem_vgc_calc_v_counter(
+  h_counter = _clem_vgc_calc_h_counter(
       clem_calc_ns_step_from_clocks(vgc->dt_scanline, clock->ref_step));
 
   switch (ioreg) {

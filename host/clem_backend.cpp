@@ -581,13 +581,15 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
   auto fixedFrameInterval =
     std::chrono::microseconds((long)std::floor(1e6/emulatorRefreshFrequency));
   auto lastFrameTimePoint = std::chrono::high_resolution_clock::now();
+  std::optional<unsigned> hitBreakpoint;
+  std::optional<bool> commandFailed;
+  std::optional<Command::Type> commandType;
+  std::optional<std::string> debugMessage;
+
   while (!isTerminated) {
     bool isRunning = !stepsRemaining.has_value() || *stepsRemaining > 0;
     bool publishState = false;
     bool updateSeqNo = false;
-    std::optional<bool> commandFailed;
-    std::optional<Command::Type> commandType;
-    std::optional<std::string> debugMessage;
 
     std::unique_lock<std::mutex> queuelock(commandQueueMutex_);
     if (!isRunning) {
@@ -697,7 +699,6 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       continue;
     }
     //  if isRunning is false, we use a condition var/wait to hold the thread
-    std::optional<unsigned> hitBreakpoint;
     if (isRunning && !isTerminated) {
       //  Run the emulator in either 'step' or 'run' mode.
       //
@@ -865,6 +866,10 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       }
       logOutput_.clear();
       loggedInstructions_.clear();
+      hitBreakpoint = std::nullopt;
+      commandFailed = std::nullopt;
+      commandType = std::nullopt;
+      debugMessage = std::nullopt;
     }
   } // !isTerminated
 
