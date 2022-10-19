@@ -1793,7 +1793,7 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
   //  Start BIT
   case CLEM_OPC_BIT_IMM:
     _clem_read_pba_mode_imm_816(clem, &tmp_value, &tmp_pc, m_status);
-    _cpu_bit(cpu, tmp_value, m_status);
+    _cpu_bit_imm(cpu, tmp_value, m_status);
     _opcode_instruction_define(&opc_inst, IR, tmp_value, m_status);
     break;
   case CLEM_OPC_BIT_ABS:

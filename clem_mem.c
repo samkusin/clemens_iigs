@@ -314,7 +314,6 @@ static void _clem_mmio_mega2_inten_set(struct ClemensMMIO *mmio, uint8_t data) {
   if (data & 0x07) {
     CLEM_WARN("clem_mmio: mega2 mouse not impl - set %02X", data);
   }
-  printf("SET C041 = %02X\n", data);
 }
 
 static uint8_t _clem_mmio_mega2_inten_get(struct ClemensMMIO *mmio) {
@@ -1765,6 +1764,7 @@ void clem_read(ClemensMachine *clem, uint8_t *data, uint16_t adr, uint8_t bank,
   uint16_t offset = ((uint16_t)page->read << 8) | (adr & 0xff);
   bool read_only = (flags == CLEM_MEM_FLAG_NULL);
   bool mega2_access = false;
+  bool io_access = false;
 
   // TODO: store off if read_reg has a read_count of 1 here
   //       reset it automatically if true at the end of this function
@@ -1780,6 +1780,7 @@ void clem_read(ClemensMachine *clem, uint8_t *data, uint16_t adr, uint8_t bank,
     } else {
       CLEM_ASSERT(false);
     }
+    io_access = true;
   } else if (!(page->flags & CLEM_MEM_PAGE_TYPE_MASK) ||
              (page->flags & CLEM_MEM_PAGE_BANK_MASK)) {
     uint8_t *bank_mem;
@@ -1812,6 +1813,7 @@ void clem_read(ClemensMachine *clem, uint8_t *data, uint16_t adr, uint8_t bank,
     clem->cpu.pins.vpaOut = (flags & CLEM_MEM_FLAG_PROGRAM) != 0;
     clem->cpu.pins.vdaOut = (flags & CLEM_MEM_FLAG_DATA) != 0;
     clem->cpu.pins.rwbOut = true;
+    clem->cpu.pins.ioOut = io_access;
     _clem_mem_cycle(clem, mega2_access);
     if (clem->cpu.pins.vdaOut) {
       clem->mmio.last_data_address = (((uint32_t)bank) << 16) | adr;
@@ -1827,6 +1829,7 @@ void clem_write(ClemensMachine *clem, uint8_t data, uint16_t adr, uint8_t bank,
   uint16_t offset = ((uint16_t)page->write << 8) | (adr & 0xff);
   uint8_t flags = mem_flags == CLEM_MEM_FLAG_NULL ? CLEM_OP_IO_NO_OP : 0;
   bool mega2_access = false;
+  bool io_access = false;
 
   if (page->flags & CLEM_MEM_IO_MEMORY_MASK) {
     unsigned slot_idx;
@@ -1842,6 +1845,7 @@ void clem_write(ClemensMachine *clem, uint8_t data, uint16_t adr, uint8_t bank,
     } else {
       CLEM_ASSERT(false);
     }
+    io_access = true;
   } else if (!(page->flags & CLEM_MEM_PAGE_TYPE_MASK) ||
              (page->flags & CLEM_MEM_PAGE_BANK_MASK)) {
     uint8_t *bank_mem;
@@ -1878,6 +1882,7 @@ void clem_write(ClemensMachine *clem, uint8_t data, uint16_t adr, uint8_t bank,
     clem->cpu.pins.vpaOut = false;
     clem->cpu.pins.vdaOut = (mem_flags & CLEM_MEM_FLAG_DATA) != 0;
     clem->cpu.pins.rwbOut = false;
+    clem->cpu.pins.ioOut = io_access;
     _clem_mem_cycle(clem, mega2_access);
     if (clem->cpu.pins.vdaOut) {
       /* TODO: move into clemens machine to remove dependency on MMIO */
