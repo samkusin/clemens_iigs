@@ -76,7 +76,7 @@ public:
   //  Send a message to the publish delegate from the frontend
   void debugMessage(std::string msg);
   //  Enable a program trace
-  void debugProgramTrace(bool enable, std::string path);
+  void debugProgramTrace(std::string op, std::string path);
   //  Save and load the machine
   void saveMachine(std::string path);
   void loadMachine(std::string path);

@@ -15,6 +15,10 @@ public:
   ClemensProgramTrace();
 
   void enableToolboxLogging(bool enable);
+  void enableIWMLogging(bool enable);
+
+  bool isToolboxLoggingEnabled() const { return enableToolboxLogging_; }
+  bool isIWMLoggingEnabled() const { return enableIWMLogging_; }
 
   ClemensTraceExecutedInstruction& addExecutedInstruction(
     const ClemensInstruction& instruction,
@@ -49,7 +53,20 @@ private:
     uint8_t pbr;
   };
   std::vector<Toolbox> toolboxCalls_;
+
+  struct MemoryOperation {
+    uint64_t seq;
+    char opname[4];
+    uint16_t pc;
+    uint16_t adr;
+    uint8_t pbr;
+    uint8_t dbr;
+    uint8_t value;      //  this could be parts of a 16-bit value
+  };
+  std::vector<MemoryOperation> memoryOps_;
+
   bool enableToolboxLogging_;
+  bool enableIWMLogging_;
 };
 
 #endif

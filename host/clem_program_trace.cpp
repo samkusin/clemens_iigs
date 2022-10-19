@@ -1,5 +1,7 @@
 #include "clem_program_trace.hpp"
 
+#include "clem_mmio_defs.h"
+
 #include <array>
 #include <cstdio>
 #include <cstdint>
@@ -41,13 +43,18 @@ static std::array<const char*, 0x20> kToolsetNames = {
 };
 
 ClemensProgramTrace::ClemensProgramTrace() :
-  enableToolboxLogging_(false)
+  enableToolboxLogging_(false),
+  enableIWMLogging_(false)
 {
   reset();
 }
 
 void ClemensProgramTrace::enableToolboxLogging(bool enable) {
-  enableToolboxLogging_ = true;
+  enableToolboxLogging_ = enable;
+}
+
+void ClemensProgramTrace::enableIWMLogging(bool enable) {
+  enableIWMLogging_ = enable;
 }
 
 ClemensTraceExecutedInstruction& ClemensProgramTrace::addExecutedInstruction(
@@ -55,13 +62,17 @@ ClemensTraceExecutedInstruction& ClemensProgramTrace::addExecutedInstruction(
   const char* operand,
   const ClemensMachine& machineState
 ) {
+  /*if (machineState.cpu.regs.PC == 0x125 && machineState.cpu.regs.PBR == 0xfe) {
+    printf("TBC: %04X (%s)\n", machineState.cpu.regs.X,
+           kToolsetNames[(machineState.cpu.regs.X & 0xff)-1]);
+  }
+  */
+
+
+
   //  check instruction before and after our newly added instruction to see if
   //    there's overlap
   //    if overlap, convert those actions to misc bytes
-  if (machineState.cpu.regs.PC == 0x125 && machineState.cpu.regs.PBR == 0xfe) {
-    printf("TBC: %04X (%s)\n", machineState.cpu.regs.X,  kToolsetNames[(machineState.cpu.regs.X & 0xff)-1]);
-  }
-
   //  find where in the action list to insert our instruction
   uint32_t newCurrentActionIdx;
   if (freeActionIndices_.empty()) {
@@ -127,12 +138,28 @@ ClemensTraceExecutedInstruction& ClemensProgramTrace::addExecutedInstruction(
     }
   }
 
+  current = &actions_[newCurrentActionIdx];
   if (enableToolboxLogging_) {
     if (instruction.opc == CLEM_OPC_JSL && instruction.bank == 0xe1 && instruction.value == 0x0000) {
       toolboxCalls_.emplace_back();
       toolboxCalls_.back().call = machineState.cpu.regs.X;
       toolboxCalls_.back().pc = instruction.addr;
       toolboxCalls_.back().pbr = instruction.pbr;
+    }
+  }
+  if (enableIWMLogging_ && machineState.cpu.pins.ioOut) {
+    if (machineState.cpu.pins.vdaOut &&
+        (machineState.cpu.pins.adr >= 0xc0e0 && machineState.cpu.pins.adr <= 0xc0ef) ||
+        (machineState.cpu.pins.adr == 0xc031)) {
+      memoryOps_.emplace_back();
+      auto& ops = memoryOps_.back();
+      ops.seq = current->seq;
+      memcpy(ops.opname, instruction.desc->name, sizeof(ops.opname));
+      ops.adr = machineState.cpu.pins.adr;
+      ops.dbr = machineState.cpu.pins.bank;
+      ops.pbr = instruction.pbr;
+      ops.pc = instruction.addr;
+      ops.value = machineState.cpu.pins.data;
     }
   }
 
@@ -244,6 +271,24 @@ bool ClemensProgramTrace::exportTrace(const char* filename)
                          kToolsetNames[toolset & 0xff]);
 
         }
+        outLeft -= amt;
+        out += amt;
+        out[0] = '\n';
+        out[1] = '\0';
+        fputs(line, fp);
+      }
+    }
+
+    if (!memoryOps_.empty()) {
+      fputs("\nOPS:\n=================================================\n", fp);
+
+      for (auto& ops: memoryOps_) {
+        char* out = &line[0];
+        size_t outLeft = sizeof(line);
+
+        int amt = snprintf(out, outLeft, "%16" PRIu64 " %02X:%04X %s $%04X %02X", ops.seq, ops.pbr,
+                           ops.pc, ops.opname, ops.adr, ops.value);
+
         outLeft -= amt;
         out += amt;
         out[0] = '\n';
