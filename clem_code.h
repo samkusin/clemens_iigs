@@ -814,6 +814,19 @@ static inline void _cpu_bit(struct Clemens65C816 *cpu, uint16_t value,
   }
 }
 
+static inline void _cpu_bit_imm(struct Clemens65C816 *cpu, uint16_t value,
+                                bool is8) {
+  // immediate mode only affects the Z flag
+  if (is8) {
+    uint8_t v = (uint8_t)(value);
+    uint8_t a = (uint8_t)(cpu->regs.A);
+    _cpu_p_flags_z_data(cpu, v & a);
+  } else {
+    _cpu_p_flags_z_data_16(cpu, value & cpu->regs.A);
+  }
+}
+
+
 static inline void _cpu_inc(struct Clemens65C816 *cpu, uint16_t *value,
                             bool is8) {
   if (is8) {

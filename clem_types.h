@@ -516,6 +516,7 @@ struct ClemensCPUPins {
   bool vdaOut;      // Valid Data Address
   bool vpaOut;      // Valid Program Address
   bool rwbOut;      // Read/Write byte
+  bool ioOut;       // IO access (for introspection purposes - not on the 65816)
                     /*
                     bool vpbOut;                        // Vector Pull
                     bool mlbOut;                        // Memory Lock

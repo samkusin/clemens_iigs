@@ -196,7 +196,9 @@ void clem_disk_read_and_position_head_35(
                     sense_out = (drive->qtr_track_index != 0);
                     break;
                 case CLEM_IWM_DISK35_QUERY_EJECTED:
-                    sense_out = (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTED) == 0;
+                    //  it appears the Neil Parker docs on this are confusing, or
+                    //  incorrect.   ejected == 1, not ejected == 0
+                    sense_out = (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTED) != 0;
                     break;
                 case CLEM_IWM_DISK35_QUERY_60HZ_ROTATION:
                     assert(true);

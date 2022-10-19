@@ -23,7 +23,7 @@ The emulator backend is written in C.  The `host` front-end is written in C++ wi
 
 * Disk II copy protected image boot
 * Apple II speaker
-* Prodos 16 system boot (until the GUI)
+* Prodos 16 and GS/OS boot
 * Hi-res and Double Hi-res graphics
 * 80-column
 * IRQ/BRK/RESET interrupts
@@ -31,6 +31,7 @@ The emulator backend is written in C.  The `host` front-end is written in C++ wi
 * Super Hi-Res 320/640 modes
 * Mockingboard C without SSI-223
 * Ensoniq audio playback
+* Mouse support
 
 See CHANGELOG.md for details on the next release's upcoming features.
 
@@ -111,7 +112,7 @@ The best ways to run Apple IIgs software are:
 * A KEGS port available on MacOS or Linux (Windows ports have been spotty IMO GSPort, GSPlus, etc.)
 * MAME in the browser https://archive.org/details/softwarelibrary_apple2gs
 
-Honestly I think if something can write a modern port of KEGS to Windows with a decent GUI frontend, that'll be the emulator you want to use.
+Honestly I think if someone can write a modern port of KEGS to Windows with a decent GUI frontend, that'll be the emulator you want to use.
 
 So why do we need another emulator.   We don't.  This is a personal project that I thought wouldn't be too hard to write (oh, really?).  Also I started this project to address a midlife programming crisis of sorts.
 

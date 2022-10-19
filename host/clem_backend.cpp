@@ -298,15 +298,15 @@ void ClemensBackend::debugMessage(std::string msg) {
   queue(Command{Command::DebugMessage, std::move(msg)});
 }
 
-void ClemensBackend::debugProgramTrace(bool enable, std::string path) {
+void ClemensBackend::debugProgramTrace(std::string op, std::string path) {
   queue(Command{Command::DebugProgramTrace,
-                fmt::format("{},{}", enable ? 1 : 0, path.empty() ? "#" : path.c_str())});
+                fmt::format("{},{}", op, path.empty() ? "#" : path.c_str())});
 }
 
 bool ClemensBackend::programTrace(const std::string_view &inputParam) {
   auto sepPos = inputParam.find(',');
-  auto param = inputParam.substr(0, sepPos);
-  bool enable = param[0] == '1';
+  auto op = inputParam.substr(0, sepPos);
+  std::string_view param;
   if (sepPos != std::string_view::npos) {
     param = inputParam.substr(sepPos+1);
     if (param == "#") param = std::string_view();
@@ -314,7 +314,7 @@ bool ClemensBackend::programTrace(const std::string_view &inputParam) {
     param = std::string_view();
   }
   auto path = param;
-  if (programTrace_ == nullptr && enable) {
+  if (programTrace_ == nullptr && op == "on") {
     programTrace_ = std::make_unique<ClemensProgramTrace>();
     programTrace_->enableToolboxLogging(true);
     fmt::print("Program trace enabled\n");
@@ -333,9 +333,17 @@ bool ClemensBackend::programTrace(const std::string_view &inputParam) {
                   exportPath.string());
     }
   }
-  if (programTrace_ != nullptr && !enable) {
-    fmt::print("Program trace disabled");
+  if (programTrace_ != nullptr && op == "off") {
+    fmt::print("Program trace disabled\n");
     programTrace_ = nullptr;
+  }
+  if (programTrace_) {
+    if (op == "iwm") {
+      programTrace_->enableIWMLogging(!programTrace_->isIWMLoggingEnabled());
+      fmt::format("{} tracing = {}\n", op, programTrace_->isIWMLoggingEnabled());
+    } else {
+      fmt::format("{} tracing is not recognized.\n", op);
+    }
   }
   return ok;
 }
@@ -896,7 +904,7 @@ std::optional<unsigned> ClemensBackend::checkHitBreakpoint() {
         break;
       case ClemensBackendBreakpoint::DataRead:
       case ClemensBackendBreakpoint::Write:
-        if (machine_.cpu.regs.DBR == b_bank && machine_.cpu.pins.adr == b_adr) {
+        if (machine_.cpu.pins.bank == b_bank && machine_.cpu.pins.adr == b_adr) {
           if (machine_.cpu.pins.vdaOut) {
             if (it->type == ClemensBackendBreakpoint::DataRead &&
                 machine_.cpu.pins.rwbOut) {

@@ -169,6 +169,7 @@ private:
     float fps;
     bool mmioWasInitialized = false;
     bool isTracing = false;
+    bool isIWMTracing = false;
   };
 
   //  This state sticks around until processed by the UI frame - a hacky solution

@@ -9,7 +9,7 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-* Clean up ADB support (Mouse)
+
 * Verify Mega II Interrupts work
 * Lores mode
 * Linux support
@@ -33,6 +33,7 @@ This is a running todo list.
 
 ## DONE
 
+* Clean up ADB support (Mouse)
 * Fix Slot 3 I/O (defaulting to card vs internal ROM) - broke when Mockingboard
   support added
 * New GUI Host (better debugging, more intuitive, quality of life)

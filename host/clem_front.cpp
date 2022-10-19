@@ -2520,31 +2520,49 @@ void ClemensFrontend::cmdTrace(std::string_view operand) {
     CLEM_TERM_COUT.format(TerminalLine::Info, "Trace is {}", frameReadState_.isTracing ? "active" : "inactive");
     return;
   }
-  bool enable = params[0] == "on";
-
+  std::optional<bool> enable;
+  if (params[0] == "on") {
+    enable = true;
+  } else if (params[0] == "off") {
+    enable = false;
+  }
   std::string path;
   if (paramCount > 1) {
     path = params[1];
   }
-  if (!frameReadState_.isTracing) {
-    if (!enable) {
-      CLEM_TERM_COUT.print(TerminalLine::Info, "Not tracing.");
+  if (enable.has_value()) {
+    if (!frameReadState_.isTracing) {
+      if (!enable) {
+        CLEM_TERM_COUT.print(TerminalLine::Info, "Not tracing.");
+      } else {
+        CLEM_TERM_COUT.print(TerminalLine::Info, "Enabling trace.");
+      }
     } else {
-      CLEM_TERM_COUT.print(TerminalLine::Info, "Enabling trace.");
-    }
-  } else {
-    if (!enable) {
-      if (path.empty()) {
-        CLEM_TERM_COUT.print(TerminalLine::Warn,
-                             "Trace will be lost as tracing was active but no output file"
-                             " was specified");
+      if (!enable) {
+        if (path.empty()) {
+          CLEM_TERM_COUT.print(TerminalLine::Warn,
+                              "Trace will be lost as tracing was active but no output file"
+                              " was specified");
+        }
+      }
+      if (!path.empty()) {
+        CLEM_TERM_COUT.format(TerminalLine::Info, "Trace will be saved to {}", path);
       }
     }
-    if (!path.empty()) {
-      CLEM_TERM_COUT.format(TerminalLine::Info, "Trace will be saved to {}", path);
+  } else if (frameReadState_.isTracing) {
+    if (params[0] == "iwm") {
+      if (frameReadState_.isIWMTracing) {
+        CLEM_TERM_COUT.print(TerminalLine::Info, "IWM tracing deactivated");
+      } else {
+        CLEM_TERM_COUT.print(TerminalLine::Info, "IWM tracing activated");
+      }
+    } else {
+      CLEM_TERM_COUT.format(TerminalLine::Error, "Invalid tracing option '{}'", params[0]);
     }
+  } else {
+    CLEM_TERM_COUT.print(TerminalLine::Error, "Operation only allowed while tracing is active.");
   }
-  backend_->debugProgramTrace(enable, path);
+  backend_->debugProgramTrace(std::string(params[0]), path);
 }
 
 std::string ClemensFrontend::cmdMessageFromBackend(std::string_view message,
