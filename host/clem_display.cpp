@@ -389,9 +389,34 @@ ClemensDisplayProvider::ClemensDisplayProvider(
   renderPipelineDesc.face_winding = SG_FACEWINDING_CCW;
   renderPipelineDesc.depth.pixel_format = SG_PIXELFORMAT_NONE;
   hiresPipeline_ = sg_make_pipeline(renderPipelineDesc);
+
+  //  create hires pipeline and vertex buffer, no alpha blending, triangles
+  shaderDesc = {};
+  shaderDesc.vs.uniform_blocks[0].size = sizeof(DisplayVertexParams);
+  shaderDesc.attrs[0].sem_name = "POSITION";
+  shaderDesc.attrs[1].sem_name = "TEXCOORD";
+  shaderDesc.attrs[2].sem_name = "COLOR";
+  shaderDesc.vs.source = VS_D3D11_VERTEX;
+  shaderDesc.fs.images[0].image_type = SG_IMAGETYPE_2D;
+  shaderDesc.fs.images[1].image_type = SG_IMAGETYPE_2D;
+  shaderDesc.fs.source = FS_D3D11_SUPER;
+  superHiresShader_ = sg_make_shader(shaderDesc);
+
+  renderPipelineDesc = {};
+  renderPipelineDesc.layout.attrs[0].format = SG_VERTEXFORMAT_FLOAT2;
+  renderPipelineDesc.layout.attrs[1].format = SG_VERTEXFORMAT_FLOAT2;
+  renderPipelineDesc.layout.attrs[2].format = SG_VERTEXFORMAT_UBYTE4N;
+  renderPipelineDesc.layout.buffers[0].stride = sizeof(DrawVertex);
+  renderPipelineDesc.shader = superHiresShader_;
+  renderPipelineDesc.cull_mode = SG_CULLMODE_BACK;
+  renderPipelineDesc.face_winding = SG_FACEWINDING_CCW;
+  renderPipelineDesc.depth.pixel_format = SG_PIXELFORMAT_NONE;
+  superHiresPipeline_ = sg_make_pipeline(renderPipelineDesc);
 }
 
 ClemensDisplayProvider::~ClemensDisplayProvider() {
+  sg_destroy_pipeline(superHiresPipeline_);
+  sg_destroy_shader(superHiresShader_);
   sg_destroy_pipeline(hiresPipeline_);
   sg_destroy_shader(hiresShader_);
   sg_destroy_pipeline(textPipeline_);
@@ -1042,7 +1067,7 @@ void ClemensDisplay::renderSuperHiresGraphics(
   rangeParam.ptr = &vertexParams;
   rangeParam.size = sizeof(vertexParams);
 
-  sg_apply_pipeline(provider_.hiresPipeline_);
+  sg_apply_pipeline(provider_.superHiresPipeline_);
   sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, rangeParam);
 
   //  texture contains a scaled version of the original 280 x 160/192 screen

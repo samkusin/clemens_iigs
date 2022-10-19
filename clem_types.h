@@ -71,8 +71,9 @@ struct ClemensDeviceKeyboard {
 };
 
 struct ClemensDeviceMouse {
-  int x;
-  int y;
+  unsigned pos[CLEM_ADB_KEYB_BUFFER_LIMIT];
+  int size;
+  bool btn_down;
 };
 
 struct ClemensDeviceGameport {
@@ -214,7 +215,8 @@ enum ClemensInputType {
   kClemensInputType_KeyDown,
   kClemensInputType_KeyUp,
   kClemensInputType_MouseButtonDown,
-  kClemensInputType_MouseButtonUp
+  kClemensInputType_MouseButtonUp,
+  kClemensInputType_MouseMove
 };
 
 /**
@@ -226,9 +228,14 @@ enum ClemensInputType {
  */
 struct ClemensInputEvent {
   enum ClemensInputType type;
-  /* value based on the input type (ADB keycode, mouse or gamepad button) */
-  unsigned value;
-  /* key toggle mask */
+  /* Value based on the input type (ADB keycode, mouse or gamepad button.)
+     Mouse pointer deltas as reported by host scaled for the ADB.  These are
+     in the range of +- 64 and are packed into the value (upper + lower 16 bits
+     for Y and X respectively.)
+  */
+  int16_t value_a;
+  int16_t value_b;
+  /* Key toggle mask */
   unsigned adb_key_toggle_mask;
 };
 

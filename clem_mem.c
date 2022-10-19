@@ -314,6 +314,7 @@ static void _clem_mmio_mega2_inten_set(struct ClemensMMIO *mmio, uint8_t data) {
   if (data & 0x07) {
     CLEM_WARN("clem_mmio: mega2 mouse not impl - set %02X", data);
   }
+  printf("SET C041 = %02X\n", data);
 }
 
 static uint8_t _clem_mmio_mega2_inten_get(struct ClemensMMIO *mmio) {
@@ -565,10 +566,8 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr,
   uint8_t ioreg = addr & 0xff;
   bool is_noop = (flags & CLEM_OP_IO_NO_OP) != 0;
 
-  if (!(flags & CLEM_OP_IO_NO_OP)) {
-    /* disk motor speed registers */
-    *mega2_access = true;
-  }
+  //  TODO: some registers go through the CYA access path which runs faster
+  *mega2_access = true;
 
   ref_clock.ts = clem->clocks_spent;
   ref_clock.ref_step =
@@ -591,9 +590,6 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr,
                                          ioreg, flags | CLEM_OP_IO_DEVSEL);
       }
     }
-
-    /* TODO: assuming reads from card memory via MEGA2 are slow */
-    *mega2_access = true;
 
     return result;
   }
@@ -620,6 +616,8 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr,
   case CLEM_MMIO_REG_KEYB_READ + 14:
   case CLEM_MMIO_REG_KEYB_READ + 15:
   case CLEM_MMIO_REG_ANYKEY_STROBE:
+    result = clem_adb_read_mega2_switch(&mmio->dev_adb, ioreg, flags);
+    break;
   case CLEM_MMIO_REG_ADB_MOUSE_DATA:
   case CLEM_MMIO_REG_ADB_MODKEY:
   case CLEM_MMIO_REG_ADB_CMD_DATA:
@@ -734,6 +732,10 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr,
     break;
   case CLEM_MMIO_REG_MEGA2_INTEN:
     result = _clem_mmio_mega2_inten_get(mmio);
+    break;
+  case CLEM_MMIO_REG_MEGA2_MOUSE_DX:
+  case CLEM_MMIO_REG_MEGA2_MOUSE_DY:
+    result = clem_adb_read_mega2_switch(&mmio->dev_adb, ioreg, flags);
     break;
   case CLEM_MMIO_REG_DIAG_INTTYPE:
     result = _clem_mmio_inttype_c046(mmio);
@@ -1011,9 +1013,8 @@ static void _clem_mmio_write(ClemensMachine *clem, uint8_t data, uint16_t addr,
   case CLEM_MMIO_REG_RTC_VGC_SCANINT:
     if (!(data & 0x40)) {
       _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_RTC_1SEC);
-    } else {
-      clem_vgc_write_switch(&mmio->vgc, &ref_clock, ioreg, data & ~0x40);
     }
+    clem_vgc_write_switch(&mmio->vgc, &ref_clock, ioreg, data & ~0x40);
     break;
   case CLEM_MMIO_REG_RTC_CTL:
     mmio->dev_rtc.ctl_c034 = data;

@@ -215,6 +215,10 @@
 #define CLEM_MMIO_REG_AUDIO_ADRHI       0x3F
 /** Enable specific Mega2 (Video, mouse, timer) interrupts */
 #define CLEM_MMIO_REG_MEGA2_INTEN       0x41
+/** Read Mega II mouse delta X - IIgs only, so TBD */
+#define CLEM_MMIO_REG_MEGA2_MOUSE_DX    0x44
+/** Read Mega II mouse delta Y - IIgs only, so TBD */
+#define CLEM_MMIO_REG_MEGA2_MOUSE_DY    0x45
 /** Various Mega II specific interrupt flags likely used only by firmware */
 #define CLEM_MMIO_REG_DIAG_INTTYPE      0x46
 /** Clears some MEGA2 based interrupts */

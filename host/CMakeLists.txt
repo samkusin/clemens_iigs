@@ -56,7 +56,6 @@ add_executable(clemens_iigs
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk_library.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_front.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_app.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_import_disk.cpp"

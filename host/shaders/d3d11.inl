@@ -40,5 +40,16 @@ const char* FS_D3D11_HIRES =
   "float4 main(float2 uv: TEXCOORD0, float4 color: COLOR0): SV_Target0 {\n"
   "    float4 texl_hgr = hgr_tex.Sample(smp, uv);\n"
   "    float4 texl_color = hcolor_tex.Sample(smp, float2(texl_hgr.x, 0.0));\n"
-  "    return texl_color * color;\n"
+  "    return texl_color;\n"
+  "};\n";
+
+const char* FS_D3D11_SUPER =
+  "Texture2D<float4> hgr_tex: register(t0);\n"
+  "Texture2D<float4> hcolor_tex: register(t1);\n"
+  "sampler smp: register(s0);\n"
+  "float4 main(float2 uv: TEXCOORD0, float4 color: COLOR0): SV_Target0 {\n"
+  "    float4 texl_hgr = hgr_tex.Sample(smp, uv);\n"
+  "    float cx = ((texl_hgr.x*255.0) + 0.5)/255.0;\n"
+  "    float4 texl_color = hcolor_tex.Sample(smp, float2(cx, 0.0));\n"
+  "    return texl_color;\n"
   "};\n";

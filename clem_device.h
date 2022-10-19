@@ -111,6 +111,17 @@ uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
                              uint8_t flags);
 
 /**
+ * @brief Mouse and Apple II keyboard inputs
+ *
+ * @param adb
+ * @param ioreg
+ * @param flags
+ * @return uint8_t
+ */
+uint8_t clem_adb_read_mega2_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
+                                   uint8_t flags);
+
+/**
  * @brief Resets the Sound state
  *
  * @param glu sound data

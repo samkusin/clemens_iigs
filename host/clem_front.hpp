@@ -28,10 +28,14 @@ public:
                   const cinek::ByteBuffer &systemFontHiBuffer);
   ~ClemensFrontend();
 
+  struct FrameAppInterop {
+    bool mouseLock;
+  };
+
   //  application rendering hook
-  void frame(int width, int height, float deltaTime);
+  void frame(int width, int height, float deltaTime, FrameAppInterop& interop);
   //  application input from OS
-  void input(const ClemensInputEvent &input);
+  void input(ClemensInputEvent input);
 
 private:
   template <typename TBufferType> friend struct FormatView;
@@ -73,6 +77,8 @@ private:
   bool cmdMessageLocal(std::string_view operand);
   void cmdSave(std::string_view operand);
   void cmdLoad(std::string_view operand);
+  void cmdGet(std::string_view operand);
+  void cmdADBMouse(std::string_view operand);
 
 private:
   ClemensDisplayProvider displayProvider_;
@@ -113,6 +119,18 @@ private:
     uint8_t ph03;
   };
 
+  struct DOCStatus {
+    /** PCM output (floating point per channel) */
+    float voice[16];
+
+    uint8_t reg[256];             /**< DOC register values */
+    unsigned acc[32];             /**< Oscillator running accumulator */
+    uint16_t ptr[32];             /**< Stored pointer from last cycle */
+    uint8_t osc_flags[32];        /**< IRQ flagged */
+
+    void copyFrom(const ClemensDeviceEnsoniq& doc);
+  };
+
   // This state comes in for any update to the emulator per frame.  As such
   // its possible to "lose" state if the emulator runs faster than the UI.
   // This is OK in most cases as the UI will only present this data per frame
@@ -121,6 +139,7 @@ private:
     uint8_t *bankE1 = nullptr;
     uint8_t *memoryView = nullptr;
     uint8_t* ioPage = nullptr;
+    uint8_t* docRAM = nullptr;
     LogOutputNode *logNode = nullptr;
     ClemensBackendBreakpoint *breakpoints = nullptr;
     unsigned breakpointCount = 0;
@@ -129,6 +148,7 @@ private:
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives;
 
     float emulatorSpeedMhz;
+    ClemensClock emulatorClock;
 
     Clemens65C816 cpu;
     ClemensMonitor monitorFrame;
@@ -137,6 +157,7 @@ private:
     ClemensAudio audioFrame;
 
     IWMStatus iwm;
+    DOCStatus doc;
 
     uint32_t vgcModeFlags;
 
@@ -185,6 +206,7 @@ private:
   uint32_t lastFrameIRQs_, lastFrameNMIs_;
   uint8_t lastFrameIORegs_[256];
   bool emulatorHasKeyboardFocus_;
+  bool emulatorHasMouseFocus_;
 
   struct TerminalLine {
     enum Type { Debug, Info, Warn, Error, Command, Opcode };
@@ -207,9 +229,12 @@ private:
 
 private:
   void doMachineDebugMemoryDisplay();
+  void doMachineDebugDOCDisplay();
   void doMachineDebugCoreIODisplay();
   void doMachineDebugVideoIODisplay();
   void doMachineDebugDiskIODisplay();
+  void doMachineDebugADBDisplay();
+  void doMachineDebugSoundDisplay();
 
   enum class DebugIOMode {
     Core

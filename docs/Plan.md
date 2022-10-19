@@ -5,26 +5,21 @@
 The Clemens GS emulator's goal is to *emulate* the Apple IIgs design (ROM3
 with ROM1 if possible compatibility.)
 
-
 ## TODO
 
 This is a running todo list.
 
-* New GUI Host (better debugging, more intuitive, quality of life)
-* Fix Slot 3 I/O (defaulting to card vs internal ROM) - broke when Mockingboard
-  support added
-* Card expansion ROM selector is not working
-* Lores mode
-* Verify Mega II Interrupts work
-* Linux support
-* Flashing Characters
 * Clean up ADB support (Mouse)
+* Verify Mega II Interrupts work
+* Lores mode
+* Linux support
+* Smartport Hard Drive Support
+* Flashing Characters
 * SCC Support
 * Joystick/Paddle Support
 * Apple IIgs Diagnostic Test
 * Double Lores Mode (should be simple given how clem_display.cpp is written)
 * Monochrome Support
-* Smartport Hard Drive Support
 * Dblhires is offset by 4 pixels (1 block) in display due to conversion method
 * Black and White DBLHIRES ($C029 bit 5)
 * ROM 01
@@ -38,6 +33,9 @@ This is a running todo list.
 
 ## DONE
 
+* Fix Slot 3 I/O (defaulting to card vs internal ROM) - broke when Mockingboard
+  support added
+* New GUI Host (better debugging, more intuitive, quality of life)
 * VGC Interrupt Support
 * Better Apple II Speaker Support
 * Ensoniq Support - http://www.buchty.net/ensoniq/5503.html

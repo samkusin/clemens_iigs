@@ -17,12 +17,17 @@
 #include <tuple>
 
 //  TODO: Insert card to slot (non-gui)
+//  TODO: Mouse x,y scaling based on display view size vs desktop size
 //  TODO: blank disk gui selection for disk set (selecting combo create will
 //        enable another input widget, unselecting will gray out that widget.)
-//  TODO: Fix 80 column mode and card vs internal slot 3 ram mapping
 //  TODO: preroll audio for some buffer on to handle sound clipping on lower end
 //        systems
 
+//  DONE: Break on IRQ
+//  DONE: List IRQ flags from emulator
+//  DONE: Mouse lock and release (via keyboard combo ctl-f12?)
+//  DONE: Mouse issues - in emulator - may be related to VGCINT?
+//  DONE: Fix 80 column mode and card vs internal slot 3 ram mapping
 //  DONE: restored mockingboard support
 //  DONE: Fix sound clipping/starvation
 //  DONE: Diagnostics
@@ -282,6 +287,14 @@ static std::string getCommandTypeName(ClemensBackendCommand::Type type) {
   }
 }
 
+void ClemensFrontend::DOCStatus::copyFrom(const ClemensDeviceEnsoniq& doc) {
+  memcpy(voice, doc.voice, sizeof(voice));
+  memcpy(reg, doc.reg, sizeof(reg));
+  memcpy(acc, doc.acc, sizeof(acc));
+  memcpy(ptr, doc.ptr, sizeof(ptr));
+  memcpy(osc_flags, doc.osc_flags, sizeof(osc_flags));
+}
+
 ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
     : displayProvider_(systemFontLoBuffer, systemFontHiBuffer), display_(displayProvider_),
@@ -291,7 +304,8 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
       frameSeqNo_(std::numeric_limits<decltype(frameSeqNo_)>::max()),
       frameLastSeqNo_(std::numeric_limits<decltype(frameLastSeqNo_)>::max()), lastFrameCPUPins_{},
       lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0), lastFrameNMIs_(0),
-      emulatorHasKeyboardFocus_(true), terminalMode_(TerminalMode::Command),
+      emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false),
+      terminalMode_(TerminalMode::Command),
       guiMode_(GUIMode::Emulator),diskLibraryRootPath_{
           (std::filesystem::current_path() / std::filesystem::path(CLEM_HOST_LIBRARY_DIR))
               .string()},
@@ -327,8 +341,19 @@ ClemensFrontend::~ClemensFrontend() {
   free(frameReadMemory_.getHead());
 }
 
-void ClemensFrontend::input(const ClemensInputEvent &input) {
-  if (emulatorHasKeyboardFocus_) {
+void ClemensFrontend::input(ClemensInputEvent input) {
+  if (input.type == kClemensInputType_MouseButtonDown ||
+      input.type == kClemensInputType_MouseButtonUp ||
+      input.type == kClemensInputType_MouseMove) {
+    if (!emulatorHasMouseFocus_) {
+      input.type = kClemensInputType_None;
+    }
+  }
+  if (emulatorHasKeyboardFocus_ && input.type != kClemensInputType_None) {
+    if (input.type == kClemensInputType_MouseMove) {
+      input.value_a = std::clamp(input.value_a, (int16_t)(-63), (int16_t)(63));
+      input.value_b = std::clamp(input.value_b, (int16_t)(-63), (int16_t)(63));
+    }
     backend_->inputEvent(input);
   }
 }
@@ -379,7 +404,8 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
     frameWriteState_.mmioWasInitialized = state.mmio_was_initialized;
     frameWriteState_.isTracing = state.isTracing;
     frameWriteState_.emulatorSpeedMhz = state.emulatorSpeedMhz;
-
+    frameWriteState_.emulatorClock.ts = state.machine->clocks_spent;
+    frameWriteState_.emulatorClock.ref_step = CLEM_CLOCKS_MEGA2_CYCLE;
     //  copy over component state as needed
     frameWriteState_.vgcModeFlags = state.machine->mmio.vgc.mode_flags;
     frameWriteState_.irqs = state.machine->mmio.irq_line;
@@ -469,9 +495,17 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
         clem_read(state.machine, &memoryView[addr], addr, state.debugMemoryPage,
                   CLEM_MEM_FLAG_NULL);
       }
+
+      constexpr size_t kDOCRAMSize = 65536;
+
+      frameWriteState_.docRAM = (uint8_t*)frameWriteMemory_.allocate(kDOCRAMSize);
+      memcpy(frameWriteState_.docRAM, &state.machine->mmio.dev_audio.doc.sound_ram,
+             kDOCRAMSize);
     } else {
       frameWriteState_.memoryView = nullptr;
+      frameWriteState_.docRAM = nullptr;
     }
+    frameWriteState_.doc.copyFrom(state.machine->mmio.dev_audio.doc);
 
     const ClemensBackendDiskDriveState *driveState = state.diskDrives;
     for (auto &diskDrive : frameWriteState_.diskDrives) {
@@ -550,7 +584,8 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
   framePublished_.notify_one();
 }
 
-void ClemensFrontend::frame(int width, int height, float deltaTime) {
+void ClemensFrontend::frame(int width, int height, float deltaTime,
+                            FrameAppInterop& interop) {
   //  send commands to emulator thread
   //  get results from emulator thread
   //    video, audio, machine state, etc
@@ -638,6 +673,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
       CLEM_TERM_COUT.format(TerminalLine::Info, "Breakpoint {} hit {:02X}/{:04X}.", bpIndex,
                             (breakpoints_[bpIndex].address >> 16) & 0xff,
                             breakpoints_[bpIndex].address & 0xffff);
+      emulatorHasMouseFocus_ = false;
       lastCommandState_.hitBreakpoint = std::nullopt;
     }
     if (lastCommandState_.message.has_value()) {
@@ -748,6 +784,12 @@ void ClemensFrontend::frame(int width, int height, float deltaTime) {
   }
 
   backend_->publish();
+
+  if (ImGui::IsKeyPressed(ImGuiKey_Space) && ImGui::GetIO().KeyAlt && ImGui::GetIO().KeySuper) {
+    emulatorHasMouseFocus_ = false;
+  }
+
+  interop.mouseLock = emulatorHasMouseFocus_;
 }
 
 static ImColor getModifiedColor(bool hi) {
@@ -771,7 +813,7 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
   ImGui::Begin("Status", nullptr,
                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                    ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                   ImGuiWindowFlags_NoMove);
+                   ImGuiWindowFlags_NoMove );
   doMachineDiagnosticsDisplay();
   ImGui::Separator();
   doMachineDiskDisplay();
@@ -792,42 +834,72 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
       doMachineDebugDiskIODisplay();
       ImGui::EndTabItem();
     }
+    if (ImGui::BeginTabItem("Input")) {
+      doMachineDebugADBDisplay();
+      ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem("Sound")) {
+      doMachineDebugSoundDisplay();
+      ImGui::EndTabItem();
+    }
     ImGui::EndTabBar();
   }
   ImGui::Separator();
-  doMachineDebugMemoryDisplay();
-
+  ImGui::BeginChild("MachineStateLower", ImGui::GetContentRegionAvail());
+  if (ImGui::BeginTabBar("CompDebug")) {
+    if (ImGui::BeginTabItem("Memory")) {
+      doMachineDebugMemoryDisplay();
+      ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem("DOC")) {
+      doMachineDebugDOCDisplay();
+      ImGui::EndTabItem();
+    }
+    ImGui::EndTabBar();
+  }
+  ImGui::EndChild();
   ImGui::End();
 }
 
 void ClemensFrontend::doMachineDiagnosticsDisplay() {
-  ImGui::BeginTable("Diagnostics", 4);
+  auto fontCharSize = ImGui::GetFont()->GetCharAdvance('A');
+  auto emulatorTime = (uint64_t)(clem_calc_secs_from_clocks(&frameReadState_.emulatorClock) * 1000);
+  ImGui::BeginTable("Diagnostics", 3);
+  ImGui::TableSetupColumn("CPU", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 10);
+  ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);
+  ImGui::TableSetupColumn("Value");
+  ImGui::TableNextRow();
   ImGui::TableNextColumn();
   ImGui::Text("CPU %02u", clem_host_get_processor_number());
   ImGui::TableNextColumn();
   ImGui::Text("GUI");
   ImGui::TableNextColumn();
-  ImGui::Text("%0.1f", ImGui::GetIO().Framerate);
-  ImGui::TableNextColumn();
-  ImGui::Text("fps");
+  ImGui::Text("%3.1f fps", ImGui::GetIO().Framerate);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
   ImGui::Text("CPU %02u", frameReadState_.backendCPUID);
   ImGui::TableNextColumn();
   ImGui::Text("EMU");
   ImGui::TableNextColumn();
-  ImGui::Text("%0.1f", frameReadState_.fps);
-  ImGui::TableNextColumn();
-  ImGui::Text("fps");
+  ImGui::Text("%3.1f fps", frameReadState_.fps);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
   ImGui::Text("");
   ImGui::TableNextColumn();
   ImGui::Text("RUN");
   ImGui::TableNextColumn();
-  ImGui::Text("%0.3f", frameReadState_.emulatorSpeedMhz);
+  ImGui::Text("%3.3f mhz", frameReadState_.emulatorSpeedMhz);
+  ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::Text("mhz");
+  ImGui::Text("");
+  ImGui::TableNextColumn();
+  ImGui::Text("TIME");
+  ImGui::TableNextColumn();
+  unsigned hours = emulatorTime / 3600000;
+  unsigned minutes = (emulatorTime % 3600000) / 60000;
+  unsigned seconds = ((emulatorTime % 3600000) % 60000) / 1000;
+  unsigned milliseconds = ((emulatorTime % 3600000) % 60000) % 1000;
+  ImGui::Text("%02u:%02u:%02u.%03u", hours, minutes, seconds, milliseconds);
   ImGui::EndTable();
 }
 
@@ -1058,6 +1130,81 @@ void ClemensFrontend::doMachineDebugMemoryDisplay() {
   debugMemoryEditor_.OptAddrDigitsCount = 4;
   debugMemoryEditor_.Cols = 8;
   debugMemoryEditor_.DrawContents(this, CLEM_IIGS_BANK_SIZE, (size_t)(bank) << 16);
+}
+
+void ClemensFrontend::doMachineDebugDOCDisplay() {
+
+  auto& doc = frameReadState_.doc;
+
+  ImGui::BeginTable("MMIO_Ensoniq_Global", 3);
+  {
+    ImGui::TableSetupColumn("OIR");
+    ImGui::TableSetupColumn("OSC");
+    ImGui::TableSetupColumn("ADC");
+    ImGui::TableHeadersRow();
+    ImGui::TableNextColumn();
+    ImGui::Text("%c:%u", doc.reg[CLEM_ENSONIQ_REG_OSC_OIR] & 0x80 ? '-' : 'I',
+                         (doc.reg[CLEM_ENSONIQ_REG_OSC_OIR] >> 1) & 0x1f);
+    ImGui::TableNextColumn();
+    ImGui::Text("%u + 1", (doc.reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1));
+    ImGui::TableNextColumn();
+    ImGui::Text("%02X", doc.reg[CLEM_ENSONIQ_REG_OSC_ADC]);
+  }
+  ImGui::EndTable();
+
+  //  OSC 0, 1, ... N
+  //  Per OSC: Control: Halt, Mode, Channel, IE, IRQ
+  //           Data, ACC, PTR
+  //
+  auto contentAvail = ImGui::GetContentRegionAvail();
+  auto fontCharSize = ImGui::GetFont()->GetCharAdvance('A');
+  unsigned oscCount = (doc.reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1) + 1;
+  ImGui::BeginTable("MMIO_Ensoniq_OSC", 10, ImGuiTableFlags_ScrollY, contentAvail);
+  {
+    ImGui::TableSetupColumn("OSC");
+    ImGui::TableSetupColumn("IE");
+    ImGui::TableSetupColumn("IR");
+    ImGui::TableSetupColumn("M1");
+    ImGui::TableSetupColumn("M0");
+    ImGui::TableSetupColumn("CH");
+    ImGui::TableSetupColumn("FC", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
+    ImGui::TableSetupColumn("ACC", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);
+    ImGui::TableSetupColumn("TBL", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
+    ImGui::TableSetupColumn("PTR", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
+    ImGui::TableHeadersRow();
+    ImColor oscActiveColor(0, 255, 255);
+    ImColor oscHalted(64, 64, 64);
+    for (unsigned oscIndex = 0; oscIndex < oscCount; ++oscIndex) {
+      auto ctl = doc.reg[CLEM_ENSONIQ_REG_OSC_CTRL + oscIndex];
+      uint16_t fc =
+        ((uint16_t)doc.reg[CLEM_ENSONIQ_REG_OSC_FCHI + oscIndex] << 8) |
+          doc.reg[CLEM_ENSONIQ_REG_OSC_FCLOW + oscIndex];
+      auto flags = doc.osc_flags[oscIndex];
+      const ImColor& col = (ctl & CLEM_ENSONIQ_OSC_CTL_HALT) ? oscHalted : oscActiveColor;
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%u", oscIndex);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_IE) ? '1' : '0');
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%c", (flags & CLEM_ENSONIQ_OSC_FLAG_IRQ) ? 'I' : ' ');
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_SYNC) ? '1' : '0');
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_M0) ? '1' : '0');
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%u", (ctl >> 4));
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%04X", fc);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%06X", doc.acc[oscIndex] & 0x00ffffff);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%04X", (uint16_t)doc.reg[CLEM_ENSONIQ_REG_OSC_PTR + oscIndex] << 8);
+      ImGui::TableNextColumn();
+      ImGui::TextColored(col, "%04X",  doc.ptr[oscIndex]);
+      ImGui::TableNextRow();
+    }
+  }
+  ImGui::EndTable();
 }
 
 ImU8 ClemensFrontend::imguiMemoryEditorRead(const ImU8* mem_ptr, size_t off) {
@@ -1396,6 +1543,98 @@ void ClemensFrontend::doMachineDebugDiskIODisplay() {
   ImGui::EndTable();
 }
 
+void ClemensFrontend::doMachineDebugADBDisplay() {
+  auto* ioregs = frameReadState_.ioPage;
+  //auto& iwmState = frameReadState_.iwm;
+
+  if (!ioregs) return;
+
+  auto fontCharSize = ImGui::GetFont()->GetCharAdvance('A');
+
+  ImGui::BeginTable("IODEBUG", 2);
+  ImGui::TableSetupColumn("Col1");
+  ImGui::TableSetupColumn("Col2");
+  ImGui::TableNextRow();
+
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("IOREGS", 3);
+  ImGui::TableSetupColumn("Symbol", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 9);
+  ImGui::TableSetupColumn("Addr", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
+  ImGui::TableSetupColumn("Data", ImGuiTableColumnFlags_WidthFixed);
+  ImGui::TableHeadersRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_KEYB_READ);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_ANYKEY_STROBE);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_ADB_MOUSE_DATA);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_ADB_MODKEY);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_ADB_STATUS);
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::TextUnformatted(" ");
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::TextUnformatted(" ");
+  ImGui::EndTable();
+
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("PARAMS", 2, ImGuiTableFlags_SizingFixedFit);
+  ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 8);
+  ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);
+  ImGui::TableHeadersRow();
+  ImGui::EndTable();
+
+  ImGui::EndTable();
+}
+
+void ClemensFrontend::doMachineDebugSoundDisplay() {
+  auto* ioregs = frameReadState_.ioPage;
+  //auto& iwmState = frameReadState_.iwm;
+
+  if (!ioregs) return;
+
+  auto fontCharSize = ImGui::GetFont()->GetCharAdvance('A');
+
+  ImGui::BeginTable("IODEBUG", 2);
+  ImGui::TableSetupColumn("Col1");
+  ImGui::TableSetupColumn("Col2");
+  ImGui::TableNextRow();
+
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("IOREGS", 3);
+  ImGui::TableSetupColumn("Symbol", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 9);
+  ImGui::TableSetupColumn("Addr", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
+  ImGui::TableSetupColumn("Data", ImGuiTableColumnFlags_WidthFixed);
+  ImGui::TableHeadersRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_AUDIO_CTL);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_AUDIO_DATA);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_AUDIO_ADRLO);
+  ImGui::TableNextRow();
+  doMachineDebugIORegister(lastFrameIORegs_, ioregs, CLEM_MMIO_REG_AUDIO_ADRHI);
+  ImGui::TableNextRow();
+  ImGui::TextUnformatted(" ");
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::TextUnformatted(" ");
+  ImGui::TableNextRow();
+  ImGui::TableNextColumn();
+  ImGui::TextUnformatted(" ");
+  ImGui::EndTable();
+
+  ImGui::TableNextColumn();
+  ImGui::BeginTable("PARAMS", 2, ImGuiTableFlags_SizingFixedFit);
+  ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 8);
+  ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);
+  ImGui::TableHeadersRow();
+  ImGui::EndTable();
+
+  ImGui::EndTable();
+}
+
 void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU,
                                           float screenV) {
   ImGui::SetNextWindowPos(rootAnchor);
@@ -1422,6 +1661,10 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
   } else {
     emulatorHasKeyboardFocus_ = false;
   }
+  if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    emulatorHasMouseFocus_ = ImGui::IsWindowHovered();
+  }
+
   ImGui::End();
 }
 
@@ -1931,6 +2174,10 @@ void ClemensFrontend::executeCommand(std::string_view command) {
     cmdSave(operand);
   } else if (action == "load") {
     cmdLoad(operand);
+  } else if (action == "get" || action == "g") {
+    cmdGet(operand);
+  } else if (action == "adbmouse") {
+    cmdADBMouse(operand);
   } else if (!action.empty()) {
     CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
   }
@@ -1962,7 +2209,11 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
   CLEM_TERM_COUT.print(TerminalLine::Info,
                        "b]reak erase,<index>        - remove breakpoint with index");
   CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "b]reak irq                  - break on IRQ");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
                        "b]reak list                 - list all breakpoints");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "g]et <register>             - return the current value of a register");
   CLEM_TERM_COUT.print(TerminalLine::Info,
                        "v]iew {memory|doc}          - view browser in context area");
   CLEM_TERM_COUT.print(TerminalLine::Info,
@@ -1977,6 +2228,10 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
                        "save <pathname>             - saves a snapshot into the snapshots folder");
   CLEM_TERM_COUT.print(TerminalLine::Info,
                        "load <pathname>             - loads a snapshot into the snapshots folder");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "adbmouse <dx>,<dy>          - injects a mouse move event");
+  CLEM_TERM_COUT.print(TerminalLine::Info,
+                       "adbmouse {0|1}              - injects a mouse button event (1=up, 0=down)");
   CLEM_TERM_COUT.newline();
 }
 
@@ -2002,15 +2257,19 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
   }
   if (operand == "list") {
       //  TODO: granular listing based on operand
-    static const char *bpType[] = {"unknown", "execute", "data-read", "write"};
+    static const char *bpType[] = {"unknown", "execute", "data-read", "write", "IRQ"};
     if (breakpoints_.empty()) {
       CLEM_TERM_COUT.print(TerminalLine::Info, "No breakpoints defined.");
       return;
     }
     for (size_t i = 0; i < breakpoints_.size(); ++i) {
       auto &bp = breakpoints_[i];
-      CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {:02X}/{:04X} {}", i,
-                            (bp.address >> 16) & 0xff, bp.address & 0xffff, bpType[bp.type]);
+      if (bp.type == ClemensBackendBreakpoint::IRQ) {
+        CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {}", i, bpType[bp.type]);
+      } else {
+        CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {:02X}/{:04X} {}", i,
+                              (bp.address >> 16) & 0xff, bp.address & 0xffff, bpType[bp.type]);
+      }
     }
     return;
   }
@@ -2035,6 +2294,11 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
       CLEM_TERM_COUT.format(TerminalLine::Error, "Breakpoint type {} is invalid.", typeStr);
       return;
     }
+  } else if (operand == "irq") {
+    breakpoint.type = ClemensBackendBreakpoint::IRQ;
+    breakpoint.address = 0x0;
+    backend_->addBreakpoint(breakpoint);
+    return;
   } else {
     breakpoint.type = ClemensBackendBreakpoint::Execute;
   }
@@ -2285,7 +2549,7 @@ void ClemensFrontend::cmdTrace(std::string_view operand) {
 
 std::string ClemensFrontend::cmdMessageFromBackend(std::string_view message,
                                                    const ClemensMachine* machine) {
-  auto [params, cmd, paramCount] = gatherMessageParams(message);
+  auto [params, cmd, paramCount] = gatherMessageParams(message, true);
   if (cmd == "dump") {
     unsigned startBank, endBank;
     if (std::from_chars(params[0].data(), params[0].data() + params[0].size(), startBank, 16).ec
@@ -2335,7 +2599,7 @@ bool ClemensFrontend::cmdMessageLocal(std::string_view message) {
     return false;
   } else if (cmd == "dump") {
     bool isOk = true;
-    std::filesystem::path outPath = params[0];
+    auto outPath = std::filesystem::path(CLEM_HOST_TRACES_DIR) / params[0];
     std::ios_base::openmode flags = std::ios_base::out | std::ios_base::binary;
     std::ofstream outstream(outPath, flags);
     if (outstream.is_open()) {
@@ -2396,4 +2660,49 @@ void ClemensFrontend::cmdLoad(std::string_view operand) {
     return;
   }
   backend_->loadMachine(std::string(params[0]));
+}
+
+void ClemensFrontend::cmdGet(std::string_view operand) {
+  if (operand.empty()) {
+    CLEM_TERM_COUT.print(TerminalLine::Error, "Get requires a register name.");
+    return;
+  }
+  if (operand == "irqs") {
+    CLEM_TERM_COUT.format(TerminalLine::Info, "IRQ: {:08X}", frameReadState_.irqs);
+    return;
+  }
+}
+
+void ClemensFrontend::cmdADBMouse(std::string_view operand) {
+  auto [params, cmd, paramCount] = gatherMessageParams(operand);
+  ClemensInputEvent input;
+
+  if (paramCount == 2) {
+    int16_t dx, dy;
+    if (std::from_chars(params[0].data(), params[0].data() + params[0].size(), dx).ec != std::errc{}) {
+      CLEM_TERM_COUT.print(TerminalLine::Error, "ADBMouse delta X could not be parsed.");
+      return;
+    }
+    if (std::from_chars(params[1].data(), params[1].data() + params[1].size(), dy).ec != std::errc{}) {
+      CLEM_TERM_COUT.print(TerminalLine::Error, "ADBMouse delta Y could not be parsed.");
+      return;
+    }
+    input.type = kClemensInputType_MouseMove;
+    input.value_a = dx;
+    input.value_b = dy;
+  } else if (paramCount == 1) {
+    int btn;
+    if (std::from_chars(params[0].data(), params[0].data() + params[0].size(), btn).ec != std::errc{}) {
+      CLEM_TERM_COUT.print(TerminalLine::Error, "ADBMouse button state could not be parsed.");
+      return;
+    }
+    input.type = btn == 0 ? kClemensInputType_MouseButtonDown : kClemensInputType_MouseButtonUp;
+    input.value_a = 0x01;
+    input.value_b = 0x01;
+  } else {
+    CLEM_TERM_COUT.print(TerminalLine::Error, "ADBMouse invalid parameters.");
+    return;
+  }
+  backend_->inputEvent(input);
+  CLEM_TERM_COUT.print(TerminalLine::Info, "Input sent.");
 }

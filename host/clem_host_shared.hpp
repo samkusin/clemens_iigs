@@ -29,7 +29,8 @@ struct ClemensBackendBreakpoint {
     Undefined,
     Execute,
     DataRead,
-    Write
+    Write,
+    IRQ
   };
   Type type;
   uint32_t address;
