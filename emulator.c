@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <ctype.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -872,8 +873,8 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor,
   }
 
   machine->mmio_bypass = false;
-  _clem_mmio_init(&machine->mmio, machine->bank_page_map,
-                  machine->clocks_step_mega2);
+  clem_mmio_init(&machine->mmio, machine->bank_page_map,
+                 machine->clocks_step_mega2);
 
   return 0;
 }

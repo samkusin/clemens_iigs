@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 
@@ -27,7 +28,7 @@ size_t ClemensDiskImporter::calculateRequiredMemory(ClemensDriveType driveType,
 ClemensDiskImporter::ClemensDiskImporter(ClemensDriveType driveType, size_t count)
     : memory_(calculateRequiredMemory(driveType, count),
               malloc(calculateRequiredMemory(driveType, count))),
-      driveType_(driveType), head_(nullptr), tail_(nullptr) {}
+      head_(nullptr), tail_(nullptr), driveType_(driveType) {}
 
 ClemensDiskImporter::~ClemensDiskImporter() { free(memory_.getHead()); }
 

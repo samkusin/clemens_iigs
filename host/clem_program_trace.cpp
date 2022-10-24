@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdio>
 #include <cstdint>
+#include <cstring>
 
 #include <inttypes.h>
 
@@ -148,9 +149,10 @@ ClemensTraceExecutedInstruction& ClemensProgramTrace::addExecutedInstruction(
     }
   }
   if (enableIWMLogging_ && machineState.cpu.pins.ioOut) {
-    if (machineState.cpu.pins.vdaOut &&
-        (machineState.cpu.pins.adr >= 0xc0e0 && machineState.cpu.pins.adr <= 0xc0ef) ||
-        (machineState.cpu.pins.adr == 0xc031)) {
+    if (machineState.cpu.pins.vdaOut && (
+      (machineState.cpu.pins.adr >= 0xc0e0 && machineState.cpu.pins.adr <= 0xc0ef) ||
+      machineState.cpu.pins.adr == 0xc031)
+    ) {
       memoryOps_.emplace_back();
       auto& ops = memoryOps_.back();
       ops.seq = current->seq;

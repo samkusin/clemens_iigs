@@ -14,6 +14,7 @@
 
 #include "clem_disk.h"
 
+#include <stddef.h>
 #include <stdint.h>
 
 #define CLEM_WOZ_INVALID_DATA (-1)

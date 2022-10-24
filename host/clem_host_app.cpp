@@ -4,11 +4,14 @@
 
 #if CLEMENS_PLATFORM_WINDOWS
 #define SOKOL_D3D11
+#elif CLEMENS_PLATFORM_LINUX
+#define SOKOL_GLCORE33
 #endif
 
 #include "imgui.h"
 
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 
@@ -94,7 +97,9 @@ static void onInit()
 
   initDirectories();
 
+#if CLEMENS_PLATFORM_WINDOWS
   CoInitializeEx(NULL, COINIT_MULTITHREADED);
+#endif
 
   sg_desc desc = {};
   desc.context = sapp_sgcontext();
@@ -107,7 +112,7 @@ static void onInit()
   simguiDesc.no_default_font = true;
   simgui_setup(simguiDesc);
 
-  g_sokolToADBKey.fill((unsigned)(-1));
+  g_sokolToADBKey.fill(-1);
   g_sokolToADBKey[SAPP_KEYCODE_SPACE] = CLEM_ADB_KEY_SPACE;
   g_sokolToADBKey[SAPP_KEYCODE_APOSTROPHE] = CLEM_ADB_KEY_APOSTRAPHE;
   g_sokolToADBKey[SAPP_KEYCODE_COMMA] = CLEM_ADB_KEY_COMMA;
@@ -300,8 +305,9 @@ static void onCleanup()
 
   g_Host = nullptr;
 
+#if CLEMENS_PLATFORM_WINDOWS
   CoUninitialize();
-
+#endif
   simgui_shutdown();
   sg_shutdown();
 }
@@ -312,7 +318,7 @@ static void onFail(const char* msg)
 }
 
 
-sapp_desc sokol_main(int argc, char* argv[])
+sapp_desc sokol_main(int /*argc*/, char*[] /*argv[]*/)
 {
   sapp_desc sapp = {};
 

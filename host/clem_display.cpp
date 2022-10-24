@@ -3,6 +3,11 @@
 
 #include "render.h"
 
+#if defined(__GNUC__)
+//  removes a lot of unused STB Truetype functions
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
 
 #define STBTT_STATIC
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -657,8 +662,8 @@ void ClemensDisplay::renderTextPlane(
   unsigned textABGR = grColorToABGR((emulatorTextColor_ >> 4) & 0xf);
 
   for (int i = 0; i < video.scanline_count; ++i) {
-    int row = i + video.scanline_start;
-    const uint8_t* scanline = memory + video.scanlines[row].offset;
+    //int row = i + video.scanline_start;
+    //const uint8_t* scanline = memory + video.scanlines[row].offset;
     auto* vertex = &vertices[0];
     for (int j = 0; j < video.scanline_byte_cnt; ++j) {
       float x0 = ((j * kPhaseCount) + phase);
@@ -694,7 +699,7 @@ void ClemensDisplay::renderTextPlane(
         glyphIndex =  kPrimarySetToGlyph[scanline[j]];
       }
       glyphIndex &= 0xffff;
-      auto* glyph = &glyphSet[glyphIndex];
+      //auto* glyph = &glyphSet[glyphIndex];
       stbtt_aligned_quad quad;
       float xpos = ((j * kPhaseCount) + phase) * vertexParams.display_ratio[0];
       float ypos = row * vertexParams.display_ratio[1] + (vertexParams.display_ratio[1] - 1);
@@ -1036,15 +1041,15 @@ void ClemensDisplay::renderSuperHiresGraphics(
 
 
   uint8_t* buffer0 = video_out;
-  for (unsigned y = 0; y < video.scanline_count; ++y) {
+  for (int y = 0; y < video.scanline_count; ++y) {
     uint8_t* buffer1 = buffer0 + kGraphicsTextureWidth;
     memcpy(buffer1, buffer0, kGraphicsTextureWidth);
     buffer0 += kGraphicsTextureWidth * 2;
   }
 
-  for (unsigned y = 0; y < 8; ++y) {
+  for (int y = 0; y < 8; ++y) {
     uint8_t* texdata = &emulatorRGBABuffer_[1024 * y];
-    for (unsigned x = 0; x < 256; ++x) {
+    for (int x = 0; x < 256; ++x) {
         texdata[x * 4] = (uint8_t)(video.rgba[x] >> 24);
         texdata[x * 4 + 1] = (uint8_t)((video.rgba[x] >> 16) & 0xff);
         texdata[x * 4 + 2] = (uint8_t)((video.rgba[x] >> 8) & 0xff);
@@ -1118,3 +1123,7 @@ auto ClemensDisplay::createVertexParams(
   vertexParams.offsets[1] = (emulatorMonitorDimensions_[1] - emulatorVideoDimensions_[1]) * 0.5f;
   return vertexParams;
 }
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif

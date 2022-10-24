@@ -61,6 +61,8 @@ add_library(clemens_65816 STATIC
     ${CONTRIB_SOURCES}
     ${EMULATOR_SOURCES})
 
+set (CMAKE_C_STANDARD 11)
+
 target_include_directories(clemens_65816
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 

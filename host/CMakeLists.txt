@@ -15,9 +15,17 @@ set(CKAUDIO_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/context.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/core.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/queue.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/queue.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wincoreaudio.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wintime.c")
+    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/queue.h")
+
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+    set(CKAUDIO_SOURCES ${CKAUDIO_SOURCES}
+        "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wincoreaudio.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wintime.c")
+elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    set(CKAUDIO_SOURCES ${CKAUDIO_SOURCES}
+        "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/linuxalsa.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/linuxtime.c")
+endif()
 
 add_library(ckaudio STATIC ${CKAUDIO_SOURCES})
 
@@ -79,9 +87,9 @@ target_link_libraries(clemens_iigs
 
 target_compile_features( clemens_iigs PRIVATE cxx_std_17 )
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(clemens_iigs PRIVATE -Wall -Wextra -pedantic)
-    target_compile_options(clemens_iigs PUBLIC -fno-exceptions)
-    target_compile_options(clemens_iigs PUBLIC -fno-rtti)
+    target_compile_options(clemens_iigs PRIVATE -Wall -Wextra -Wno-missing-field-initializers -pedantic)
+    target_compile_options(clemens_iigs PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>)
+    target_compile_options(clemens_iigs PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     # Removing MSVC options that are less necessary for game / simulation
     # development.

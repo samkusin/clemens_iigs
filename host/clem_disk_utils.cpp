@@ -1,5 +1,6 @@
 #include "clem_disk_utils.hpp"
 
+#include <algorithm>
 #include <array>
 #include <filesystem>
 #include <fstream>
@@ -66,6 +67,8 @@ size_t calculateNibRequiredMemory(ClemensDriveType driveType) {
     case kClemensDrive_5_25_D1:
     case kClemensDrive_5_25_D2:
       size = CLEM_DISK_525_MAX_DATA_SIZE;
+      break;
+    default:
       break;
   }
   return size;

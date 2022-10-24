@@ -2,10 +2,11 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
+#include <cstring>
 
-static void *allocateLocal(void *user_ctx, size_t sz) { return malloc(sz); }
+static void *allocateLocal(void */*user_ctx*/, size_t sz) { return malloc(sz); }
 
-static void freeLocal(void *user_ctx, void *data) { free(data); }
+static void freeLocal(void * /*user_ctx*/, void *data) { free(data); }
 
 //  TODO: optimize when needed per platform
 
@@ -53,7 +54,7 @@ unsigned ClemensAudioDevice::getBufferStride() const {
   return queuedFrameStride_;
 }
 
-unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float deltaTime) {
+unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float /*deltaTime */) {
   if (!audio.frame_count)
     return 0;
 
@@ -162,25 +163,9 @@ uint32_t ClemensAudioDevice::mixClemensAudio(CKAudioBuffer *outBuffer,
   return frameLimit;
 }
 
-static uint32_t mixSilenceF32Stereo(CKAudioBuffer *buffer,
-                                    uint32_t frameStart) {
-  uint32_t frameIndex;
-  uint8_t *output =
-      (uint8_t *)buffer->data + buffer->data_format.frame_size * frameStart;
-  for (frameIndex = frameStart; frameIndex < buffer->frame_limit;
-       ++frameIndex) {
-    float *f32out = (float *)output;
-    f32out[0] = 0.0f;
-    f32out[1] = 0.0f;
-    output += buffer->data_format.frame_size;
-  }
-  return frameIndex;
-}
-
 uint32_t ClemensAudioDevice::mixAudio(CKAudioBuffer *audioBuffer,
-                                      CKAudioTimePoint *timepoint, void *ctx) {
+                                      CKAudioTimePoint */*timepoint */, void *ctx) {
   auto *audio = reinterpret_cast<ClemensAudioDevice *>(ctx);
-  float dt_per_sample = 1.0f / audioBuffer->data_format.frequency;
 
   uint32_t frameIndex =
       audio->mixClemensAudio(audioBuffer, audioBuffer->frame_limit);

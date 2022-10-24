@@ -74,7 +74,7 @@ static char sDecBase16Table[256] = {
  * Caller is responsible for freeing the returned buffer. Returned buffer is
  * nul terminated to make it easier to use as a C string. The nul terminator is
  * not included in out_len.
- * 
+ *
  * Samir Sinha: Made some changes to avoid allocation
  */
 unsigned int base64_encode_len(unsigned int src_len)
@@ -151,10 +151,10 @@ unsigned int base64_decode_len(const char* src, unsigned int len)
   unsigned int count, i;
 	count = 0;
 	for (i = 0; i < len; i++) {
-		if (sDecBase64Table[src[i]] != -1)
+		if (sDecBase64Table[(unsigned char)src[i]] != -1)
 			count++;
 	}
-  
+
 	if (count == 0 || count % 4)
 		return 0;
   return count / 4 * 3;
@@ -176,7 +176,7 @@ unsigned int base64_decode(
 	pos = out;
 
   for (i = 0; i < len; i++) {
-		tmp = sDecBase64Table[src[i]];
+		tmp = sDecBase64Table[(unsigned char)src[i]];
 		if (tmp == -1)
 			continue;
 
@@ -235,19 +235,19 @@ unsigned int cinek_decode_hex(
 ) {
   const char* in = source;
   unsigned int offset;
-  unsigned char decoded;
+  char decoded;
 
   //  input hex 8-bit value
   //  output 8-bit unsigned char (int8)
   for (offset = 0; offset < size; ++offset) {
     char inChar = *(in++);
     if (!inChar) break;
-    decoded = sDecBase16Table[inChar];
+    decoded = sDecBase16Table[(unsigned char)inChar];
     if (decoded < 0) break;
     result[offset] = (decoded << 4);
     inChar = *(in++);
     if (!inChar) break;
-    decoded = sDecBase16Table[inChar];
+    decoded = sDecBase16Table[(unsigned char)inChar];
     if (decoded < 0) break;
     result[offset] |= (decoded & 0x0f);
   }

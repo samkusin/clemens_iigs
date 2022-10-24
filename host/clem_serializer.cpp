@@ -128,7 +128,7 @@ bool save(std::string outputPath, ClemensMachine* machine, size_t driveCount,
   mpack_write_cstr(&writer, "disks");
   {
     mpack_start_array(&writer, kClemensDrive_Count);
-    for (size_t driveIndex = 0; driveIndex < kClemensDrive_Count; ++driveIndex) {
+    for (size_t driveIndex = 0; driveIndex < driveCount; ++driveIndex) {
       saveDiskMetadata(&writer, containers[driveIndex], states[driveIndex]);
     }
     mpack_finish_array(&writer);
@@ -184,7 +184,7 @@ bool load(std::string outputPath, ClemensMachine* machine, size_t driveCount,
   mpack_expect_cstr_match(&reader, "cards");
   {
     uint32_t card_count = mpack_expect_map(&reader);
-    for (int i = 0; i < card_count; ++i) {
+    for (uint32_t i = 0; i < card_count; ++i) {
       mpack_expect_cstr(&reader, str, sizeof(str));
       if (!strncmp(str, slots[i].c_str(), sizeof(str))) {
         destroyCard(machine->card_slot[i]);
@@ -207,7 +207,7 @@ bool load(std::string outputPath, ClemensMachine* machine, size_t driveCount,
   mpack_expect_cstr(&reader, str, sizeof(str));
   {
     mpack_expect_array(&reader);
-    for (size_t driveIndex = 0; driveIndex < kClemensDrive_Count; ++driveIndex) {
+    for (size_t driveIndex = 0; driveIndex < driveCount; ++driveIndex) {
       if (!loadDiskMetadata(&reader, containers[driveIndex], states[driveIndex])) {
         fmt::print("Loading emulator snapshot failed due to disk image '{}' at drive '{}'.",
                    states[driveIndex].imagePath.empty() ? "none defined" :

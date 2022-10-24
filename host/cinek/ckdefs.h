@@ -214,7 +214,7 @@
 
 #if CK_COMPILER_CLANG
   #define CK_FILENAME __BASE_FILE__
-#else CK_COMPILER_GNUC
+#elif CK_COMPILER_GNUC
   #define CK_FILENAME __FILE__
 #endif
 

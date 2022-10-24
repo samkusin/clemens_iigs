@@ -6,8 +6,13 @@
 
 #if defined(_WIN32)
 #define CLEMENS_PLATFORM_WINDOWS 1
+#define CLEMENS_PLATFORM_LINUX 0
+#elif defined(__linux__)
+#define CLEMENS_PLATFORM_WINDOWS 0
+#define CLEMENS_PLATFORM_LINUX 1
 #else
 #define CLEMENS_PLATFORM_WINDOWS 0
+#define CLEMENS_PLATFORM_LINUX 0
 #endif
 
 #ifdef __cplusplus
