@@ -11,7 +11,7 @@ static std::array<std::string_view, 4> sDriveNames = {
   "s5d1", "s5d2", "s6d1", "s6d2"
 };
 
-struct ClemensWOZDisk* ClemensDiskUtilities::parseWOZ(
+struct ClemensWOZDisk* parseWOZ(
   struct ClemensWOZDisk* woz, cinek::ConstRange<uint8_t>& image) {
   const uint8_t* bits_data_current = clem_woz_check_header(
     image.first, cinek::length(image));

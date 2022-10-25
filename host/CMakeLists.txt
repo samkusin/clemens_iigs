@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.15)
 
 project(clements_iigs LANGUAGES C CXX)
 
+set(CMAKE_CXX_STANDARD 17)
+
 # build header-only source
 # build imgui
 # build app
@@ -86,10 +88,16 @@ target_link_libraries(clemens_iigs
         imgui)
 
 target_compile_features( clemens_iigs PRIVATE cxx_std_17 )
+
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(clemens_iigs PRIVATE -Wall -Wextra -Wno-missing-field-initializers -pedantic)
-    target_compile_options(clemens_iigs PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>)
-    target_compile_options(clemens_iigs PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
+    target_compile_options(clemens_iigs PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions -fno-rtti>)
+    if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+        target_link_libraries(clemens_iigs PRIVATE X11 Xi Xcursor GL dl pthread)
+        target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_GL)
+    endif()
+    # GCC 8 doesn't link the fs library even with C++17 enabled
+    target_link_libraries(clemens_iigs PRIVATE $<$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>:stdc++fs>)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     # Removing MSVC options that are less necessary for game / simulation
     # development.
@@ -107,10 +115,11 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     string(REGEX REPLACE "/EHsc*" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
-    target_compile_definitions(clemens_iigs PUBLIC _CRT_SECURE_NO_WARNINGS _ITERATOR_DEBUG_LEVEL=0)
-    target_compile_options(clemens_iigs PUBLIC /EHs-c-)
-    target_compile_definitions(clemens_iigs PUBLIC _HAS_EXCEPTIONS=0 FMT_EXCEPTIONS=0)
-    target_compile_options(clemens_iigs PUBLIC /GR-)
+    target_compile_definitions(clemens_iigs PRIVATE _CRT_SECURE_NO_WARNINGS _ITERATOR_DEBUG_LEVEL=0)
+    target_compile_options(clemens_iigs PRIVATE /EHs-c-)
+    target_compile_definitions(clemens_iigs PRIVATE _HAS_EXCEPTIONS=0 FMT_EXCEPTIONS=0)
+    target_compile_options(clemens_iigs PRIVATE /GR-)
+    target_compile_definitions(common PUBLIC CK3D_BACKEND_D3D11)
 else()
     message(WARNING "Unsupported compiler")
 endif()
