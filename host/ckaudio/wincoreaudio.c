@@ -33,8 +33,6 @@ static void *allocateLocal(void *ctx, size_t amt) { return malloc(amt); }
 
 static void freeLocal(void *ctx, void *p) { free(p); }
 
-CKAudioContext g_ckaudio_context;
-
 void ckaudio_message(CKAudioMessageType type, const char *module,
                      const char *fmt, ...) {
     static const char *type_strings[CKAUDIO_MESSAGE_TYPE_LIMIT] = {

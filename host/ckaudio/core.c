@@ -3,6 +3,8 @@
 
 #include <string.h>
 
+CKAudioContext g_ckaudio_context;
+
 void *ckaudio_allocator_calloc(CKAudioContext *ctx, size_t cnt, size_t amt)
 {
     void *data = ctx->allocator.allocate(ctx->allocator.user_ctx, cnt * amt);
@@ -80,4 +82,14 @@ void ckaudio_buffer_release(CKAudioBuffer *buffer)
         ckaudio_allocator_free(&g_ckaudio_context, buffer->data);
     }
     memset(buffer, 0, sizeof(*buffer));
+}
+
+void ckaudio_timepoint_make_null(CKAudioTimePoint *tp) { memset(tp->data, 0xff, sizeof(tp->data)); }
+
+bool ckaudio_timepoint_is_null(CKAudioTimePoint *tp) {
+  for (unsigned i = 0; i < sizeof(tp->data); ++i) {
+    if (tp->data[i] != 0xff)
+      return false;
+  }
+  return true;
 }

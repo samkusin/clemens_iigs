@@ -24,12 +24,21 @@ extern "C" {
  *
  */
 typedef struct {
-  char data[8];
+  char data[16];
 } ClemensHostTimePoint;
 
 typedef struct {
   unsigned char data[16];
 } ClemensHostUUID;
+
+#if CLEMENS_PLATFORM_LINUX
+/**
+ * @brief
+ *
+ * @param display A pointer to the Display opened via XOpenDisplay
+ */
+void clem_host_x11_init(const void* display);
+#endif
 
 /**
  * @brief

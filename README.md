@@ -85,6 +85,12 @@ cd ../build-run/clemens_iigs
 ./Debug/clemens_iigs.exe
 ```
 
+### Linux
+
+```
+apt install rsync
+```
+
 ## Usage
 
 The ROM 3 needed to boot the system needs to be supplied by the user.  There are ways to find it on common non-commercial disk image sites.

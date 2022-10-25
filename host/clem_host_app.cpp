@@ -92,6 +92,9 @@ static void initDirectories() {
 
 static void onInit()
 {
+#if CLEMENS_PLATFORM_LINUX
+  clem_host_x11_init(sapp_x11_get_display());
+#endif
   clem_host_timepoint_init();
   clem_host_timepoint_now(&g_LastTimepoint);
 

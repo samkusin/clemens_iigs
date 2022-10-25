@@ -1301,6 +1301,9 @@ SOKOL_APP_API_DECL const void* sapp_wgpu_get_depth_stencil_view(void);
 /* Android: get native activity handle */
 SOKOL_APP_API_DECL const void* sapp_android_get_native_activity(void);
 
+/* X11: get the opened display */
+SOKOL_APP_API_DECL const void* sapp_x11_get_display(void);
+
 #ifdef __cplusplus
 } /* extern "C" */
 
@@ -10724,6 +10727,15 @@ SOKOL_API_IMPL const void* sapp_android_get_native_activity(void) {
 
 SOKOL_API_IMPL void sapp_html5_ask_leave_site(bool ask) {
     _sapp.html5_ask_leave_site = ask;
+}
+
+SOKOL_API_IMPL const void* sapp_x11_get_display(void) {
+    SOKOL_ASSERT(_sapp.valid);
+    #if defined(_SAPP_LINUX)
+        return (const void*) _sapp.x11.display;
+    #else
+        return 0;
+    #endif
 }
 
 #endif /* SOKOL_APP_IMPL */

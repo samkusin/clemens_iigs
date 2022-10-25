@@ -1,5 +1,3 @@
-
-
 #include "clem_host_platform.h"
 
 #define WIN32_LEAN_AND_MEAN

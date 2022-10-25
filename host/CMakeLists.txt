@@ -19,11 +19,11 @@ set(CKAUDIO_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/queue.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/queue.h")
 
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(CKAUDIO_SOURCES ${CKAUDIO_SOURCES}
         "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wincoreaudio.c"
         "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wintime.c")
-elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(CKAUDIO_SOURCES ${CKAUDIO_SOURCES}
         "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/linuxalsa.c"
         "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/linuxtime.c")
@@ -55,6 +55,9 @@ set(FMT_SOURCES
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(PLATFORM_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_windows.c")
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(PLATFORM_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_linux.c")
 endif()
 
 add_executable(clemens_iigs
@@ -92,12 +95,14 @@ target_compile_features( clemens_iigs PRIVATE cxx_std_17 )
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(clemens_iigs PRIVATE -Wall -Wextra -Wno-missing-field-initializers -pedantic)
     target_compile_options(clemens_iigs PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions -fno-rtti>)
-    if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-        target_link_libraries(clemens_iigs PRIVATE X11 Xi Xcursor GL dl pthread)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_link_libraries(clemens_iigs PRIVATE X11 Xi Xcursor GL dl pthread uuid)
         target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_GL)
     endif()
-    # GCC 8 doesn't link the fs library even with C++17 enabled
-    target_link_libraries(clemens_iigs PRIVATE $<$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>:stdc++fs>)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        # GCC 8 doesn't link the fs library even with C++17 enabled
+        target_link_libraries(clemens_iigs PRIVATE $<$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>:stdc++fs>)
+    endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     # Removing MSVC options that are less necessary for game / simulation
     # development.
