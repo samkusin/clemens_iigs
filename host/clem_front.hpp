@@ -45,7 +45,8 @@ private:
   //  the backend state delegate is run on a separate thread and notifies
   //  when a frame has been published
   void backendStateDelegate(const ClemensBackendState &state);
-
+  void copyState(const ClemensBackendState& state);
+  
   void doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize);
   void doMachineDiagnosticsDisplay();
   void doMachineDiskDisplay();

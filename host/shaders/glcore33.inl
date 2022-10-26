@@ -25,7 +25,7 @@ const char* VS_VERTEX_SOURCE =
     "in vec2 uv;\n"
     "out vec4 frag_color;\n"
     "void main() {\n"
-    "  frag_color = texture(tex, uv) * color;\n"
+    "  frag_color = texture(tex, uv).xxxx * color;\n"
     "}\n";
 
   const char* FS_HIRES_SOURCE =

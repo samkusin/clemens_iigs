@@ -1,6 +1,7 @@
 #include "util.h"
 #include "munit/munit.h"
 #include "emulator.h"
+#include "clem_mem.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -33,7 +34,6 @@ int clem_test_init_machine(
                         memory->g_test_rom, sizeof(memory->g_test_rom),
                         memory->g_e0_ram, memory->g_e1_ram,
                         memory->g_fpi_ram,
-                        memory->g_card_rom,
                         memory->g_card_expansion_rom,
                         CLEM_TEST_NUM_FPI_BANKS);
 }
@@ -46,8 +46,8 @@ int clem_test_init_machine_trivial_rom(
     uint16_t adr;
 
     bank = &memory->g_test_rom[CLEM_IIGS_BANK_SIZE * 3];
-    adr = (CLEM_6502_RESET_VECTOR_HI_ADDR << 8) |
-          CLEM_6502_RESET_VECTOR_LO_ADDR;
+    adr = (uint16_t)((CLEM_6502_RESET_VECTOR_HI_ADDR << 8) |
+          CLEM_6502_RESET_VECTOR_LO_ADDR);
     bank[adr] = 0x00;
     bank[adr + 1] = 0xfe;
     adr = 0xfe00;
@@ -70,7 +70,6 @@ int clem_test_init_machine_trivial_rom(
                         memory->g_test_rom, sizeof(memory->g_test_rom),
                         memory->g_e0_ram, memory->g_e1_ram,
                         memory->g_fpi_ram,
-                        memory->g_card_rom,
                         memory->g_card_expansion_rom,
                         CLEM_TEST_NUM_FPI_BANKS);
 }

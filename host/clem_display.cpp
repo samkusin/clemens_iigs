@@ -368,11 +368,13 @@ ClemensDisplayProvider::ClemensDisplayProvider(
   //  create shader
   sg_shader_desc shaderDesc = {};
   defineUniformBlocks(shaderDesc);
+#if defined(CK3D_BACKEND_D3D11)
   shaderDesc.attrs[0].sem_name = "POSITION";
   shaderDesc.attrs[1].sem_name = "TEXCOORD";
   shaderDesc.attrs[1].sem_index = 1;
   shaderDesc.attrs[2].sem_name = "COLOR";
   shaderDesc.attrs[2].sem_index = 1;
+#endif
   shaderDesc.vs.source = VS_VERTEX_SOURCE;
   shaderDesc.fs.images[0].image_type = SG_IMAGETYPE_2D;
 #if defined(CK3D_BACKEND_GL)
@@ -400,11 +402,13 @@ ClemensDisplayProvider::ClemensDisplayProvider(
   //  create hires pipeline and vertex buffer, no alpha blending, triangles
   shaderDesc = {};
   defineUniformBlocks(shaderDesc);
+#if defined(CK3D_BACKEND_D3D11)
   shaderDesc.attrs[0].sem_name = "POSITION";
   shaderDesc.attrs[1].sem_name = "TEXCOORD";
   shaderDesc.attrs[1].sem_index = 1;
   shaderDesc.attrs[2].sem_name = "COLOR";
   shaderDesc.attrs[2].sem_index = 1;
+#endif
   shaderDesc.vs.source = VS_VERTEX_SOURCE;
   shaderDesc.fs.images[0].image_type = SG_IMAGETYPE_2D;
   shaderDesc.fs.images[1].image_type = SG_IMAGETYPE_2D;
@@ -429,11 +433,13 @@ ClemensDisplayProvider::ClemensDisplayProvider(
   //  create hires pipeline and vertex buffer, no alpha blending, triangles
   shaderDesc = {};
   defineUniformBlocks(shaderDesc);
+#if defined(CK3D_BACKEND_D3D11)
   shaderDesc.attrs[0].sem_name = "POSITION";
   shaderDesc.attrs[1].sem_name = "TEXCOORD";
   shaderDesc.attrs[1].sem_index = 1;
   shaderDesc.attrs[2].sem_name = "COLOR";
   shaderDesc.attrs[2].sem_index = 1;
+#endif
   shaderDesc.vs.source = VS_VERTEX_SOURCE;
   shaderDesc.fs.images[0].image_type = SG_IMAGETYPE_2D;
   shaderDesc.fs.images[1].image_type = SG_IMAGETYPE_2D;
@@ -1043,18 +1049,20 @@ void ClemensDisplay::renderHiresGraphicsTexture(
   float y0 = 0.0f;
   float x1 = x0 + emulatorVideoDimensions_[0];
   float y1 = y0 + (video.scanline_count * y_scalar);
+  float u0 = 0.0f;
+  float v0 = 0.0f;
   float u1 = emulatorVideoDimensions_[0] / kGraphicsTextureWidth;
   float v1 = (video.scanline_count * y_scalar) / kGraphicsTextureHeight;
 
   sg_range verticesRange;
   verticesRange.ptr = &vertices[0];
   verticesRange.size = 6 * sizeof(DrawVertex);
-  vertices[0] = { { x0, y0 }, { 0.0f, 0.0f }, 0xffffffff };
-  vertices[1] = { { x0, y1 }, { 0.0f, v1   }, 0xffffffff };
-  vertices[2] = { { x1, y1 }, { u1,   v1   }, 0xffffffff };
-  vertices[3] = { { x0, y0 }, { 0.0f, 0.0f }, 0xffffffff };
-  vertices[4] = { { x1, y1 }, { u1,   v1   }, 0xffffffff };
-  vertices[5] = { { x1, y0 }, { u1,  0.0f  }, 0xffffffff };
+  vertices[0] = { { x0, y0 }, { u0, v0 }, 0xffffffff };
+  vertices[1] = { { x0, y1 }, { u0, v1 }, 0xffffffff };
+  vertices[2] = { { x1, y1 }, { u1, v1 }, 0xffffffff };
+  vertices[3] = { { x0, y0 }, { u0, v0 }, 0xffffffff };
+  vertices[4] = { { x1, y1 }, { u1, v1 }, 0xffffffff };
+  vertices[5] = { { x1, y0 }, { u1, v1 }, 0xffffffff };
 
   sg_bindings renderBindings = {};
   renderBindings.vertex_buffers[0] = vertexBuffer_;
@@ -1120,18 +1128,20 @@ void ClemensDisplay::renderSuperHiresGraphics(
   float y0 = 0.0f;
   float x1 = x0 + emulatorVideoDimensions_[0];
   float y1 = y0 + (video.scanline_count * y_scalar);
+  float u0 = 0.0f;
+  float v0 = 0.0f;
   float u1 = emulatorVideoDimensions_[0] / kGraphicsTextureWidth;
   float v1 = (video.scanline_count * y_scalar) / kGraphicsTextureHeight;
 
   sg_range verticesRange;
   verticesRange.ptr = &vertices[0];
   verticesRange.size = 6 * sizeof(DrawVertex);
-  vertices[0] = { { x0, y0 }, { 0.0f, 0.0f }, 0xffffffff };
-  vertices[1] = { { x0, y1 }, { 0.0f, v1   }, 0xffffffff };
-  vertices[2] = { { x1, y1 }, { u1,   v1   }, 0xffffffff };
-  vertices[3] = { { x0, y0 }, { 0.0f, 0.0f }, 0xffffffff };
-  vertices[4] = { { x1, y1 }, { u1,   v1   }, 0xffffffff };
-  vertices[5] = { { x1, y0 }, { u1,  0.0f  }, 0xffffffff };
+  vertices[0] = { { x0, y0 }, { u0, v0 }, 0xffffffff };
+  vertices[1] = { { x0, y1 }, { u0, v1 }, 0xffffffff };
+  vertices[2] = { { x1, y1 }, { u1, v1 }, 0xffffffff };
+  vertices[3] = { { x0, y0 }, { u0, v0 }, 0xffffffff };
+  vertices[4] = { { x1, y1 }, { u1, v1 }, 0xffffffff };
+  vertices[5] = { { x1, y0 }, { u1, v1 }, 0xffffffff };
 
   sg_bindings renderBindings = {};
   renderBindings.vertex_buffers[0] = vertexBuffer_;

@@ -66,6 +66,10 @@ set (CMAKE_C_STANDARD 11)
 target_include_directories(clemens_65816
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(clemens_65816 PUBLIC m)
+endif()
+
 add_library(clemens_65816_serializer STATIC
     ${CONTRIB_SOURCES}
     "${CMAKE_CURRENT_SOURCE_DIR}/serializer.c")
@@ -81,7 +85,6 @@ add_library(clemens_65816_render STATIC
 target_link_libraries(clemens_65816_render PUBLIC clemens_65816)
 target_include_directories(clemens_65816_render
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
-
 
 add_subdirectory(tests)
 
