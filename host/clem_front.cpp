@@ -295,12 +295,15 @@ void ClemensFrontend::DOCStatus::copyFrom(const ClemensDeviceEnsoniq& doc) {
   memcpy(osc_flags, doc.osc_flags, sizeof(osc_flags));
 }
 
+const uint64_t ClemensFrontend::kFrameSeqNoInvalid =
+  std::numeric_limits<uint64_t>::max();
+
 ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
     : displayProvider_(systemFontLoBuffer, systemFontHiBuffer), display_(displayProvider_),
       audio_(),
-      frameSeqNo_(std::numeric_limits<decltype(frameSeqNo_)>::max()),
-      frameLastSeqNo_(std::numeric_limits<decltype(frameLastSeqNo_)>::max()),
+      frameSeqNo_(kFrameSeqNoInvalid),
+      frameLastSeqNo_(kFrameSeqNoInvalid),
       frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameMemory_(kLogMemorySize, malloc(kLogMemorySize)),
@@ -860,7 +863,10 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
 
 void ClemensFrontend::doMachineDiagnosticsDisplay() {
   auto fontCharSize = ImGui::GetFont()->GetCharAdvance('A');
-  auto emulatorTime = (uint64_t)(clem_calc_secs_from_clocks(&frameReadState_.emulatorClock) * 1000);
+  uint64_t emulatorTime = 0;
+  if (frameSeqNo_ != kFrameSeqNoInvalid) {
+    emulatorTime  = (uint64_t)(clem_calc_secs_from_clocks(&frameReadState_.emulatorClock) * 1000);
+  }
   ImGui::BeginTable("Diagnostics", 3);
   ImGui::TableSetupColumn("CPU", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 10);
   ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);

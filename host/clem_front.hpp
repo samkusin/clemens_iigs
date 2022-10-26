@@ -92,6 +92,8 @@ private:
   std::condition_variable framePublished_;
   std::mutex frameMutex_;
   uint64_t frameSeqNo_, frameLastSeqNo_;
+  static const uint64_t kFrameSeqNoInvalid;
+
   //  Toggle between frame memory buffers so that backendStateDelegate and frame
   //  write to and read from separate buffers, to minimize the time we need to
   //  keep the frame mutex between the two threads.
