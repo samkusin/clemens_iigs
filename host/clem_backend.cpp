@@ -723,7 +723,6 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       //  If neither mode is applicable, the emulator holds and this loop will
       //  wait for commands from the frontend
       //
-      fmt::print("SKS 0\n");
       areInstructionsLogged_ = stepsRemaining.has_value() && (*stepsRemaining > 0);
 
       const time_t kEpoch1904To1970Seconds = 2082844800;
