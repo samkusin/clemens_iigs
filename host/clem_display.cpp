@@ -16,7 +16,11 @@
 #include <cstdio>
 #include <cstdlib>
 
+#if defined(CK3D_BACKEND_D3D11)
 #include "shaders/d3d11.inl"
+#elif defined(CK3D_BACKEND_GL)
+#include "shaders/glcore33.inl"
+#endif
 
 
 //  Renders ClemensVideo data onto a render target/texture representing the
@@ -296,6 +300,22 @@ static sg_image loadFont(stbtt_bakedchar* glyphSet,
   return fontImage;
 }
 
+void defineUniformBlocks(sg_shader_desc& shaderDesc) {
+  shaderDesc.vs.uniform_blocks[0].size = sizeof(ClemensDisplayVertexParams);
+
+#if defined(CK3D_BACKEND_GL)
+  shaderDesc.vs.uniform_blocks[0].uniforms[0].name = "render_dims";
+  shaderDesc.vs.uniform_blocks[0].uniforms[0].type = SG_UNIFORMTYPE_FLOAT2;
+  shaderDesc.vs.uniform_blocks[0].uniforms[1].name = "display_ratio";
+  shaderDesc.vs.uniform_blocks[0].uniforms[1].type = SG_UNIFORMTYPE_FLOAT2;
+  shaderDesc.vs.uniform_blocks[0].uniforms[2].name = "virtual_dims";
+  shaderDesc.vs.uniform_blocks[0].uniforms[2].type = SG_UNIFORMTYPE_FLOAT2;
+  shaderDesc.vs.uniform_blocks[0].uniforms[3].name = "offsets";
+  shaderDesc.vs.uniform_blocks[0].uniforms[3].type = SG_UNIFORMTYPE_FLOAT2;
+#endif
+}
+
+
 } // namespace anon
 
 ClemensDisplayProvider::ClemensDisplayProvider(
@@ -347,13 +367,18 @@ ClemensDisplayProvider::ClemensDisplayProvider(
 
   //  create shader
   sg_shader_desc shaderDesc = {};
-  shaderDesc.vs.uniform_blocks[0].size = sizeof(DisplayVertexParams);
+  defineUniformBlocks(shaderDesc);
   shaderDesc.attrs[0].sem_name = "POSITION";
   shaderDesc.attrs[1].sem_name = "TEXCOORD";
+  shaderDesc.attrs[1].sem_index = 1;
   shaderDesc.attrs[2].sem_name = "COLOR";
-  shaderDesc.vs.source = VS_D3D11_VERTEX;
+  shaderDesc.attrs[2].sem_index = 1;
+  shaderDesc.vs.source = VS_VERTEX_SOURCE;
   shaderDesc.fs.images[0].image_type = SG_IMAGETYPE_2D;
-  shaderDesc.fs.source = FS_D3D11_TEXT;
+#if defined(CK3D_BACKEND_GL)
+  shaderDesc.fs.images[0].name = "tex";
+#endif
+  shaderDesc.fs.source = FS_TEXT_SOURCE;
   textShader_ = sg_make_shader(shaderDesc);
 
   //  create text pipeline and vertex buffer, no alpha blending, triangles
@@ -374,14 +399,20 @@ ClemensDisplayProvider::ClemensDisplayProvider(
 
   //  create hires pipeline and vertex buffer, no alpha blending, triangles
   shaderDesc = {};
-  shaderDesc.vs.uniform_blocks[0].size = sizeof(DisplayVertexParams);
+  defineUniformBlocks(shaderDesc);
   shaderDesc.attrs[0].sem_name = "POSITION";
   shaderDesc.attrs[1].sem_name = "TEXCOORD";
+  shaderDesc.attrs[1].sem_index = 1;
   shaderDesc.attrs[2].sem_name = "COLOR";
-  shaderDesc.vs.source = VS_D3D11_VERTEX;
+  shaderDesc.attrs[2].sem_index = 1;
+  shaderDesc.vs.source = VS_VERTEX_SOURCE;
   shaderDesc.fs.images[0].image_type = SG_IMAGETYPE_2D;
   shaderDesc.fs.images[1].image_type = SG_IMAGETYPE_2D;
-  shaderDesc.fs.source = FS_D3D11_HIRES;
+#if defined(CK3D_BACKEND_GL)
+  shaderDesc.fs.images[0].name = "hgr_tex";
+  shaderDesc.fs.images[1].name = "hcolor_tex";
+#endif
+  shaderDesc.fs.source = FS_HIRES_SOURCE;
   hiresShader_ = sg_make_shader(shaderDesc);
 
   renderPipelineDesc = {};
@@ -397,14 +428,20 @@ ClemensDisplayProvider::ClemensDisplayProvider(
 
   //  create hires pipeline and vertex buffer, no alpha blending, triangles
   shaderDesc = {};
-  shaderDesc.vs.uniform_blocks[0].size = sizeof(DisplayVertexParams);
+  defineUniformBlocks(shaderDesc);
   shaderDesc.attrs[0].sem_name = "POSITION";
   shaderDesc.attrs[1].sem_name = "TEXCOORD";
+  shaderDesc.attrs[1].sem_index = 1;
   shaderDesc.attrs[2].sem_name = "COLOR";
-  shaderDesc.vs.source = VS_D3D11_VERTEX;
+  shaderDesc.attrs[2].sem_index = 1;
+  shaderDesc.vs.source = VS_VERTEX_SOURCE;
   shaderDesc.fs.images[0].image_type = SG_IMAGETYPE_2D;
   shaderDesc.fs.images[1].image_type = SG_IMAGETYPE_2D;
-  shaderDesc.fs.source = FS_D3D11_SUPER;
+#if defined(CK3D_BACKEND_GL)
+  shaderDesc.fs.images[0].name = "hgr_tex";
+  shaderDesc.fs.images[1].name = "hcolor_tex";
+#endif
+  shaderDesc.fs.source = FS_SUPER_SOURCE;
   superHiresShader_ = sg_make_shader(shaderDesc);
 
   renderPipelineDesc = {};

@@ -81,6 +81,6 @@ unsigned clem_host_get_processor_number() {
 }
 
 void clem_host_uuid_gen(ClemensHostUUID* uuid) {
-  //Under Linux, libuuid
-
+  assert(sizeof(uuid_t) <= sizeof(uuid->data));
+  uuid_generate(uuid->data);
 }

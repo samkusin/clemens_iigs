@@ -94,7 +94,7 @@ target_compile_features( clemens_iigs PRIVATE cxx_std_17 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(clemens_iigs PRIVATE -Wall -Wextra -Wno-missing-field-initializers -pedantic)
-    target_compile_options(clemens_iigs PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions -fno-rtti>)
+    target_compile_options(clemens_iigs PRIVATE $<$<COMPILE_LANG_AND_ID:CXX,GNU>:-fno-exceptions -fno-rtti>)
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_link_libraries(clemens_iigs PRIVATE X11 Xi Xcursor GL dl pthread uuid)
         target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_GL)

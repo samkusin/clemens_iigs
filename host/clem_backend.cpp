@@ -583,6 +583,9 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     }
   }
 
+
+  fmt::print("Starting backend thread.\n");
+
   ClemensCard* mockingboard = findMockingboardCard(&machine_);
   uint64_t publishSeqNo = 0;
   unsigned emulatorRefreshFrequency = 60;
@@ -720,6 +723,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
       //  If neither mode is applicable, the emulator holds and this loop will
       //  wait for commands from the frontend
       //
+      fmt::print("SKS 0\n");
       areInstructionsLogged_ = stepsRemaining.has_value() && (*stepsRemaining > 0);
 
       const time_t kEpoch1904To1970Seconds = 2082844800;
@@ -889,7 +893,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     machine_.card_slot[i] = NULL;
   }
 
-  printf("Terminated backend refresh thread.\n");
+  fmt::print("Terminated backend refresh thread.\n");
 }
 
 std::optional<unsigned> ClemensBackend::checkHitBreakpoint() {

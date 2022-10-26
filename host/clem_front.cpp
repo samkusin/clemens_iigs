@@ -332,7 +332,6 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
 
   debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;
   debugMemoryEditor_.WriteFn = &ClemensFrontend::imguiMemoryEditorWrite;
-
   CLEM_TERM_COUT.print(TerminalLine::Info, "Welcome to the Clemens IIgs Emulator");
 }
 
