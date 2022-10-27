@@ -17,9 +17,7 @@
 #include <tuple>
 
 //  TODO: Diagnose Linux caps lock issue
-//  TODO: Diagnose Linux emulated monitor offset issue (image appears higher than 
-//        on Windows, or maybe a GL issue)
-//  TODO: Linux hires graphics are broken - maybe a GCC vs MSVC issue
+//  TODO: Diagnose GL offsets issue with emulated display
 //  TODO: Insert card to slot (non-gui)
 //  TODO: Mouse x,y scaling based on display view size vs desktop size
 //  TODO: blank disk gui selection for disk set (selecting combo create will
@@ -388,9 +386,9 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState& state) {
 
 void ClemensFrontend::copyState(const ClemensBackendState &state) {
   std::lock_guard<std::mutex> frameLock(frameMutex_);
-  
+
   frameSeqNo_ = state.seqno;
-  
+
   frameWriteMemory_.reset();
 
   frameWriteState_.cpu = state.machine->cpu;
@@ -609,7 +607,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime,
   std::unique_lock<std::mutex> frameLock(frameMutex_);
   framePublished_.wait_for(frameLock, std::chrono::milliseconds::zero(),
                            [this]() { return frameSeqNo_ != frameLastSeqNo_; });
-  
+
   isNewFrame = frameLastSeqNo_ != frameSeqNo_;
   if (isNewFrame) {
     lastFrameCPURegs_ = frameReadState_.cpu.regs;
@@ -711,7 +709,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime,
     frameLastSeqNo_ = frameSeqNo_;
   }
   frameLock.unlock();
- 
+
   //  render video
   constexpr int kClemensScreenWidth = 720;
   constexpr int kClemensScreenHeight = 480;
@@ -761,7 +759,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime,
   const int kMonitorViewHeight = height - kTerminalViewHeight;
   ImVec2 monitorSize(kMonitorViewWidth, kMonitorViewHeight);
 
-  
+
   doMachineStateLayout(ImVec2(0, 0), ImVec2(kMachineStateViewWidth, height));
   doMachineViewLayout(ImVec2(kMonitorX, 0), monitorSize, screenUVs[0], screenUVs[1]);
   doMachineTerminalLayout(ImVec2(kMonitorX, height - kTerminalViewHeight),
@@ -824,7 +822,7 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
                    ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
                    ImGuiWindowFlags_NoMove );
   doMachineDiagnosticsDisplay();
-  ImGui::Separator(); 
+  ImGui::Separator();
   doMachineDiskDisplay();
   ImGui::Separator();
   doMachineCPUInfoDisplay();
@@ -1661,7 +1659,7 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
   ImVec2 contentSize = ImGui::GetContentRegionAvail();
   ImVec2 monitorSize(contentSize.y * 1.5f, contentSize.y);
   ImVec2 monitorAnchor(p.x + (contentSize.x - monitorSize.x) * 0.5f, p.y);
-  float screenV0 = 0.0f, screenV1 = screenV; 
+  float screenV0 = 0.0f, screenV1 = screenV;
 #if defined(CK3D_BACKEND_GL)
   std::swap(screenV0, screenV1);
 #endif

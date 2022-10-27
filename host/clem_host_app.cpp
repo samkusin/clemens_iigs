@@ -2,10 +2,14 @@
 #include "clem_host_platform.h"
 #include <cinttypes>
 
-#if CLEMENS_PLATFORM_WINDOWS
+#if defined(CK3D_BACKEND_D3D11)
 #define SOKOL_D3D11
-#elif CLEMENS_PLATFORM_LINUX
+#elif defined(CK3D_BACKEND_GL)
 #define SOKOL_GLCORE33
+#endif
+
+#ifdef _WIN32
+#include <combaseapi.h>
 #endif
 
 #include "imgui.h"
