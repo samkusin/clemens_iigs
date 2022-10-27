@@ -16,6 +16,10 @@
 #include <filesystem>
 #include <tuple>
 
+//  TODO: Diagnose Linux caps lock issue
+//  TODO: Diagnose Linux emulated monitor offset issue (image appears higher than 
+//        on Windows, or maybe a GL issue)
+//  TODO: Linux hires graphics are broken - maybe a GCC vs MSVC issue
 //  TODO: Insert card to slot (non-gui)
 //  TODO: Mouse x,y scaling based on display view size vs desktop size
 //  TODO: blank disk gui selection for disk set (selecting combo create will
@@ -341,6 +345,8 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
 ClemensFrontend::~ClemensFrontend() {
   backend_ = nullptr;
   audio_.stop();
+  delete[] thisFrameAudioBuffer_.getHead();
+  delete[] lastCommandState_.audioBuffer.getHead();
   free(frameWriteMemory_.getHead());
   free(frameReadMemory_.getHead());
 }
