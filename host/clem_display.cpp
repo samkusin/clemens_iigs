@@ -663,11 +663,11 @@ void ClemensDisplay::renderText40Col(
   sg_bindings textBindings_ = {};
   textBindings_.fs_images[0] = provider_.systemFontImage_;
   textBindings_.vertex_buffers[0] = textVertexBuffer_;
-  
+
   sg_bindings backBindings = {};
   backBindings.fs_images[0] = provider_.blankImage_;
   backBindings.vertex_buffers[0] = textVertexBuffer_;
-  
+
   sg_range rangeParam;
   rangeParam.ptr = &vertexParams;
   rangeParam.size = sizeof(vertexParams);
@@ -690,7 +690,7 @@ void ClemensDisplay::renderText80Col(
   auto vertexParams = createVertexParams(80, 24);
   DrawVertex* vertices =
     reinterpret_cast<DrawVertex *>(const_cast<void*>(textVertices_.ptr));
-  vertices = renderTextPlane(vertices, video, vertexParams, 80, auxMemory, 0, 
+  vertices = renderTextPlane(vertices, video, vertexParams, 80, auxMemory, 0,
                              useAlternateCharacterSet);
   if (!vertices) return;
   vertices = renderTextPlane(vertices, video, vertexParams, 80, mainMemory, 1,
@@ -726,7 +726,7 @@ void ClemensDisplay::renderText80Col(
 auto ClemensDisplay::renderTextPlane(
   DrawVertex* vertices,
   const ClemensVideo& video,
-  const DisplayVertexParams& vertexParams,                            
+  const DisplayVertexParams& vertexParams,
   int columns,
   const uint8_t* memory,
   int phase,
@@ -1099,7 +1099,7 @@ void ClemensDisplay::renderHiresGraphicsTexture(
   vertices[2] = { { x1, y1 }, { u1, v1 }, 0xffffffff };
   vertices[3] = { { x0, y0 }, { u0, v0 }, 0xffffffff };
   vertices[4] = { { x1, y1 }, { u1, v1 }, 0xffffffff };
-  vertices[5] = { { x1, y0 }, { u1, v1 }, 0xffffffff };
+  vertices[5] = { { x1, y0 }, { u1, v0 }, 0xffffffff };
 
   sg_bindings renderBindings = {};
   renderBindings.vertex_buffers[0] = vertexBuffer_;
@@ -1178,7 +1178,7 @@ void ClemensDisplay::renderSuperHiresGraphics(
   vertices[2] = { { x1, y1 }, { u1, v1 }, 0xffffffff };
   vertices[3] = { { x0, y0 }, { u0, v0 }, 0xffffffff };
   vertices[4] = { { x1, y1 }, { u1, v1 }, 0xffffffff };
-  vertices[5] = { { x1, y0 }, { u1, v1 }, 0xffffffff };
+  vertices[5] = { { x1, y0 }, { u1, v0 }, 0xffffffff };
 
   sg_bindings renderBindings = {};
   renderBindings.vertex_buffers[0] = vertexBuffer_;
