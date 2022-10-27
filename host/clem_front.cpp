@@ -1661,7 +1661,9 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
   ImVec2 monitorAnchor(p.x + (contentSize.x - monitorSize.x) * 0.5f, p.y);
   float screenV0 = 0.0f, screenV1 = screenV;
 #if defined(CK3D_BACKEND_GL)
-  std::swap(screenV0, screenV1);
+  // Flip the texture coords so that the top V is 1.0f
+  screenV0 = 1.0f;
+  screenV1 = 1.0f - screenV1;
 #endif
   ImGui::GetWindowDrawList()->AddImage(
       texId, ImVec2(monitorAnchor.x, monitorAnchor.y),
