@@ -96,9 +96,6 @@ static void initDirectories() {
 
 static void onInit()
 {
-#if CLEMENS_PLATFORM_LINUX
-  clem_host_x11_init(sapp_x11_get_display());
-#endif
   clem_host_timepoint_init();
   clem_host_timepoint_now(&g_LastTimepoint);
 
@@ -294,7 +291,7 @@ static void onEvent(const sapp_event* evt)
       break;
   }
   if (clemInput.type != kClemensInputType_None) {
-    if (clem_host_get_caps_lock_state()) {
+    if (evt->modifiers & SAPP_MODIFIER_CAPS) {
       g_ADBKeyToggleMask |= CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;
     } else {
       g_ADBKeyToggleMask &= ~CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;

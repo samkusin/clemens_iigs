@@ -15,7 +15,6 @@
 #define CLEM_HOST_LINUX_CLOCK_ID CLOCK_MONOTONIC
 
 static struct timespec s_timer_resolution;
-static Display* s_x11_display = NULL;
 
 //  seems to be a reliable way to call getcpu() regardless of glibc/distribution
 static inline unsigned local_getcpu() {
@@ -31,15 +30,6 @@ static inline unsigned local_getcpu() {
 static inline long _clem_host_calc_ns(ClemensHostTimePoint* tp) {
   struct timespec* ts = (struct timespec*)(&tp->data[0]);
   return ts->tv_nsec + ts->tv_sec * 1000000000;
-}
-
-void clem_host_x11_init(const void* display) {
-  //XModifierKeymap* keymap;
-  s_x11_display = (Display *)display;
-  //keymap = XGetModifierMapping(s_x11_display);
-  //keymap = XInsertModifiermapEntry(keymap, (KeyCode)XK_Caps_Lock, LockMapIndex);
-  //XSetModifierMapping(s_x11_display, keymap);
-  //XFreeModifiermap(keymap);
 }
 
 void clem_host_timepoint_init() {
@@ -63,17 +53,6 @@ double clem_host_timepoint_deltad(ClemensHostTimePoint* t1,
                                   ClemensHostTimePoint* t0) {
   long diff_ns = _clem_host_calc_ns(t1) - _clem_host_calc_ns(t0);
   return diff_ns * 1e-9;
-}
-
-
-bool clem_host_get_caps_lock_state() {
-  XModifierKeymap* keymap = XGetModifierMapping(s_x11_display);
-  int i;
-  for (i = 0; i < keymap->max_keypermod; ++i) {
-    if (keymap->modifiermap[LockMapIndex]) return true;
-  }
-  XFreeModifiermap(keymap);
-  return false;
 }
 
 unsigned clem_host_get_processor_number() {

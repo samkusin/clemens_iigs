@@ -35,10 +35,6 @@ double clem_host_timepoint_deltad(
   return (counter1 - counter0) / (double)s_counter_frequency.QuadPart;
 }
 
-bool clem_host_get_caps_lock_state() {
-  return (GetKeyState(VK_CAPITAL) & 0x1) ? true : false;
-}
-
 unsigned clem_host_get_processor_number() {
   return (unsigned)GetCurrentProcessorNumber();
 }

@@ -16,8 +16,6 @@
 #include <filesystem>
 #include <tuple>
 
-//  TODO: Diagnose Linux caps lock issue
-//  TODO: Diagnose GL offsets issue with emulated display
 //  TODO: Insert card to slot (non-gui)
 //  TODO: Mouse x,y scaling based on display view size vs desktop size
 //  TODO: blank disk gui selection for disk set (selecting combo create will
@@ -25,6 +23,8 @@
 //  TODO: preroll audio for some buffer on to handle sound clipping on lower end
 //        systems
 
+//  DONE: Diagnose GL offsets issue with emulated display
+//  DONE: Diagnose Linux caps lock issue
 //  DONE: Break on IRQ
 //  DONE: List IRQ flags from emulator
 //  DONE: Mouse lock and release (via keyboard combo ctl-f12?)

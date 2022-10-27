@@ -1096,7 +1096,8 @@ enum {
     SAPP_MODIFIER_SHIFT = 0x1,
     SAPP_MODIFIER_CTRL = 0x2,
     SAPP_MODIFIER_ALT = 0x4,
-    SAPP_MODIFIER_SUPER = 0x8
+    SAPP_MODIFIER_SUPER = 0x8,
+    SAPP_MODIFIER_CAPS = 0x10
 };
 
 typedef struct sapp_event {
@@ -5845,6 +5846,9 @@ _SOKOL_PRIVATE uint32_t _sapp_win32_mods(void) {
     if ((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & (1<<15)) {
         mods |= SAPP_MODIFIER_SUPER;
     }
+    if (GetKeyState(VK_CAPITAL) & (1<<0)) { /* we check the toggled state vs up/down*/
+        mods |= SAPP_MODIFIER_CAPS;
+    }
     return mods;
 }
 
@@ -9579,6 +9583,9 @@ _SOKOL_PRIVATE uint32_t _sapp_x11_mod(uint32_t x11_mods) {
     }
     if (x11_mods & Mod4Mask) {
         mods |= SAPP_MODIFIER_SUPER;
+    }
+    if (x11_mods & LockMask) {
+        mods |= SAPP_MODIFIER_CAPS;
     }
     return mods;
 }

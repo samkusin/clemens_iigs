@@ -73,14 +73,6 @@ double clem_host_timepoint_deltad(ClemensHostTimePoint* t1,
 
 
 /**
- * @brief Returns the state of the caps lock toggle key
- *
- * @return true Caps Lock enabled
- * @return false Caps Lock disabled
- */
-bool clem_host_get_caps_lock_state();
-
-/**
  * @brief Returns the current processor the local thread is running on
  *
  * Effectively getcpu() on Linux, and GetCurrentProcessorNumber() on Windows
