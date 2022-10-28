@@ -3655,7 +3655,7 @@ void clemens_emulate(ClemensMachine *clem) {
              cpu->state_type == kClemensCPUStateType_NMI) {
     uint8_t tmp_data;
     uint8_t tmp_datahi;
-    uint8_t vlo, vhi;
+    uint16_t vlo, vhi;
     if (cpu->pins.emulation) {
       vlo = cpu->state_type == kClemensCPUStateType_NMI
                 ? CLEM_6502_NMI_VECTOR_LO_ADDR
