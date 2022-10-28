@@ -93,7 +93,7 @@ target_link_libraries(clemens_iigs
 target_compile_features( clemens_iigs PRIVATE cxx_std_17 )
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_GL)
+    target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_D3D11)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_GL)
     target_link_libraries(clemens_iigs PRIVATE X11 Xi Xcursor GL dl pthread uuid)

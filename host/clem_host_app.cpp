@@ -1,5 +1,4 @@
 
-#include "clem_host_platform.h"
 #include <cinttypes>
 
 #if defined(CK3D_BACKEND_D3D11)
@@ -22,14 +21,16 @@
 #include "clem_front.hpp"
 
 #define SOKOL_IMPL
+#include "sokol/sokol_time.h"
 #include "sokol/sokol_app.h"
+#include "sokol/sokol_audio.h"
 #include "sokol/sokol_gfx.h"
 #include "sokol/sokol_glue.h"
 #include "sokol/sokol_imgui.h"
 
 
+static uint64_t g_lastTime = 0;
 static ClemensFrontend* g_Host = nullptr;
-static ClemensHostTimePoint g_LastTimepoint;
 static sg_pass_action g_sgPassAction;
 static unsigned g_ADBKeyToggleMask = 0;
 
@@ -96,9 +97,7 @@ static void initDirectories() {
 
 static void onInit()
 {
-  clem_host_timepoint_init();
-  clem_host_timepoint_now(&g_LastTimepoint);
-
+  stm_setup();
   initDirectories();
 
 #if CLEMENS_PLATFORM_WINDOWS
@@ -234,13 +233,17 @@ static void onFrame()
 {
   const int frameWidth = sapp_width();
   const int frameHeight = sapp_height();
-  ClemensHostTimePoint currentTimepoint;
 
-  clem_host_timepoint_now(&currentTimepoint);
-  auto deltaTime = clem_host_timepoint_deltaf(
-    &currentTimepoint, &g_LastTimepoint);
+  uint64_t deltaTicks = stm_laptime(&g_lastTime);
+  double deltaTime = stm_sec(deltaTicks);
 
-  simgui_new_frame(frameWidth, frameHeight, deltaTime);
+  simgui_frame_desc_t imguiFrameDesc = {};
+  imguiFrameDesc.delta_time = deltaTime;
+  imguiFrameDesc.dpi_scale = 1.0f;
+  imguiFrameDesc.width = frameWidth;
+  imguiFrameDesc.height = frameHeight;
+
+  simgui_new_frame(imguiFrameDesc);
 
   ClemensFrontend::FrameAppInterop interop;
   interop.mouseLock = sapp_mouse_locked();
@@ -251,8 +254,6 @@ static void onFrame()
   simgui_render();
   sg_end_pass();
   sg_commit();
-
-  g_LastTimepoint = currentTimepoint;
 }
 
 static void onEvent(const sapp_event* evt)

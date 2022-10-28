@@ -33,7 +33,7 @@ public:
   };
 
   //  application rendering hook
-  void frame(int width, int height, float deltaTime, FrameAppInterop& interop);
+  void frame(int width, int height, double deltaTime, FrameAppInterop& interop);
   //  application input from OS
   void input(ClemensInputEvent input);
 
@@ -46,7 +46,7 @@ private:
   //  when a frame has been published
   void backendStateDelegate(const ClemensBackendState &state);
   void copyState(const ClemensBackendState& state);
-  
+
   void doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize);
   void doMachineDiagnosticsDisplay();
   void doMachineDiskDisplay();

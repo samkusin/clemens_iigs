@@ -595,7 +595,7 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
   }
 }
 
-void ClemensFrontend::frame(int width, int height, float deltaTime,
+void ClemensFrontend::frame(int width, int height, double deltaTime,
                             FrameAppInterop& interop) {
   //  send commands to emulator thread
   //  get results from emulator thread
