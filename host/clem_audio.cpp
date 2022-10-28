@@ -5,10 +5,6 @@
 #include <cstdlib>
 #include <cstring>
 
-static void *allocateLocal(void */*user_ctx*/, size_t sz) { return malloc(sz); }
-
-static void freeLocal(void * /*user_ctx*/, void *data) { free(data); }
-
 //  TODO: optimize when needed per platform
 
 ClemensAudioDevice::ClemensAudioDevice()
