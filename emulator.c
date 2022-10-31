@@ -1315,8 +1315,8 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video,
   } else if (vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE) {
     video->scanline_start = 0;
     if (vgc->mode_flags & CLEM_VGC_HIRES) {
-      if ((vgc->mode_flags & CLEM_VGC_DBLHIRES_MASK) ==
-          CLEM_VGC_DBLHIRES_MASK) {
+      if ((vgc->mode_flags & CLEM_VGC_DBLRES_MASK) ==
+          CLEM_VGC_DBLRES_MASK) {
         video->format = kClemensVideoFormat_Double_Hires;
       } else {
         video->format = kClemensVideoFormat_Hires;
@@ -1328,7 +1328,7 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video,
       }
       video->scanline_limit = CLEM_VGC_HGR_SCANLINE_COUNT;
     } else {
-      if (vgc->mode_flags & CLEM_VGC_DBLHIRES_MASK) {
+      if ((vgc->mode_flags & CLEM_VGC_DBLRES_MASK) == CLEM_VGC_DBLRES_MASK) {
         video->format = kClemensVideoFormat_Double_Lores;
       } else {
         video->format = kClemensVideoFormat_Lores;
