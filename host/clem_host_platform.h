@@ -24,10 +24,6 @@ extern "C" {
  *
  */
 typedef struct {
-  char data[16];
-} ClemensHostTimePoint;
-
-typedef struct {
   unsigned char data[16];
 } ClemensHostUUID;
 
@@ -39,38 +35,6 @@ typedef struct {
  */
 void clem_host_x11_init(const void* display);
 #endif
-
-/**
- * @brief
- *
- */
-void clem_host_timepoint_init();
-
-/**
- * @brief
- *
- * @param tp
- */
-void clem_host_timepoint_now(ClemensHostTimePoint* tp);
-/**
- * @brief
- *
- * @param t1
- * @param t0
- * @return float
- */
-float clem_host_timepoint_deltaf(ClemensHostTimePoint* t1,
-                                 ClemensHostTimePoint* t0);
-/**
- * @brief
- *
- * @param t1
- * @param t0
- * @return double
- */
-double clem_host_timepoint_deltad(ClemensHostTimePoint* t1,
-                                  ClemensHostTimePoint* t0);
-
 
 /**
  * @brief Returns the current processor the local thread is running on

@@ -10,31 +10,6 @@ set(CMAKE_CXX_STANDARD 17)
 
 add_subdirectory(ext/imgui)
 
-# TODO: make header-only version when ready
-set(CKAUDIO_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/core.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/types.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/context.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/core.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/queue.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/queue.h")
-
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    set(CKAUDIO_SOURCES ${CKAUDIO_SOURCES}
-        "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wincoreaudio.c"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wintime.c")
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(CKAUDIO_SOURCES ${CKAUDIO_SOURCES}
-        "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/linuxalsa.c"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/linuxtime.c")
-endif()
-
-add_library(ckaudio STATIC ${CKAUDIO_SOURCES})
-
-target_include_directories(ckaudio
-    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
-
-
 set(CINEK_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/cinek/ckdebug.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/cinek/buffer.cpp"
@@ -87,7 +62,6 @@ target_link_libraries(clemens_iigs
         clemens_65816_render
         clemens_65816_serializer
         clemens_65816_iocards
-        ckaudio
         imgui)
 
 target_compile_features( clemens_iigs PRIVATE cxx_std_17 )
