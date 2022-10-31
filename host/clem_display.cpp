@@ -648,79 +648,99 @@ void ClemensDisplay::finish(float *uvs)
   uvs[1] = emulatorMonitorDimensions_[1] / kRenderTargetHeight;
 }
 
-void ClemensDisplay::renderText40Col(
-  const ClemensVideo& video,
-  const uint8_t* mainMemory,
-  bool useAlternateCharacterSet
-) {
-  auto vertexParams = createVertexParams(40, 24);
-  DrawVertex* vertices =
+void ClemensDisplay::renderTextGraphics(
+  const ClemensVideo& text, const ClemensVideo& graphics, const uint8_t* mainMemory,
+  const uint8_t* auxMemory, bool text80col, bool useAltCharSet) {
+
+  DrawVertex* verticesBegin =
     reinterpret_cast<DrawVertex *>(const_cast<void*>(textVertices_.ptr));
-  vertices = renderTextPlane(vertices, video, vertexParams, 40, mainMemory, 0,
-                             useAlternateCharacterSet);
-  if (!vertices) return;
+  DrawVertex* vertices = verticesBegin;
+  DisplayVertexParams textVertexParams;
+  DisplayVertexParams loresVertexParams;
 
-  sg_bindings textBindings_ = {};
-  textBindings_.fs_images[0] = provider_.systemFontImage_;
-  textBindings_.vertex_buffers[0] = textVertexBuffer_;
+  DrawVertex* loresVertices = vertices;
+  if (graphics.format == kClemensVideoFormat_Double_Lores) {
+    loresVertexParams = createVertexParams(80, 48);
+    vertices = renderLoresPlane(vertices, graphics, loresVertexParams, 80, auxMemory, 0);
+    if (!vertices) return;
+    vertices = renderLoresPlane(vertices, graphics, loresVertexParams, 80, mainMemory, 1);
+    if (!vertices) return;
+  } else if (graphics.format == kClemensVideoFormat_Lores) {
+    loresVertexParams = createVertexParams(40, 48);
+    vertices = renderLoresPlane(vertices, graphics, loresVertexParams, 40, mainMemory, 0);
+  }
 
+  DrawVertex* textVertices = vertices;
+  if (text.format == kClemensVideoFormat_Text) {
+    if (text80col) {
+      textVertexParams = createVertexParams(80, 24);
+      vertices = renderTextPlane(vertices, text, textVertexParams, 80, auxMemory, 0,
+                                 useAltCharSet);
+      if (!vertices) return;
+      vertices = renderTextPlane(vertices, text, textVertexParams, 80, mainMemory, 1,
+                                 useAltCharSet);
+      if (!vertices) return;
+    } else {
+      textVertexParams = createVertexParams(40, 24);
+      vertices = renderTextPlane(vertices, text, textVertexParams, 40, mainMemory, 0,
+                                 useAltCharSet);
+      if (!vertices) return;
+    }
+  }
+
+  if ((vertices - verticesBegin) == 0) return;
+
+  sg_apply_pipeline(provider_.textPipeline_);
+  sg_update_buffer(textVertexBuffer_, textVertices_);
+
+  //  render lores first
   sg_bindings backBindings = {};
   backBindings.fs_images[0] = provider_.blankImage_;
   backBindings.vertex_buffers[0] = textVertexBuffer_;
+  int loresVertexCount = int(textVertices - loresVertices);
+  if (loresVertexCount > 0) {
+    int drawCount = graphics.format == kClemensVideoFormat_Double_Lores ? 2 : 1;
+    assert((loresVertexCount % drawCount) == 0);   // sanity check
+    int vertexPerDrawCall = loresVertexCount / drawCount;
 
-  sg_range rangeParam;
-  rangeParam.ptr = &vertexParams;
-  rangeParam.size = sizeof(vertexParams);
-  sg_apply_pipeline(provider_.textPipeline_);
-  sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, rangeParam);
+    sg_range uniformsBuffer = {};
+    uniformsBuffer.ptr = &loresVertexParams;
+    uniformsBuffer.size = sizeof(loresVertexParams);
+    sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, uniformsBuffer);
+    sg_apply_bindings(backBindings);
+    sg_draw(0, vertexPerDrawCall, 1);
+    if (graphics.format == kClemensVideoFormat_Double_Lores) {
+      sg_draw(vertexPerDrawCall, vertexPerDrawCall, 1);
+    }
+  }
 
-  int quadCount = video.scanline_count * video.scanline_byte_cnt;
-  sg_update_buffer(textVertexBuffer_, textVertices_);
-  sg_apply_bindings(backBindings);
-  sg_draw(0, quadCount * 6, 1);
-  sg_apply_bindings(textBindings_);
-  sg_draw(quadCount * 6, quadCount * 6, 1);
-}
+  //  render the text background and character requiring two draw calls.  the
+  //  background and text characters are not interleaved
+  sg_bindings textBindings = {};
+  textBindings.fs_images[0] = text80col ? provider_.systemFontImageHi_ : provider_.systemFontImage_;
+  textBindings.vertex_buffers[0] = textVertexBuffer_;
+  int textVertexOffset = loresVertexCount;
+  int textVertexCount = int(vertices - textVertices);
+  if (textVertexCount > 0) {
+    int drawCount = text80col ? 4 : 2;
+    assert((textVertexCount % drawCount) == 0);   // sanity check
+    int textVertexPerDrawCall = textVertexCount / drawCount;
 
-void ClemensDisplay::renderText80Col(
-  const ClemensVideo& video,
-  const uint8_t* mainMemory, const uint8_t* auxMemory,
-  bool useAlternateCharacterSet
-) {
-  auto vertexParams = createVertexParams(80, 24);
-  DrawVertex* vertices =
-    reinterpret_cast<DrawVertex *>(const_cast<void*>(textVertices_.ptr));
-  vertices = renderTextPlane(vertices, video, vertexParams, 80, auxMemory, 0,
-                             useAlternateCharacterSet);
-  if (!vertices) return;
-  vertices = renderTextPlane(vertices, video, vertexParams, 80, mainMemory, 1,
-                             useAlternateCharacterSet);
-  if (!vertices) return;
-
-  sg_bindings textBindings_ = {};
-  textBindings_.fs_images[0] = provider_.systemFontImageHi_;
-  textBindings_.vertex_buffers[0] = textVertexBuffer_;
-
-  sg_bindings backBindings = {};
-  backBindings.fs_images[0] = provider_.blankImage_;
-  backBindings.vertex_buffers[0] = textVertexBuffer_;
-
-  sg_range rangeParam;
-  rangeParam.ptr = &vertexParams;
-  rangeParam.size = sizeof(vertexParams);
-  sg_apply_pipeline(provider_.textPipeline_);
-  sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, rangeParam);
-
-  int quadCount = video.scanline_count * video.scanline_byte_cnt;
-  sg_update_buffer(textVertexBuffer_, textVertices_);
-  sg_apply_bindings(backBindings);
-  sg_draw(0, quadCount * 6, 1);
-  sg_apply_bindings(textBindings_);
-  sg_draw(quadCount * 6, quadCount * 6, 1);
-  sg_apply_bindings(backBindings);
-  sg_draw(quadCount * 6 * 2, quadCount * 6, 1);
-  sg_apply_bindings(textBindings_);
-  sg_draw(quadCount * 6 * 3, quadCount * 6, 1);
+    sg_range uniformsBuffer = {};
+    uniformsBuffer.ptr = &textVertexParams;
+    uniformsBuffer.size = sizeof(textVertexParams);
+    sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, uniformsBuffer);
+    sg_apply_bindings(backBindings);
+    sg_draw(textVertexOffset, textVertexPerDrawCall, 1);
+    sg_apply_bindings(textBindings);
+    sg_draw(textVertexOffset + textVertexPerDrawCall, textVertexPerDrawCall, 1);
+    if (text80col) {
+      sg_apply_bindings(backBindings);
+      sg_draw(textVertexOffset + textVertexPerDrawCall * 2, textVertexPerDrawCall, 1);
+      sg_apply_bindings(textBindings);
+      sg_draw(textVertexOffset + textVertexPerDrawCall * 3, textVertexPerDrawCall, 1);
+    }
+  }
 }
 
 auto ClemensDisplay::renderTextPlane(
@@ -750,11 +770,9 @@ auto ClemensDisplay::renderTextPlane(
 
   DrawVertex* vertex = vertices;
   for (int i = 0; i < video.scanline_count; ++i) {
-    //int row = i + video.scanline_start;
-    //const uint8_t* scanline = memory + video.scanlines[row].offset;
     for (int j = 0; j < video.scanline_byte_cnt; ++j) {
       float x0 = ((j * kPhaseCount) + phase);
-      float y0 = i;
+      float y0 = i + video.scanline_start;
       float x1 = x0 + 1.0f;
       float y1 = y0 + 1.0f;
       vertex[0] = { { x0, y0 }, { 0.0f, 0.0f }, textABGR };
@@ -775,10 +793,11 @@ auto ClemensDisplay::renderTextPlane(
     for (int j = 0; j < video.scanline_byte_cnt; ++j) {
       //  TODO: handle flashing chars
       unsigned glyphIndex;
+      const uint8_t charIndex = scanline[j];
       if (useAlternateCharacterSet) {
-        glyphIndex = kAlternateSetToGlyph[scanline[j]];
+        glyphIndex = kAlternateSetToGlyph[charIndex];
       } else {
-        glyphIndex =  kPrimarySetToGlyph[scanline[j]];
+        glyphIndex =  kPrimarySetToGlyph[charIndex];
       }
       glyphIndex &= 0xffff;
       //auto* glyph = &glyphSet[glyphIndex];
@@ -803,45 +822,20 @@ auto ClemensDisplay::renderTextPlane(
   return vertex;
 }
 
-void ClemensDisplay::renderLoresGraphics(
-  const ClemensVideo& video,
-  const uint8_t* memory
-) {
-  renderLoresPlane(video, 40, memory, 0);
-}
-
-void ClemensDisplay::renderLoresPlane(
-  const ClemensVideo& video,
-  int columns, const uint8_t* memory,
-  int phase
-) {
+auto ClemensDisplay::renderLoresPlane(DrawVertex* vertices, const ClemensVideo& video,
+                                      const DisplayVertexParams& vertexParams, int columns,
+                                      const uint8_t* memory, int phase) -> DrawVertex* {
   if (video.format != kClemensVideoFormat_Lores) {
-    return;
+    return nullptr;
   }
 
   const int kPhaseCount = columns / 40;
 
-  auto vertexParams = createVertexParams(columns, 48);
-  sg_bindings pixelBindings_ = {};
-  pixelBindings_.vertex_buffers[0] = textVertexBuffer_;
-  pixelBindings_.fs_images[0] = provider_.blankImage_;
-
-  DrawVertex vertices[80 * 6];
-  sg_range verticesRange;
-  verticesRange.ptr = &vertices[0];
-  verticesRange.size = 2 * video.scanline_byte_cnt * 6 * sizeof(DrawVertex);
-
-  sg_range rangeParam;
-  rangeParam.ptr = &vertexParams;
-  rangeParam.size = sizeof(vertexParams);
-  sg_apply_pipeline(provider_.textPipeline_);
-  sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, rangeParam);
-
-  // pass 1 - background
+  // background pass
+  DrawVertex* vertex = vertices;
   for (int i = 0; i < video.scanline_count; ++i) {
     int row = i + video.scanline_start;
     const uint8_t* scanline = memory + video.scanlines[row].offset;
-    auto* vertex = &vertices[0];
     for (int j = 0; j < video.scanline_byte_cnt; ++j) {
       float x0 = ((j * kPhaseCount) + phase);
       float y0 = i * 2;
@@ -868,11 +862,9 @@ void ClemensDisplay::renderLoresPlane(
       vertex[5] = { { x1, y0 }, { 1.0f, 0.0f }, textABGR };
       vertex += 6;
     }
-    auto vbOffset = sg_append_buffer(pixelBindings_.vertex_buffers[0], verticesRange);
-    pixelBindings_.vertex_buffer_offsets[0] = vbOffset;
-    sg_apply_bindings(pixelBindings_);
-    sg_draw(0, 12 * video.scanline_byte_cnt, 1);
   }
+
+  return vertex;
 }
 
 void ClemensDisplay::renderHiresGraphics(

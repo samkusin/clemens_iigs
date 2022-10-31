@@ -65,14 +65,9 @@ public:
   //  from the emulator.  The 'video' structures represent scanline data
   //  containing offsets into these banks.
   //
-  void renderText40Col(const ClemensVideo& video,
-    const uint8_t* mainMemory,
-    bool useAlternateCharacterSet);
-  void renderText80Col(const ClemensVideo& video,
-    const uint8_t* mainMemory, const uint8_t* auxMemory,
-    bool useAlternateCharacterSet);
-
-  void renderLoresGraphics(const ClemensVideo& video, const uint8_t* memory);
+  void renderTextGraphics(const ClemensVideo& text, const ClemensVideo& graphics,
+                          const uint8_t* mainMemory, const uint8_t* auxMemory,
+                          bool text80col, bool altCharSet);
   void renderHiresGraphics(const ClemensVideo& video, const uint8_t* memory);
   void renderDoubleHiresGraphics(const ClemensVideo& video,
                                  const uint8_t* main, const uint8_t* aux);
@@ -89,8 +84,9 @@ private:
                               const DisplayVertexParams& vertexParams,
                               int columns, const uint8_t* memory, int phase,
                               bool useAlternateCharacterSet);
-  void renderLoresPlane(const ClemensVideo& video, int columns, const uint8_t* memory,
-                       int phase);
+  DrawVertex* renderLoresPlane(DrawVertex* vertices, const ClemensVideo& video,
+                               const DisplayVertexParams& vertexParams,
+                               int columns, const uint8_t* memory, int phase);
   void renderHiresGraphicsTexture(const ClemensVideo& video,
                                   const DisplayVertexParams& params,
                                   sg_image colorArray);

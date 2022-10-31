@@ -718,23 +718,17 @@ void ClemensFrontend::frame(int width, int height, double deltaTime,
   if (frameReadState_.mmioWasInitialized && guiMode_ != GUIMode::RebootEmulator) {
     const uint8_t *e0mem = frameReadState_.bankE0;
     const uint8_t *e1mem = frameReadState_.bankE1;
+    bool altCharSet = frameReadState_.vgcModeFlags & CLEM_VGC_ALTCHARSET;
+    bool text80col = frameReadState_.vgcModeFlags & CLEM_VGC_80COLUMN_TEXT;
     display_.start(frameReadState_.monitorFrame, kClemensScreenWidth, kClemensScreenHeight);
-    if (frameReadState_.textFrame.format == kClemensVideoFormat_Text) {
-      bool altCharSet = frameReadState_.vgcModeFlags & CLEM_VGC_ALTCHARSET;
-      if (frameReadState_.vgcModeFlags & CLEM_VGC_80COLUMN_TEXT) {
-        display_.renderText80Col(frameReadState_.textFrame, e0mem, e1mem, altCharSet);
-      } else {
-        display_.renderText40Col(frameReadState_.textFrame, e0mem, altCharSet);
-      }
-    }
+    display_.renderTextGraphics(frameReadState_.textFrame, frameReadState_.graphicsFrame,
+                                 e0mem, e1mem, text80col, altCharSet);
     if (frameReadState_.graphicsFrame.format == kClemensVideoFormat_Double_Hires) {
       display_.renderDoubleHiresGraphics(frameReadState_.graphicsFrame, e0mem, e1mem);
     } else if (frameReadState_.graphicsFrame.format == kClemensVideoFormat_Hires) {
       display_.renderHiresGraphics(frameReadState_.graphicsFrame, e0mem);
     } else if (frameReadState_.graphicsFrame.format == kClemensVideoFormat_Super_Hires) {
       display_.renderSuperHiresGraphics(frameReadState_.graphicsFrame, e1mem);
-    } else if (frameReadState_.vgcModeFlags & CLEM_VGC_LORES) {
-      display_.renderLoresGraphics(frameReadState_.graphicsFrame, e0mem);
     }
     display_.finish(screenUVs);
 
