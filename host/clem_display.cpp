@@ -659,7 +659,13 @@ void ClemensDisplay::renderTextGraphics(
   DisplayVertexParams loresVertexParams;
 
   DrawVertex* loresVertices = vertices;
-  if (graphics.format == kClemensVideoFormat_Lores) {
+  if (graphics.format == kClemensVideoFormat_Double_Lores) {
+    loresVertexParams = createVertexParams(80, 48);
+    vertices = renderLoresPlane(vertices, graphics, loresVertexParams, 80, auxMemory, 0);
+    if (!vertices) return;
+    vertices = renderLoresPlane(vertices, graphics, loresVertexParams, 80, mainMemory, 1);
+    if (!vertices) return;
+  } else if (graphics.format == kClemensVideoFormat_Lores) {
     loresVertexParams = createVertexParams(40, 48);
     vertices = renderLoresPlane(vertices, graphics, loresVertexParams, 40, mainMemory, 0);
   }
@@ -693,12 +699,19 @@ void ClemensDisplay::renderTextGraphics(
   backBindings.vertex_buffers[0] = textVertexBuffer_;
   int loresVertexCount = int(textVertices - loresVertices);
   if (loresVertexCount > 0) {
+    int drawCount = graphics.format == kClemensVideoFormat_Double_Lores ? 2 : 1;
+    assert((loresVertexCount % drawCount) == 0);   // sanity check
+    int vertexPerDrawCall = loresVertexCount / drawCount;
+
     sg_range uniformsBuffer = {};
     uniformsBuffer.ptr = &loresVertexParams;
     uniformsBuffer.size = sizeof(loresVertexParams);
     sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, uniformsBuffer);
     sg_apply_bindings(backBindings);
-    sg_draw(0, loresVertexCount, 1);
+    sg_draw(0, vertexPerDrawCall, 1);
+    if (graphics.format == kClemensVideoFormat_Double_Lores) {
+      sg_draw(vertexPerDrawCall, vertexPerDrawCall, 1);
+    }
   }
 
   //  render the text background and character requiring two draw calls.  the
