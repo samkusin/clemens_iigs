@@ -823,7 +823,7 @@ auto ClemensDisplay::renderTextPlane(
 }
 
 auto ClemensDisplay::renderLoresPlane(DrawVertex* vertices, const ClemensVideo& video,
-                                      const DisplayVertexParams& vertexParams, int columns,
+                                      const DisplayVertexParams& , int columns,
                                       const uint8_t* memory, int phase) -> DrawVertex* {
   if (video.format != kClemensVideoFormat_Lores) {
     return nullptr;
