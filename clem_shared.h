@@ -69,27 +69,24 @@ struct ClemensClock {
   clem_clocks_duration_t ref_step;
 };
 
-extern inline double clem_calc_secs_from_clocks(struct ClemensClock *clock) {
-  return (CLEM_MEGA2_CYCLE_NS * (uint64_t)(clock->ts / clock->ref_step)) *
-         1.0e-9;
-}
+/** _clock_ is of type ClemensClock */
+#define clem_calc_secs_from_clocks(_clock_) \
+  ((CLEM_MEGA2_CYCLE_NS * (uint64_t)((_clock_)->ts / (_clock_)->ref_step)) * \
+    1.0e-9)
 
 /* BEWARE - these macros act on sub second time intervals (per frame deltas.)
    Do not use these utilities to calculate values over long time intervals
 */
-extern inline uint32_t
-clem_calc_ns_step_from_clocks(clem_clocks_duration_t clocks_step,
-                              clem_clocks_duration_t clocks_step_reference) {
-  return (uint32_t)(CLEM_MEGA2_CYCLE_NS * (uint64_t)clocks_step /
-                    clocks_step_reference);
-}
+/** _clocks_step_ and _clocks_step_reference_ is of type clem_clocks_duration_t
+ */
+#define clem_calc_ns_step_from_clocks(_clocks_step_, _clocks_step_reference_) \
+  ((uint32_t)(CLEM_MEGA2_CYCLE_NS * (uint64_t)(_clocks_step_) / \
+    (_clocks_step_reference_)))
 
-extern inline clem_clocks_duration_t
-clem_calc_clocks_step_from_ns(unsigned ns,
-                              clem_clocks_duration_t clocks_step_reference) {
-  return (clem_clocks_duration_t)(ns * clocks_step_reference) /
-         (CLEM_MEGA2_CYCLE_NS);
-}
+/** _ns_ is of type uint64_t */
+#define clem_calc_clocks_step_from_ns(_ns_, _clocks_step_reference_) \
+  ((clem_clocks_duration_t)(_ns_ * _clocks_step_reference_) / \
+    CLEM_MEGA2_CYCLE_NS)
 
 typedef struct {
   void *context;

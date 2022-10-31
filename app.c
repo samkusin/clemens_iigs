@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "emulator.h"
 
@@ -44,7 +45,6 @@ int main(int argc, char* argv[])
                  malloc(CLEM_IIGS_BANK_SIZE),
                  malloc(CLEM_IIGS_BANK_SIZE),
                  malloc(CLEM_IIGS_BANK_SIZE * 16),
-                 malloc(CLEM_IIGS_PAGE_SIZE * 7),
                  malloc(CLEM_IIGS_EXPANSION_ROM_SIZE * 7),
                  16);
 

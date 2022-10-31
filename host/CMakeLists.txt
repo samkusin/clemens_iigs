@@ -2,28 +2,13 @@ cmake_minimum_required(VERSION 3.15)
 
 project(clements_iigs LANGUAGES C CXX)
 
+set(CMAKE_CXX_STANDARD 17)
+
 # build header-only source
 # build imgui
 # build app
 
 add_subdirectory(ext/imgui)
-
-# TODO: make header-only version when ready
-set(CKAUDIO_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/core.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/types.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/context.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/core.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/queue.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/queue.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wincoreaudio.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ckaudio/wintime.c")
-
-add_library(ckaudio STATIC ${CKAUDIO_SOURCES})
-
-target_include_directories(ckaudio
-    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
-
 
 set(CINEK_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/cinek/ckdebug.c"
@@ -45,6 +30,9 @@ set(FMT_SOURCES
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(PLATFORM_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_windows.c")
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(PLATFORM_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_linux.c")
 endif()
 
 add_executable(clemens_iigs
@@ -74,14 +62,26 @@ target_link_libraries(clemens_iigs
         clemens_65816_render
         clemens_65816_serializer
         clemens_65816_iocards
-        ckaudio
         imgui)
 
 target_compile_features( clemens_iigs PRIVATE cxx_std_17 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_D3D11)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_GL)
+    target_link_libraries(clemens_iigs PRIVATE asound X11 Xi Xcursor GL dl pthread uuid)
+else()
+    target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_GL)
+endif()
+
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(clemens_iigs PRIVATE -Wall -Wextra -pedantic)
-    target_compile_options(clemens_iigs PUBLIC -fno-exceptions)
-    target_compile_options(clemens_iigs PUBLIC -fno-rtti)
+    target_compile_options(clemens_iigs PRIVATE -Wall -Wextra -Wno-missing-field-initializers -pedantic)
+    target_compile_options(clemens_iigs PRIVATE $<$<COMPILE_LANG_AND_ID:CXX,GNU>:-fno-exceptions -fno-rtti>)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        # GCC 8 doesn't link the fs library even with C++17 enabled
+        target_link_libraries(clemens_iigs PRIVATE $<$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>:stdc++fs>)
+    endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     # Removing MSVC options that are less necessary for game / simulation
     # development.
@@ -99,10 +99,10 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     string(REGEX REPLACE "/EHsc*" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
-    target_compile_definitions(clemens_iigs PUBLIC _CRT_SECURE_NO_WARNINGS _ITERATOR_DEBUG_LEVEL=0)
-    target_compile_options(clemens_iigs PUBLIC /EHs-c-)
-    target_compile_definitions(clemens_iigs PUBLIC _HAS_EXCEPTIONS=0 FMT_EXCEPTIONS=0)
-    target_compile_options(clemens_iigs PUBLIC /GR-)
+    target_compile_definitions(clemens_iigs PRIVATE _CRT_SECURE_NO_WARNINGS _ITERATOR_DEBUG_LEVEL=0)
+    target_compile_options(clemens_iigs PRIVATE /EHs-c-)
+    target_compile_definitions(clemens_iigs PRIVATE _HAS_EXCEPTIONS=0 FMT_EXCEPTIONS=0)
+    target_compile_options(clemens_iigs PRIVATE /GR-)
 else()
     message(WARNING "Unsupported compiler")
 endif()

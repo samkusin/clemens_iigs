@@ -10,24 +10,24 @@
     assert(_cond_);                                                            \
   } while (0)
 
-#define CLEM_UNIMPLEMENTED(_fmt_, ...)                                         \
+#define CLEM_UNIMPLEMENTED(...)                                         \
   do {                                                                         \
-    clem_debug_log(CLEM_DEBUG_LOG_UNIMPL, _fmt_, __VA_ARGS__);                 \
+    clem_debug_log(CLEM_DEBUG_LOG_UNIMPL, __VA_ARGS__);                 \
   } while (0)
 
-#define CLEM_WARN(_fmt_, ...)                                                  \
+#define CLEM_WARN(...)                                                  \
   do {                                                                         \
-    clem_debug_log(CLEM_DEBUG_LOG_WARN, _fmt_, __VA_ARGS__);                   \
+    clem_debug_log(CLEM_DEBUG_LOG_WARN, __VA_ARGS__);                   \
   } while (0)
 
-#define CLEM_LOG(_fmt_, ...)                                                   \
+#define CLEM_LOG(...)                                                   \
   do {                                                                         \
-    clem_debug_log(CLEM_DEBUG_LOG_INFO, _fmt_, __VA_ARGS__);                   \
+    clem_debug_log(CLEM_DEBUG_LOG_INFO, __VA_ARGS__);                   \
   } while (0)
 
-#define CLEM_DEBUG(_fmt_, ...)                                                 \
+#define CLEM_DEBUG(...)                                                 \
   do {                                                                         \
-    clem_debug_log(CLEM_DEBUG_LOG_DEBUG, _fmt_, __VA_ARGS__);                  \
+    clem_debug_log(CLEM_DEBUG_LOG_DEBUG, __VA_ARGS__);                  \
   } while (0)
 
 #ifdef __cplusplus

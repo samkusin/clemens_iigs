@@ -28,14 +28,14 @@ public:
                          const cinek::ByteBuffer& systemFontHiBuffer);
   ~ClemensDisplayProvider();
 
+  void* allocate(size_t sz);
+  void free(void* ptr);
+
 private:
   friend class ClemensDisplay;
 
   using DrawVertex = ClemensDisplayVertex;
   using DisplayVertexParams = ClemensDisplayVertexParams;
-
-  cinek::ByteBuffer systemFontFileBuffer_;
-  cinek::ByteBuffer systemFontFileHiBuffer_;
 
   sg_image systemFontImage_;
   sg_image systemFontImageHi_;
@@ -85,8 +85,10 @@ private:
   using DrawVertex = ClemensDisplayVertex;
   using DisplayVertexParams = ClemensDisplayVertexParams;
 
-  void renderTextPlane(const ClemensVideo& video, int columns, const uint8_t* memory,
-                       int phase, bool useAlternateCharacterSet);
+  DrawVertex* renderTextPlane(DrawVertex* vertices, const ClemensVideo& video,
+                              const DisplayVertexParams& vertexParams,
+                              int columns, const uint8_t* memory, int phase,
+                              bool useAlternateCharacterSet);
   void renderLoresPlane(const ClemensVideo& video, int columns, const uint8_t* memory,
                        int phase);
   void renderHiresGraphicsTexture(const ClemensVideo& video,
@@ -106,6 +108,8 @@ private:
   sg_image graphicsTarget_;
   sg_image screenTarget_;
   sg_pass screenPass_;
+
+  sg_range textVertices_;
 
   uint8_t* emulatorVideoBuffer_;
   uint8_t* emulatorRGBABuffer_;

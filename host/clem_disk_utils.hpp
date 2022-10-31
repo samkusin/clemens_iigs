@@ -1,7 +1,7 @@
 #ifndef CLEM_HOST_DISK_UTILS_HPP
 #define CLEM_HOST_DISK_UTILS_HPP
 
-#include <string>
+#include <string_view>
 #include "cinek/buffertypes.hpp"
 #include "clem_woz.h"
 

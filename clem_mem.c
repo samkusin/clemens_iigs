@@ -7,6 +7,8 @@
 #include "clem_util.h"
 #include "clem_vgc.h"
 
+#include <string.h>
+
 /**
  * Video Memory layout
  *
@@ -1732,9 +1734,9 @@ void clem_mmio_restore(struct ClemensMMIO *mmio) {
   _clem_mmio_memory_map(mmio, memory_flags);
 }
 
-void _clem_mmio_init(struct ClemensMMIO *mmio,
-                     struct ClemensMemoryPageMap **bank_page_map,
-                     clem_clocks_duration_t mega2_clocks_step) {
+void clem_mmio_init(struct ClemensMMIO *mmio,
+                    struct ClemensMemoryPageMap **bank_page_map,
+                    clem_clocks_duration_t mega2_clocks_step) {
   //  Memory map starts out without shadowing, but our call to
   //  init_page_maps will initialize the memory map on IIgs reset
   //  Fast CPU mode

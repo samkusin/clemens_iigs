@@ -53,6 +53,10 @@ void clem_write(ClemensMachine* clem, uint8_t data, uint16_t adr,
 void clem_mmio_reset(struct ClemensMMIO* mmio,
                      clem_clocks_duration_t mega2_clocks_step);
 
+void clem_mmio_init(struct ClemensMMIO *mmio,
+                    struct ClemensMemoryPageMap **bank_page_map,
+                    clem_clocks_duration_t mega2_clocks_step);
+
 void clem_mmio_restore(struct ClemensMMIO* mmio);
 
 #ifdef __cplusplus

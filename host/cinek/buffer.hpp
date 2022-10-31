@@ -50,8 +50,8 @@ namespace cinek {
   class BufferBase
   {
   public:
-    using Range = Range<T>;
-    using ConstRange = ConstRange<T>;
+    using Range = ::cinek::Range<T>;
+    using ConstRange = ::cinek::ConstRange<T>;
     using DataType = T;
     using ThisType = BufferBase<T>;
 

@@ -1,3 +1,4 @@
+#include "clem_shared.h"
 #include "clem_vgc.h"
 #include "clem_debug.h"
 #include "clem_mmio_defs.h"

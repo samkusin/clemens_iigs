@@ -164,9 +164,9 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
                  diskDrives_[driveIndex].imagePath,
                  ClemensDiskUtilities::getDriveName(driveType));
     } else {
-      printf("Failed to load image '{}' into drive {}\n",
-             diskDrives_[driveIndex].imagePath,
-             ClemensDiskUtilities::getDriveName(driveType));
+      fmt::print("Failed to load image '{}' into drive {}\n",
+                 diskDrives_[driveIndex].imagePath,
+                 ClemensDiskUtilities::getDriveName(driveType));
     }
   }
 
@@ -340,9 +340,9 @@ bool ClemensBackend::programTrace(const std::string_view &inputParam) {
   if (programTrace_) {
     if (op == "iwm") {
       programTrace_->enableIWMLogging(!programTrace_->isIWMLoggingEnabled());
-      fmt::format("{} tracing = {}\n", op, programTrace_->isIWMLoggingEnabled());
+      fmt::print("{} tracing = {}\n", op, programTrace_->isIWMLoggingEnabled());
     } else {
-      fmt::format("{} tracing is not recognized.\n", op);
+      fmt::print("{} tracing is not recognized.\n", op);
     }
   }
   return ok;
@@ -401,7 +401,7 @@ bool ClemensBackend::loadDisk(ClemensDriveType driveType) {
   if (input.is_open()) {
     input.seekg(0, std::ios_base::end);
     size_t inputImageSize = input.tellg();
-    if (inputImageSize <= diskBuffer_.getCapacity()) {
+    if (inputImageSize <= (size_t)diskBuffer_.getCapacity()) {
       auto bits = diskBuffer_.forwardSize(inputImageSize);
       input.seekg(0);
       input.read((char *)bits.first, inputImageSize);
@@ -583,6 +583,9 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     }
   }
 
+
+  fmt::print("Starting backend thread.\n");
+
   ClemensCard* mockingboard = findMockingboardCard(&machine_);
   uint64_t publishSeqNo = 0;
   unsigned emulatorRefreshFrequency = 60;
@@ -693,6 +696,8 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           if (!loadSnapshot(command.operand)) commandFailed = true;
           mockingboard = findMockingboardCard(&machine_);
           break;
+        case Command::Undefined:
+          break;
       }
       if (commandFailed.has_value() && *commandFailed == true && !commandType.has_value()) {
         commandType = command.type;
@@ -799,7 +804,6 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
         auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
         auto driveType = static_cast<ClemensDriveType>(driveIndex);
-        auto* clemensDrive = clemens_drive_get(&machine_, driveType);
         if (clemens_eject_disk_async(&machine_, driveType, &disks_[driveIndex])) {
           saveDisk(driveType);
           localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", diskDrive.imagePath);
@@ -888,7 +892,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     machine_.card_slot[i] = NULL;
   }
 
-  printf("Terminated backend refresh thread.\n");
+  fmt::print("Terminated backend refresh thread.\n");
 }
 
 std::optional<unsigned> ClemensBackend::checkHitBreakpoint() {
@@ -920,6 +924,9 @@ std::optional<unsigned> ClemensBackend::checkHitBreakpoint() {
         if (machine_.cpu.state_type ==  kClemensCPUStateType_IRQ) {
           return index;
         }
+        break;
+      default:
+        assert(false);
         break;
     }
   }
@@ -1008,7 +1015,7 @@ void ClemensBackend::saveBRAM() {
 
   std::ofstream bramFile("clem.bram", std::ios::binary);
   if (bramFile.is_open()) {
-    bramFile.write((char *)machine_.mmio.dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
+    bramFile.write((char *)bram, CLEM_RTC_BRAM_SIZE);
   } else {
     //  TODO: display error?
   }

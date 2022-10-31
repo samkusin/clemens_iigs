@@ -36,6 +36,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <cassert>
+#include <utility>
 
 namespace cinek {
 
@@ -52,7 +53,7 @@ namespace cinek {
    */
   class FixedStack
   {
-    CK_CLASS_NON_COPYABLE(FixedStack);
+    CK_CLASS_NON_COPYABLE(FixedStack)
 
   public:
     FixedStack() = default;

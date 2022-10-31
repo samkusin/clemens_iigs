@@ -63,6 +63,7 @@ static void stdlog(void* context, const char* sourceId, const char* fmt, va_list
 static void stdrawlog(void* context, cinek_log_level level, const char* sourceId, const char* msg)
 {
     (void)context;
+    (void)level;
     fprintf(stdout, "%s : ", sourceId);
     fputs(msg, stdout);
 }

@@ -1,28 +1,36 @@
 
-#include "clem_host_platform.h"
 #include <cinttypes>
 
-#if CLEMENS_PLATFORM_WINDOWS
+#if defined(CK3D_BACKEND_D3D11)
 #define SOKOL_D3D11
+#elif defined(CK3D_BACKEND_GL)
+#define SOKOL_GLCORE33
+#endif
+
+#ifdef _WIN32
+#include <combaseapi.h>
 #endif
 
 #include "imgui.h"
 
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 
 #include "clem_front.hpp"
 
 #define SOKOL_IMPL
+#include "sokol/sokol_time.h"
 #include "sokol/sokol_app.h"
+#include "sokol/sokol_audio.h"
 #include "sokol/sokol_gfx.h"
 #include "sokol/sokol_glue.h"
 #include "sokol/sokol_imgui.h"
 
 
+static uint64_t g_lastTime = 0;
 static ClemensFrontend* g_Host = nullptr;
-static ClemensHostTimePoint g_LastTimepoint;
 static sg_pass_action g_sgPassAction;
 static unsigned g_ADBKeyToggleMask = 0;
 
@@ -89,12 +97,12 @@ static void initDirectories() {
 
 static void onInit()
 {
-  clem_host_timepoint_init();
-  clem_host_timepoint_now(&g_LastTimepoint);
-
+  stm_setup();
   initDirectories();
 
+#if CLEMENS_PLATFORM_WINDOWS
   CoInitializeEx(NULL, COINIT_MULTITHREADED);
+#endif
 
   sg_desc desc = {};
   desc.context = sapp_sgcontext();
@@ -107,7 +115,7 @@ static void onInit()
   simguiDesc.no_default_font = true;
   simgui_setup(simguiDesc);
 
-  g_sokolToADBKey.fill((unsigned)(-1));
+  g_sokolToADBKey.fill(-1);
   g_sokolToADBKey[SAPP_KEYCODE_SPACE] = CLEM_ADB_KEY_SPACE;
   g_sokolToADBKey[SAPP_KEYCODE_APOSTROPHE] = CLEM_ADB_KEY_APOSTRAPHE;
   g_sokolToADBKey[SAPP_KEYCODE_COMMA] = CLEM_ADB_KEY_COMMA;
@@ -225,13 +233,17 @@ static void onFrame()
 {
   const int frameWidth = sapp_width();
   const int frameHeight = sapp_height();
-  ClemensHostTimePoint currentTimepoint;
 
-  clem_host_timepoint_now(&currentTimepoint);
-  auto deltaTime = clem_host_timepoint_deltaf(
-    &currentTimepoint, &g_LastTimepoint);
+  uint64_t deltaTicks = stm_laptime(&g_lastTime);
+  double deltaTime = stm_sec(deltaTicks);
 
-  simgui_new_frame(frameWidth, frameHeight, deltaTime);
+  simgui_frame_desc_t imguiFrameDesc = {};
+  imguiFrameDesc.delta_time = deltaTime;
+  imguiFrameDesc.dpi_scale = 1.0f;
+  imguiFrameDesc.width = frameWidth;
+  imguiFrameDesc.height = frameHeight;
+
+  simgui_new_frame(imguiFrameDesc);
 
   ClemensFrontend::FrameAppInterop interop;
   interop.mouseLock = sapp_mouse_locked();
@@ -242,8 +254,6 @@ static void onFrame()
   simgui_render();
   sg_end_pass();
   sg_commit();
-
-  g_LastTimepoint = currentTimepoint;
 }
 
 static void onEvent(const sapp_event* evt)
@@ -282,7 +292,7 @@ static void onEvent(const sapp_event* evt)
       break;
   }
   if (clemInput.type != kClemensInputType_None) {
-    if (clem_host_get_caps_lock_state()) {
+    if (evt->modifiers & SAPP_MODIFIER_CAPS) {
       g_ADBKeyToggleMask |= CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;
     } else {
       g_ADBKeyToggleMask &= ~CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;
@@ -300,8 +310,9 @@ static void onCleanup()
 
   g_Host = nullptr;
 
+#if CLEMENS_PLATFORM_WINDOWS
   CoUninitialize();
-
+#endif
   simgui_shutdown();
   sg_shutdown();
 }
@@ -312,7 +323,7 @@ static void onFail(const char* msg)
 }
 
 
-sapp_desc sokol_main(int argc, char* argv[])
+sapp_desc sokol_main(int /*argc*/, char*[] /*argv[]*/)
 {
   sapp_desc sapp = {};
 

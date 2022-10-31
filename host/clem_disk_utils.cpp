@@ -1,5 +1,6 @@
 #include "clem_disk_utils.hpp"
 
+#include <algorithm>
 #include <array>
 #include <filesystem>
 #include <fstream>
@@ -10,7 +11,7 @@ static std::array<std::string_view, 4> sDriveNames = {
   "s5d1", "s5d2", "s6d1", "s6d2"
 };
 
-struct ClemensWOZDisk* ClemensDiskUtilities::parseWOZ(
+struct ClemensWOZDisk* parseWOZ(
   struct ClemensWOZDisk* woz, cinek::ConstRange<uint8_t>& image) {
   const uint8_t* bits_data_current = clem_woz_check_header(
     image.first, cinek::length(image));
@@ -66,6 +67,8 @@ size_t calculateNibRequiredMemory(ClemensDriveType driveType) {
     case kClemensDrive_5_25_D1:
     case kClemensDrive_5_25_D2:
       size = CLEM_DISK_525_MAX_DATA_SIZE;
+      break;
+    default:
       break;
   }
   return size;

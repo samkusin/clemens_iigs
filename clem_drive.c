@@ -94,7 +94,7 @@ static int s_disk2_phase_states[8][16] = {
 */
 
 static void _clem_disk_reset_drive(struct ClemensDrive *drive) {
-
+  int rand_max = (int)(RAND_MAX * 0.30f);
   drive->real_track_index = 0xfe;
   drive->random_bit_index = 0;
   drive->qtr_track_index = 0;
@@ -110,7 +110,7 @@ static void _clem_disk_reset_drive(struct ClemensDrive *drive) {
   do {
     unsigned random_byte_index = (drive->random_bit_index / 8);
     unsigned random_bit_shift = (drive->random_bit_index % 8);
-    if (rand() < (RAND_MAX * 3) / 10) {
+    if (rand() < rand_max) {
       drive->random_bits[random_byte_index] |= (1 << random_bit_shift);
     } else {
       drive->random_bits[random_byte_index] &= ~(1 << random_bit_shift);

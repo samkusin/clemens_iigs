@@ -1,4 +1,4 @@
-const char* VS_D3D11_VERTEX =
+const char* VS_VERTEX_SOURCE =
   "cbuffer Globals {\n"
   "    float2 render_dims;\n"
   "    float2 display_ratio;\n"
@@ -7,8 +7,8 @@ const char* VS_D3D11_VERTEX =
   "};\n"
   "struct Input {\n"
   "    float2 pos: POSITION;\n"
-  "    float2 uv: TEXCOORD0;\n"
-  "    float4 color: COLOR0;\n"
+  "    float2 uv: TEXCOORD1;\n"
+  "    float4 color: COLOR1;\n"
   "};\n"
   "struct Output {\n"
   "    float2 uv: TEXCOORD0;\n"
@@ -25,7 +25,7 @@ const char* VS_D3D11_VERTEX =
   "    return output;\n"
   "}\n";
 
-const char* FS_D3D11_TEXT =
+const char* FS_TEXT_SOURCE =
   "Texture2D<float4> tex: register(t0);\n"
   "sampler smp: register(s0);\n"
   "float4 main(float2 uv: TEXCOORD0, float4 color: COLOR0): SV_Target0 {\n"
@@ -33,7 +33,7 @@ const char* FS_D3D11_TEXT =
   "    return texl.xxxx * color;\n"
   "}\n";
 
-const char* FS_D3D11_HIRES =
+const char* FS_HIRES_SOURCE =
   "Texture2D<float4> hgr_tex: register(t0);\n"
   "Texture2D<float4> hcolor_tex: register(t1);\n"
   "sampler smp: register(s0);\n"
@@ -43,7 +43,7 @@ const char* FS_D3D11_HIRES =
   "    return texl_color;\n"
   "};\n";
 
-const char* FS_D3D11_SUPER =
+const char* FS_SUPER_SOURCE =
   "Texture2D<float4> hgr_tex: register(t0);\n"
   "Texture2D<float4> hcolor_tex: register(t1);\n"
   "sampler smp: register(s0);\n"

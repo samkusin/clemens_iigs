@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <ctype.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -872,8 +873,8 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor,
   }
 
   machine->mmio_bypass = false;
-  _clem_mmio_init(&machine->mmio, machine->bank_page_map,
-                  machine->clocks_step_mega2);
+  clem_mmio_init(&machine->mmio, machine->bank_page_map,
+                 machine->clocks_step_mega2);
 
   return 0;
 }
@@ -3654,7 +3655,7 @@ void clemens_emulate(ClemensMachine *clem) {
              cpu->state_type == kClemensCPUStateType_NMI) {
     uint8_t tmp_data;
     uint8_t tmp_datahi;
-    uint8_t vlo, vhi;
+    uint16_t vlo, vhi;
     if (cpu->pins.emulation) {
       vlo = cpu->state_type == kClemensCPUStateType_NMI
                 ? CLEM_6502_NMI_VECTOR_LO_ADDR

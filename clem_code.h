@@ -974,7 +974,7 @@ static inline uint16_t _clem_read_interrupt_vector(ClemensMachine *clem,
 }
 
 static inline void _clem_irq_brk_setup(ClemensMachine *clem, uint8_t *pbr,
-                                       uint16_t *pc, uint8_t vlo, uint8_t vhi,
+                                       uint16_t *pc, uint16_t vlo, uint16_t vhi,
                                        bool is_brk) {
   /*
       pass PC into function since instructions modify may modify the current
@@ -998,8 +998,7 @@ static inline void _clem_irq_brk_setup(ClemensMachine *clem, uint8_t *pbr,
   cpu->regs.P &= ~kClemensCPUStatus_Decimal;
   cpu->regs.P |= kClemensCPUStatus_IRQDisable;
   *pbr = 0x00;
-  *pc = _clem_read_interrupt_vector(clem, CLEM_6502_IRQBRK_VECTOR_LO_ADDR,
-                                    CLEM_6502_IRQBRK_VECTOR_HI_ADDR);
+  *pc = _clem_read_interrupt_vector(clem, vlo, vhi);
 }
 
 static inline uint16_t _clem_irq_brk_return(ClemensMachine *clem) {

@@ -33,7 +33,7 @@ public:
   };
 
   //  application rendering hook
-  void frame(int width, int height, float deltaTime, FrameAppInterop& interop);
+  void frame(int width, int height, double deltaTime, FrameAppInterop& interop);
   //  application input from OS
   void input(ClemensInputEvent input);
 
@@ -45,6 +45,7 @@ private:
   //  the backend state delegate is run on a separate thread and notifies
   //  when a frame has been published
   void backendStateDelegate(const ClemensBackendState &state);
+  void copyState(const ClemensBackendState& state);
 
   void doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize);
   void doMachineDiagnosticsDisplay();
@@ -92,6 +93,8 @@ private:
   std::condition_variable framePublished_;
   std::mutex frameMutex_;
   uint64_t frameSeqNo_, frameLastSeqNo_;
+  static const uint64_t kFrameSeqNoInvalid;
+
   //  Toggle between frame memory buffers so that backendStateDelegate and frame
   //  write to and read from separate buffers, to minimize the time we need to
   //  keep the frame mutex between the two threads.

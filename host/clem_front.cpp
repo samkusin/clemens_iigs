@@ -23,6 +23,8 @@
 //  TODO: preroll audio for some buffer on to handle sound clipping on lower end
 //        systems
 
+//  DONE: Diagnose GL offsets issue with emulated display
+//  DONE: Diagnose Linux caps lock issue
 //  DONE: Break on IRQ
 //  DONE: List IRQ flags from emulator
 //  DONE: Mouse lock and release (via keyboard combo ctl-f12?)
@@ -295,22 +297,27 @@ void ClemensFrontend::DOCStatus::copyFrom(const ClemensDeviceEnsoniq& doc) {
   memcpy(osc_flags, doc.osc_flags, sizeof(osc_flags));
 }
 
+const uint64_t ClemensFrontend::kFrameSeqNoInvalid =
+  std::numeric_limits<uint64_t>::max();
+
 ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
     : displayProvider_(systemFontLoBuffer, systemFontHiBuffer), display_(displayProvider_),
-      audio_(), frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
+      audio_(),
+      frameSeqNo_(kFrameSeqNoInvalid),
+      frameLastSeqNo_(kFrameSeqNoInvalid),
+      frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameMemory_(kLogMemorySize, malloc(kLogMemorySize)),
-      frameSeqNo_(std::numeric_limits<decltype(frameSeqNo_)>::max()),
-      frameLastSeqNo_(std::numeric_limits<decltype(frameLastSeqNo_)>::max()), lastFrameCPUPins_{},
-      lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0), lastFrameNMIs_(0),
-      emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false),
+      lastFrameCPUPins_{}, lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0),
+      lastFrameNMIs_(0), emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false),
       terminalMode_(TerminalMode::Command),
-      guiMode_(GUIMode::Emulator),diskLibraryRootPath_{
+      diskLibraryRootPath_{
           (std::filesystem::current_path() / std::filesystem::path(CLEM_HOST_LIBRARY_DIR))
               .string()},
       diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0) ,
-      debugIOMode_(DebugIOMode::Core) {
+      debugIOMode_(DebugIOMode::Core),
+      guiMode_(GUIMode::Emulator) {
 
   ClemensTraceExecutedInstruction::initialize();
 
@@ -330,13 +337,14 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
 
   debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;
   debugMemoryEditor_.WriteFn = &ClemensFrontend::imguiMemoryEditorWrite;
-
   CLEM_TERM_COUT.print(TerminalLine::Info, "Welcome to the Clemens IIgs Emulator");
 }
 
 ClemensFrontend::~ClemensFrontend() {
   backend_ = nullptr;
   audio_.stop();
+  delete[] thisFrameAudioBuffer_.getHead();
+  delete[] lastCommandState_.audioBuffer.getHead();
   free(frameWriteMemory_.getHead());
   free(frameReadMemory_.getHead());
 }
@@ -371,220 +379,223 @@ std::unique_ptr<ClemensBackend> ClemensFrontend::createBackend() {
   return backend;
 }
 
-void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
-  {
-    std::lock_guard<std::mutex> frameLock(frameMutex_);
-
-    frameSeqNo_ = state.seqno;
-    frameWriteMemory_.reset();
-
-    frameWriteState_.cpu = state.machine->cpu;
-    frameWriteState_.monitorFrame = state.monitor;
-
-    //  copy scanlines as this data may become invalid on a frame-to-frame
-    //  basis
-    frameWriteState_.textFrame = state.text;
-    if (frameWriteState_.textFrame.format != kClemensVideoFormat_None) {
-      frameWriteState_.textFrame.scanlines = frameWriteMemory_.allocateArray<ClemensScanline>(
-        state.text.scanline_limit);
-      memcpy(frameWriteState_.textFrame.scanlines, state.text.scanlines,
-             sizeof(ClemensScanline) * state.text.scanline_limit);
-    }
-    frameWriteState_.graphicsFrame = state.graphics;
-    if (frameWriteState_.graphicsFrame.format != kClemensVideoFormat_None) {
-      frameWriteState_.graphicsFrame.scanlines = frameWriteMemory_.allocateArray<ClemensScanline>(
-        state.graphics.scanline_limit);
-      memcpy(frameWriteState_.graphicsFrame.scanlines, state.graphics.scanlines,
-             sizeof(ClemensScanline) * state.graphics.scanline_limit);
-
-    }
-    frameWriteState_.audioFrame = state.audio;
-    frameWriteState_.backendCPUID = state.hostCPUID;
-    frameWriteState_.fps = state.fps;
-    frameWriteState_.mmioWasInitialized = state.mmio_was_initialized;
-    frameWriteState_.isTracing = state.isTracing;
-    frameWriteState_.emulatorSpeedMhz = state.emulatorSpeedMhz;
-    frameWriteState_.emulatorClock.ts = state.machine->clocks_spent;
-    frameWriteState_.emulatorClock.ref_step = CLEM_CLOCKS_MEGA2_CYCLE;
-    //  copy over component state as needed
-    frameWriteState_.vgcModeFlags = state.machine->mmio.vgc.mode_flags;
-    frameWriteState_.irqs = state.machine->mmio.irq_line;
-    frameWriteState_.nmis = state.machine->mmio.nmi_line;
-
-    const ClemensDeviceIWM& iwm = state.machine->mmio.dev_iwm;
-    const ClemensDrive* iwmDrive = nullptr;
-    frameWriteState_.iwm.status = 0;
-    if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
-      frameWriteState_.iwm.status |= kIWMStatusDriveOn;
-    }
-    if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-      frameWriteState_.iwm.status |= kIWMStatusDrive35;
-      iwmDrive = &state.machine->active_drives.slot5[0];
-    } else {
-      iwmDrive = &state.machine->active_drives.slot6[0];
-    }
-    if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_2) {
-      frameWriteState_.iwm.status |= kIWMStatusDriveAlt;
-      ++iwmDrive;
-    }
-    if (iwm.q6_switch) {
-      frameWriteState_.iwm.status |= kIWMStatusIWMQ6;
-    }
-    if (iwm.q7_switch) {
-      frameWriteState_.iwm.status |= kIWMStatusIWMQ7;
-    }
-    if (iwmDrive->is_spindle_on) {
-      frameWriteState_.iwm.status |= kIWMStatusDriveSpin;
-    }
-
-    frameWriteState_.iwm.qtr_track_index = iwmDrive->qtr_track_index;
-    frameWriteState_.iwm.track_byte_index = iwmDrive->track_byte_index;
-    frameWriteState_.iwm.track_bit_shift = iwmDrive->track_bit_shift;
-    frameWriteState_.iwm.track_bit_length = iwmDrive->track_bit_length;
-    frameWriteState_.iwm.data = iwm.data;
-    frameWriteState_.iwm.latch = iwm.latch;
-    frameWriteState_.iwm.ph03 = (uint8_t)(iwm.out_phase & 0xff);
-
-    const uint8_t* diskBits = iwmDrive->disk.bits_data;
-    unsigned diskTrackIndex = frameWriteState_.iwm.qtr_track_index;
-    constexpr auto diskBufferSize = sizeof(frameWriteState_.iwm.buffer);
-    if (iwmDrive->disk.track_initialized[diskTrackIndex]) {
-      unsigned trackByteCount = iwmDrive->disk.track_byte_count[diskTrackIndex];
-      unsigned left, right;
-      if (iwmDrive->track_byte_index > 0) {
-        left = iwmDrive->track_byte_index - 1;
-      } else {
-        left = trackByteCount - 1;
-      }
-      right = iwmDrive->track_byte_index + diskBufferSize - 1;
-      if (right >= trackByteCount) {
-        right = right - trackByteCount;
-      }
-      diskBits += iwmDrive->disk.track_byte_offset[diskTrackIndex];
-      unsigned bufferIndex = 0;
-      if (left > right) {
-        for (; left < trackByteCount; ++left, ++bufferIndex) {
-          frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];
-        }
-        left = 0;
-      }
-      for (; left <= right; ++left, ++bufferIndex) {
-        frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];
-      }
-    } else {
-      memset(frameWriteState_.iwm.buffer, 0, diskBufferSize);
-    }
-
-    //  copy over memory banks as needed
-    frameWriteState_.bankE0 = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
-    memcpy(frameWriteState_.bankE0, state.machine->mega2_bank_map[0], CLEM_IIGS_BANK_SIZE);
-    frameWriteState_.bankE1 = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
-    memcpy(frameWriteState_.bankE1, state.machine->mega2_bank_map[1], CLEM_IIGS_BANK_SIZE);
-
-    frameWriteState_.ioPage = (uint8_t *)frameWriteMemory_.allocate(256);
-    memcpy(frameWriteState_.ioPage, state.ioPageValues, 256);
-
-    frameWriteState_.memoryViewBank = state.debugMemoryPage;
-    if (!state.isRunning) {
-      frameWriteState_.memoryView = (uint8_t*)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
-      //  read every byte from the memory controller - which can be 'slow' enough
-      //  to effect framerate on some systems.   so we only update memory state
-      //  when the emulator isn't actively running instructions
-      uint8_t* memoryView = reinterpret_cast<uint8_t*>(frameWriteState_.memoryView);
-      for (unsigned addr = 0; addr < 0x10000; ++addr) {
-        clem_read(state.machine, &memoryView[addr], addr, state.debugMemoryPage,
-                  CLEM_MEM_FLAG_NULL);
-      }
-
-      constexpr size_t kDOCRAMSize = 65536;
-
-      frameWriteState_.docRAM = (uint8_t*)frameWriteMemory_.allocate(kDOCRAMSize);
-      memcpy(frameWriteState_.docRAM, &state.machine->mmio.dev_audio.doc.sound_ram,
-             kDOCRAMSize);
-    } else {
-      frameWriteState_.memoryView = nullptr;
-      frameWriteState_.docRAM = nullptr;
-    }
-    frameWriteState_.doc.copyFrom(state.machine->mmio.dev_audio.doc);
-
-    const ClemensBackendDiskDriveState *driveState = state.diskDrives;
-    for (auto &diskDrive : frameWriteState_.diskDrives) {
-      diskDrive = *driveState;
-      ++driveState;
-    }
-
-    frameWriteState_.breakpoints = frameWriteMemory_.allocateArray<ClemensBackendBreakpoint>(
-        state.bpBufferEnd - state.bpBufferStart);
-    frameWriteState_.breakpointCount = (unsigned)(state.bpBufferEnd - state.bpBufferStart);
-    auto *bpDest = frameWriteState_.breakpoints;
-    for (auto *bpCur = state.bpBufferStart; bpCur != state.bpBufferEnd; ++bpCur, ++bpDest) {
-      *bpDest = *bpCur;
-      if (state.bpHitIndex.has_value() && !lastCommandState_.hitBreakpoint.has_value()) {
-        if (unsigned(bpCur - state.bpBufferStart) == *state.bpHitIndex) {
-          lastCommandState_.hitBreakpoint = *state.bpHitIndex;
-        }
-      }
-    }
-    if (!lastCommandState_.message.has_value() && state.message.has_value()) {
-      lastCommandState_.message = cmdMessageFromBackend(*state.message, state.machine);
-    }
-    if (!lastCommandState_.commandFailed.has_value()) {
-      lastCommandState_.commandFailed = state.commandFailed;
-    }
-    if (!lastCommandState_.commandType.has_value()) {
-      lastCommandState_.commandType = state.commandType;
-    }
-    if (!lastCommandState_.terminated.has_value()) {
-      lastCommandState_.terminated = state.terminated;
-    }
-
-    auto audioBufferSize = int32_t(state.audio.frame_count * state.audio.frame_stride);
-    auto audioBufferRange = lastCommandState_.audioBuffer.forwardSize(audioBufferSize);
-    memcpy(audioBufferRange.first, state.audio.data, cinek::length(audioBufferRange));
-
-    frameWriteState_.logLevel = state.logLevel;
-    for (auto *logItem = state.logBufferStart; logItem != state.logBufferEnd; ++logItem) {
-      LogOutputNode *logMemory = reinterpret_cast<LogOutputNode *>(
-          frameMemory_.allocate(sizeof(LogOutputNode) + CK_ALIGN_SIZE_TO_ARCH(logItem->text.size())));
-      logMemory->logLevel = logItem->level;
-      logMemory->sz = unsigned(logItem->text.size());
-      logItem->text.copy(reinterpret_cast<char *>(logMemory) + sizeof(LogOutputNode),
-                         std::string::npos);
-      logMemory->next = nullptr;
-      if (!lastCommandState_.logNode) {
-        lastCommandState_.logNode = logMemory;
-      } else {
-        lastCommandState_.logNodeTail->next = logMemory;
-      }
-      lastCommandState_.logNodeTail = logMemory;
-    }
-
-    if (state.logInstructionStart != state.logInstructionEnd) {
-      size_t instructionCount = state.logInstructionEnd - state.logInstructionStart;
-      LogInstructionNode* logInstMemory = reinterpret_cast<LogInstructionNode*>(
-          frameMemory_.allocate(sizeof(LogInstructionNode)));
-      logInstMemory->begin =
-        frameMemory_.allocateArray<ClemensBackendExecutedInstruction>(instructionCount);
-      logInstMemory->end = logInstMemory->begin + instructionCount;
-      logInstMemory->next = nullptr;
-      memcpy(logInstMemory->begin, state.logInstructionStart,
-             instructionCount * sizeof(ClemensBackendExecutedInstruction));
-      if (!lastCommandState_.logInstructionNode) {
-        lastCommandState_.logInstructionNode = logInstMemory;
-      } else {
-        lastCommandState_.logInstructionNodeTail->next = logInstMemory;
-      }
-      lastCommandState_.logInstructionNodeTail = logInstMemory;
-    }
-
-    if (state.message.has_value()) {
-      printf("debug message: %s\n", (*state.message).c_str());
-    }
-  }
-  framePublished_.notify_one();
+void ClemensFrontend::backendStateDelegate(const ClemensBackendState& state) {
+  copyState(state);
+  framePublished_.notify_all();
 }
 
-void ClemensFrontend::frame(int width, int height, float deltaTime,
+void ClemensFrontend::copyState(const ClemensBackendState &state) {
+  std::lock_guard<std::mutex> frameLock(frameMutex_);
+
+  frameSeqNo_ = state.seqno;
+
+  frameWriteMemory_.reset();
+
+  frameWriteState_.cpu = state.machine->cpu;
+  frameWriteState_.monitorFrame = state.monitor;
+
+  //  copy scanlines as this data may become invalid on a frame-to-frame
+  //  basis
+  frameWriteState_.textFrame = state.text;
+  if (frameWriteState_.textFrame.format != kClemensVideoFormat_None) {
+    frameWriteState_.textFrame.scanlines = frameWriteMemory_.allocateArray<ClemensScanline>(
+      state.text.scanline_limit);
+    memcpy(frameWriteState_.textFrame.scanlines, state.text.scanlines,
+            sizeof(ClemensScanline) * state.text.scanline_limit);
+  }
+  frameWriteState_.graphicsFrame = state.graphics;
+  if (frameWriteState_.graphicsFrame.format != kClemensVideoFormat_None) {
+    frameWriteState_.graphicsFrame.scanlines = frameWriteMemory_.allocateArray<ClemensScanline>(
+      state.graphics.scanline_limit);
+    memcpy(frameWriteState_.graphicsFrame.scanlines, state.graphics.scanlines,
+            sizeof(ClemensScanline) * state.graphics.scanline_limit);
+
+  }
+  frameWriteState_.audioFrame = state.audio;
+  frameWriteState_.backendCPUID = state.hostCPUID;
+  frameWriteState_.fps = state.fps;
+  frameWriteState_.mmioWasInitialized = state.mmio_was_initialized;
+  frameWriteState_.isTracing = state.isTracing;
+  frameWriteState_.emulatorSpeedMhz = state.emulatorSpeedMhz;
+  frameWriteState_.emulatorClock.ts = state.machine->clocks_spent;
+  frameWriteState_.emulatorClock.ref_step = CLEM_CLOCKS_MEGA2_CYCLE;
+  //  copy over component state as needed
+  frameWriteState_.vgcModeFlags = state.machine->mmio.vgc.mode_flags;
+  frameWriteState_.irqs = state.machine->mmio.irq_line;
+  frameWriteState_.nmis = state.machine->mmio.nmi_line;
+
+  const ClemensDeviceIWM& iwm = state.machine->mmio.dev_iwm;
+  const ClemensDrive* iwmDrive = nullptr;
+  frameWriteState_.iwm.status = 0;
+  if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
+    frameWriteState_.iwm.status |= kIWMStatusDriveOn;
+  }
+  if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+    frameWriteState_.iwm.status |= kIWMStatusDrive35;
+    iwmDrive = &state.machine->active_drives.slot5[0];
+  } else {
+    iwmDrive = &state.machine->active_drives.slot6[0];
+  }
+  if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_2) {
+    frameWriteState_.iwm.status |= kIWMStatusDriveAlt;
+    ++iwmDrive;
+  }
+  if (iwm.q6_switch) {
+    frameWriteState_.iwm.status |= kIWMStatusIWMQ6;
+  }
+  if (iwm.q7_switch) {
+    frameWriteState_.iwm.status |= kIWMStatusIWMQ7;
+  }
+  if (iwmDrive->is_spindle_on) {
+    frameWriteState_.iwm.status |= kIWMStatusDriveSpin;
+  }
+
+  frameWriteState_.iwm.qtr_track_index = iwmDrive->qtr_track_index;
+  frameWriteState_.iwm.track_byte_index = iwmDrive->track_byte_index;
+  frameWriteState_.iwm.track_bit_shift = iwmDrive->track_bit_shift;
+  frameWriteState_.iwm.track_bit_length = iwmDrive->track_bit_length;
+  frameWriteState_.iwm.data = iwm.data;
+  frameWriteState_.iwm.latch = iwm.latch;
+  frameWriteState_.iwm.ph03 = (uint8_t)(iwm.out_phase & 0xff);
+
+  const uint8_t* diskBits = iwmDrive->disk.bits_data;
+  unsigned diskTrackIndex = frameWriteState_.iwm.qtr_track_index;
+  constexpr auto diskBufferSize = sizeof(frameWriteState_.iwm.buffer);
+  if (iwmDrive->disk.track_initialized[diskTrackIndex]) {
+    unsigned trackByteCount = iwmDrive->disk.track_byte_count[diskTrackIndex];
+    unsigned left, right;
+    if (iwmDrive->track_byte_index > 0) {
+      left = iwmDrive->track_byte_index - 1;
+    } else {
+      left = trackByteCount - 1;
+    }
+    right = iwmDrive->track_byte_index + diskBufferSize - 1;
+    if (right >= trackByteCount) {
+      right = right - trackByteCount;
+    }
+    diskBits += iwmDrive->disk.track_byte_offset[diskTrackIndex];
+    unsigned bufferIndex = 0;
+    if (left > right) {
+      for (; left < trackByteCount; ++left, ++bufferIndex) {
+        frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];
+      }
+      left = 0;
+    }
+    for (; left <= right; ++left, ++bufferIndex) {
+      frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];
+    }
+  } else {
+    memset(frameWriteState_.iwm.buffer, 0, diskBufferSize);
+  }
+
+  //  copy over memory banks as needed
+  frameWriteState_.bankE0 = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
+  memcpy(frameWriteState_.bankE0, state.machine->mega2_bank_map[0], CLEM_IIGS_BANK_SIZE);
+  frameWriteState_.bankE1 = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
+  memcpy(frameWriteState_.bankE1, state.machine->mega2_bank_map[1], CLEM_IIGS_BANK_SIZE);
+
+  frameWriteState_.ioPage = (uint8_t *)frameWriteMemory_.allocate(256);
+  memcpy(frameWriteState_.ioPage, state.ioPageValues, 256);
+
+  frameWriteState_.memoryViewBank = state.debugMemoryPage;
+  if (!state.isRunning) {
+    frameWriteState_.memoryView = (uint8_t*)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
+    //  read every byte from the memory controller - which can be 'slow' enough
+    //  to effect framerate on some systems.   so we only update memory state
+    //  when the emulator isn't actively running instructions
+    uint8_t* memoryView = reinterpret_cast<uint8_t*>(frameWriteState_.memoryView);
+    for (unsigned addr = 0; addr < 0x10000; ++addr) {
+      clem_read(state.machine, &memoryView[addr], addr, state.debugMemoryPage,
+                CLEM_MEM_FLAG_NULL);
+    }
+
+    constexpr size_t kDOCRAMSize = 65536;
+
+    frameWriteState_.docRAM = (uint8_t*)frameWriteMemory_.allocate(kDOCRAMSize);
+    memcpy(frameWriteState_.docRAM, &state.machine->mmio.dev_audio.doc.sound_ram,
+            kDOCRAMSize);
+  } else {
+    frameWriteState_.memoryView = nullptr;
+    frameWriteState_.docRAM = nullptr;
+  }
+  frameWriteState_.doc.copyFrom(state.machine->mmio.dev_audio.doc);
+
+  const ClemensBackendDiskDriveState *driveState = state.diskDrives;
+  for (auto &diskDrive : frameWriteState_.diskDrives) {
+    diskDrive = *driveState;
+    ++driveState;
+  }
+
+  frameWriteState_.breakpoints = frameWriteMemory_.allocateArray<ClemensBackendBreakpoint>(
+      state.bpBufferEnd - state.bpBufferStart);
+  frameWriteState_.breakpointCount = (unsigned)(state.bpBufferEnd - state.bpBufferStart);
+  auto *bpDest = frameWriteState_.breakpoints;
+  for (auto *bpCur = state.bpBufferStart; bpCur != state.bpBufferEnd; ++bpCur, ++bpDest) {
+    *bpDest = *bpCur;
+    if (state.bpHitIndex.has_value() && !lastCommandState_.hitBreakpoint.has_value()) {
+      if (unsigned(bpCur - state.bpBufferStart) == *state.bpHitIndex) {
+        lastCommandState_.hitBreakpoint = *state.bpHitIndex;
+      }
+    }
+  }
+  if (!lastCommandState_.message.has_value() && state.message.has_value()) {
+    lastCommandState_.message = cmdMessageFromBackend(*state.message, state.machine);
+  }
+  if (!lastCommandState_.commandFailed.has_value()) {
+    lastCommandState_.commandFailed = state.commandFailed;
+  }
+  if (!lastCommandState_.commandType.has_value()) {
+    lastCommandState_.commandType = state.commandType;
+  }
+  if (!lastCommandState_.terminated.has_value()) {
+    lastCommandState_.terminated = state.terminated;
+  }
+
+  auto audioBufferSize = int32_t(state.audio.frame_count * state.audio.frame_stride);
+  auto audioBufferRange = lastCommandState_.audioBuffer.forwardSize(audioBufferSize);
+  memcpy(audioBufferRange.first, state.audio.data, cinek::length(audioBufferRange));
+
+  frameWriteState_.logLevel = state.logLevel;
+  for (auto *logItem = state.logBufferStart; logItem != state.logBufferEnd; ++logItem) {
+    LogOutputNode *logMemory = reinterpret_cast<LogOutputNode *>(
+        frameMemory_.allocate(sizeof(LogOutputNode) + CK_ALIGN_SIZE_TO_ARCH(logItem->text.size())));
+    logMemory->logLevel = logItem->level;
+    logMemory->sz = unsigned(logItem->text.size());
+    logItem->text.copy(reinterpret_cast<char *>(logMemory) + sizeof(LogOutputNode),
+                        std::string::npos);
+    logMemory->next = nullptr;
+    if (!lastCommandState_.logNode) {
+      lastCommandState_.logNode = logMemory;
+    } else {
+      lastCommandState_.logNodeTail->next = logMemory;
+    }
+    lastCommandState_.logNodeTail = logMemory;
+  }
+
+  if (state.logInstructionStart != state.logInstructionEnd) {
+    size_t instructionCount = state.logInstructionEnd - state.logInstructionStart;
+    LogInstructionNode* logInstMemory = reinterpret_cast<LogInstructionNode*>(
+        frameMemory_.allocate(sizeof(LogInstructionNode)));
+    logInstMemory->begin =
+      frameMemory_.allocateArray<ClemensBackendExecutedInstruction>(instructionCount);
+    logInstMemory->end = logInstMemory->begin + instructionCount;
+    logInstMemory->next = nullptr;
+    memcpy(logInstMemory->begin, state.logInstructionStart,
+            instructionCount * sizeof(ClemensBackendExecutedInstruction));
+    if (!lastCommandState_.logInstructionNode) {
+      lastCommandState_.logInstructionNode = logInstMemory;
+    } else {
+      lastCommandState_.logInstructionNodeTail->next = logInstMemory;
+    }
+    lastCommandState_.logInstructionNodeTail = logInstMemory;
+  }
+
+  if (state.message.has_value()) {
+    printf("debug message: %s\n", (*state.message).c_str());
+  }
+}
+
+void ClemensFrontend::frame(int width, int height, double deltaTime,
                             FrameAppInterop& interop) {
   //  send commands to emulator thread
   //  get results from emulator thread
@@ -596,6 +607,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime,
   std::unique_lock<std::mutex> frameLock(frameMutex_);
   framePublished_.wait_for(frameLock, std::chrono::milliseconds::zero(),
                            [this]() { return frameSeqNo_ != frameLastSeqNo_; });
+
   isNewFrame = frameLastSeqNo_ != frameSeqNo_;
   if (isNewFrame) {
     lastFrameCPURegs_ = frameReadState_.cpu.regs;
@@ -640,6 +652,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime,
     lastCommandState_.logNode = lastCommandState_.logNodeTail = nullptr;
     //  display last few log instructions
     LogInstructionNode* logInstructionNode = lastCommandState_.logInstructionNode;
+
     while (logInstructionNode) {
       ClemensBackendExecutedInstruction* execInstruction = logInstructionNode->begin;
       ClemensTraceExecutedInstruction instruction;
@@ -696,6 +709,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime,
     frameLastSeqNo_ = frameSeqNo_;
   }
   frameLock.unlock();
+
   //  render video
   constexpr int kClemensScreenWidth = 720;
   constexpr int kClemensScreenHeight = 480;
@@ -732,14 +746,7 @@ void ClemensFrontend::frame(int width, int height, float deltaTime,
       audioFrame.frame_start = 0;
       audioFrame.frame_count = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
       audioFrame.frame_total = thisFrameAudioBuffer_.getCapacity() / audioFrame.frame_stride;
-      float *audio_frame_head = reinterpret_cast<float *>(
-          audioFrame.data + audioFrame.frame_start * audioFrame.frame_stride);
-      /*
-      clem_card_ay3_render(&mockingboard_, audio_frame_head, audio.frame_count,
-                           audio.frame_stride / sizeof(float),
-                           audio_->getAudioFrequency());
-      */
-      unsigned consumedFrames = audio_.queue(audioFrame, deltaTime);
+      audio_.queue(audioFrame, deltaTime);
       thisFrameAudioBuffer_.reset();
     }
   }
@@ -752,11 +759,11 @@ void ClemensFrontend::frame(int width, int height, float deltaTime,
   const int kMonitorViewHeight = height - kTerminalViewHeight;
   ImVec2 monitorSize(kMonitorViewWidth, kMonitorViewHeight);
 
+
   doMachineStateLayout(ImVec2(0, 0), ImVec2(kMachineStateViewWidth, height));
   doMachineViewLayout(ImVec2(kMonitorX, 0), monitorSize, screenUVs[0], screenUVs[1]);
   doMachineTerminalLayout(ImVec2(kMonitorX, height - kTerminalViewHeight),
                           ImVec2(width - kMonitorX, kTerminalViewHeight));
-
   switch (guiMode_) {
   case GUIMode::ImportDiskModal:
   case GUIMode::BlankDiskModal:
@@ -863,7 +870,10 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
 
 void ClemensFrontend::doMachineDiagnosticsDisplay() {
   auto fontCharSize = ImGui::GetFont()->GetCharAdvance('A');
-  auto emulatorTime = (uint64_t)(clem_calc_secs_from_clocks(&frameReadState_.emulatorClock) * 1000);
+  uint64_t emulatorTime = 0;
+  if (frameSeqNo_ != kFrameSeqNoInvalid) {
+    emulatorTime  = (uint64_t)(clem_calc_secs_from_clocks(&frameReadState_.emulatorClock) * 1000);
+  }
   ImGui::BeginTable("Diagnostics", 3);
   ImGui::TableSetupColumn("CPU", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 10);
   ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);
@@ -884,14 +894,14 @@ void ClemensFrontend::doMachineDiagnosticsDisplay() {
   ImGui::Text("%3.1f fps", frameReadState_.fps);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::Text("");
+  ImGui::TextUnformatted("");
   ImGui::TableNextColumn();
   ImGui::Text("RUN");
   ImGui::TableNextColumn();
   ImGui::Text("%3.3f mhz", frameReadState_.emulatorSpeedMhz);
   ImGui::TableNextRow();
   ImGui::TableNextColumn();
-  ImGui::Text("");
+  ImGui::TextUnformatted("");
   ImGui::TableNextColumn();
   ImGui::Text("TIME");
   ImGui::TableNextColumn();
@@ -1121,7 +1131,7 @@ void ClemensFrontend::doMachineCPUInfoDisplay() {
 }
 
 void ClemensFrontend::doMachineDebugMemoryDisplay() {
-  float localContentWidth = ImGui::GetWindowContentRegionWidth();
+  //float localContentWidth = ImGui::GetWindowContentRegionWidth();
   if (!frameReadState_.memoryView) return;
   uint8_t bank = frameReadState_.memoryViewBank;
   if (ImGui::InputScalar("Bank", ImGuiDataType_U8,  &bank, NULL, NULL, "%02X", ImGuiInputTextFlags_CharsHexadecimal)) {
@@ -1513,7 +1523,7 @@ void ClemensFrontend::doMachineDebugDiskIODisplay() {
                   iwmState.track_bit_length);
     }
   } else {
-    ImGui::Text("");
+    ImGui::TextUnformatted("");
   }
   ImGui::PopStyleColor();
   ImGui::TableNextRow();
@@ -1649,11 +1659,16 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
   ImVec2 contentSize = ImGui::GetContentRegionAvail();
   ImVec2 monitorSize(contentSize.y * 1.5f, contentSize.y);
   ImVec2 monitorAnchor(p.x + (contentSize.x - monitorSize.x) * 0.5f, p.y);
-  ImVec2 display_uv(screenU, screenV);
+  float screenV0 = 0.0f, screenV1 = screenV;
+#if defined(CK3D_BACKEND_GL)
+  // Flip the texture coords so that the top V is 1.0f
+  screenV0 = 1.0f;
+  screenV1 = 1.0f - screenV1;
+#endif
   ImGui::GetWindowDrawList()->AddImage(
       texId, ImVec2(monitorAnchor.x, monitorAnchor.y),
-      ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y), ImVec2(0, 0),
-      display_uv, ImGui::GetColorU32(tint_col));
+      ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y), ImVec2(0, screenV0),
+      ImVec2(screenU, screenV1), ImGui::GetColorU32(tint_col));
 
   if (ImGui::IsWindowFocused()) {
     ImGui::SetKeyboardFocusHere(0);
@@ -1757,6 +1772,8 @@ void ClemensFrontend::layoutTerminalLines() {
     case TerminalLine::Opcode:
       ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(0, 255, 0, 255));
       break;
+    default:
+      break;
     }
     ImGui::TextUnformatted(terminalLines_.at(index).text.c_str());
     if (line.type != TerminalLine::Info) {
@@ -1781,6 +1798,8 @@ void ClemensFrontend::layoutConsoleLines() {
       break;
     case TerminalLine::Command:
       ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(0, 255, 255, 255));
+      break;
+    default:
       break;
     }
     ImGui::TextUnformatted(consoleLines_.at(index).text.c_str());
@@ -1808,8 +1827,8 @@ void ClemensFrontend::doModalOperations(int width, int height) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
       auto selection = ImGuiFileDialog::Instance()->GetSelection();
       auto filepath = ImGuiFileDialog::Instance()->GetCurrentPath();
-      auto driveType = (ClemensDriveType)(reinterpret_cast<intptr_t>(
-          ImGuiFileDialog::Instance()->GetUserDatas()));
+      //auto driveType = (ClemensDriveType)(reinterpret_cast<intptr_t>(
+      //    ImGuiFileDialog::Instance()->GetUserDatas()));
       importDiskFiles_.clear();
       for (auto &e : selection) {
         importDiskFiles_.emplace_back(e.second);
@@ -1884,7 +1903,7 @@ void ClemensFrontend::doModalOperations(int width, int height) {
   }
 }
 
-void ClemensFrontend::doImportDiskSetFlowStart(int width, int height) {
+void ClemensFrontend::doImportDiskSetFlowStart(int /*width*/, int /*height*/) {
   auto guiModeLast = guiMode_;
   ImVec2 center = ImGui::GetMainViewport()->GetCenter();
   ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
@@ -1975,7 +1994,7 @@ void ClemensFrontend::doImportDiskSetReplaceOld(int width, int height) {
       std::error_code errorCode;
       ImGui::CloseCurrentPopup();
       guiMode_ = GUIMode::ImportDiskSet;
-      if (std::filesystem::remove_all(importDiskSetPath_, errorCode) < 0) {
+      if (std::filesystem::remove_all(importDiskSetPath_, errorCode) == std::uintmax_t(-1)) {
         failure = true;
       }
     }
@@ -2052,7 +2071,7 @@ void ClemensFrontend::doImportDiskSet(int width, int height) {
   }
 }
 
-void ClemensFrontend::doNewBlankDisk(int width, int height) {
+void ClemensFrontend::doNewBlankDisk(int /*width */, int /*height*/) {
   // importDiskSetPath_ is the path of the disk set
   // importDiskSetName_ is the name of the blank dist
   // Must create or use the existing path pointed to in importDiskSetPath
@@ -2065,7 +2084,7 @@ void ClemensFrontend::doNewBlankDisk(int width, int height) {
 }
 
 std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath,
-                                                          std::string collectionName,
+                                                          std::string /*collectionName */,
                                                           ClemensDriveType driveType,
                                                           std::vector<std::string> imagePaths) {
   //  parse file extension for supported types:
@@ -2101,6 +2120,8 @@ std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath
                         imagePath, sDriveDescription[driveType]),
             false);
       }
+      break;
+    default:
       break;
     }
   }
@@ -2184,6 +2205,9 @@ void ClemensFrontend::executeCommand(std::string_view command) {
 }
 
 void ClemensFrontend::cmdHelp(std::string_view operand) {
+  if (!operand.empty()) {
+    CLEM_TERM_COUT.print(TerminalLine::Warn, "Command specific help not yet supported.");
+  }
   CLEM_TERM_COUT.print(TerminalLine::Info,
                        "reset                       - soft reset of the machine");
   CLEM_TERM_COUT.print(TerminalLine::Info,
@@ -2247,7 +2271,7 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
       if (!parseInt(param, index)) {
         CLEM_TERM_COUT.format(TerminalLine::Error, "Invalid index specified {}", param);
         return;
-      } else if (index < 0 || index >= breakpoints_.size()) {
+      } else if (index < 0 || index >= int(breakpoints_.size())) {
         CLEM_TERM_COUT.format(TerminalLine::Error, "Breakpoint {} doesn't exist", index);
         return;
       }
@@ -2304,7 +2328,7 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
   }
 
   char address[16];
-  auto bankSepPos = operand.find('//');
+  auto bankSepPos = operand.find('/');
   if (bankSepPos == std::string_view::npos) {
     if (operand.size() >= 2) {
       snprintf(address, sizeof(address), "%02X", frameReadState_.cpu.regs.PBR);

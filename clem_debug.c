@@ -4,6 +4,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 static FILE *g_fp_debug_out = NULL;
 static char s_clem_debug_buffer[65536 * 102];
