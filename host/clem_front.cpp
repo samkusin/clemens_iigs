@@ -1670,7 +1670,7 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
   } else {
     emulatorHasKeyboardFocus_ = false;
   }
-  if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+  if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !emulatorHasMouseFocus_) {
     emulatorHasMouseFocus_ = ImGui::IsWindowHovered();
   }
 
