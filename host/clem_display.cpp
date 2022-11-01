@@ -639,6 +639,8 @@ void ClemensDisplay::start(
   emulatorVideoDimensions_[1] = monitor.height;
 
   emulatorTextColor_ = monitor.text_color;
+  emulatorSignal_ = monitor.signal;
+  emulatorColor_ = monitor.color;
 }
 
 void ClemensDisplay::finish(float *uvs)
@@ -786,6 +788,11 @@ auto ClemensDisplay::renderTextPlane(
   }
 
   //  poss 2 - foreground
+  //  determine cycle for flashing characters - we use a vertical blank counter
+  //  which in combination with the screen mode (NTSC vs PAL) can be used to
+  //  calculate a real-time value
+  unsigned monitorRefreshRate = emulatorSignal_ == CLEM_MONITOR_SIGNAL_PAL ? 50 : 60;
+  unsigned videoTimePhase = video.vbl_counter % monitorRefreshRate;
   textABGR = grColorToABGR(emulatorTextColor_ & 0xf);
   for (int i = 0; i < video.scanline_count; ++i) {
     int row = i + video.scanline_start;
@@ -798,6 +805,10 @@ auto ClemensDisplay::renderTextPlane(
         glyphIndex = kAlternateSetToGlyph[charIndex];
       } else {
         glyphIndex =  kPrimarySetToGlyph[charIndex];
+      }
+      //  TODO: is the cycle really 1 second?
+      if (videoTimePhase >= monitorRefreshRate / 2) {
+        glyphIndex = (glyphIndex << 16) | (glyphIndex >> 16);
       }
       glyphIndex &= 0xffff;
       //auto* glyph = &glyphSet[glyphIndex];

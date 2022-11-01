@@ -266,6 +266,7 @@ struct ClemensVGC {
   clem_clocks_time_t ts_last_frame;
   clem_clocks_time_t ts_scanline_0;
   clem_clocks_duration_t dt_scanline;
+  unsigned vbl_counter;
 
   /* amalgom of possible display modes */
   unsigned mode_flags;
@@ -628,6 +629,7 @@ typedef struct {
   int scanline_count;
   int scanline_limit;
   enum ClemensVideoFormat format;
+  unsigned vbl_counter;
   uint32_t rgba[256]; /**< Superhires palette data (16 x 16) rgba */
 } ClemensVideo;
 

@@ -56,6 +56,7 @@ void clem_vgc_reset(struct ClemensVGC *vgc) {
   vgc->text_bg_color = CLEM_VGC_COLOR_MEDIUM_BLUE;
   vgc->scanline_irq_enable = false;
   vgc->vbl_started = false;
+  vgc->vbl_counter = 0;
 
   /*  text page 1 $0400-$07FF, page 2 = $0800-$0BFF
 
@@ -152,6 +153,7 @@ void clem_vgc_set_text_colors(struct ClemensVGC *vgc, unsigned fg_color,
 }
 
 void clem_vgc_set_region(struct ClemensVGC *vgc, uint8_t c02b_value) {
+  unsigned last_mode_flags = vgc->mode_flags;
   if (c02b_value & 0x08) {
     clem_vgc_set_mode(vgc, CLEM_VGC_LANGUAGE);
   } else {
@@ -161,6 +163,13 @@ void clem_vgc_set_region(struct ClemensVGC *vgc, uint8_t c02b_value) {
     clem_vgc_set_mode(vgc, CLEM_VGC_PAL);
   } else {
     clem_vgc_clear_mode(vgc, CLEM_VGC_PAL);
+  }
+  if ((last_mode_flags ^ vgc->mode_flags) & CLEM_VGC_PAL) {
+    //  since we use vertical blanks as a time counter vs absolute clocks, need
+    //  to reset the counter when changing the refresh rate - not the best
+    //  solution but given how infrequent this use-case might be, this
+    //  oddity shoudn't have any practical effect
+    vgc->vbl_counter = 0;
   }
   vgc->text_language = (c02b_value & 0xe0) >> 5;
 }
@@ -231,6 +240,7 @@ void clem_vgc_sync(struct ClemensVGC *vgc, struct ClemensClock *clock,
           clem_calc_clocks_step_from_ns(frame_ns - CLEM_VGC_NTSC_SCAN_TIME_NS,
                                         clock->ref_step);
       vgc->vbl_started = false;
+      vgc->vbl_counter++;
     }
   }
 
