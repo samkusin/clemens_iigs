@@ -1,15 +1,16 @@
 
-## Version 0.4 (WIP)
+## Version 0.4
 
+* Placeholder documentation!
 * New GUI/Debugger layout and improved performance counters
 * Quality-of-life improvements to interface
 * Emulated Mouse support
 * More GS title support
 * Lores and double lores graphics support
-* Alternate character set support
-* Linux builds (Clang or GCC)
+* Flashing text support
+* Linux builds (GCC)
+* GL Renderer
 * Import to WOZ / Nibblized disk and save on disk eject for writable disks
-* Improved 3.5" emulated disk speeds
 
 ## Version 0.3
 
