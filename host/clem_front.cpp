@@ -49,7 +49,8 @@ template <typename TBufferType> struct FormatView {
   using LevelType = typename StringType::Type;
 
   BufferType &buffer_;
-  FormatView(BufferType &buffer) : buffer_(buffer) {}
+  bool &viewChanged_;
+  FormatView(BufferType &buffer, bool& viewChanged) : buffer_(buffer), viewChanged_(viewChanged) {}
   template <typename... Args>
   void format(LevelType type, const char *formatStr, const Args &...args) {
     size_t sz = fmt::formatted_size(formatStr, args...);
@@ -81,6 +82,7 @@ private:
     }
     StringType &tail = *buffer_.acquireTail();
     buffer_.push();
+    viewChanged_ = true;
     return tail;
   }
 };
@@ -259,7 +261,8 @@ void initDebugIODescriptors() {
 
 } // namespace anon
 
-#define CLEM_TERM_COUT FormatView<decltype(ClemensFrontend::terminalLines_)>(terminalLines_)
+
+#define CLEM_TERM_COUT FormatView<decltype(ClemensFrontend::terminalLines_)>(terminalLines_, terminalChanged_)
 
 static constexpr size_t kFrameMemorySize = 8 * 1024 * 1024;
 static constexpr size_t kLogMemorySize = 8 * 1024 * 1024;
@@ -311,6 +314,8 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
       frameMemory_(kLogMemorySize, malloc(kLogMemorySize)),
       lastFrameCPUPins_{}, lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0),
       lastFrameNMIs_(0), emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false),
+      terminalChanged_(false),
+      consoleChanged_(false),
       terminalMode_(TerminalMode::Command),
       diskLibraryRootPath_{
           (std::filesystem::current_path() / std::filesystem::path(CLEM_HOST_LIBRARY_DIR))
@@ -648,6 +653,7 @@ void ClemensFrontend::frame(int width, int height, double deltaTime,
       }
       consoleLines_.push(std::move(logLine));
       logNode = logNode->next;
+      consoleChanged_ = true;
     }
     lastCommandState_.logNode = lastCommandState_.logNodeTail = nullptr;
     //  display last few log instructions
@@ -1773,7 +1779,10 @@ void ClemensFrontend::layoutTerminalLines() {
     if (line.type != TerminalLine::Info) {
       ImGui::PopStyleColor();
     }
+  }
+  if (terminalChanged_) {
     ImGui::SetScrollHereY();
+    terminalChanged_ = false;
   }
 }
 
@@ -1800,7 +1809,10 @@ void ClemensFrontend::layoutConsoleLines() {
     if (line.type != TerminalLine::Info) {
       ImGui::PopStyleColor();
     }
+  }
+  if (consoleChanged_) {
     ImGui::SetScrollHereY();
+    consoleChanged_ = false;
   }
 }
 

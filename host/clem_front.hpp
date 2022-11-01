@@ -220,6 +220,8 @@ private:
   template <size_t N> using TerminalBuffer = cinek::CircularBuffer<TerminalLine, N>;
   TerminalBuffer<128> terminalLines_;
   TerminalBuffer<512> consoleLines_;
+  bool terminalChanged_;
+  bool consoleChanged_;
 
   enum class TerminalMode { Command, Log, Execution };
   TerminalMode terminalMode_;
