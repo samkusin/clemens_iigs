@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <tuple>
 
+//  TODO: Platform specific user data directory (ROM, disk images, traces, etc)
 //  TODO: Insert card to slot (non-gui)
 //  TODO: Mouse x,y scaling based on display view size vs desktop size
 //  TODO: blank disk gui selection for disk set (selecting combo create will
@@ -380,7 +381,7 @@ std::unique_ptr<ClemensBackend> ClemensFrontend::createBackend() {
   backend->reset();
   backend->run();
   guiMode_ = GUIMode::Emulator;
-  printf("Creating new backend emulator refreshing @ %u Hz.\n", refreshFrequency_);
+  fmt::print("Creating new backend emulator refreshing @ {} Hz.\n", refreshFrequency_);
   return backend;
 }
 

@@ -142,6 +142,12 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
   initEmulatedDiskLocalStorage();
 
   romBuffer_ = loadROM(romPathname.c_str());
+  if (romBuffer_.isEmpty()) {
+    //  TODO: load a dummy ROM, for now an empty buffer
+    romBuffer_ = cinek::ByteBuffer(
+      (uint8_t *)slabMemory_.allocate(CLEM_IIGS_BANK_SIZE), CLEM_IIGS_BANK_SIZE);
+    memset(romBuffer_.forwardSize(CLEM_IIGS_BANK_SIZE).first, 0, CLEM_IIGS_BANK_SIZE);
+  }
 
   memset(&machine_, 0, sizeof(machine_));
   clemens_host_setup(&machine_, &ClemensBackend::emulatorLog, this);
@@ -986,13 +992,17 @@ void ClemensBackend::initApple2GS() {
   const unsigned kFPIBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT;
   const uint32_t kClocksPerFastCycle = CLEM_CLOCKS_FAST_CYCLE;
   const uint32_t kClocksPerSlowCycle = CLEM_CLOCKS_MEGA2_CYCLE;
-  clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle,
-               romBuffer_.getHead(), romBuffer_.getSize(),
-               slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
-               slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
-               slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount),
-               slabMemory_.allocate(2048 * 7),    //  TODO: placeholder
-               kFPIBankCount);
+  int result = clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle,
+                            romBuffer_.getHead(), romBuffer_.getSize(),
+                            slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
+                            slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
+                            slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount),
+                            slabMemory_.allocate(2048 * 7),    //  TODO: placeholder
+                            kFPIBankCount);
+  if (result < 0) {
+    fmt::print("Clemens library failed to initialize with err code (%d)\n", result);
+    return;
+  }
   loadBRAM();
 
   //  TODO: It seems the internal audio code expects 2 channel float PCM,

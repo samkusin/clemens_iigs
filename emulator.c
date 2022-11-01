@@ -843,7 +843,7 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor,
   clemens_simple_init(machine, speed_factor, clocks_step, fpiRAM,
                       fpiRAMBankCount);
 
-  if (romSize != CLEM_IIGS_ROM3_SIZE || rom == NULL) {
+  if (rom == NULL) {
     return -1;
   }
   if (fpiRAMBankCount < 4 || fpiRAM == NULL || e0bank == NULL ||
