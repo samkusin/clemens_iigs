@@ -56,6 +56,8 @@ public:
   void inputEvent(const ClemensInputEvent &inputEvent);
   //  Insert disk
   void insertDisk(ClemensDriveType driveType, std::string diskPath);
+  //  Insert blank disk
+  void insertBlankDisk(ClemensDriveType driveType, std::string diskPath);
   //  Eject disk
   void ejectDisk(ClemensDriveType driveType);
   //  Break
@@ -90,7 +92,7 @@ private:
   void main(PublishStateDelegate publishDelegate);
   void resetMachine();
   unsigned stepMachine(const std::string_view &inputParam);
-  bool insertDisk(const std::string_view &inputParam);
+  bool insertDisk(const std::string_view &inputParam, bool allowBlank);
   void ejectDisk(const std::string_view &inputParam);
   bool writeProtectDisk(const std::string_view &inputParam);
   void writeMemory(const std::string_view& inputParam);
@@ -104,8 +106,9 @@ private:
   std::optional<unsigned> checkHitBreakpoint();
 
   void initEmulatedDiskLocalStorage();
-  bool loadDisk(ClemensDriveType driveType);
+  bool loadDisk(ClemensDriveType driveType, bool allowBlank);
   bool saveDisk(ClemensDriveType driveType);
+  void resetDisk(ClemensDriveType driveType);
   cinek::ByteBuffer loadROM(const char *romPathname);
 
   //  TODO: These methods could be moved into a subclass as they are specific

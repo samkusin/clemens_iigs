@@ -86,5 +86,51 @@ ClemensDriveType getDriveType(std::string_view driveName) {
   return static_cast<ClemensDriveType>(driveIndex);
 }
 
+struct ClemensWOZDisk* createWOZ(struct ClemensWOZDisk* woz,
+                                 const struct ClemensNibbleDisk* nib) {
+  if (nib->disk_type == CLEM_DISK_TYPE_5_25) {
+    woz->disk_type = CLEM_WOZ_DISK_5_25;
+    woz->boot_type = CLEM_WOZ_BOOT_5_25_16;
+  } else if (nib->disk_type == CLEM_DISK_TYPE_3_5) {
+    woz->disk_type = CLEM_WOZ_DISK_3_5;
+    woz->boot_type = CLEM_WOZ_BOOT_UNDEFINED;
+  }
+  // these images come from non-copy protected sources - which implies
+  // synchronization
+  woz->flags =
+      CLEM_WOZ_SUPPORT_UNKNOWN | CLEM_WOZ_IMAGE_CLEANED | CLEM_WOZ_IMAGE_SYNCHRONIZED;
+  if (nib->is_double_sided) {
+    woz->flags |= CLEM_WOZ_IMAGE_DOUBLE_SIDED;
+  }
+  if (nib->is_write_protected) {
+    woz->flags |= CLEM_WOZ_IMAGE_WRITE_PROTECT;
+  }
+  woz->required_ram_kb = 0;
+  woz->max_track_size_bytes = 0;
+
+  for (unsigned i = 0; i < nib->track_count; ++i) {
+    if (nib->track_byte_count[i] > woz->max_track_size_bytes) {
+      woz->max_track_size_bytes = nib->track_byte_count[i];
+    }
+  }
+  //  block align the byte count
+  woz->max_track_size_bytes = ((woz->max_track_size_bytes + 511) / 512) * 512;
+  woz->version = 2;
+  memset(woz->creator, 0x20, sizeof(woz->creator));
+  woz->creator[0] = 'C';
+  woz->creator[1] = 'l';
+  woz->creator[2] = 'e';
+  woz->creator[3] = 'm';
+  woz->creator[4] = 'e';
+  woz->creator[5] = 'n';
+  woz->creator[6] = 's';
+  woz->creator[8] = 'H';
+  woz->creator[9] = 'o';
+  woz->creator[10] = 's';
+  woz->creator[11] = 't';
+
+  woz->nib = const_cast<struct ClemensNibbleDisk*>(nib);
+  return woz;
+}
 
 } // end namespace

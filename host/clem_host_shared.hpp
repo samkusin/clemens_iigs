@@ -65,6 +65,7 @@ struct ClemensBackendCommand {
     StepMachine,
     Publish,
     InsertDisk,
+    InsertBlankDisk,
     EjectDisk,
     Input,
     Break,

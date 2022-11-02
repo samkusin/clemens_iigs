@@ -62,6 +62,8 @@ Windows takes priority.  For Linux, perhaps run a subset of these.
   * Audio and Visuals should look right
   * DOC Debugging Window should show proper activity
 * Ultima IV (Remaster) Disk startup
+  * Ensure system speed set to 'Slow' (Mockingboard music will play poorly
+    otherwise as expected.)
   * Ensure Slot 4 is set to 'Your Card'
   * Mockingboard is OK
   * Check Write Protect toggle to verify disk writes work
