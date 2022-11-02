@@ -8,6 +8,7 @@
 
 #include "iocards/mockingboard.h"
 
+
 namespace ClemensSerializer {
 
 void saveDiskMetadata(mpack_writer_t* writer, const ClemensWOZDisk& container,
@@ -16,6 +17,7 @@ void saveDiskMetadata(mpack_writer_t* writer, const ClemensWOZDisk& container,
   //  ejecting the disk, which is state managed by the host's backend vs the
   //  disk device
   //  the nibbilized disk is stored within the machine and is saved there
+
   mpack_build_map(writer);
 
   mpack_write_cstr(writer, "image");
@@ -74,7 +76,6 @@ bool loadDiskMetadata(mpack_reader_t* reader, ClemensWOZDisk& container,
   return true;
 }
 
-
 bool save(std::string outputPath, ClemensMachine* machine, size_t driveCount,
           const ClemensWOZDisk* containers, const ClemensBackendDiskDriveState* states) {
   mpack_writer_t writer;
@@ -87,8 +88,11 @@ bool save(std::string outputPath, ClemensMachine* machine, size_t driveCount,
   //    disk[ { woz/2img, path }]
   //  }
   //
-
   mpack_writer_init_filename(&writer, outputPath.c_str());
+  if (mpack_writer_error(&writer) != mpack_ok) {
+    return false;
+  }
+
   mpack_build_map(&writer);
   mpack_write_cstr(&writer, "machine");
   //  TODO: ROM1 machine ROM version needs to be serialized.. in the clemens
@@ -99,6 +103,8 @@ bool save(std::string outputPath, ClemensMachine* machine, size_t driveCount,
   mpack_write_bin(&writer, (char *)clemens_rtc_get_bram(machine, NULL),
                   CLEM_RTC_BRAM_SIZE);
 
+  //  slots and cards indices are linked 1:1 here - this means card names
+  //  are considered unique - if this changes, then we'll have to redo this
   mpack_write_cstr(&writer, "slots");
   {
     mpack_start_array(&writer, 7);
@@ -134,8 +140,11 @@ bool save(std::string outputPath, ClemensMachine* machine, size_t driveCount,
     mpack_finish_array(&writer);
   }
   mpack_complete_map(&writer);
-  mpack_writer_destroy(&writer);
-  return true;
+  auto writerError = mpack_writer_destroy(&writer);
+  if (writerError != mpack_ok) {
+    fmt::print("serializer save failed with error {}@ \n", mpack_error_to_string(writerError));
+  }
+  return (writerError == mpack_ok);
 }
 
 bool load(std::string outputPath, ClemensMachine* machine, size_t driveCount,
@@ -145,7 +154,11 @@ bool load(std::string outputPath, ClemensMachine* machine, size_t driveCount,
   char str[256];
 
   mpack_reader_t reader;
+
   mpack_reader_init_filename(&reader, outputPath.c_str());
+  if (mpack_reader_error(&reader) != mpack_ok) {
+    return false;
+  }
   mpack_expect_map(&reader);
   //  "machine"
   mpack_expect_cstr(&reader, str, sizeof(str));
@@ -186,17 +199,27 @@ bool load(std::string outputPath, ClemensMachine* machine, size_t driveCount,
     uint32_t card_count = mpack_expect_map(&reader);
     for (uint32_t i = 0; i < card_count; ++i) {
       mpack_expect_cstr(&reader, str, sizeof(str));
-      if (!strncmp(str, slots[i].c_str(), sizeof(str))) {
-        destroyCard(machine->card_slot[i]);
-        machine->card_slot[i] = createCard(kClemensCardMockingboardName);
-        if (!strncmp(str, kClemensCardMockingboardName, sizeof(str))) {
-          clem_card_mockingboard_unserialize(&reader, machine->card_slot[i], alloc_cb, context);
-        } else {
-          mpack_expect_nil(&reader);
+      int slotId = -1;
+      for (uint32_t slotIndex = 0; slotIndex < 7; ++slotIndex) {
+        if (slots[slotIndex] == str) {
+          slotId = slotIndex;
+          break;
         }
-      } else {
-        mpack_expect_nil(&reader);
       }
+      if (slotId >= 0) {
+        if (!strncmp(str, slots[slotId].c_str(), sizeof(str))) {
+          destroyCard(machine->card_slot[slotId]);
+          machine->card_slot[slotId] = createCard(kClemensCardMockingboardName);
+          if (!strncmp(str, kClemensCardMockingboardName, sizeof(str))) {
+            clem_card_mockingboard_unserialize(&reader, machine->card_slot[slotId], alloc_cb,
+                                               context);
+          } else {
+            mpack_expect_nil(&reader);
+          }
+        }
+        continue;
+      }
+      mpack_expect_nil(&reader);
     }
     mpack_done_map(&reader);
   }
@@ -204,7 +227,7 @@ bool load(std::string outputPath, ClemensMachine* machine, size_t driveCount,
   //  "disks"
   //  load woz filenames - the actual images have already been
   //  unserialized inside clemens_unserialize_machine
-  mpack_expect_cstr(&reader, str, sizeof(str));
+  mpack_expect_cstr_match(&reader, "disks");
   {
     mpack_expect_array(&reader);
     for (size_t driveIndex = 0; driveIndex < driveCount; ++driveIndex) {
@@ -219,8 +242,11 @@ bool load(std::string outputPath, ClemensMachine* machine, size_t driveCount,
     mpack_done_array(&reader);
   }
   mpack_done_map(&reader);
-  mpack_reader_destroy(&reader);
-  return true;
+  auto readerError = mpack_reader_destroy(&reader);
+  if (readerError != mpack_ok) {
+    fmt::print("serializer load failed with error: {}\n", mpack_error_to_string(readerError));
+  }
+  return (readerError == mpack_ok);
 }
 
 }  // namespace ClemensSerializer

@@ -137,6 +137,9 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
   debugMemoryPage_(0x00),
   areInstructionsLogged_(false) {
 
+  diskContainers_.fill(ClemensWOZDisk{});
+  diskDrives_.fill(ClemensBackendDiskDriveState{});
+
   loggedInstructions_.reserve(10000);
 
   initEmulatedDiskLocalStorage();
@@ -170,7 +173,7 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
                  diskDrives_[driveIndex].imagePath,
                  ClemensDiskUtilities::getDriveName(driveType));
     } else {
-      fmt::print("Failed to load image '{}' into drive {}\n",
+      fmt::print("Loaded image '{}' into drive {}\n",
                  diskDrives_[driveIndex].imagePath,
                  ClemensDiskUtilities::getDriveName(driveType));
     }
@@ -431,6 +434,7 @@ bool ClemensBackend::saveDisk(ClemensDriveType driveType) {
   auto writeOut = diskBuffer_.forwardSize(diskBuffer_.getCapacity());
 
   size_t writeOutCount = cinek::length(writeOut);
+  diskContainers_[driveType].nib = &disks_[driveType];
   if (!clem_woz_serialize(&diskContainers_[driveType], writeOut.first, &writeOutCount)) {
     return false;
   }
@@ -699,8 +703,11 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           if (!saveSnapshot(command.operand)) commandFailed = true;
           break;
         case Command::LoadMachine:
-          if (!loadSnapshot(command.operand)) commandFailed = true;
-          mockingboard = findMockingboardCard(&machine_);
+          if (loadSnapshot(command.operand)) {
+            mockingboard = findMockingboardCard(&machine_);
+          } else {
+            commandFailed = true;
+          }
           break;
         case Command::Undefined:
           break;
