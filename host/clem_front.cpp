@@ -2086,7 +2086,9 @@ void ClemensFrontend::doImportDiskSet(int width, int height) {
     auto contentRegionAvail = ImGui::GetContentRegionAvail();
     ImGui::Spacing();
     ImGui::Spacing();
-    ImGui::TextWrapped(messageModalString_.c_str());
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextUnformatted(messageModalString_.c_str());
+    ImGui::PopTextWrapPos();
     ImGui::Spacing();
     ImGui::SetCursorPos(ImVec2(
         cursorPos.x, cursorPos.y + contentRegionAvail.y -
