@@ -1240,7 +1240,9 @@ static void doMachineDebugIORegister(uint8_t* ioregsold, uint8_t* ioregs, uint8_
   bool changed = ioregsold[reg] != ioregs[reg];
   bool tooltip = false;
   ImGui::TableNextColumn();
-  ImGui::TextColored(changed ? getModifiedColor(true) : getDefaultColor(true), desc.readLabel);
+  ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)(changed ? getModifiedColor(true) : getDefaultColor(true)));
+  ImGui::TextUnformatted(desc.readLabel);
+  ImGui::PopStyleColor();
   tooltip = tooltip || ImGui::IsItemHovered();
   ImGui::TableNextColumn();
   ImGui::TextColored(changed ? getModifiedColor(true) : getDefaultColor(true),
@@ -2061,7 +2063,9 @@ void ClemensFrontend::doImportDiskSet(int width, int height) {
     auto contentRegionAvail = ImGui::GetContentRegionAvail();
     ImGui::Spacing();
     ImGui::Spacing();
-    ImGui::TextWrapped(messageModalString_.c_str());
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextUnformatted(messageModalString_.c_str());
+    ImGui::PopTextWrapPos();
     ImGui::Spacing();
     ImGui::Spacing();
     ImGui::SetCursorPos(ImVec2(
