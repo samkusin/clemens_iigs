@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <tuple>
 
+//  TODO: Platform specific user data directory (ROM, disk images, traces, etc)
 //  TODO: Insert card to slot (non-gui)
 //  TODO: Mouse x,y scaling based on display view size vs desktop size
 //  TODO: blank disk gui selection for disk set (selecting combo create will
@@ -49,7 +50,8 @@ template <typename TBufferType> struct FormatView {
   using LevelType = typename StringType::Type;
 
   BufferType &buffer_;
-  FormatView(BufferType &buffer) : buffer_(buffer) {}
+  bool &viewChanged_;
+  FormatView(BufferType &buffer, bool& viewChanged) : buffer_(buffer), viewChanged_(viewChanged) {}
   template <typename... Args>
   void format(LevelType type, const char *formatStr, const Args &...args) {
     size_t sz = fmt::formatted_size(formatStr, args...);
@@ -81,6 +83,7 @@ private:
     }
     StringType &tail = *buffer_.acquireTail();
     buffer_.push();
+    viewChanged_ = true;
     return tail;
   }
 };
@@ -259,7 +262,8 @@ void initDebugIODescriptors() {
 
 } // namespace anon
 
-#define CLEM_TERM_COUT FormatView<decltype(ClemensFrontend::terminalLines_)>(terminalLines_)
+
+#define CLEM_TERM_COUT FormatView<decltype(ClemensFrontend::terminalLines_)>(terminalLines_, terminalChanged_)
 
 static constexpr size_t kFrameMemorySize = 8 * 1024 * 1024;
 static constexpr size_t kLogMemorySize = 8 * 1024 * 1024;
@@ -311,6 +315,8 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
       frameMemory_(kLogMemorySize, malloc(kLogMemorySize)),
       lastFrameCPUPins_{}, lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0),
       lastFrameNMIs_(0), emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false),
+      terminalChanged_(false),
+      consoleChanged_(false),
       terminalMode_(TerminalMode::Command),
       diskLibraryRootPath_{
           (std::filesystem::current_path() / std::filesystem::path(CLEM_HOST_LIBRARY_DIR))
@@ -375,7 +381,7 @@ std::unique_ptr<ClemensBackend> ClemensFrontend::createBackend() {
   backend->reset();
   backend->run();
   guiMode_ = GUIMode::Emulator;
-  printf("Creating new backend emulator refreshing @ %u Hz.\n", refreshFrequency_);
+  fmt::print("Creating new backend emulator refreshing @ {} Hz.\n", refreshFrequency_);
   return backend;
 }
 
@@ -648,6 +654,7 @@ void ClemensFrontend::frame(int width, int height, double deltaTime,
       }
       consoleLines_.push(std::move(logLine));
       logNode = logNode->next;
+      consoleChanged_ = true;
     }
     lastCommandState_.logNode = lastCommandState_.logNodeTail = nullptr;
     //  display last few log instructions
@@ -670,7 +677,9 @@ void ClemensFrontend::frame(int width, int height, double deltaTime,
     breakpoints_.clear();
     for (unsigned bpIndex = 0; bpIndex < frameReadState_.breakpointCount; ++bpIndex) {
       breakpoints_.emplace_back(frameReadState_.breakpoints[bpIndex]);
+      config_.breakpoints.push_back(breakpoints_.back());
     }
+    config_.breakpoints = breakpoints_;
     if (lastCommandState_.commandFailed.has_value()) {
       if (*lastCommandState_.commandFailed) {
         CLEM_TERM_COUT.format(TerminalLine::Error, "{} Failed.",
@@ -767,10 +776,14 @@ void ClemensFrontend::frame(int width, int height, double deltaTime,
     doImportDiskSetFlowStart(width, height);
     break;
   case GUIMode::ImportDiskSetReplaceOld:
+  case GUIMode::NewBlankDiskReplaceOld:
     doImportDiskSetReplaceOld(width, height);
     break;
   case GUIMode::ImportDiskSet:
     doImportDiskSet(width, height);
+    break;
+  case GUIMode::NewBlankDiskFlow:
+    doNewBlankDiskFlow(width, height);
     break;
   case GUIMode::NewBlankDisk:
     doNewBlankDisk(width, height);
@@ -1670,7 +1683,7 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
   } else {
     emulatorHasKeyboardFocus_ = false;
   }
-  if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+  if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !emulatorHasMouseFocus_) {
     emulatorHasMouseFocus_ = ImGui::IsWindowHovered();
   }
 
@@ -1773,7 +1786,10 @@ void ClemensFrontend::layoutTerminalLines() {
     if (line.type != TerminalLine::Info) {
       ImGui::PopStyleColor();
     }
+  }
+  if (terminalChanged_) {
     ImGui::SetScrollHereY();
+    terminalChanged_ = false;
   }
 }
 
@@ -1800,11 +1816,15 @@ void ClemensFrontend::layoutConsoleLines() {
     if (line.type != TerminalLine::Info) {
       ImGui::PopStyleColor();
     }
+  }
+  if (consoleChanged_) {
     ImGui::SetScrollHereY();
+    consoleChanged_ = false;
   }
 }
 
 void ClemensFrontend::doModalOperations(int width, int height) {
+  bool newOperation = false;
   if (!ImGuiFileDialog::Instance()->WasOpenedThisFrame()) {
     if (guiMode_ == GUIMode::ImportDiskModal) {
       //  File GUI dialog
@@ -1829,6 +1849,7 @@ void ClemensFrontend::doModalOperations(int width, int height) {
       }
       guiMode_ = GUIMode::ImportDiskSetFlow;
       ImGui::OpenPopup("Import Master Disk Set");
+      newOperation = true;
     } else {
       guiMode_ = GUIMode::Emulator;
     }
@@ -1838,7 +1859,12 @@ void ClemensFrontend::doModalOperations(int width, int height) {
   if (!ImGui::IsPopupOpen("Enter Disk Set Name")) {
     if (guiMode_ == GUIMode::BlankDiskModal) {
       ImGui::OpenPopup("Enter Disk Set Name");
+      newOperation = true;
     }
+  }
+  if (newOperation) {
+    importDiskSetPath_.clear();
+    importDiskSetName_.clear();
   }
   ImVec2 center = ImGui::GetMainViewport()->GetCenter();
   ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
@@ -1846,8 +1872,8 @@ void ClemensFrontend::doModalOperations(int width, int height) {
       ImVec2(std::max(720.0f, width * 0.33f), 7 * ImGui::GetTextLineHeightWithSpacing()));
   if (ImGui::BeginPopupModal("Enter Disk Set Name", NULL, 0)) {
     ImGui::Spacing();
-    char collectionName[64] = "";
-    char imageName[64] = "";
+    char collectionName[64] {};
+    char imageName[64] {};
 
     //  TODO: seems the user has to enter text and press enter always to confirm
     //        adding an OK button seems that the right thing to do, but there's
@@ -1863,16 +1889,16 @@ void ClemensFrontend::doModalOperations(int width, int height) {
     ImGui::TableNextColumn();
     ImGui::TextUnformatted("Disk Set");
     ImGui::TableNextColumn();
-    if (ImGui::InputText("##1", collectionName, sizeof(collectionName),
-                         ImGuiInputTextFlags_EnterReturnsTrue)) {
+    importDiskSetPath_.copy(collectionName, importDiskSetPath_.size());
+    if (ImGui::InputText("##1", collectionName, sizeof(collectionName))) {
       importDiskSetPath_ = collectionName;
     }
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
     ImGui::TextUnformatted("Disk Name");
     ImGui::TableNextColumn();
-    if (ImGui::InputText("##2", imageName, sizeof(imageName),
-                         ImGuiInputTextFlags_EnterReturnsTrue)) {
+    importDiskSetName_.copy(imageName, importDiskSetName_.size());
+    if (ImGui::InputText("##2", imageName, sizeof(imageName))) {
       importDiskSetName_ = imageName;
     }
     ImGui::EndTable();
@@ -1881,7 +1907,7 @@ void ClemensFrontend::doModalOperations(int width, int height) {
           !importDiskSetName_.empty()) {
         importDiskSetPath_ =
             (std::filesystem::path(diskLibraryRootPath_) / importDiskSetPath_).string();
-        guiMode_ = GUIMode::NewBlankDisk;
+        guiMode_ = GUIMode::NewBlankDiskFlow;
       } else {
         guiMode_ = GUIMode::Emulator;
       }
@@ -1987,7 +2013,11 @@ void ClemensFrontend::doImportDiskSetReplaceOld(int width, int height) {
     if (ImGui::Button("Yes")) {
       std::error_code errorCode;
       ImGui::CloseCurrentPopup();
-      guiMode_ = GUIMode::ImportDiskSet;
+      if (guiMode_ == GUIMode::ImportDiskSetReplaceOld) {
+        guiMode_ = GUIMode::ImportDiskSet;
+      } else if (guiMode_ == GUIMode::NewBlankDiskReplaceOld) {
+        guiMode_ = GUIMode::NewBlankDisk;
+      }
       if (std::filesystem::remove_all(importDiskSetPath_, errorCode) == std::uintmax_t(-1)) {
         failure = true;
       }
@@ -2004,7 +2034,7 @@ void ClemensFrontend::doImportDiskSetReplaceOld(int width, int height) {
     if (guiMode_ == GUIMode::ImportDiskSet) {
       if (failure) {
         ImGui::OpenPopup("Import Disk Set Error");
-        messageModalString_ = "Cancelled Dist Set import.";
+        messageModalString_ = "Cancelled Disk Set import.";
       } else {
         auto result = importDisks(importDiskSetPath_, importDiskSetName_, importDriveType_,
                                   std::move(importDiskFiles_));
@@ -2065,7 +2095,8 @@ void ClemensFrontend::doImportDiskSet(int width, int height) {
   }
 }
 
-void ClemensFrontend::doNewBlankDisk(int /*width */, int /*height*/) {
+void ClemensFrontend::doNewBlankDiskFlow(int /*width */, int /*height*/) {
+  // importDriveType_ is the drive type of the disk to create
   // importDiskSetPath_ is the path of the disk set
   // importDiskSetName_ is the name of the blank dist
   // Must create or use the existing path pointed to in importDiskSetPath
@@ -2075,6 +2106,41 @@ void ClemensFrontend::doNewBlankDisk(int /*width */, int /*height*/) {
   // Generate local disk set/name path for:
   //   auto relativePath = location.parent_path().filename() / location.stem();
   //  issue backend::InsertNewDisk()
+  auto diskDirectory = std::filesystem::path(importDiskSetPath_);
+  auto diskPath = diskDirectory / importDiskSetName_;
+
+  if (std::filesystem::exists(diskPath)) {
+    guiMode_ = GUIMode::NewBlankDiskReplaceOld;
+    ImGui::OpenPopup("Replace Disk Set");
+  } else {
+    guiMode_ = GUIMode::NewBlankDisk;
+  }
+}
+
+void ClemensFrontend::doNewBlankDisk(int /*width */, int /*height*/) {
+  // importDriveType_ is the drive type of the disk to create
+  // importDiskSetPath_ is the path of the disk set
+  // importDiskSetName_ is the name of the blank dist
+  // Must create or use the existing path pointed to in importDiskSetPath
+  // location = importDiskSetPath_ / importDiskSetName_ + .woz
+  // If a file exists (@location), then
+  //  error out
+  // Generate local disk set/name path for:
+  //   auto relativePath = location.parent_path().filename() / location.stem();
+  //  issue backend::InsertNewDisk()
+  auto diskDirectory = std::filesystem::path(importDiskSetPath_);
+  if (!std::filesystem::exists(diskDirectory)) {
+    if (!std::filesystem::create_directories(diskDirectory)) {
+      messageModalString_ = fmt::format("Unable to create directory {}", diskDirectory.string());
+      ImGui::OpenPopup("Import Disk Set Error");
+      guiMode_ = GUIMode::ImportDiskSetFlow;
+      return;
+    }
+  }
+  auto diskPath = diskDirectory / importDiskSetName_;
+  diskPath.replace_extension("woz");
+  backend_->insertBlankDisk(importDriveType_, diskPath.string());
+  guiMode_ = GUIMode::Emulator;
 }
 
 std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath,

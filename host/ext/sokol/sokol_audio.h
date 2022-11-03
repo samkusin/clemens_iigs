@@ -1495,7 +1495,7 @@ error:
         _saudio.backend.device = 0;
     }
     return false;
-};
+}
 
 _SOKOL_PRIVATE void _saudio_backend_shutdown(void) {
     SOKOL_ASSERT(_saudio.backend.device);
@@ -1504,7 +1504,7 @@ _SOKOL_PRIVATE void _saudio_backend_shutdown(void) {
     snd_pcm_drain(_saudio.backend.device);
     snd_pcm_close(_saudio.backend.device);
     _saudio_free(_saudio.backend.buffer);
-};
+}
 
 /*=== WASAPI BACKEND IMPLEMENTATION ==========================================*/
 #elif defined(_SAUDIO_WINDOWS)

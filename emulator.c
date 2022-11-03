@@ -843,7 +843,7 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor,
   clemens_simple_init(machine, speed_factor, clocks_step, fpiRAM,
                       fpiRAMBankCount);
 
-  if (romSize != CLEM_IIGS_ROM3_SIZE || rom == NULL) {
+  if (rom == NULL) {
     return -1;
   }
   if (fpiRAMBankCount < 4 || fpiRAM == NULL || e0bank == NULL ||
@@ -1256,6 +1256,7 @@ ClemensMonitor *clemens_get_monitor(ClemensMonitor *monitor,
 ClemensVideo *clemens_get_text_video(ClemensVideo *video,
                                      ClemensMachine *clem) {
   struct ClemensVGC *vgc = &clem->mmio.vgc;
+  video->vbl_counter = vgc->vbl_counter;
   if (!(vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE)) {
     video->scanline_start = 0;
   } else if (vgc->mode_flags & CLEM_VGC_MIXED_TEXT) {
@@ -1304,6 +1305,7 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video,
   struct ClemensVGC *vgc = &clem->mmio.vgc;
   bool use_page_2 = (clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
                     !(clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE);
+  video->vbl_counter = vgc->vbl_counter;
   if (vgc->mode_flags & CLEM_VGC_SUPER_HIRES) {
     video->format = kClemensVideoFormat_Super_Hires;
     video->scanline_count = CLEM_VGC_SHGR_SCANLINE_COUNT;

@@ -27,6 +27,7 @@ struct ClemensSerializerRecord kVGC[] = {
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensVGC, ts_last_frame),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensVGC, ts_scanline_0),
     CLEM_SERIALIZER_RECORD_DURATION(struct ClemensVGC, dt_scanline),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, vbl_counter),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, mode_flags),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, text_fg_color),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, text_bg_color),

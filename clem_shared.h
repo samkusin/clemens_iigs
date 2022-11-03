@@ -85,7 +85,7 @@ struct ClemensClock {
 
 /** _ns_ is of type uint64_t */
 #define clem_calc_clocks_step_from_ns(_ns_, _clocks_step_reference_) \
-  ((clem_clocks_duration_t)(_ns_ * _clocks_step_reference_) / \
+  ((clem_clocks_duration_t)((_ns_) * (_clocks_step_reference_)) / \
     CLEM_MEGA2_CYCLE_NS)
 
 typedef struct {

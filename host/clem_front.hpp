@@ -220,6 +220,8 @@ private:
   template <size_t N> using TerminalBuffer = cinek::CircularBuffer<TerminalLine, N>;
   TerminalBuffer<128> terminalLines_;
   TerminalBuffer<512> consoleLines_;
+  bool terminalChanged_;
+  bool consoleChanged_;
 
   enum class TerminalMode { Command, Log, Execution };
   TerminalMode terminalMode_;
@@ -256,7 +258,8 @@ private:
   void doImportDiskSetFlowStart(int width, int height);
   void doImportDiskSetReplaceOld(int width, int height);
   void doImportDiskSet(int width, int height);
-  void doNewBlankDisk(int widht, int height);
+  void doNewBlankDiskFlow(int width, int height);
+  void doNewBlankDisk(int width, int height);
 
   enum class GUIMode {
     Emulator,
@@ -265,6 +268,8 @@ private:
     ImportDiskSetFlow,
     ImportDiskSetReplaceOld,
     ImportDiskSet,
+    NewBlankDiskFlow,
+    NewBlankDiskReplaceOld,
     NewBlankDisk,
     RebootEmulator
   };

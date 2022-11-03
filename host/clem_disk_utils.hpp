@@ -15,6 +15,8 @@ std::string_view getDriveName(ClemensDriveType driveType);
 
 ClemensDriveType getDriveType(std::string_view driveName);
 
+struct ClemensWOZDisk* createWOZ(struct ClemensWOZDisk* woz, const struct ClemensNibbleDisk* nib);
+
 } // end namespace
 
 #endif

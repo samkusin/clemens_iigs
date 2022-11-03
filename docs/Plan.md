@@ -9,20 +9,19 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-
-* Verify Mega II Interrupts work
-* Lores mode
-* Linux support
+* Speed up disk access when reading/writing (fast mode for emulation)
 * Smartport Hard Drive Support
-* Flashing Characters
-* SCC Support
+* ROM 01
 * Joystick/Paddle Support
+* CYA vs MEGA2 I/O access speeds
+  * Some CYA registers are still "slow" so resolve these so they run at the IIgs
+    fast speed
+* Verify Mega II Interrupts work
+* SCC Support
 * Apple IIgs Diagnostic Test
-* Double Lores Mode (should be simple given how clem_display.cpp is written)
 * Monochrome Support
 * Dblhires is offset by 4 pixels (1 block) in display due to conversion method
 * Black and White DBLHIRES ($C029 bit 5)
-* ROM 01
 * Data accesses across banks are allowed (but not stack accesses?)
 * Audit Direct Page in emulation mode (wrap zero page, only if D=0000 for 6502
   instructions, but for 65816 instructions there is no wrapping?)
@@ -33,6 +32,10 @@ This is a running todo list.
 
 ## DONE
 
+* Flashing Characters
+* Double Lores Mode (should be simple given how clem_display.cpp is written)
+* Lores mode
+* Linux support
 * Clean up ADB support (Mouse)
 * Fix Slot 3 I/O (defaulting to card vs internal ROM) - broke when Mockingboard
   support added

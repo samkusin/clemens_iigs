@@ -133,15 +133,25 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
                                PublishStateDelegate publishDelegate) :
   config_(config),
   slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
+  breakpoints_(std::move(config_.breakpoints)),
   logLevel_(CLEM_DEBUG_LOG_INFO),
   debugMemoryPage_(0x00),
   areInstructionsLogged_(false) {
+
+  diskContainers_.fill(ClemensWOZDisk{});
+  diskDrives_.fill(ClemensBackendDiskDriveState{});
 
   loggedInstructions_.reserve(10000);
 
   initEmulatedDiskLocalStorage();
 
   romBuffer_ = loadROM(romPathname.c_str());
+  if (romBuffer_.isEmpty()) {
+    //  TODO: load a dummy ROM, for now an empty buffer
+    romBuffer_ = cinek::ByteBuffer(
+      (uint8_t *)slabMemory_.allocate(CLEM_IIGS_BANK_SIZE), CLEM_IIGS_BANK_SIZE);
+    memset(romBuffer_.forwardSize(CLEM_IIGS_BANK_SIZE).first, 0, CLEM_IIGS_BANK_SIZE);
+  }
 
   memset(&machine_, 0, sizeof(machine_));
   clemens_host_setup(&machine_, &ClemensBackend::emulatorLog, this);
@@ -159,12 +169,12 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
   for (size_t driveIndex = 0; driveIndex < diskDrives_.size(); ++driveIndex) {
     if (diskDrives_[driveIndex].imagePath.empty()) continue;
     auto driveType = static_cast<ClemensDriveType>(driveIndex);
-    if (!loadDisk(driveType)) {
+    if (!loadDisk(driveType, false)) {
       fmt::print("Failed to load image '{}' into drive {}\n",
                  diskDrives_[driveIndex].imagePath,
                  ClemensDiskUtilities::getDriveName(driveType));
     } else {
-      fmt::print("Failed to load image '{}' into drive {}\n",
+      fmt::print("Loaded image '{}' into drive {}\n",
                  diskDrives_[driveIndex].imagePath,
                  ClemensDiskUtilities::getDriveName(driveType));
     }
@@ -224,7 +234,7 @@ void ClemensBackend::insertDisk(ClemensDriveType driveType, std::string diskPath
                 fmt::format("{}={}", ClemensDiskUtilities::getDriveName(driveType), diskPath)});
 }
 
-bool ClemensBackend::insertDisk(const std::string_view& inputParam) {
+bool ClemensBackend::insertDisk(const std::string_view& inputParam, bool allowBlank) {
   auto sepPos = inputParam.find('=');
   if (sepPos == std::string_view::npos) return false;
   auto driveName = inputParam.substr(0, sepPos);
@@ -233,8 +243,14 @@ bool ClemensBackend::insertDisk(const std::string_view& inputParam) {
   if (driveType == kClemensDrive_Invalid) return false;
 
   diskDrives_[driveType].imagePath = imagePath;
-  return loadDisk(driveType);
+  return loadDisk(driveType, allowBlank);
 }
+
+void ClemensBackend::insertBlankDisk(ClemensDriveType driveType, std::string diskPath) {
+  queue(Command{Command::InsertBlankDisk,
+                fmt::format("{}={}", ClemensDiskUtilities::getDriveName(driveType), diskPath)});
+}
+
 
 void ClemensBackend::ejectDisk(ClemensDriveType driveType) {
   queue(Command{Command::EjectDisk,
@@ -355,7 +371,8 @@ void ClemensBackend::saveMachine(std::string path) {
 bool ClemensBackend::saveSnapshot(const std::string_view &inputParam) {
   auto outputPath = std::filesystem::path(CLEM_HOST_SNAPSHOT_DIR) / inputParam;
   return ClemensSerializer::save(outputPath.string(), &machine_, diskContainers_.size(),
-                                 diskContainers_.data(), diskDrives_.data());
+                                 diskContainers_.data(), diskDrives_.data(),
+                                 breakpoints_);
 }
 
 void ClemensBackend::loadMachine(std::string path) {
@@ -366,6 +383,7 @@ bool ClemensBackend::loadSnapshot(const std::string_view &inputParam) {
   auto outputPath = std::filesystem::path(CLEM_HOST_SNAPSHOT_DIR) / inputParam;
   bool res = ClemensSerializer::load(outputPath.string(), &machine_, diskContainers_.size(),
                                      diskContainers_.data(), diskDrives_.data(),
+                                     breakpoints_,
                                      &ClemensBackend::unserializeAllocate, this);
   saveBRAM();
   return res;
@@ -393,7 +411,7 @@ uint8_t *ClemensBackend::unserializeAllocate(unsigned sz, void *context) {
   return (uint8_t *)host->slabMemory_.allocate(sz);
 }
 
-bool ClemensBackend::loadDisk(ClemensDriveType driveType) {
+bool ClemensBackend::loadDisk(ClemensDriveType driveType, bool allowBlank) {
   diskBuffer_.reset();
 
   std::ifstream input(diskDrives_[driveType].imagePath,
@@ -415,6 +433,14 @@ bool ClemensBackend::loadDisk(ClemensDriveType driveType) {
         }
       }
     }
+  } else if (allowBlank) {
+    resetDisk(driveType);
+    if (ClemensDiskUtilities::createWOZ(&diskContainers_[driveType], &disks_[driveType])) {
+      if (clemens_assign_disk(&machine_, driveType, &disks_[driveType])) {
+        return true;
+      }
+    }
+    return true;
   }
   diskDrives_[driveType].imagePath.clear();
   return false;
@@ -425,6 +451,7 @@ bool ClemensBackend::saveDisk(ClemensDriveType driveType) {
   auto writeOut = diskBuffer_.forwardSize(diskBuffer_.getCapacity());
 
   size_t writeOutCount = cinek::length(writeOut);
+  diskContainers_[driveType].nib = &disks_[driveType];
   if (!clem_woz_serialize(&diskContainers_[driveType], writeOut.first, &writeOutCount)) {
     return false;
   }
@@ -434,6 +461,84 @@ bool ClemensBackend::saveDisk(ClemensDriveType driveType) {
   out.write((char*)writeOut.first, writeOutCount);
   if (out.fail() || out.bad()) return false;
   return true;
+}
+
+void ClemensBackend::resetDisk(ClemensDriveType driveType) {
+  auto& nib = disks_[driveType];
+  unsigned max_track_size_bytes = 0, track_byte_offset = 0;
+
+  auto trackDataSize = nib.bits_data_end - nib.bits_data;
+  memset(nib.bits_data, 0, trackDataSize);
+  nib.is_write_protected = false;
+  nib.is_double_sided = false;
+
+  switch (driveType) {
+    case kClemensDrive_3_5_D1:
+    case kClemensDrive_3_5_D2:
+      nib.disk_type = CLEM_DISK_TYPE_3_5;
+      nib.is_double_sided = true;     // TODO: an option?
+      nib.bit_timing_ns = 2000;
+      nib.track_count = nib.is_double_sided ? 160 : 80;
+      for (unsigned i = 0; i < CLEM_DISK_LIMIT_QTR_TRACKS; ++i) {
+        if (nib.is_double_sided) {
+          nib.meta_track_map[i] = i;
+        } else if ((i % 2) == 0) {
+          nib.meta_track_map[i] = (i / 2);
+        } else {
+          nib.meta_track_map[i] = 0xff;
+        }
+      }
+      track_byte_offset = 0;
+      for (unsigned region_index = 0; region_index < 5; ++region_index) {
+        unsigned bits_cnt = CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(
+                                g_clem_max_sectors_per_region_35[region_index]) *
+                            8;
+        max_track_size_bytes = bits_cnt / 8;
+        for (unsigned i = g_clem_track_start_per_region_35[region_index];
+            i < g_clem_track_start_per_region_35[region_index + 1];) {
+          unsigned track_index = i;
+          if (!nib.is_double_sided) {
+            track_index /= 2;
+            i += 2;
+          } else {
+            i += 1;
+          }
+          nib.track_byte_offset[track_index] = track_byte_offset;
+          nib.track_byte_count[track_index] = max_track_size_bytes;
+          nib.track_bits_count[track_index] = bits_cnt;
+          nib.track_initialized[track_index] = 0;
+          track_byte_offset += max_track_size_bytes;
+        }
+      }
+      break;
+
+    case kClemensDrive_5_25_D1:
+    case kClemensDrive_5_25_D2:
+      nib.disk_type = CLEM_DISK_TYPE_5_25;
+      nib.bit_timing_ns = 4000;
+      nib.track_count = 35;
+      max_track_size_bytes = CLEM_DISK_525_BYTES_PER_TRACK;
+      for (unsigned i = 0; i < CLEM_DISK_LIMIT_QTR_TRACKS; ++i) {
+        if ((i % 4) == 0 || (i % 4) == 1) {
+          nib.meta_track_map[i] = (i / 4);
+        } else {
+          nib.meta_track_map[i] = 0xff;
+        }
+      }
+      track_byte_offset = 0;
+      for (unsigned i = 0; i < nib.track_count; ++i) {
+        nib.track_byte_offset[i] = track_byte_offset;
+        nib.track_byte_count[i] = max_track_size_bytes;
+        nib.track_bits_count[i] = CLEM_DISK_BLANK_TRACK_BIT_LENGTH_525;
+        nib.track_initialized[i] = 0;
+        track_byte_offset += max_track_size_bytes;
+      }
+      break;
+
+    default:
+      assert(false);
+      break;
+  }
 }
 
 static const char* sInputKeys[] = {
@@ -654,7 +759,10 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           publishState = true;
           break;
         case Command::InsertDisk:
-          if (!insertDisk(command.operand)) commandFailed = true;
+          if (!insertDisk(command.operand, false)) commandFailed = true;
+          break;
+        case Command::InsertBlankDisk:
+          if (!insertDisk(command.operand, true)) commandFailed = true;
           break;
         case Command::EjectDisk:
           ejectDisk(command.operand);
@@ -693,8 +801,11 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
           if (!saveSnapshot(command.operand)) commandFailed = true;
           break;
         case Command::LoadMachine:
-          if (!loadSnapshot(command.operand)) commandFailed = true;
-          mockingboard = findMockingboardCard(&machine_);
+          if (loadSnapshot(command.operand)) {
+            mockingboard = findMockingboardCard(&machine_);
+          } else {
+            commandFailed = true;
+          }
           break;
         case Command::Undefined:
           break;
@@ -790,6 +901,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             diskDrive.isEjecting = false;
             if (!saveDisk(driveType)) diskDrive.saveFailed = true;
             diskDrive.imagePath.clear();
+            resetDisk(driveType);
           }
         }
       }
@@ -937,6 +1049,7 @@ void ClemensBackend::initEmulatedDiskLocalStorage() {
   diskBuffer_ =
     cinek::ByteBuffer((uint8_t*)slabMemory_.allocate(CLEM_DISK_35_MAX_DATA_SIZE),
                       CLEM_DISK_35_MAX_DATA_SIZE + 4096);
+  disks_.fill(ClemensNibbleDisk{});
   disks_[kClemensDrive_3_5_D1].bits_data =
     (uint8_t*)slabMemory_.allocate(CLEM_DISK_35_MAX_DATA_SIZE);
   disks_[kClemensDrive_3_5_D1].bits_data_end =
@@ -986,13 +1099,17 @@ void ClemensBackend::initApple2GS() {
   const unsigned kFPIBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT;
   const uint32_t kClocksPerFastCycle = CLEM_CLOCKS_FAST_CYCLE;
   const uint32_t kClocksPerSlowCycle = CLEM_CLOCKS_MEGA2_CYCLE;
-  clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle,
-               romBuffer_.getHead(), romBuffer_.getSize(),
-               slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
-               slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
-               slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount),
-               slabMemory_.allocate(2048 * 7),    //  TODO: placeholder
-               kFPIBankCount);
+  int result = clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle,
+                            romBuffer_.getHead(), romBuffer_.getSize(),
+                            slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
+                            slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
+                            slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount),
+                            slabMemory_.allocate(2048 * 7),    //  TODO: placeholder
+                            kFPIBankCount);
+  if (result < 0) {
+    fmt::print("Clemens library failed to initialize with err code (%d)\n", result);
+    return;
+  }
   loadBRAM();
 
   //  TODO: It seems the internal audio code expects 2 channel float PCM,

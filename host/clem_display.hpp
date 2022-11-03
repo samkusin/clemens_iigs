@@ -112,6 +112,8 @@ private:
   float emulatorVideoDimensions_[2];
   float emulatorMonitorDimensions_[2];
   unsigned emulatorTextColor_;
+  unsigned emulatorSignal_;
+  unsigned emulatorColor_;
 };
 
 #endif

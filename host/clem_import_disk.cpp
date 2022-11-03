@@ -142,48 +142,9 @@ auto ClemensDiskImporter::nibblizeImage(Clemens2IMGDisk *disk) -> DiskRecord * {
   if (!record)
     return nullptr;
 
-  if (disk->nib->disk_type == CLEM_DISK_TYPE_5_25) {
-    record->disk.disk_type = CLEM_WOZ_DISK_5_25;
-    record->disk.boot_type = CLEM_WOZ_BOOT_5_25_16;
-  } else if (disk->nib->disk_type == CLEM_DISK_TYPE_3_5) {
-    record->disk.disk_type = CLEM_WOZ_DISK_3_5;
-    record->disk.boot_type = CLEM_WOZ_BOOT_UNDEFINED;
-  }
-  // these images come from non-copy protected sources - which implies
-  // synchronization
-  record->disk.flags =
-      CLEM_WOZ_SUPPORT_UNKNOWN | CLEM_WOZ_IMAGE_CLEANED | CLEM_WOZ_IMAGE_SYNCHRONIZED;
-  if (disk->nib->is_double_sided) {
-    record->disk.flags |= CLEM_WOZ_IMAGE_DOUBLE_SIDED;
-  }
-  if (disk->nib->is_write_protected) {
-    record->disk.flags |= CLEM_WOZ_IMAGE_WRITE_PROTECT;
-  }
-  record->disk.required_ram_kb = 0;
-  record->disk.max_track_size_bytes = 0;
 
-  for (unsigned i = 0; i < disk->nib->track_count; ++i) {
-    if (disk->nib->track_byte_count[i] > record->disk.max_track_size_bytes) {
-      record->disk.max_track_size_bytes = disk->nib->track_byte_count[i];
-    }
-  }
-  //  block align the byte count
-  record->disk.max_track_size_bytes = ((record->disk.max_track_size_bytes + 511) / 512) * 512;
-  record->disk.version = 2;
-  memset(record->disk.creator, 0x20, sizeof(record->disk.creator));
-  record->disk.creator[0] = 'C';
-  record->disk.creator[1] = 'l';
-  record->disk.creator[2] = 'e';
-  record->disk.creator[3] = 'm';
-  record->disk.creator[4] = 'e';
-  record->disk.creator[5] = 'n';
-  record->disk.creator[6] = 's';
-  record->disk.creator[8] = 'H';
-  record->disk.creator[9] = 'o';
-  record->disk.creator[10] = 's';
-  record->disk.creator[11] = 't';
+  ClemensDiskUtilities::createWOZ(&record->disk, disk->nib);
 
-  record->disk.nib = disk->nib;
   record->name[0] = '\0';
   record->next = nullptr;
   return record;

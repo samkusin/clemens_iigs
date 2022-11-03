@@ -28,6 +28,9 @@
 #include "sokol/sokol_glue.h"
 #include "sokol/sokol_imgui.h"
 
+#include "fonts/font_printchar21.h"
+#include "fonts/font_prnumber3.h"
+#include "fonts/font_bloada1024.h"
 
 static uint64_t g_lastTime = 0;
 static ClemensFrontend* g_Host = nullptr;
@@ -37,16 +40,13 @@ static unsigned g_ADBKeyToggleMask = 0;
 std::array<int16_t, 512> g_sokolToADBKey;
 
 cinek::ByteBuffer loadFont(const char* pathname) {
-  FILE* fp = fopen(pathname, "rb");
-  if (!fp) return cinek::ByteBuffer();
-
-  fseek(fp, 0, SEEK_END);
-  long sz = ftell(fp);
-  unsigned char* buf = (unsigned char*)malloc(sz);
-  fseek(fp, 0, SEEK_SET);
-  fread(buf, 1, sz, fp);
-  fclose(fp);
-  return cinek::ByteBuffer(buf, (int32_t)sz, (int32_t)sz);
+  cinek::ByteBuffer buffer;
+  if (!strcasecmp(pathname, "fonts/PrintChar21.ttf")) {
+    buffer = cinek::ByteBuffer(PrintChar21_ttf, PrintChar21_ttf_len, PrintChar21_ttf_len);
+  } else if (!strcasecmp(pathname, "fonts/PRNumber3.ttf")) {
+    buffer = cinek::ByteBuffer(PRNumber3_ttf, PRNumber3_ttf_len, PRNumber3_ttf_len);
+  }
+  return buffer;
 }
 
 static void imguiFontSetup(const cinek::ByteBuffer& systemFontLoBuffer,
@@ -225,8 +225,6 @@ static void onInit()
   auto systemFontHiBuffer = loadFont("fonts/PRNumber3.ttf");
   imguiFontSetup(systemFontLoBuffer, systemFontHiBuffer);
   g_Host = new ClemensFrontend(systemFontLoBuffer, systemFontHiBuffer);
-  free(systemFontLoBuffer.getHead());
-  free(systemFontHiBuffer.getHead());
 }
 
 static void onFrame()
