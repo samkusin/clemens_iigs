@@ -22,7 +22,7 @@ jobs:
 
     - name: Prerequisites
       # Needed for X11 extensions and audio builds
-      run: sudo apt-get install -y libxi-dev libxcursor-dev libasound2-dev
+      run: sudo apt-get install -y libxi-dev libxcursor-dev libasound2-dev mesa-common-dev
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
