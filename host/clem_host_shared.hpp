@@ -7,6 +7,7 @@
 #include <chrono>
 #include <optional>
 #include <string>
+#include <vector>
 
 #define CLEM_HOST_LIBRARY_DIR "library"
 #define CLEM_HOST_SNAPSHOT_DIR "snapshots"
@@ -48,9 +49,9 @@ struct ClemensBackendConfig {
   enum class Type {
     Apple2GS
   };
-
   std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDriveStates;
   std::array<std::string, 7> cardNames;
+  std::vector<ClemensBackendBreakpoint> breakpoints;
   unsigned audioSamplesPerSecond;
   Type type;
 };

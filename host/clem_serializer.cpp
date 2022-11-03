@@ -77,7 +77,8 @@ bool loadDiskMetadata(mpack_reader_t* reader, ClemensWOZDisk& container,
 }
 
 bool save(std::string outputPath, ClemensMachine* machine, size_t driveCount,
-          const ClemensWOZDisk* containers, const ClemensBackendDiskDriveState* states) {
+          const ClemensWOZDisk* containers, const ClemensBackendDiskDriveState* states,
+          const std::vector<ClemensBackendBreakpoint>& breakpoints) {
   mpack_writer_t writer;
   //  this save buffer is probably, unnecessarily big - but it's just used for
   //  saves and freed
@@ -139,6 +140,19 @@ bool save(std::string outputPath, ClemensMachine* machine, size_t driveCount,
     }
     mpack_finish_array(&writer);
   }
+  mpack_write_cstr(&writer, "breakpoints");
+  {
+    mpack_start_array(&writer, (uint32_t)(breakpoints.size() & 0xffffffff));
+    for (auto& breakpoint : breakpoints) {
+      mpack_build_map(&writer);
+      mpack_write_cstr(&writer, "type");
+      mpack_write_i32(&writer, static_cast<int>(breakpoint.type));
+      mpack_write_cstr(&writer, "address");
+      mpack_write_u32(&writer, breakpoint.address);
+      mpack_complete_map(&writer);
+    }
+    mpack_finish_array(&writer);
+  }
   mpack_complete_map(&writer);
   auto writerError = mpack_writer_destroy(&writer);
   if (writerError != mpack_ok) {
@@ -149,6 +163,7 @@ bool save(std::string outputPath, ClemensMachine* machine, size_t driveCount,
 
 bool load(std::string outputPath, ClemensMachine* machine, size_t driveCount,
           ClemensWOZDisk* containers, ClemensBackendDiskDriveState* states,
+          std::vector<ClemensBackendBreakpoint>& breakpoints,
           ClemensSerializerAllocateCb alloc_cb,
           void *context) {
   char str[256];
@@ -238,6 +253,24 @@ bool load(std::string outputPath, ClemensMachine* machine, size_t driveCount,
                    ClemensDiskUtilities::getDriveName(static_cast<ClemensDriveType>(driveIndex)));
         return false;
       }
+    }
+    mpack_done_array(&reader);
+  }
+
+  mpack_expect_cstr_match(&reader, "breakpoints");
+  {
+    uint32_t breakpointCount = mpack_expect_array(&reader);
+    breakpoints.clear();
+    breakpoints.reserve(breakpointCount);
+    for (uint32_t breakpointIdx = 0; breakpointIdx < breakpointCount; ++breakpointIdx) {
+      breakpoints.emplace_back();
+      auto& breakpoint = breakpoints.back();
+      mpack_expect_map(&reader);
+      mpack_expect_cstr_match(&reader, "type");
+      breakpoint.type = static_cast<ClemensBackendBreakpoint::Type>(mpack_expect_i32(&reader));
+      mpack_expect_cstr_match(&reader, "address");
+      breakpoint.address = mpack_expect_u32(&reader);
+      mpack_done_map(&reader);
     }
     mpack_done_array(&reader);
   }

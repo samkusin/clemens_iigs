@@ -1,3 +1,4 @@
+# Changelog
 
 ## Version 0.4
 
@@ -9,7 +10,7 @@
 * Lores and double lores graphics support
 * Flashing text support
 * Linux builds (GCC)
-* GL Renderer
+* GL Renderer for Linux (works for Windows via CMake configuration)
 * Import to WOZ / Nibblized disk and save on disk eject for writable disks
 
 ## Version 0.3

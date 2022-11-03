@@ -677,7 +677,9 @@ void ClemensFrontend::frame(int width, int height, double deltaTime,
     breakpoints_.clear();
     for (unsigned bpIndex = 0; bpIndex < frameReadState_.breakpointCount; ++bpIndex) {
       breakpoints_.emplace_back(frameReadState_.breakpoints[bpIndex]);
+      config_.breakpoints.push_back(breakpoints_.back());
     }
+    config_.breakpoints = breakpoints_;
     if (lastCommandState_.commandFailed.has_value()) {
       if (*lastCommandState_.commandFailed) {
         CLEM_TERM_COUT.format(TerminalLine::Error, "{} Failed.",

@@ -133,6 +133,7 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config& config,
                                PublishStateDelegate publishDelegate) :
   config_(config),
   slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
+  breakpoints_(std::move(config_.breakpoints)),
   logLevel_(CLEM_DEBUG_LOG_INFO),
   debugMemoryPage_(0x00),
   areInstructionsLogged_(false) {
@@ -370,7 +371,8 @@ void ClemensBackend::saveMachine(std::string path) {
 bool ClemensBackend::saveSnapshot(const std::string_view &inputParam) {
   auto outputPath = std::filesystem::path(CLEM_HOST_SNAPSHOT_DIR) / inputParam;
   return ClemensSerializer::save(outputPath.string(), &machine_, diskContainers_.size(),
-                                 diskContainers_.data(), diskDrives_.data());
+                                 diskContainers_.data(), diskDrives_.data(),
+                                 breakpoints_);
 }
 
 void ClemensBackend::loadMachine(std::string path) {
@@ -381,6 +383,7 @@ bool ClemensBackend::loadSnapshot(const std::string_view &inputParam) {
   auto outputPath = std::filesystem::path(CLEM_HOST_SNAPSHOT_DIR) / inputParam;
   bool res = ClemensSerializer::load(outputPath.string(), &machine_, diskContainers_.size(),
                                      diskContainers_.data(), diskDrives_.data(),
+                                     breakpoints_,
                                      &ClemensBackend::unserializeAllocate, this);
   saveBRAM();
   return res;
