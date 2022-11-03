@@ -305,7 +305,7 @@ static void _opcode_print(ClemensMachine *clem,
     snprintf(operand, sizeof(operand), "$%02X%04X", inst->bank, inst->value);
     break;
   case kClemensCPUAddrMode_PCLongIndirect:
-    snprintf(operand, sizeof(operand), "[$%04X]", inst->bank, inst->value);
+    snprintf(operand, sizeof(operand), "[$%04X]", inst->value);
     break;
   case kClemensCPUAddrMode_Operand:
     snprintf(operand, sizeof(operand), "%02X", inst->value);

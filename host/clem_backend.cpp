@@ -107,7 +107,7 @@ struct ClemensRunSampler {
     sampledClocksSpent += clocksSpent;
 
     if (cyclesBuffer.isFull()) {
-      decltype(cyclesBuffer)::ValueType lruCycles;
+      decltype(cyclesBuffer)::ValueType lruCycles = 0;
       cyclesBuffer.pop(lruCycles);
       sampledCyclesSpent -= lruCycles;
     }
