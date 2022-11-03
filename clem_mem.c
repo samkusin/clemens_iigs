@@ -812,10 +812,12 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr,
   case CLEM_MMIO_REG_AN3_OFF:
   case CLEM_MMIO_REG_AN3_ON:
     /* AN3 used for double hires graphics */
-    if (ioreg == CLEM_MMIO_REG_AN3_ON) {
-      clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_DISABLE_AN3);
-    } else {
-      clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_DISABLE_AN3);
+    if (!is_noop) {
+      if (ioreg == CLEM_MMIO_REG_AN3_ON) {
+        clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_DISABLE_AN3);
+      } else {
+        clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_DISABLE_AN3);
+      }
     }
     result = clem_adb_read_switch(&mmio->dev_adb, ioreg, flags);
     break;
