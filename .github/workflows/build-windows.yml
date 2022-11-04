@@ -2,7 +2,7 @@ name: CMake
 
 on:
   push:
-    branches: [ 'main', '0.4-prep' ]
+    branches: [ 'main' ]
     tags: ['t*']
   pull_request:
     branches: [ 'main' ]
