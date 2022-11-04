@@ -2,7 +2,7 @@ name: CMake
 
 on:
   push:
-    branches: [ "main", "release-*" ]
+    branches: [ "main", "releases/**", "0.4-prep" ]
   pull_request:
     branches: [ "main" ]
 
@@ -40,7 +40,7 @@ jobs:
       if: ${{ github.ref_name == 'release' || github.ref_name == '0.4-prep' }}
       uses: actions/upload-artifact@v3
       with:
-        name: ${{ github.ref_name }}
+        name: ${{github.ref_name}}
         path: ${{github.workspace}}/build-run/clemens_iigs/Release/*
 
     # - name: Test
