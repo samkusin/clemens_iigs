@@ -45,7 +45,7 @@ jobs:
       if: ${{ github.ref_type == 'tag'}}
       uses: actions/upload-artifact@v3
       with:
-        name: clemens-${{github.ref_name}}-${{github.runner.os}}-${{github.runner.arch}}.zip
+        name: clemens-${{github.ref_name}}-${{runner.os}}-${{runner.arch}}.zip
         path: ${{github.workspace}}/build-run/clemens_iigs/Release/*
 
     # - name: Test
