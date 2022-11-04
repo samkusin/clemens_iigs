@@ -33,8 +33,6 @@ function(project_create_assets_target ARG_TARGET_NAME)
     add_dependencies(app_assets_${ARG_TARGET_NAME} ${ARG_TARGET_NAME})
 endfunction()
 
-enable_testing()
-
 set(PROJECT_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}-run")
 
 set(EMULATOR_SOURCES
@@ -86,7 +84,11 @@ target_link_libraries(clemens_65816_render PUBLIC clemens_65816)
 target_include_directories(clemens_65816_render
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
+if(BUILD_TESTING)
+enable_testing()
 add_subdirectory(tests)
+endif()
+
 
 add_executable(clemens_65816_emulator
     "${CMAKE_CURRENT_SOURCE_DIR}/app.c")
