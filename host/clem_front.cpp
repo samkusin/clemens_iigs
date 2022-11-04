@@ -1,3 +1,4 @@
+#include "version.h"
 #include "clem_front.hpp"
 #include "clem_backend.hpp"
 #include "clem_disk_utils.hpp"
@@ -343,7 +344,8 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
 
   debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;
   debugMemoryEditor_.WriteFn = &ClemensFrontend::imguiMemoryEditorWrite;
-  CLEM_TERM_COUT.print(TerminalLine::Info, "Welcome to the Clemens IIgs Emulator");
+  CLEM_TERM_COUT.format(TerminalLine::Info, "Welcome to the Clemens IIgs Emulator {}.{}",
+                        CLEM_HOST_VERSION_MAJOR, CLEM_HOST_VERSION_MINOR);
 }
 
 ClemensFrontend::~ClemensFrontend() {
