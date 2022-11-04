@@ -99,7 +99,7 @@ struct ClemensRunSampler {
     //    acutal_clocks = sampledClocksSpent
     //    (reference / actual) * 1.023mhz is the emulator speed
     if (clocksBuffer.isFull()) {
-      decltype(clocksBuffer)::ValueType lruClocksSpent;
+      decltype(clocksBuffer)::ValueType lruClocksSpent = 0;
       clocksBuffer.pop(lruClocksSpent);
       sampledClocksSpent -= lruClocksSpent;
     }
@@ -107,7 +107,7 @@ struct ClemensRunSampler {
     sampledClocksSpent += clocksSpent;
 
     if (cyclesBuffer.isFull()) {
-      decltype(cyclesBuffer)::ValueType lruCycles;
+      decltype(cyclesBuffer)::ValueType lruCycles = 0;
       cyclesBuffer.pop(lruCycles);
       sampledCyclesSpent -= lruCycles;
     }

@@ -6,6 +6,12 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(__GNUC__)
+//  removes a lot of unused STB Truetype functions
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
+#endif
+
 
 int clem_test_init_machine(
     ClemensMachine* machine,
@@ -119,3 +125,6 @@ void test_check_mega2_bank(
                                       &machine->mega2_bank_map[bank & 1][adr]);
     }
 }
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
