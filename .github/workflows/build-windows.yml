@@ -22,8 +22,6 @@ jobs:
 
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.1
-      with:
-        vs-version: '[16.4,16.5)'
 
     #- name: Prerequisites
     #  # Needed for X11 extensions and audio builds
