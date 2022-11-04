@@ -2,8 +2,8 @@ name: CMake
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
+    branches: [ "main", "release" ]
+  pull:
     branches: [ "main" ]
 
 env:
@@ -36,13 +36,12 @@ jobs:
       # Build your program with the given configuration
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
-    # - name: Archive production artifacts
-    #  uses: actions/upload-artifact@v3
-    #  with:
-    #    name: dist
-    #    path: ${{github.workspace}}/build-run/clemens_iigs/Release/*
-    #    retention-days: 1
-
+    - name: Archive production artifacts
+      if: ${{ github.ref_name == 'release' || github.ref_name == '0.4-prep' }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist
+        path: ${{github.workspace}}/build-run/clemens_iigs/Release/*
 
     # - name: Test
     #  working-directory: ${{github.workspace}}/build
