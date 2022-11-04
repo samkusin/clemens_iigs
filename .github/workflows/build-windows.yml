@@ -39,8 +39,9 @@ jobs:
     - name: Archive production artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: dist-without-markdown
-          path: ${{github.workspace}}/build-run/clemens_iigs/Release
+        name: dist
+        path: ${{github.workspace}}/build-run/clemens_iigs/Release/*
+        retention-days: 1
 
 
     # - name: Test
