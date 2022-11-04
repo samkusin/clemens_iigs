@@ -36,6 +36,13 @@ jobs:
       # Build your program with the given configuration
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
+    - name: Archive production artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist-without-markdown
+          path: ${{github.workspace}}/build-run/clemens_iigs/Release
+
+
     # - name: Test
     #  working-directory: ${{github.workspace}}/build
       # Execute tests defined by the CMake configuration.
