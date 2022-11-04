@@ -2,9 +2,10 @@ name: CMake
 
 on:
   push:
-    branches: [ "main", "releases/**" , "0.4-prep" ]
+    branches: [ 'main', '0.4-prep' ]
+    tags: ['t*']
   pull_request:
-    branches: [ "main" ]
+    branches: [ 'main' ]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -41,10 +42,10 @@ jobs:
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
     - name: Archive production artifacts
-      if: ${{ github.ref_name == 'release' || github.ref_name == '0.4-prep' }}
+      if: ${{ github.ref_type == 'tag'}}
       uses: actions/upload-artifact@v3
       with:
-        name: ${{github.ref_name}}
+        name: clemens-${{github.ref_name}}-${{github.runner.os}}-${{github.runner.arch}}.zip
         path: ${{github.workspace}}/build-run/clemens_iigs/Release/*
 
     # - name: Test
