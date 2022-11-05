@@ -2208,7 +2208,18 @@ std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath
 
 static std::string_view trimToken(const std::string_view& token, size_t off = 0,
                                   size_t length=std::string_view::npos) {
-  return token.substr(off, length);
+  auto tmp = token.substr(off, length);
+  auto left = tmp.begin();
+  for (; left != tmp.end(); ++left) {
+    if (!std::isspace(*left)) break;
+  }
+  tmp = tmp.substr(left - tmp.begin());
+  auto right = tmp.rbegin();
+  for(; right != tmp.rend(); ++right) {
+    if (!std::isspace(*right)) break;
+  }
+  tmp = tmp.substr(0, tmp.size() - (right - tmp.rbegin()));
+  return tmp;
 }
 
 static bool parseBool(const std::string_view& token, bool& result) {

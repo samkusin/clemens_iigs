@@ -102,9 +102,11 @@ Type 'help' to list the available commands.  The most important commands to
 remember are:
 
 ```
-reboot     - reboots the machine
-break      - breaks execution at the current PC
-step       - step instruction at current PC
+reboot                  - reboots the machine
+break                   - breaks execution at the current PC
+step                    - step instruction at current PC
+trace on                - enables program tracing
+trace off, filename.txt - outputs the trace to the specified path
 ```
 
 Please consult [the Wiki](https://github.com/samkusin/clemens_iigs/wiki/The-Clemens-Apple-IIgs-Emulator) for more detailed usage instructions.  The
