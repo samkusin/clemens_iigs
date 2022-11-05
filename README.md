@@ -1,5 +1,10 @@
 # Clemens IIGS
 
+**NOTE** This software should be considered Alpha quality.  The 65816 emulation issues
+addressed in the latest release should edge the CPU side of the software to Beta quality.
+
+There are still some missing features (see below.)
+
 ![Boot Sequence Demo](https://samirsinha.com/images/dotc-title.gif)
 
 The Clemens IIgs emulator is an attempt at writing a modern emulator for
