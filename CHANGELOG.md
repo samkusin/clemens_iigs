@@ -2,16 +2,25 @@
 
 ## Version 0.4
 
-* Placeholder documentation!
-* New GUI/Debugger layout and improved performance counters
-* Quality-of-life improvements to interface
-* Emulated Mouse support
-* More GS title support
-* Lores and double lores graphics support
-* Flashing text support
-* Linux builds (GCC)
-* GL Renderer for Linux (works for Windows via CMake configuration)
-* Import to WOZ / Nibblized disk and save on disk eject for writable disks
+* New Debugger GUI and improved diagnostics display
+* New Disk Import/Save/Load system for disk images (save/load as WOZ image)
+* Mouse Support
+* Lores and Double Lores Support
+* Linux Builds with GCC using OpenGL for Rendering
+* Various Fixes
+  * Fixed Super Hires Renderer to display correct colors
+  * Ensoniq fix that didn't account for the default voice (Neuromancer music plays)
+  * Fixed confusion between INTCXROM and SLOTROMSEL switches
+  * IRQs in native mode were firing the emulated IRQBRK vector
+  * Incorrect sync timing lead to invalid Vertical and Horizontal VGC counters
+  * Corrected BIT immediate flag manipulation
+  * Fixed 3.5" drive emulation disk-in-place query value (allowing GS/OS to boot)
+* Flashing Text
+* List toolbox calls in program trace
+* Updated dependencies
+  *  `ImGui` to `1.88` and
+  *  `fmt` to `9.1.0`
+  *  `sokol` to latest
 
 ## Version 0.3
 

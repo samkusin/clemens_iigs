@@ -1,116 +1,160 @@
 # Clemens IIGS
 
-![Boot Sequence Demo](https://samirsinha.com/images/sample-iigs-boot.gif)
+![Boot Sequence Demo](https://samirsinha.com/images/dotc-title.gif)
 
+The Clemens IIgs emulator is an attempt at writing a modern emulator for
+the Apple IIgs machine.  Its design focuses on developers versus casual play,
+providing tools to debug IIgs applications at runtime.
 
-The Clemens Apple IIgs emulator project is a personal attempt to write a modern functional emulator for the 65816 CPU based computer system from the late 1980s by Apple Computer, Inc.
+My eventual goal is to provide a solid Apple IIgs backend and debugger with a
+functional frontend.  At this writing I'd say the project is about 80% there
+with the following features missing (in rough priority of what's planned next):
 
-## Summary
+* Smartport Hard Drive
+* Gamepad/Joystick
+* ROM 01 Support
+* Serial (SCC)
+* Diagnostic Tests Pass
+* 8mhz and other fast execution modes
+* PAL and Monochrome modes
+* AppleTalk
 
-The current state of the project is a IMGUI (Dear ImGui) debugger front end running the emulator with a very `gdb` like interface to inspect memory, load disks and reset the system.  Documentation to come.
+## Features
 
-My goal is to provide a solid Apple IIgs backend + debugger for ambitious developers who want to write a modern frontend.
+### Emulation
 
-The emulator backend is written in C.  The `host` front-end is written in C++ with a few header only libraries for boilerplate rendering, I/O, GUI.
+* Super Hires 640/320 modes with VBL and Scanline IRQs
+* Ensoniq, Mockingboard C (without SSI voice) and A2 Speaker Audio
+* WOZ 2.0, 2IMG, PO, DO and DSK support
+* 5.25" and Apple 3.5" Drive Emulation
+* Mouse and Keyboard
+* Runs on ROM 3
+* All Apple IIe graphics modes (hires is OK, could be better for some titles)
 
+### Debugging
 
-### Supported Disk Types
+* Instruction level debugging
+* Breakpoints on execution at, read from or write to an address
+* Break on IRQ
+* Execution trace output and export
+* Memory bank dump to file
 
-* 5.25" and 3.5" WOZ images
-* DSK, 2MG, DO, PO images
+See [The Plan](https://github.com/samkusin/clemens_iigs/blob/main/docs/Plan.md)
+for details on the next release's upcoming features.
 
-### Working Features
+The [Documentation](https://github.com/samkusin/clemens_iigs/blob/main/docs/) folder
+contains some very rough notes on various systems and technical notes for the IIgs.
 
-* Disk II copy protected image boot
-* Apple II speaker
-* Prodos 16 and GS/OS boot
-* Hi-res and Double Hi-res graphics
-* 80-column
-* IRQ/BRK/RESET interrupts
-* ROM 3 support
-* Super Hi-Res 320/640 modes
-* Mockingboard C without SSI-223
-* Ensoniq audio playback
-* Mouse support
+This information will be moved to [the Wiki](https://github.com/samkusin/clemens_iigs/wiki/The-Clemens-Apple-IIgs-Emulator) in stages.
 
-See CHANGELOG.md for details on the next release's upcoming features.
+## Current Screenshots
 
-### Missing Features
+![Ultima V](https://samirsinha.com/images/u5a2_small.png)
 
-These are essential IIgs features that will be worked on.  This cannot be considered a working emulator until the following are functional:
+![GS/OS 5](https://samirsinha.com/images/gsos5_small.png)
 
-* Monochrome Display
-* Serial Communication
-* Extended character set text page
-* Joystick emulation
-* Accurate Hi-res display (RGB color monitor)
-* PAL/50hz emulation
-* ROM 01 support
+## Installation
 
-These are features that make Clemens an option for casual users.
+Both Linux and Windows are supported in this release.  Currently only the Windows
+build is available as a binary on the releases page.
 
-* Smartport (hard drive emulation)
-* Fast disk support - when disk is on, emulator runs at fastest possible speed
-* 8mhz mode Transwarp-like mode
-* A user-friendly front-end
-* There are others
+### Windows
 
-The CHANGELOG.md contains what has been done and what will be done in the current version.
+There is no installer and the application is contained in whole within a single exectuable.  Simply unzip the executable into a directory.  Because this
+executable is not code signed, you'll get a warning from the OS when running
+the binary.  Simply select 'More Info' and 'Run Anyway' if you're security
+policy (and personal comfort level) allows for running untrusted applications.
 
-The `docs` folder contains some very rough notes on various systems and technical notes for the IIgs.
-
-## Current Screenshots of IIgs Functionality
-
-![Myraglen](https://samirsinha.com/images/myraglen.png)
-
-![ProDOS 16](https://samirsinha.com/images/prodos16.png)
-
-## Building
-
-> **NOTE**
-> This needs to be fleshed out/cleaned up
-
-Windows only for now.   Most of the third-party libraries I use for cross-platform support will likely make porting to Linux and MacOS relatively simple (audio perhaps requiring the most work.)
-
-This project uses CMake.
-
-```
-# release will work too - this creates a folder called ./build-run in the project root
-cd build
-cmake ..
-cmake --build . --config debug --target app_assets_clemens_iigs
-
-# navigate to this directory and run the executable based on the config built
-cd ../build-run/clemens_iigs
-./Debug/clemens_iigs.exe
-```
+An alternative to installing the binary is to build the project locally.
 
 ### Linux
 
+Currently only builds from source are supported.  A future version will supply
+packages for Debian and possibly other distributions.
+
+## Getting Started
+
+1. Copy a ROM 03 file to the same directory as the executable
+2. Run the executable
+3. Download disk images from https://archive.org/details/wozaday or https://mirrors.apple2.org.za/ftp.apple.asimov.net/
+4. Import the images using one of the four available drives from the UI on the upper left handed pane.
+   1. Slot 5 refers to 3.5" disks
+   2. Slot 6 refers to 5.25" disks
+5. Once imported, you can select the image by selecting the drop down.  The imported image will appear there.
+
+
+### Emulator Input
+
+To send input to the emulated machine, click the emulator view.  Mouse input
+will be locked to the emulator view.  Keyboard events will also be directed to
+the emulator.
+
+To leave the emulator view, on Windows keyboards press the `Windows-Alt-Space` keys.
+
+The F11 Key represents the RESET key.  To sent a Ctrl-RESET to the emulator,
+press Ctrl-F11.
+
+### Terminal Commands
+
+The Terminal is currently the primary console interface available to send commands to the emulator.
+
+Type 'help' to list the available commands.  The most important commands to
+remember are:
+
 ```
-apt install rsync
+reboot     - reboots the machine
+break      - breaks execution at the current PC
+step       - step instruction at current PC
 ```
 
-## Usage
+Please consult [the Wiki](https://github.com/samkusin/clemens_iigs/wiki/The-Clemens-Apple-IIgs-Emulator) for more detailed usage instructions.  The
+following can be used to begin working with the emulator.
 
-The ROM 3 needed to boot the system needs to be supplied by the user.  There are ways to find it on common non-commercial disk image sites.
+## Build
 
-Once found, copy it to the ./build-run/clemens_iigs folder and rename it `gs_rom_3.rom`.
+Both Linux 64-bit and Windows 10 or greater are supported in this release.  On all platforms, [CMake](https://cmake.org/) is required to build the project.
 
-Then in the front-end Terminal window, (click on the lower left 'Terminal' window) type:
+### Linux
+
+#### Prerequisites
+
+The following packages must be installed to successfully build the binary.
+
+* GCC version 8 or later
+* libx11-dev
+* libxcursor-dev
+* libxi-dev
+* mesa-common-dev
+* libasound-dev
+
+#### Commands
+
+Inside the project directory execute the following.
 
 ```
-.power
-run
+cmake -B build -DCMAKE_BUILD_TYPE=<Debug|RelWithDbgInfo|Release> -DBUILD_TESTING=OFF
+cmake --build build --config=<Debug|RelWithDbgInfo|Release>
+cp build-run/clemens_iigs/clemens_iigs <your_selected_install_directory>
 ```
 
-Documentation to come.
+### Windows
+
+#### Commands
+
+Inside the project directory execute the following.
+
+```
+cmake -B build -DBUILD_TESTING=OFF
+cmake --build build --config=<Debug|RelWithDbgInfo|Release>
+cp build-run/clemens_iigs/<Config>/clemens_iigs.exe <your_selected_install_directory>
+```
 
 ## Author's Note
 
-This project is not entirely novel as there are finished emulator projects like KEGS and MAME.  I doubt Clemens will ever achieve parity with those projects.  Given the relative popularity of other equivalent classic home computer systems (C64, Amiga) and the IIgs software library, it's unclear whether this emulator will ever see genuine usage.
+This project is not entirely novel as there are finished emulator projects like KEGS and MAME.
 
-I've open-sourced this project for exposure.  I doubt external contributions will be useful until I complete a few more core systems (Ensoniq audio, super-hires and smartport being the big ones.)
+I've open-sourced this project for exposure.  Contributions are welcome if they
+are made.
 
 The best ways to run Apple IIgs software are:
 
@@ -120,7 +164,9 @@ The best ways to run Apple IIgs software are:
 
 Honestly I think if someone can write a modern port of KEGS to Windows with a decent GUI frontend, that'll be the emulator you want to use.
 
-So why do we need another emulator.   We don't.  This is a personal project that I thought wouldn't be too hard to write (oh, really?).  Also I started this project to address a midlife programming crisis of sorts.
+So why do we need another emulator.  I've found the currently solutions fine for
+running GS software.   This emulator is meant for IIgs *application* developers first.   I hope to replicate or improve upon the fine debugger AppleWin supplies
+for Apple II software developers.
 
 The Apple IIgs is an odd system.   It's a precursor to the line of Classic Macinitosh machines that ended with the iMac and later Power PC machines (ADB, IWM, Smartport, color GUI.)  It also marked the end of the Apple II line of computers on which I first learned to program in BASIC and assembly.
 
