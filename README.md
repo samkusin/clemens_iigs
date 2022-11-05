@@ -112,6 +112,8 @@ break                   - breaks execution at the current PC
 step                    - step instruction at current PC
 trace on                - enables program tracing
 trace off, filename.txt - outputs the trace to the specified path
+save filename           - saves a snapshot of the current emulator state
+load filename           - restores the emulator state to the designated snapshot
 ```
 
 Please consult [the Wiki](https://github.com/samkusin/clemens_iigs/wiki/The-Clemens-Apple-IIgs-Emulator) for more detailed usage instructions.  The
