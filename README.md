@@ -26,6 +26,8 @@ with the following features **missing** (in rough priority of what's planned nex
 
 ## Features
 
+Please note this project is released with a Contributor Code of Conduct. By participating in this project you agree to abide by its terms.
+
 ### Emulation
 
 * Super Hires 640/320 modes with VBL and Scanline IRQs
