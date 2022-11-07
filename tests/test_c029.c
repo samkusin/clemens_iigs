@@ -1,3 +1,0 @@
-/*
-    NEWVIDEO tests (TBD
-*/
