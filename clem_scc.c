@@ -28,7 +28,6 @@ void clem_scc_write_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg,
     } else {
       scc->state = CLEM_SCC_STATE_REGISTER_WAIT;
     }
-
     break;
   }
   // CLEM_LOG("clem_scc: %02X <- %02X", ioreg, value);
