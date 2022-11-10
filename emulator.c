@@ -700,7 +700,8 @@ bool clemens_is_initialized(const ClemensMachine *machine) {
     if (!machine->mem.fpi_bank_map[1]) {
         return false;
     }
-    if (!machine->clocks_step || machine->clocks_step > machine->clocks_step_mega2) {
+    if (!machine->tspec.clocks_step ||
+        machine->tspec.clocks_step > machine->tspec.clocks_step_mega2) {
         return false;
     }
     return true;
@@ -762,7 +763,7 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks
     }
 
     machine->mmio_enabled = true;
-    clem_mmio_init(&machine->mmio, machine->mem.bank_page_map, machine->clocks_step_mega2);
+    clem_mmio_init(&machine->mmio, machine->mem.bank_page_map, machine->tspec.clocks_step_mega2);
 
     return 0;
 }
@@ -770,10 +771,10 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks
 void clemens_simple_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks_step,
                          void *fpiRAM, unsigned int fpiRAMBankCount) {
     machine->cpu.pins.resbIn = true;
-    machine->clocks_step = clocks_step;
-    machine->clocks_step_fast = clocks_step;
-    machine->clocks_step_mega2 = speed_factor;
-    machine->clocks_spent = 0;
+    machine->tspec.clocks_step = clocks_step;
+    machine->tspec.clocks_step_fast = clocks_step;
+    machine->tspec.clocks_step_mega2 = speed_factor;
+    machine->tspec.clocks_spent = 0;
     machine->mmio_enabled = false;
     machine->cpu.pins.irqbIn = true;
 
@@ -1293,7 +1294,7 @@ uint64_t clemens_clocks_per_second(ClemensMachine *clem, bool *is_slow_speed) {
     } else {
         *is_slow_speed = true;
     }
-    return clem->clocks_step_mega2 * CLEM_MEGA2_CYCLES_PER_SECOND;
+    return clem->tspec.clocks_step_mega2 * CLEM_MEGA2_CYCLES_PER_SECOND;
 }
 
 void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
@@ -3463,11 +3464,11 @@ void clemens_emulate_mmio(ClemensMachine *clem) {
     }
     if (mmio->state_type == kClemensMMIOStateType_Reset) {
         clem_disk_reset_drives(&clem->active_drives);
-        clem_mmio_reset(mmio, clem->clocks_step_mega2);
+        clem_mmio_reset(mmio, clem->tspec.clocks_step_mega2);
         /* extension cards reset handling */
         clem_iwm_speed_disk_gate(clem);
-        clock.ts = clem->clocks_spent;
-        clock.ref_step = clem->clocks_step_mega2;
+        clock.ts = clem->tspec.clocks_spent;
+        clock.ref_step = clem->tspec.clocks_step_mega2;
         for (i = 0; i < 7; ++i) {
             if (clem->card_slot[i]) {
                 clem->card_slot[i]->io_reset(&clock, clem->card_slot[i]->context);
@@ -3492,12 +3493,12 @@ void clemens_emulate_mmio(ClemensMachine *clem) {
     // TODO: calculate delta_ns per emulate call to call 'real-time' systems
     //      like VGC
     delta_mega2_cycles =
-        (uint32_t)((clem->clocks_spent / clem->clocks_step_mega2) - mmio->mega2_cycles);
+        (uint32_t)((clem->tspec.clocks_spent / clem->tspec.clocks_step_mega2) - mmio->mega2_cycles);
     mmio->mega2_cycles += delta_mega2_cycles;
     mmio->timer_60hz_us += delta_mega2_cycles;
 
-    clock.ts = clem->clocks_spent;
-    clock.ref_step = clem->clocks_step_mega2;
+    clock.ts = clem->tspec.clocks_spent;
+    clock.ref_step = clem->tspec.clocks_step_mega2;
 
     card_nmis = 0;
     card_irqs = 0;

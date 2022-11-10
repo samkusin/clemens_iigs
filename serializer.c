@@ -261,6 +261,13 @@ struct ClemensSerializerRecord kMemory[] = {
                                  2, CLEM_IIGS_BANK_SIZE),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
+struct ClemensSerializerRecord kTimeSpec[] = {
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, clocks_step),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, clocks_step_fast),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, clocks_step_mega2),
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensTimeSpec, clocks_spent),
+    CLEM_SERIALIZER_RECORD_EMPTY()};
+
 struct ClemensSerializerRecord kCPURegs[] = {
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, A),
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, X),
@@ -300,10 +307,7 @@ struct ClemensSerializerRecord kCPU[] = {
 
 struct ClemensSerializerRecord kMachine[] = {
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, cpu, struct Clemens65C816, kCPU),
-    CLEM_SERIALIZER_RECORD_DURATION(ClemensMachine, clocks_step),
-    CLEM_SERIALIZER_RECORD_DURATION(ClemensMachine, clocks_step_fast),
-    CLEM_SERIALIZER_RECORD_DURATION(ClemensMachine, clocks_step_mega2),
-    CLEM_SERIALIZER_RECORD_CLOCKS(ClemensMachine, clocks_spent),
+    CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, tspec, struct ClemensTimeSpec, kTimeSpec),
     CLEM_SERIALIZER_RECORD_INT32(ClemensMachine, resb_counter),
     CLEM_SERIALIZER_RECORD_BOOL(ClemensMachine, mmio_enabled),
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, mmio, struct ClemensMMIO, kMMIO),

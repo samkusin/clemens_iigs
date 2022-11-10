@@ -825,7 +825,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
             clemens_rtc_set(&machine_, (unsigned)epoch_time_1904);
 
-            auto lastClocksSpent = machine_.clocks_spent;
+            auto lastClocksSpent = machine_.tspec.clocks_spent;
             int64_t clocksPerTimeslice =
                 calculateClocksPerTimeslice(&machine_, emulatorRefreshFrequency);
             clocksRemainingInTimeslice += clocksPerTimeslice;
@@ -833,10 +833,11 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             machine_.cpu.cycles_spent = 0;
             while (clocksRemainingInTimeslice > 0 &&
                    (!stepsRemaining.has_value() || *stepsRemaining > 0)) {
-                clem_clocks_time_t pre_emulate_time = machine_.clocks_spent;
+                clem_clocks_time_t pre_emulate_time = machine_.tspec.clocks_spent;
                 clemens_emulate_cpu(&machine_);
                 clemens_emulate_mmio(&machine_);
-                clem_clocks_duration_t emulate_step_time = machine_.clocks_spent - pre_emulate_time;
+                clem_clocks_duration_t emulate_step_time =
+                    machine_.tspec.clocks_spent - pre_emulate_time;
                 clocksRemainingInTimeslice -= emulate_step_time;
                 if (stepsRemaining.has_value()) {
                     stepsRemaining = *stepsRemaining - 1;
@@ -867,9 +868,10 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                 currentFrameTimePoint - lastFrameTimePoint);
             lastFrameTimePoint = currentFrameTimePoint;
 
-            runSampler.update(fixedFrameInterval, actualFrameInterval,
-                              (clem_clocks_duration_t)(machine_.clocks_spent - lastClocksSpent),
-                              machine_.cpu.cycles_spent);
+            runSampler.update(
+                fixedFrameInterval, actualFrameInterval,
+                (clem_clocks_duration_t)(machine_.tspec.clocks_spent - lastClocksSpent),
+                machine_.cpu.cycles_spent);
 
             for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end();
                  ++diskDriveIt) {

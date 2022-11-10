@@ -672,7 +672,7 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     frameWriteState_.mmioWasInitialized = state.mmio_was_initialized;
     frameWriteState_.isTracing = state.isTracing;
     frameWriteState_.emulatorSpeedMhz = state.emulatorSpeedMhz;
-    frameWriteState_.emulatorClock.ts = state.machine->clocks_spent;
+    frameWriteState_.emulatorClock.ts = state.machine->tspec.clocks_spent;
     frameWriteState_.emulatorClock.ref_step = CLEM_CLOCKS_MEGA2_CYCLE;
     //  copy over component state as needed
     frameWriteState_.vgcModeFlags = state.machine->mmio.vgc.mode_flags;

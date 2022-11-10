@@ -575,14 +575,15 @@ struct ClemensMemory {
        bank access.
     */
     struct ClemensMemoryPageMap *bank_page_map[256];
+
+    void (*mmio_write)(struct ClemensMemory *, struct ClemensTimeSpec *, uint8_t /* data */,
+                       uint16_t /* addr */, uint8_t /* flags */, bool * /*is_slow_access*/,
+                       void * /* context */);
+    uint8_t (*mmio_read)(struct ClemensMemory *, struct ClemensTimeSpec *, uint16_t /* addr */,
+                         uint8_t /* flags*/, bool *, void * /* context */);
 };
 
-/**
- * @brief
- *
- */
-typedef struct ClemensMachine {
-    struct Clemens65C816 cpu;
+struct ClemensTimeSpec {
     /* clocks spent per cycle as set by the current speed settings */
     clem_clocks_duration_t clocks_step;
     /* clocks spent per cycle in fast mode */
@@ -591,6 +592,15 @@ typedef struct ClemensMachine {
     clem_clocks_duration_t clocks_step_mega2;
     /* clock timer - never change once system has been started */
     clem_clocks_time_t clocks_spent;
+};
+
+/**
+ * @brief
+ *
+ */
+typedef struct ClemensMachine {
+    struct Clemens65C816 cpu;
+    struct ClemensTimeSpec tspec;
 
     /** Internal, tracks cycle count for holding down the reset key */
     int resb_counter;

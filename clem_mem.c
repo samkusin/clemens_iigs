@@ -86,7 +86,8 @@ static void _clem_mmio_memory_map(struct ClemensMMIO *mmio, uint32_t memory_flag
 static void _clem_mmio_shadow_map(struct ClemensMMIO *mmio, uint32_t shadow_flags);
 
 static inline void _clem_mem_cycle(ClemensMachine *clem, bool mega2_access) {
-    clem->clocks_spent += mega2_access ? clem->clocks_step_mega2 : (clem->clocks_step);
+    clem->tspec.clocks_spent +=
+        mega2_access ? clem->tspec.clocks_step_mega2 : (clem->tspec.clocks_step);
     ++clem->cpu.cycles_spent;
 }
 
@@ -257,10 +258,10 @@ static void _clem_mmio_speed_c036_set(ClemensMachine *clem, uint8_t value) {
     if (setflags & CLEM_MMIO_SPEED_FAST_ENABLED) {
         if (value & CLEM_MMIO_SPEED_FAST_ENABLED && !clem->mmio.dev_iwm.disk_motor_on) {
             //    CLEM_LOG("C036: Fast Mode");
-            clem->clocks_step = clem->clocks_step_fast;
+            clem->tspec.clocks_step = clem->tspec.clocks_step_fast;
         } else {
             //    CLEM_LOG("C036: Slow Mode");
-            clem->clocks_step = clem->clocks_step_mega2;
+            clem->tspec.clocks_step = clem->tspec.clocks_step_mega2;
         }
     }
     if (setflags & CLEM_MMIO_SPEED_POWERED_ON) {
@@ -551,8 +552,8 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr, uint8_t flag
     //  TODO: some registers go through the CYA access path which runs faster
     *mega2_access = true;
 
-    ref_clock.ts = clem->clocks_spent;
-    ref_clock.ref_step = *mega2_access ? clem->clocks_step_mega2 : clem->clocks_step;
+    ref_clock.ts = clem->tspec.clocks_spent;
+    ref_clock.ref_step = *mega2_access ? clem->tspec.clocks_step_mega2 : clem->tspec.clocks_step;
 
     if (flags & CLEM_OP_IO_CARD) {
         uint8_t slot_idx;
@@ -685,7 +686,7 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr, uint8_t flag
         break;
     case CLEM_MMIO_REG_RTC_CTL:
         if (!is_noop) {
-            clem_rtc_command(&mmio->dev_rtc, clem->clocks_spent, CLEM_IO_READ);
+            clem_rtc_command(&mmio->dev_rtc, clem->tspec.clocks_spent, CLEM_IO_READ);
         }
         result = mmio->dev_rtc.ctl_c034;
         break;
@@ -884,8 +885,8 @@ static void _clem_mmio_write(ClemensMachine *clem, uint8_t data, uint16_t addr, 
 
     *mega2_access = true;
 
-    ref_clock.ts = clem->clocks_spent;
-    ref_clock.ref_step = *mega2_access ? clem->clocks_step_mega2 : clem->clocks_step;
+    ref_clock.ts = clem->tspec.clocks_spent;
+    ref_clock.ref_step = *mega2_access ? clem->tspec.clocks_step_mega2 : clem->tspec.clocks_step;
 
     if ((flags & CLEM_OP_IO_CARD) && addr >= 0xC100) {
         uint8_t slot_idx = (uint8_t)(addr >> 8) - 0xc0 - 1;
@@ -992,7 +993,7 @@ static void _clem_mmio_write(ClemensMachine *clem, uint8_t data, uint16_t addr, 
         break;
     case CLEM_MMIO_REG_RTC_CTL:
         mmio->dev_rtc.ctl_c034 = data;
-        clem_rtc_command(&mmio->dev_rtc, clem->clocks_spent, CLEM_IO_WRITE);
+        clem_rtc_command(&mmio->dev_rtc, clem->tspec.clocks_spent, CLEM_IO_WRITE);
         break;
     case CLEM_MMIO_REG_RTC_DATA:
         mmio->dev_rtc.data_c033 = data;
