@@ -106,5 +106,3 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 else()
     message(WARNING "Unsupported compiler")
 endif()
-
-project_create_assets_target(clemens_iigs)

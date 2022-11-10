@@ -195,6 +195,7 @@ External libraries referenced below are used by the `host` project (the debuggin
 ### Clemens Emulator Library
 
 * [mpack](https://github.com/ludocode/mpack) : A single source file MessagePack implementation written in C in the `external` folder used for serialization of a machine
+* [unity](https://github.com/ThrowTheSwitch/Unity) : A C testing framework
 
 ### Host
 
@@ -203,6 +204,7 @@ External libraries referenced below are used by the `host` project (the debuggin
 * [Dear ImGui](https://github.com/ocornut/imgui) A well-known IMGUI C++ library
 * [Sokol](https://github.com/floooh/sokol) A cross-platform minimal rendering backend
 * [fmt](https://github.com/fmtlib/fmt) A minimal std::format implementation
+* [doctest](https://github.com/doctest/doctest) A minimal C++ single-header testing framework
 
 
 ## License

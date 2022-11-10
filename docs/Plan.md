@@ -9,10 +9,17 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
+### Version 0.5 Wishlist
+
+* Emulator detection of ROM version through introspection
 * Speed up disk access when reading/writing (fast mode for emulation)
 * Smartport Hard Drive Support
 * ROM 01
 * Joystick/Paddle Support
+* Refactor tests with new test backend
+
+### Miscellaneous
+
 * CYA vs MEGA2 I/O access speeds
   * Some CYA registers are still "slow" so resolve these so they run at the IIgs
     fast speed
@@ -31,6 +38,8 @@ This is a running todo list.
 * clipboard (paste)
 
 ## DONE
+
+Listed in order of completion
 
 * Flashing Characters
 * Double Lores Mode (should be simple given how clem_display.cpp is written)
