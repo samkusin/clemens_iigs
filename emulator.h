@@ -21,18 +21,9 @@ extern "C" {
  * @param fpiRAMBankCount
  * @return int
  */
-int clemens_init(
-    ClemensMachine* machine,
-    uint32_t speed_factor,
-    uint32_t clocks_step,
-    void* rom,
-    size_t romSize,
-    void* e0bank,
-    void* e1bank,
-    void* fpiRAM,
-    void* slotExpansionROM,
-    unsigned int fpiRAMBankCount
-);
+int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks_step, void *rom,
+                 size_t romSize, void *e0bank, void *e1bank, void *fpiRAM, void *slotExpansionROM,
+                 unsigned int fpiRAMBankCount);
 
 /**
  * @brief initializes an empty machine that acts as a 65816 with just RAM
@@ -49,20 +40,15 @@ int clemens_init(
  * @param fpiRAM
  * @param fpiRAMBankCount
  */
-void clemens_simple_init(
-    ClemensMachine* machine,
-    uint32_t speed_factor,
-    uint32_t clocks_step,
-    void* fpiRAM,
-    unsigned int fpiRAMBankCount
-);
+void clemens_simple_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks_step,
+                         void *fpiRAM, unsigned int fpiRAMBankCount);
 
 /**
  * @brief
  *
  * @param machine
  */
-void clemens_debug_context(ClemensMachine* machine);
+void clemens_debug_context(ClemensMachine *machine);
 
 /**
  * @brief Verify the machine is initialized/ready for emulation
@@ -74,7 +60,7 @@ void clemens_debug_context(ClemensMachine* machine);
  * @return true The machine has ROM/RAM and clock settings
  * @return false
  */
-bool clemens_is_initialized(const ClemensMachine* clem);
+bool clemens_is_initialized(const ClemensMachine *clem);
 
 /**
  * @brief Trivial validation function (one conditional)
@@ -86,14 +72,21 @@ bool clemens_is_initialized(const ClemensMachine* clem);
  * @return true Passes a trivial check
  * @return false Fails a trivial check
  */
-bool clemens_is_initialized_simple(const ClemensMachine* clem);
+bool clemens_is_initialized_simple(const ClemensMachine *clem);
 
 /**
  * @brief
  *
  * @param clem
  */
-void clemens_emulate(ClemensMachine* clem);
+void clemens_emulate_cpu(ClemensMachine *clem);
+
+/**
+ * @brief
+ *
+ * @param clem
+ */
+void clemens_emulate_mmio(ClemensMachine *clem);
 
 /**
  * @brief Defines the logger function and machine specific context.
@@ -108,8 +101,7 @@ void clemens_emulate(ClemensMachine* clem);
  * @param logger
  * @param debug_user_ptr
  */
-void clemens_host_setup(ClemensMachine* clem, LoggerFn logger,
-                        void* debug_user_ptr);
+void clemens_host_setup(ClemensMachine *clem, LoggerFn logger, void *debug_user_ptr);
 
 /**
  * @brief
@@ -120,8 +112,7 @@ void clemens_host_setup(ClemensMachine* clem, LoggerFn logger,
  * @param clem
  * @param callback
  */
-void clemens_opcode_callback(ClemensMachine* clem,
-                             ClemensOpcodeCallback callback);
+void clemens_opcode_callback(ClemensMachine *clem, ClemensOpcodeCallback callback);
 
 /**
  * @brief
@@ -131,12 +122,8 @@ void clemens_opcode_callback(ClemensMachine* clem,
  * @param bank_read_idx
  * @param bank_write_idx
  */
-void clemens_create_page_mapping(
-    struct ClemensMemoryPageInfo* page,
-    uint8_t page_idx,
-    uint8_t bank_read_idx,
-    uint8_t bank_write_idx
-);
+void clemens_create_page_mapping(struct ClemensMemoryPageInfo *page, uint8_t page_idx,
+                                 uint8_t bank_read_idx, uint8_t bank_write_idx);
 
 /**
  * @brief Upload hex data directly into machine memory
@@ -150,8 +137,7 @@ void clemens_create_page_mapping(
  * @param bank  This is ignored if the incoming hex points to a 32-bit address
  * @return bool
  */
-bool clemens_load_hex(ClemensMachine* clem, const char* hex, const char* hex_end,
-                      unsigned bank);
+bool clemens_load_hex(ClemensMachine *clem, const char *hex, const char *hex_end, unsigned bank);
 
 /**
  * @brief
@@ -167,9 +153,8 @@ bool clemens_load_hex(ClemensMachine* clem, const char* hex, const char* hex_end
  * @param bank
  * @param adr
  */
-unsigned clemens_out_hex_data_body(const ClemensMachine* clem, char* hex,
-                                   unsigned out_hex_byte_limit,
-                                   unsigned bank, unsigned adr);
+unsigned clemens_out_hex_data_body(const ClemensMachine *clem, char *hex,
+                                   unsigned out_hex_byte_limit, unsigned bank, unsigned adr);
 
 /**
  * @brief
@@ -180,9 +165,8 @@ unsigned clemens_out_hex_data_body(const ClemensMachine* clem, char* hex,
  * @param adr
  * @return unsigned
  */
-unsigned clemens_out_hex_data_from_memory(char *hex, const uint8_t* memory,
-                                          unsigned out_hex_byte_limit,
-                                          unsigned adr);
+unsigned clemens_out_hex_data_from_memory(char *hex, const uint8_t *memory,
+                                          unsigned out_hex_byte_limit, unsigned adr);
 
 /**
  * @brief Writes memory from the machine to the output buffer in raw bytes
@@ -199,8 +183,8 @@ unsigned clemens_out_hex_data_from_memory(char *hex, const uint8_t* memory,
  * @param bank
  * @param adr
  */
-void clemens_out_bin_data(const ClemensMachine* clem, uint8_t* out,
-                          unsigned out_byte_cnt, uint8_t bank, uint16_t adr);
+void clemens_out_bin_data(const ClemensMachine *clem, uint8_t *out, unsigned out_byte_cnt,
+                          uint8_t bank, uint16_t adr);
 
 /**
  * @brief
@@ -209,7 +193,7 @@ void clemens_out_bin_data(const ClemensMachine* clem, uint8_t* out,
  * @param is_slow_speed
  * @return uint64_t
  */
-uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed);
+uint64_t clemens_clocks_per_second(ClemensMachine *clem, bool *is_slow_speed);
 
 /**
  * @brief Trivial validation that the emulator memory interface has been
@@ -219,7 +203,7 @@ uint64_t clemens_clocks_per_second(ClemensMachine* clem, bool* is_slow_speed);
  * @return true  MMIO is initialized (requires a reset)
  * @return false MMIO not initialized
  */
-bool clemens_is_mmio_initialized(const ClemensMachine* machine);
+bool clemens_is_mmio_initialized(const ClemensMachine *machine);
 
 /**
  * @brief Sets the audio buffer used by the clemens audio system for mixing
@@ -228,8 +212,8 @@ bool clemens_is_mmio_initialized(const ClemensMachine* machine);
  * @param clem
  * @param mix_buffer
  */
-void clemens_assign_audio_mix_buffer(ClemensMachine* clem,
-                                     struct ClemensAudioMixBuffer* mix_buffer);
+void clemens_assign_audio_mix_buffer(ClemensMachine *clem,
+                                     struct ClemensAudioMixBuffer *mix_buffer);
 
 /**
  * @brief Return the current audio buffer, and advances the read head to the
@@ -239,7 +223,7 @@ void clemens_assign_audio_mix_buffer(ClemensMachine* clem,
  * @param clem
  * @return ClemensAudio*
  */
-ClemensAudio* clemens_get_audio(ClemensAudio* audio, ClemensMachine* clem);
+ClemensAudio *clemens_get_audio(ClemensAudio *audio, ClemensMachine *clem);
 
 /**
  * @brief After the host is done with the audio frame, call this.
@@ -247,7 +231,7 @@ ClemensAudio* clemens_get_audio(ClemensAudio* audio, ClemensMachine* clem);
  * @param clem
  * @param consumed
  */
-void clemens_audio_next_frame(ClemensMachine* clem, unsigned consumed);
+void clemens_audio_next_frame(ClemensMachine *clem, unsigned consumed);
 
 /**
  * @brief
@@ -256,8 +240,7 @@ void clemens_audio_next_frame(ClemensMachine* clem, unsigned consumed);
  * @param drive_type
  * @return struct ClemensDrive*
  */
-struct ClemensDrive* clemens_drive_get(ClemensMachine* clem,
-                                       enum ClemensDriveType drive_type);
+struct ClemensDrive *clemens_drive_get(ClemensMachine *clem, enum ClemensDriveType drive_type);
 
 /**
  * @brief
@@ -268,9 +251,8 @@ struct ClemensDrive* clemens_drive_get(ClemensMachine* clem,
  * @return true
  * @return false
  */
-bool clemens_assign_disk(ClemensMachine* clem,
-                         enum ClemensDriveType drive_type,
-                         struct ClemensNibbleDisk* disk);
+bool clemens_assign_disk(ClemensMachine *clem, enum ClemensDriveType drive_type,
+                         struct ClemensNibbleDisk *disk);
 
 /**
  * @brief
@@ -279,8 +261,8 @@ bool clemens_assign_disk(ClemensMachine* clem,
  * @param drive_type
  * @param disk  The output disk
  */
-void clemens_eject_disk(ClemensMachine* clem, enum ClemensDriveType drive_type,
-                        struct ClemensNibbleDisk* disk);
+void clemens_eject_disk(ClemensMachine *clem, enum ClemensDriveType drive_type,
+                        struct ClemensNibbleDisk *disk);
 
 /**
  * @brief Performs a device specific eject of a disk (3.5" disks mainly.)
@@ -294,9 +276,8 @@ void clemens_eject_disk(ClemensMachine* clem, enum ClemensDriveType drive_type,
  * @return true Disk has ejected
  * @return false Disk is still ejecting
  */
-bool clemens_eject_disk_async(ClemensMachine* clem,
-                              enum ClemensDriveType drive_type,
-                              struct ClemensNibbleDisk* disk);
+bool clemens_eject_disk_async(ClemensMachine *clem, enum ClemensDriveType drive_type,
+                              struct ClemensNibbleDisk *disk);
 
 /**
  * @brief Forwards input from ths host machine to the ADB
@@ -304,8 +285,7 @@ bool clemens_eject_disk_async(ClemensMachine* clem,
  * @param clem
  * @param input
  */
-void clemens_input(ClemensMachine* clem,
-                   const struct ClemensInputEvent* input);
+void clemens_input(ClemensMachine *clem, const struct ClemensInputEvent *input);
 
 /**
  * @brief Forwards state of toggle keys to the emulator
@@ -314,7 +294,7 @@ void clemens_input(ClemensMachine* clem,
  * @param enabled See CLEM_ADB_KEYB_TOGGLE_xxx
  * @param disabled See CLEM_ADB_KEYB_TOGGLE_xxx
  */
-void clemens_input_key_toggle(ClemensMachine* clem, unsigned enabled);
+void clemens_input_key_toggle(ClemensMachine *clem, unsigned enabled);
 
 /**
  * @brief
@@ -322,7 +302,7 @@ void clemens_input_key_toggle(ClemensMachine* clem, unsigned enabled);
  * @param input
  * @return const uint8_t*
  */
-const uint8_t* clemens_get_ascii_from_a2code(unsigned input);
+const uint8_t *clemens_get_ascii_from_a2code(unsigned input);
 
 /**
  * @brief
@@ -330,14 +310,14 @@ const uint8_t* clemens_get_ascii_from_a2code(unsigned input);
  * @param clem
  * @param seconds_since_1904
  */
-void clemens_rtc_set(ClemensMachine* clem, uint32_t seconds_since_1904);
+void clemens_rtc_set(ClemensMachine *clem, uint32_t seconds_since_1904);
 
 /**
  * @brief
  *
  * @param clem
  */
-void clemens_rtc_set_bram_dirty(ClemensMachine* clem);
+void clemens_rtc_set_bram_dirty(ClemensMachine *clem);
 
 /**
  * @brief This function can be used to persist RTC BRAM data if it has changed
@@ -346,14 +326,14 @@ void clemens_rtc_set_bram_dirty(ClemensMachine* clem);
  * @param is_dirty
  * @return const uint8_t*
  */
-const uint8_t* clemens_rtc_get_bram(ClemensMachine* clem, bool* is_dirty);
+const uint8_t *clemens_rtc_get_bram(ClemensMachine *clem, bool *is_dirty);
 
 /**
  * @brief
  *
  * @param clem
  */
-void clemens_debug_status(ClemensMachine* clem);
+void clemens_debug_status(ClemensMachine *clem);
 
 /**
  * @brief Returns the current monitor settings.
@@ -370,8 +350,7 @@ void clemens_debug_status(ClemensMachine* clem);
  * @param clem
  * @return ClemensMonitor*
  */
-ClemensMonitor* clemens_get_monitor(ClemensMonitor* monitor,
-                                    ClemensMachine* clem);
+ClemensMonitor *clemens_get_monitor(ClemensMonitor *monitor, ClemensMachine *clem);
 
 /**
  * @brief Returns the current text video data to be displayed by the host
@@ -383,8 +362,7 @@ ClemensMonitor* clemens_get_monitor(ClemensMonitor* monitor,
  * @param clem
  * @return ClemensVideo*
  */
-ClemensVideo* clemens_get_text_video(ClemensVideo* video,
-                                     ClemensMachine* clem);
+ClemensVideo *clemens_get_text_video(ClemensVideo *video, ClemensMachine *clem);
 
 /**
  * @brief Returns the current graphics video data to be displayed by the host
@@ -396,8 +374,7 @@ ClemensVideo* clemens_get_text_video(ClemensVideo* video,
  * @param clem
  * @return ClemensVideo*
  */
-ClemensVideo* clemens_get_graphics_video(ClemensVideo* video,
-                                         ClemensMachine* clem);
+ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *clem);
 
 #ifdef __cplusplus
 }
