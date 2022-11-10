@@ -254,6 +254,13 @@ struct ClemensSerializerRecord kDriveBay[] = {
                                          kDrive),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
+struct ClemensSerializerRecord kMemory[] = {
+    /* FPI bank map has custom serialization */
+    /* TODO: FPI BANK MAP and FP_BANK_USED */
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensMemory, kClemensSerializerTypeBlob, mega2_bank_map,
+                                 2, CLEM_IIGS_BANK_SIZE),
+    CLEM_SERIALIZER_RECORD_EMPTY()};
+
 struct ClemensSerializerRecord kCPURegs[] = {
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, A),
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensCPURegs, X),
@@ -301,11 +308,7 @@ struct ClemensSerializerRecord kMachine[] = {
     CLEM_SERIALIZER_RECORD_BOOL(ClemensMachine, mmio_enabled),
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, mmio, struct ClemensMMIO, kMMIO),
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, active_drives, struct ClemensDriveBay, kDriveBay),
-
-    /* FPI bank map has custom serialization */
-    /* TODO: FPI BANK MAP and FP_BANK_USED */
-    CLEM_SERIALIZER_RECORD_ARRAY(ClemensMachine, kClemensSerializerTypeBlob, mega2_bank_map, 2,
-                                 CLEM_IIGS_BANK_SIZE),
+    CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, mem, struct ClemensMemory, kMemory),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 // see clem_disk.h
@@ -530,10 +533,10 @@ mpack_writer_t *clemens_serialize_machine(mpack_writer_t *writer, ClemensMachine
        special cased to avoid unnecessary serialization
     */
     for (idx = 0; idx < 256; ++idx) {
-        mpack_write_bool(writer, machine->fpi_bank_used[idx]);
-        if (machine->fpi_bank_used[idx]) {
+        mpack_write_bool(writer, machine->mem.fpi_bank_used[idx]);
+        if (machine->mem.fpi_bank_used[idx]) {
             mpack_write_u8(writer, (uint8_t)(idx & 0xff));
-            mpack_write_bin(writer, (char *)machine->fpi_bank_map[idx], CLEM_IIGS_BANK_SIZE);
+            mpack_write_bin(writer, (char *)machine->mem.fpi_bank_map[idx], CLEM_IIGS_BANK_SIZE);
         }
     }
 
@@ -764,16 +767,16 @@ mpack_reader_t *clemens_unserialize_machine(mpack_reader_t *reader, ClemensMachi
        special cased to avoid unnecessary serialization
     */
     for (idx = 0; idx < 256; ++idx) {
-        machine->fpi_bank_used[idx] = mpack_expect_bool(reader);
-        if (machine->fpi_bank_used[idx]) {
+        machine->mem.fpi_bank_used[idx] = mpack_expect_bool(reader);
+        if (machine->mem.fpi_bank_used[idx]) {
             if (mpack_expect_u8(reader) != (uint8_t)(idx & 0xff)) {
                 return NULL;
             }
             sz = mpack_expect_bin(reader);
-            if (!machine->fpi_bank_map[idx]) {
-                machine->fpi_bank_map[idx] = (*alloc_cb)(sz, context);
+            if (!machine->mem.fpi_bank_map[idx]) {
+                machine->mem.fpi_bank_map[idx] = (*alloc_cb)(sz, context);
             }
-            mpack_read_bytes(reader, (char *)machine->fpi_bank_map[idx], sz);
+            mpack_read_bytes(reader, (char *)machine->mem.fpi_bank_map[idx], sz);
             mpack_done_bin(reader);
         }
     }

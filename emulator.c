@@ -686,7 +686,7 @@ void _clem_init_instruction_map() {
 }
 
 bool clemens_is_initialized_simple(const ClemensMachine *machine) {
-    return (machine->fpi_bank_map[0] != NULL);
+    return (machine->mem.fpi_bank_map[0] != NULL);
 }
 
 bool clemens_is_mmio_initialized(const ClemensMachine *machine) {
@@ -697,7 +697,7 @@ bool clemens_is_initialized(const ClemensMachine *machine) {
     if (!clemens_is_initialized_simple(machine)) {
         return false;
     }
-    if (!machine->fpi_bank_map[1]) {
+    if (!machine->mem.fpi_bank_map[1]) {
         return false;
     }
     if (!machine->clocks_step || machine->clocks_step > machine->clocks_step_mega2) {
@@ -744,17 +744,17 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks
     /* memory organization for the FPI */
     /* TODO: Support ROM 01 */
     for (idx = 0xfc; idx <= 0xff; ++idx) {
-        machine->fpi_bank_used[idx] = true;
-        machine->fpi_bank_map[idx] = (uint8_t *)rom + CLEM_IIGS_BANK_SIZE * (idx - 0xfc);
+        machine->mem.fpi_bank_used[idx] = true;
+        machine->mem.fpi_bank_map[idx] = (uint8_t *)rom + CLEM_IIGS_BANK_SIZE * (idx - 0xfc);
     }
     /* TODO: remap non used banks to used banks per the wrapping mechanism on
        the IIgs
     */
-    machine->fpi_bank_map[CLEM_IIGS_EMPTY_RAM_BANK] = s_empty_ram;
-    machine->mega2_bank_map[0x00] = (uint8_t *)e0bank;
-    memset(machine->mega2_bank_map[0x00], 0, CLEM_IIGS_BANK_SIZE);
-    machine->mega2_bank_map[0x01] = (uint8_t *)e1bank;
-    memset(machine->mega2_bank_map[0x01], 0, CLEM_IIGS_BANK_SIZE);
+    machine->mem.fpi_bank_map[CLEM_IIGS_EMPTY_RAM_BANK] = s_empty_ram;
+    machine->mem.mega2_bank_map[0x00] = (uint8_t *)e0bank;
+    memset(machine->mem.mega2_bank_map[0x00], 0, CLEM_IIGS_BANK_SIZE);
+    machine->mem.mega2_bank_map[0x01] = (uint8_t *)e1bank;
+    memset(machine->mem.mega2_bank_map[0x01], 0, CLEM_IIGS_BANK_SIZE);
 
     for (idx = 0; idx < 7; ++idx) {
         machine->card_slot[idx] = NULL;
@@ -762,7 +762,7 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks
     }
 
     machine->mmio_enabled = true;
-    clem_mmio_init(&machine->mmio, machine->bank_page_map, machine->clocks_step_mega2);
+    clem_mmio_init(&machine->mmio, machine->mem.bank_page_map, machine->clocks_step_mega2);
 
     return 0;
 }
@@ -780,9 +780,9 @@ void clemens_simple_init(ClemensMachine *machine, uint32_t speed_factor, uint32_
     if (fpiRAMBankCount > 256)
         fpiRAMBankCount = 256;
     for (unsigned i = 0; i < fpiRAMBankCount; ++i) {
-        machine->fpi_bank_used[i] = true;
-        machine->fpi_bank_map[i] = ((uint8_t *)fpiRAM) + (i * CLEM_IIGS_BANK_SIZE);
-        memset(machine->fpi_bank_map[i], 0, CLEM_IIGS_BANK_SIZE);
+        machine->mem.fpi_bank_used[i] = true;
+        machine->mem.fpi_bank_map[i] = ((uint8_t *)fpiRAM) + (i * CLEM_IIGS_BANK_SIZE);
+        memset(machine->mem.fpi_bank_map[i], 0, CLEM_IIGS_BANK_SIZE);
     }
     /* all non mapped FPI banks will map to empty memory until overridden by
        application or the full IIgs emulator initializtion function
@@ -790,11 +790,11 @@ void clemens_simple_init(ClemensMachine *machine, uint32_t speed_factor, uint32_
     */
     memset(s_empty_ram, 0, CLEM_IIGS_BANK_SIZE);
     for (unsigned i = fpiRAMBankCount; i < 0xff; ++i) {
-        machine->fpi_bank_used[i] = false;
-        machine->fpi_bank_map[i] = s_empty_ram;
+        machine->mem.fpi_bank_used[i] = false;
+        machine->mem.fpi_bank_map[i] = s_empty_ram;
     }
 
-    memset(&machine->bank_page_map, 0, sizeof(machine->bank_page_map));
+    memset(&machine->mem.bank_page_map, 0, sizeof(machine->mem.bank_page_map));
 
     /* internal tables used to define opcode attributes */
     for (unsigned i = 0; i < 256; ++i) {
@@ -865,7 +865,7 @@ bool clemens_load_hex(ClemensMachine *clem, const char *hex, const char *hex_end
                     state = CLEM_LOAD_HEX_STATE_ERROR;
                 } else {
                     chksum = (uint8_t)(hex_byte_length & 0xff);
-                    clem_memory = clem->fpi_bank_map[bank];
+                    clem_memory = clem->mem.fpi_bank_map[bank];
                     if (clem_memory) {
                         state = CLEM_LOAD_HEX_STATE_ADR16;
                         --next; /* backtrack since there's no delim */
@@ -991,9 +991,9 @@ unsigned clemens_out_hex_data_body(const ClemensMachine *clem, char *hex,
                                    unsigned out_hex_byte_limit, unsigned bank, unsigned adr) {
     const uint8_t *memory;
     if (bank == 0xe0 || bank == 0xe1) {
-        memory = clem->mega2_bank_map[bank & 0x1];
+        memory = clem->mem.mega2_bank_map[bank & 0x1];
     } else {
-        memory = clem->fpi_bank_map[bank & 0xff];
+        memory = clem->mem.fpi_bank_map[bank & 0xff];
     }
 
     return clemens_out_hex_data_from_memory(hex, memory, out_hex_byte_limit, adr);
@@ -1004,9 +1004,9 @@ void clemens_out_bin_data(const ClemensMachine *clem, uint8_t *out, unsigned out
     const uint8_t *memory;
     unsigned left0, right0;
     if (bank == 0xe0 || bank == 0xe1) {
-        memory = clem->mega2_bank_map[bank & 0x1];
+        memory = clem->mem.mega2_bank_map[bank & 0x1];
     } else {
-        memory = clem->fpi_bank_map[bank & 0xff];
+        memory = clem->mem.fpi_bank_map[bank & 0xff];
     }
 
     if (out_byte_cnt > 0x10000) {
@@ -1186,7 +1186,7 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *cl
         video->scanline_byte_cnt = 160;
         video->scanline_limit = CLEM_VGC_SHGR_SCANLINE_COUNT;
         video->scanlines = vgc->shgr_scanlines;
-        _clem_build_rgba_palettes(video, clem->mega2_bank_map[1]);
+        _clem_build_rgba_palettes(video, clem->mem.mega2_bank_map[1]);
         return video;
     } else if (vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE) {
         video->scanline_start = 0;
@@ -3511,7 +3511,7 @@ void clemens_emulate_mmio(ClemensMachine *clem) {
             card_nmis |= (1 << i);
     }
 
-    clem_vgc_sync(&mmio->vgc, &clock, clem->mega2_bank_map[0], clem->mega2_bank_map[1]);
+    clem_vgc_sync(&mmio->vgc, &clock, clem->mem.mega2_bank_map[0], clem->mem.mega2_bank_map[1]);
     clem_iwm_glu_sync(&mmio->dev_iwm, &clem->active_drives, &clock);
     clem_scc_glu_sync(&mmio->dev_scc, &clock);
     clem_sound_glu_sync(&mmio->dev_audio, &clock);

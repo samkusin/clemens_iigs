@@ -564,6 +564,19 @@ enum ClemensVideoFormat {
     kClemensVideoFormat_Super_Hires
 };
 
+struct ClemensMemory {
+    /* each used bank MUST be 64K (65536) bytes */
+    uint8_t *fpi_bank_map[256]; // $00 - $ff
+    bool fpi_bank_used[256];
+    uint8_t *mega2_bank_map[2]; // $e0 - $e1
+
+    /* Provides remapping of memory read/write access per bank.  For the IIgs,
+       this map covers shadowed memory as well as language card and main/aux
+       bank access.
+    */
+    struct ClemensMemoryPageMap *bank_page_map[256];
+};
+
 /**
  * @brief
  *
@@ -586,17 +599,7 @@ typedef struct ClemensMachine {
 
     struct ClemensMMIO mmio;
     struct ClemensDriveBay active_drives;
-
-    /* each used bank MUST be 64K (65536) bytes */
-    uint8_t *fpi_bank_map[256]; // $00 - $ff
-    bool fpi_bank_used[256];
-    uint8_t *mega2_bank_map[2]; // $e0 - $e1
-
-    /* Provides remapping of memory read/write access per bank.  For the IIgs,
-       this map covers shadowed memory as well as language card and main/aux
-       bank access.
-    */
-    struct ClemensMemoryPageMap *bank_page_map[256];
+    struct ClemensMemory mem;
 
     /** Handlers for all slots */
     ClemensCard *card_slot[7];

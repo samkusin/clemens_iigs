@@ -851,7 +851,7 @@ static uint8_t _clem_mmio_read(ClemensMachine *clem, uint16_t addr, uint8_t flag
         break;
     default:
         if (ioreg >= 0x71 && ioreg < 0x80) {
-            result = clem->fpi_bank_map[0xff][0xc000 | ioreg];
+            result = clem->mem.fpi_bank_map[0xff][0xc000 | ioreg];
         } else if (ioreg >= 0x90) {
             result = _clem_mmio_card_io_read(clem->card_slot[(ioreg - 0x90) >> 4], &ref_clock,
                                              ioreg & 0xf, flags);
@@ -1695,7 +1695,7 @@ void clem_mmio_init(struct ClemensMMIO *mmio, struct ClemensMemoryPageMap **bank
 }
 
 void clem_read(ClemensMachine *clem, uint8_t *data, uint16_t adr, uint8_t bank, uint8_t flags) {
-    struct ClemensMemoryPageMap *bank_page_map = clem->bank_page_map[bank];
+    struct ClemensMemoryPageMap *bank_page_map = clem->mem.bank_page_map[bank];
     struct ClemensMemoryPageInfo *page = &bank_page_map->pages[adr >> 8];
     uint16_t offset = ((uint16_t)page->read << 8) | (adr & 0xff);
     bool read_only = (flags == CLEM_MEM_FLAG_NULL);
@@ -1757,7 +1757,7 @@ void clem_read(ClemensMachine *clem, uint8_t *data, uint16_t adr, uint8_t bank, 
 }
 
 void clem_write(ClemensMachine *clem, uint8_t data, uint16_t adr, uint8_t bank, uint8_t mem_flags) {
-    struct ClemensMemoryPageMap *bank_page_map = clem->bank_page_map[bank];
+    struct ClemensMemoryPageMap *bank_page_map = clem->mem.bank_page_map[bank];
     struct ClemensMemoryShadowMap *shadow_map = bank_page_map->shadow_map;
     struct ClemensMemoryPageInfo *page = &bank_page_map->pages[adr >> 8];
     uint16_t offset = ((uint16_t)page->write << 8) | (adr & 0xff);

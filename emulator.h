@@ -75,14 +75,26 @@ bool clemens_is_initialized(const ClemensMachine *clem);
 bool clemens_is_initialized_simple(const ClemensMachine *clem);
 
 /**
- * @brief
+ * @brief Emulate the 65816 CPU only
+ *
+ * Usually this call is paired with another API to handle memory-mapped I/O (MMIO).
+ * For Apple IIgs emulation, call clemens_emulate_mmio() following this call.  Unit
+ * tests can also test CPU only functions when calling this function
+ *
+ * If emulating a 65816 machine other than the Apple IIgs, calling this function
+ * by itself will suffice (provided that the ClemensMachine was initialized in
+ * its 'simple' mode.)
  *
  * @param clem
  */
 void clemens_emulate_cpu(ClemensMachine *clem);
 
 /**
- * @brief
+ * @brief Emulate the I/O portion of an Apple IIgs
+ *
+ * This should be paired with calls to clemens_emulate_cpu().  The calls are
+ * separated out from the original clemens_emulate() function to: facilitate
+ * unit testing, and to allow emulation of other 65816 devices.
  *
  * @param clem
  */
