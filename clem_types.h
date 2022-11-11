@@ -586,11 +586,13 @@ struct ClemensMemory {
     */
     struct ClemensMemoryPageMap *bank_page_map[256];
 
+    /* The MMIO context passed into the memory callbacks to MMIO (for customization) */
+    /* THESE MUST BE SET FOR THE IIGS */
+    void *mmio_context;
     void (*mmio_write)(struct ClemensMemory *, struct ClemensTimeSpec *, uint8_t /* data */,
-                       uint16_t /* addr */, uint8_t /* flags */, bool * /*is_slow_access*/,
-                       void * /* context */);
+                       uint16_t /* addr */, uint8_t /* flags */, bool * /*is_slow_access*/);
     uint8_t (*mmio_read)(struct ClemensMemory *, struct ClemensTimeSpec *, uint16_t /* addr */,
-                         uint8_t /* flags*/, bool *, void * /* context */);
+                         uint8_t /* flags*/, bool *);
 };
 
 struct ClemensTimeSpec {
@@ -630,7 +632,7 @@ typedef struct ClemensMachine {
 
     /** Internal, skips mmio if in 'simple' mode */
     bool mmio_enabled;
-
+    /** The Apple IIgs Mega2 + CYA I/O subsystem*/
     struct ClemensMMIO mmio;
 } ClemensMachine;
 

@@ -1714,12 +1714,12 @@ void clem_read(ClemensMachine *clem, uint8_t *data, uint16_t adr, uint8_t bank, 
                 *data = clem->mem.fpi_bank_map[0xff][offset];
                 io_access = false;
             } else {
-                *data = clem_mmio_read(&clem->mmio, &clem->tspec, offset,
-                                       read_only ? CLEM_OP_IO_NO_OP : 0, &mega2_access);
+                *data = (*clem->mem.mmio_read)(&clem->mem, &clem->tspec, offset,
+                                               read_only ? CLEM_OP_IO_NO_OP : 0, &mega2_access);
             }
         } else if (page->flags & CLEM_MEM_PAGE_CARDMEM_FLAG) {
-            *data = clem_mmio_read(
-                &clem->mmio, &clem->tspec, ((uint16_t)page->read << 8) | (adr & 0xff),
+            *data = (*clem->mem.mmio_read)(
+                &clem->mem, &clem->tspec, ((uint16_t)page->read << 8) | (adr & 0xff),
                 (read_only ? CLEM_OP_IO_NO_OP : 0) | CLEM_OP_IO_CARD, &mega2_access);
         } else {
             CLEM_ASSERT(false);
@@ -1778,14 +1778,15 @@ void clem_write(ClemensMachine *clem, uint8_t data, uint16_t adr, uint8_t bank, 
         unsigned slot_idx;
         if (page->flags & CLEM_MEM_PAGE_IOADDR_FLAG) {
             if (page->flags & CLEM_MEM_PAGE_WRITEOK_FLAG) {
-                clem_mmio_write(&clem->mmio, &clem->tspec, data, offset, flags, &mega2_access);
+                (*clem->mem.mmio_write)(&clem->mem, &clem->tspec, data, offset, flags,
+                                        &mega2_access);
             } else {
                 mega2_access = true;
             }
         } else if (page->flags & CLEM_MEM_PAGE_CARDMEM_FLAG) {
-            clem_mmio_write(&clem->mmio, &clem->tspec, data,
-                            ((uint16_t)page->write << 8) | (adr & 0xff), flags | CLEM_OP_IO_CARD,
-                            &mega2_access);
+            (*clem->mem.mmio_write)(&clem->mem, &clem->tspec, data,
+                                    ((uint16_t)page->write << 8) | (adr & 0xff),
+                                    flags | CLEM_OP_IO_CARD, &mega2_access);
         } else {
             CLEM_ASSERT(false);
         }

@@ -3446,6 +3446,20 @@ void clemens_emulate_cpu(ClemensMachine *clem) {
     cpu_execute(cpu, clem);
 }
 
+static void _clem_mmio_write_hook(struct ClemensMemory *mem, struct ClemensTimeSpec *tspec,
+                                  uint8_t data, uint16_t addr, uint8_t flags,
+                                  bool *is_slow_access) {
+    clem_mmio_write((struct ClemensMMIO *)mem->mmio_context, tspec, data, addr, flags,
+                    is_slow_access);
+}
+
+static uint8_t _clem_mmio_read_hook(struct ClemensMemory *mem, struct ClemensTimeSpec *tspec,
+                                    uint8_t data, uint16_t addr, uint8_t flags,
+                                    bool *is_slow_access) {
+    return clem_mmio_read((struct ClemensMMIO *)mem->mmio_context, tspec, addr, flags,
+                          is_slow_access);
+}
+
 void clemens_emulate_mmio(ClemensMachine *clem) {
     struct Clemens65C816 *cpu = &clem->cpu;
     struct ClemensMMIO *mmio = &clem->mmio;
@@ -3461,6 +3475,9 @@ void clemens_emulate_mmio(ClemensMachine *clem) {
         return;
     }
     if (mmio->state_type == kClemensMMIOStateType_Reset) {
+        clem->mem.mmio_context = mmio;
+        clem->mem.mmio_write = &_clem_mmio_write_hook;
+        clem->mem.mmio_read = &_clem_mmio_read_hook;
         clem_disk_reset_drives(&clem->mmio.active_drives);
         clem_mmio_reset(mmio, clem->tspec.clocks_step_mega2);
         /* extension cards reset handling */
