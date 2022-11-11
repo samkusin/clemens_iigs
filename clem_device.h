@@ -13,7 +13,6 @@ extern "C" {
 #endif
 
 void clem_debug_reset(struct ClemensDeviceDebugger *dbg);
-void clem_debug_counters(struct ClemensDeviceDebugger *dbg);
 
 void clem_debug_break(struct ClemensDeviceDebugger *dbg, unsigned debug_reason, unsigned param0,
                       unsigned param1);
@@ -240,7 +239,13 @@ void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
 uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
                              struct ClemensClock *clock, uint8_t ioreg, uint8_t flags);
 
-void clem_iwm_speed_disk_gate(ClemensMachine *clem);
+/**
+ * @brief
+ *
+ * @param mmio
+ * @param tspec
+ */
+void clem_iwm_speed_disk_gate(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec);
 
 /**
  * @brief

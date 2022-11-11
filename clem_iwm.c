@@ -741,10 +741,10 @@ uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBa
     return result;
 }
 
-void clem_iwm_speed_disk_gate(ClemensMachine *clem) {
-    struct ClemensDeviceIWM *iwm = &clem->mmio.dev_iwm;
+void clem_iwm_speed_disk_gate(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) {
+    struct ClemensDeviceIWM *iwm = &mmio->dev_iwm;
     uint8_t old_disk_motor_on = iwm->disk_motor_on;
-    uint8_t speed_slot_mask = clem->mmio.speed_c036 & 0xf;
+    uint8_t speed_slot_mask = mmio->speed_c036 & 0xf;
     bool drive_on = (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) != 0;
     bool drive_35 = (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) != 0;
 
@@ -763,17 +763,17 @@ void clem_iwm_speed_disk_gate(ClemensMachine *clem) {
         if (!old_disk_motor_on) {
             CLEM_LOG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
         }
-        clem->tspec.clocks_step = clem->tspec.clocks_step_mega2;
+        tspec->clocks_step = tspec->clocks_step_mega2;
         return;
     }
-    if (clem->mmio.speed_c036 & CLEM_MMIO_SPEED_FAST_ENABLED) {
-        clem->tspec.clocks_step = clem->tspec.clocks_step_fast;
+    if (mmio->speed_c036 & CLEM_MMIO_SPEED_FAST_ENABLED) {
+        tspec->clocks_step = tspec->clocks_step_fast;
 
         if (old_disk_motor_on) {
             CLEM_LOG("SPEED FAST Disk: %02X", iwm->disk_motor_on);
         }
     } else {
-        clem->tspec.clocks_step = clem->tspec.clocks_step_mega2;
+        tspec->clocks_step = tspec->clocks_step_mega2;
         if (old_disk_motor_on) {
             CLEM_LOG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
         }

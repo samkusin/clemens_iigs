@@ -689,10 +689,6 @@ bool clemens_is_initialized_simple(const ClemensMachine *machine) {
     return (machine->mem.fpi_bank_map[0] != NULL);
 }
 
-bool clemens_is_mmio_initialized(const ClemensMachine *machine) {
-    return clemens_is_initialized_simple(machine) && machine->mmio_enabled;
-}
-
 bool clemens_is_initialized(const ClemensMachine *machine) {
     if (!clemens_is_initialized_simple(machine)) {
         return false;
@@ -730,7 +726,7 @@ void clemens_create_page_mapping(struct ClemensMemoryPageInfo *page, uint8_t pag
 }
 
 int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks_step, void *rom,
-                 size_t romSize, void *e0bank, void *e1bank, void *fpiRAM, void *slotExpansionROM,
+                 size_t romSize, void *e0bank, void *e1bank, void *fpiRAM,
                  unsigned int fpiRAMBankCount) {
     unsigned idx;
 
@@ -756,12 +752,6 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks
     memset(machine->mem.mega2_bank_map[0x00], 0, CLEM_IIGS_BANK_SIZE);
     machine->mem.mega2_bank_map[0x01] = (uint8_t *)e1bank;
     memset(machine->mem.mega2_bank_map[0x01], 0, CLEM_IIGS_BANK_SIZE);
-    // machine->mem.mmio_read = &clem_mmio_read;
-    // machine->mem.mmio_write = &clem_mmio_write;
-
-    machine->mmio_enabled = true;
-    clem_mmio_init(&machine->mmio, machine->mem.bank_page_map, machine->tspec.clocks_step_mega2,
-                   slotExpansionROM);
 
     return 0;
 }
@@ -773,7 +763,6 @@ void clemens_simple_init(ClemensMachine *machine, uint32_t speed_factor, uint32_
     machine->tspec.clocks_step_fast = clocks_step;
     machine->tspec.clocks_step_mega2 = speed_factor;
     machine->tspec.clocks_spent = 0;
-    machine->mmio_enabled = false;
     machine->cpu.pins.irqbIn = true;
 
     if (fpiRAMBankCount > 256)
@@ -1024,20 +1013,20 @@ void clemens_out_bin_data(const ClemensMachine *clem, uint8_t *out, unsigned out
     memcpy(out, memory + left0, right0 - left0);
 }
 
-struct ClemensDrive *clemens_drive_get(ClemensMachine *clem, enum ClemensDriveType drive_type) {
+struct ClemensDrive *clemens_drive_get(ClemensMMIO *mmio, enum ClemensDriveType drive_type) {
     struct ClemensDrive *drive;
     switch (drive_type) {
     case kClemensDrive_3_5_D1:
-        drive = &clem->mmio.active_drives.slot5[0];
+        drive = &mmio->active_drives.slot5[0];
         break;
     case kClemensDrive_3_5_D2:
-        drive = &clem->mmio.active_drives.slot5[1];
+        drive = &mmio->active_drives.slot5[1];
         break;
     case kClemensDrive_5_25_D1:
-        drive = &clem->mmio.active_drives.slot6[0];
+        drive = &mmio->active_drives.slot6[0];
         break;
     case kClemensDrive_5_25_D2:
-        drive = &clem->mmio.active_drives.slot6[1];
+        drive = &mmio->active_drives.slot6[1];
         break;
     default:
         drive = NULL;
@@ -1046,9 +1035,9 @@ struct ClemensDrive *clemens_drive_get(ClemensMachine *clem, enum ClemensDriveTy
     return drive;
 }
 
-bool clemens_assign_disk(ClemensMachine *clem, enum ClemensDriveType drive_type,
+bool clemens_assign_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
                          struct ClemensNibbleDisk *disk) {
-    struct ClemensDrive *drive = clemens_drive_get(clem, drive_type);
+    struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
     if (!drive) {
         return false;
     }
@@ -1057,9 +1046,6 @@ bool clemens_assign_disk(ClemensMachine *clem, enum ClemensDriveType drive_type,
         return false;
     }
     if (!disk) {
-        return false;
-    }
-    if (!clemens_is_initialized_simple(clem)) {
         return false;
     }
     /* filter out 'bad' disk/drive pairings before the IWM has a chance to flag
@@ -1079,46 +1065,43 @@ bool clemens_assign_disk(ClemensMachine *clem, enum ClemensDriveType drive_type,
     if (disk->disk_type != CLEM_DISK_TYPE_NONE) {
         CLEM_LOG("%s inserting disk", s_drive_names[drive_type]);
     }
-    clem_iwm_insert_disk(&clem->mmio.dev_iwm, drive, disk);
+    clem_iwm_insert_disk(&mmio->dev_iwm, drive, disk);
     return true;
 }
 
-void clemens_eject_disk(ClemensMachine *clem, enum ClemensDriveType drive_type,
+void clemens_eject_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
                         struct ClemensNibbleDisk *disk) {
-    struct ClemensDrive *drive = clemens_drive_get(clem, drive_type);
+    struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
     if (!drive)
-        return;
-    if (!clemens_is_initialized_simple(clem))
         return;
 
     if (drive->disk.disk_type != CLEM_DISK_TYPE_NONE) {
         CLEM_LOG("%s ejecting disk", s_drive_names[drive_type]);
     }
-    clem_iwm_eject_disk(&clem->mmio.dev_iwm, drive, disk);
+    clem_iwm_eject_disk(&mmio->dev_iwm, drive, disk);
 }
 
-bool clemens_eject_disk_async(ClemensMachine *clem, enum ClemensDriveType drive_type,
+bool clemens_eject_disk_async(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
                               struct ClemensNibbleDisk *disk) {
-    struct ClemensDrive *drive = clemens_drive_get(clem, drive_type);
-    if (drive && clemens_is_initialized_simple(clem)) {
+    struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
+    if (drive) {
         if (drive->disk.disk_type != CLEM_DISK_TYPE_NONE) {
             CLEM_LOG("%s ejecting disk", s_drive_names[drive_type]);
         }
-        return clem_iwm_eject_disk_async(&clem->mmio.dev_iwm, drive, disk);
+        return clem_iwm_eject_disk_async(&mmio->dev_iwm, drive, disk);
     }
-    clem_iwm_eject_disk(&clem->mmio.dev_iwm, drive, disk);
+    clem_iwm_eject_disk(&mmio->dev_iwm, drive, disk);
     return true;
 }
 
-ClemensMonitor *clemens_get_monitor(ClemensMonitor *monitor, ClemensMachine *clem) {
-    struct ClemensVGC *vgc = &clem->mmio.vgc;
+ClemensMonitor *clemens_get_monitor(ClemensMonitor *monitor, ClemensMMIO *mmio) {
+    struct ClemensVGC *vgc = &mmio->vgc;
 
     //  TODO: use vgc flags to detect NTSC vs PAL, Mono vs RGB
     monitor->signal = CLEM_MONITOR_SIGNAL_NTSC;
     monitor->signal = CLEM_MONITOR_COLOR_RGB;
-    monitor->border_color = clem->mmio.dev_rtc.ctl_c034 & 0x0f;
-    monitor->text_color =
-        ((clem->mmio.vgc.text_bg_color & 0xf) << 4) | (clem->mmio.vgc.text_fg_color & 0xf);
+    monitor->border_color = mmio->dev_rtc.ctl_c034 & 0x0f;
+    monitor->text_color = ((vgc->text_bg_color & 0xf) << 4) | (vgc->text_fg_color & 0xf);
 
     if (vgc->mode_flags & CLEM_VGC_SUPER_HIRES) {
         monitor->width = 640;
@@ -1130,8 +1113,8 @@ ClemensMonitor *clemens_get_monitor(ClemensMonitor *monitor, ClemensMachine *cle
     return monitor;
 }
 
-ClemensVideo *clemens_get_text_video(ClemensVideo *video, ClemensMachine *clem) {
-    struct ClemensVGC *vgc = &clem->mmio.vgc;
+ClemensVideo *clemens_get_text_video(ClemensVideo *video, ClemensMMIO *mmio) {
+    struct ClemensVGC *vgc = &mmio->vgc;
     video->vbl_counter = vgc->vbl_counter;
     if (!(vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE)) {
         video->scanline_start = 0;
@@ -1145,8 +1128,8 @@ ClemensVideo *clemens_get_text_video(ClemensVideo *video, ClemensMachine *clem) 
     video->scanline_limit = CLEM_VGC_TEXT_SCANLINE_COUNT;
     video->format = kClemensVideoFormat_Text;
     video->scanline_byte_cnt = 40;
-    if ((clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
-        !(clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE)) {
+    if ((mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
+        !(mmio->mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE)) {
         video->scanlines = vgc->text_2_scanlines;
     } else {
         video->scanlines = vgc->text_1_scanlines;
@@ -1174,10 +1157,11 @@ void _clem_build_rgba_palettes(ClemensVideo *video, uint8_t *e1_bank) {
     }
 }
 
-ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *clem) {
-    struct ClemensVGC *vgc = &clem->mmio.vgc;
-    bool use_page_2 = (clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
-                      !(clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE);
+ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *clem,
+                                         ClemensMMIO *mmio) {
+    struct ClemensVGC *vgc = &mmio->vgc;
+    bool use_page_2 = (mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
+                      !(mmio->mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE);
     video->vbl_counter = vgc->vbl_counter;
     if (vgc->mode_flags & CLEM_VGC_SUPER_HIRES) {
         video->format = kClemensVideoFormat_Super_Hires;
@@ -1235,14 +1219,13 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *cl
     return video;
 }
 
-void clemens_assign_audio_mix_buffer(ClemensMachine *clem,
-                                     struct ClemensAudioMixBuffer *mix_buffer) {
-    memcpy(&clem->mmio.dev_audio.mix_buffer, mix_buffer, sizeof(struct ClemensAudioMixBuffer));
-    clem_sound_reset(&clem->mmio.dev_audio);
+void clemens_assign_audio_mix_buffer(ClemensMMIO *mmio, struct ClemensAudioMixBuffer *mix_buffer) {
+    memcpy(&mmio->dev_audio.mix_buffer, mix_buffer, sizeof(struct ClemensAudioMixBuffer));
+    clem_sound_reset(&mmio->dev_audio);
 }
 
-ClemensAudio *clemens_get_audio(ClemensAudio *audio, ClemensMachine *clem) {
-    struct ClemensDeviceAudio *device = &clem->mmio.dev_audio;
+ClemensAudio *clemens_get_audio(ClemensAudio *audio, ClemensMMIO *mmio) {
+    struct ClemensDeviceAudio *device = &mmio->dev_audio;
     audio->data = device->mix_buffer.data;
     audio->frame_start = 0;
     audio->frame_count = device->mix_frame_index;
@@ -1252,47 +1235,43 @@ ClemensAudio *clemens_get_audio(ClemensAudio *audio, ClemensMachine *clem) {
     return audio;
 }
 
-void clemens_audio_next_frame(ClemensMachine *clem, unsigned consumed) {
-    clem_sound_consume_frames(&clem->mmio.dev_audio, consumed);
+void clemens_audio_next_frame(ClemensMMIO *mmio, unsigned consumed) {
+    clem_sound_consume_frames(&mmio->dev_audio, consumed);
 }
 
-void clemens_input(ClemensMachine *machine, const struct ClemensInputEvent *input) {
-    clem_adb_device_input(&machine->mmio.dev_adb, input);
+void clemens_input(ClemensMMIO *mmio, const struct ClemensInputEvent *input) {
+    clem_adb_device_input(&mmio->dev_adb, input);
 }
 
-void clemens_input_key_toggle(ClemensMachine *clem, unsigned enabled) {
-    clem_adb_device_key_toggle(&clem->mmio.dev_adb, enabled);
+void clemens_input_key_toggle(ClemensMMIO *mmio, unsigned enabled) {
+    clem_adb_device_key_toggle(&mmio->dev_adb, enabled);
 }
 
 const uint8_t *clemens_get_ascii_from_a2code(unsigned input) {
     return clem_adb_ascii_from_a2code(input);
 }
 
-void clemens_rtc_set(ClemensMachine *machine, uint32_t seconds_since_1904) {
-    clem_rtc_set_clock_time(&machine->mmio.dev_rtc, seconds_since_1904);
+void clemens_rtc_set(ClemensMMIO *mmio, uint32_t seconds_since_1904) {
+    clem_rtc_set_clock_time(&mmio->dev_rtc, seconds_since_1904);
 }
 
-const uint8_t *clemens_rtc_get_bram(ClemensMachine *clem, bool *is_dirty) {
-    bool flag = clem_rtc_clear_bram_dirty(&clem->mmio.dev_rtc);
+const uint8_t *clemens_rtc_get_bram(ClemensMMIO *mmio, bool *is_dirty) {
+    bool flag = clem_rtc_clear_bram_dirty(&mmio->dev_rtc);
     if (is_dirty) {
         *is_dirty = flag;
     }
-    return clem->mmio.dev_rtc.bram;
+    return mmio->dev_rtc.bram;
 }
 
-void clemens_rtc_set_bram_dirty(ClemensMachine *clem) {
-    clem_rtc_set_bram_dirty(&clem->mmio.dev_rtc);
-}
+void clemens_rtc_set_bram_dirty(ClemensMMIO *mmio) { clem_rtc_set_bram_dirty(&mmio->dev_rtc); }
 
-void clemens_debug_status(ClemensMachine *clem) { clem_debug_counters(&clem->mmio.dev_debug); }
-
-uint64_t clemens_clocks_per_second(ClemensMachine *clem, bool *is_slow_speed) {
-    if (clem->mmio.speed_c036 & CLEM_MMIO_SPEED_FAST_ENABLED) {
+uint64_t clemens_clocks_per_second(ClemensMMIO *mmio, bool *is_slow_speed) {
+    if (mmio->speed_c036 & CLEM_MMIO_SPEED_FAST_ENABLED) {
         *is_slow_speed = false;
     } else {
         *is_slow_speed = true;
     }
-    return clem->tspec.clocks_step_mega2 * CLEM_MEGA2_CYCLES_PER_SECOND;
+    return mmio->clocks_step_mega2 * CLEM_MEGA2_CYCLES_PER_SECOND;
 }
 
 void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
@@ -3457,6 +3436,11 @@ static uint8_t _clem_mmio_read_hook(struct ClemensMemory *mem, struct ClemensTim
     return clem_mmio_read((ClemensMMIO *)mem->mmio_context, tspec, addr, flags, is_slow_access);
 }
 
+static bool _clem_mmio_niolc(struct ClemensMemory *mem) {
+    ClemensMMIO *mmio = (ClemensMMIO *)mem->mmio_context;
+    return (mmio->mmap_register & CLEM_MEM_IO_MMAP_NIOLC) != 0;
+}
+
 void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     struct Clemens65C816 *cpu = &clem->cpu;
     struct ClemensClock clock;
@@ -3474,10 +3458,11 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
         clem->mem.mmio_context = mmio;
         clem->mem.mmio_write = &_clem_mmio_write_hook;
         clem->mem.mmio_read = &_clem_mmio_read_hook;
-        clem_disk_reset_drives(&clem->mmio.active_drives);
+        clem->mem.mmio_niolc = &_clem_mmio_niolc;
+        clem_disk_reset_drives(&mmio->active_drives);
         clem_mmio_reset(mmio, clem->tspec.clocks_step_mega2);
         /* extension cards reset handling */
-        clem_iwm_speed_disk_gate(clem);
+        clem_iwm_speed_disk_gate(mmio, &clem->tspec);
         clock.ts = clem->tspec.clocks_spent;
         clock.ref_step = clem->tspec.clocks_step_mega2;
         for (i = 0; i < 7; ++i) {
@@ -3485,7 +3470,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
                 mmio->card_slot[i]->io_reset(&clock, mmio->card_slot[i]->context);
             }
         }
-        clem_iwm_speed_disk_gate(clem);
+        clem_iwm_speed_disk_gate(mmio, &clem->tspec);
 
         mmio->state_type = kClemensMMIOStateType_Active;
         return;
@@ -3496,7 +3481,13 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     mmio->dev_debug.pc = cpu->regs.PC;
     mmio->dev_debug.pbr = cpu->regs.PBR;
 
-    clem_iwm_speed_disk_gate(clem);
+    //  record the last data access for switches that check if an I/O was accessed
+    //  twice in succession
+    if (clem->cpu.pins.vdaOut) {
+        mmio->last_data_address = (((uint32_t)clem->cpu.pins.bank) << 16) | clem->cpu.pins.adr;
+    }
+
+    clem_iwm_speed_disk_gate(mmio, &clem->tspec);
 
     //  1 mega2 cycle = 1023 nanoseconds
     //  1 fast cycle = 1023 / (2864/1023) nanoseconds
@@ -3527,7 +3518,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     }
 
     clem_vgc_sync(&mmio->vgc, &clock, clem->mem.mega2_bank_map[0], clem->mem.mega2_bank_map[1]);
-    clem_iwm_glu_sync(&mmio->dev_iwm, &clem->mmio.active_drives, &clock);
+    clem_iwm_glu_sync(&mmio->dev_iwm, &mmio->active_drives, &clock);
     clem_scc_glu_sync(&mmio->dev_scc, &clock);
     clem_sound_glu_sync(&mmio->dev_audio, &clock);
 
@@ -3546,7 +3537,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     mmio->irq_line = (mmio->dev_adb.irq_line | mmio->dev_timer.irq_line | mmio->dev_audio.irq_line |
                       mmio->vgc.irq_line | card_irqs);
     mmio->nmi_line = card_nmis;
-    clem_iwm_speed_disk_gate(clem);
+    clem_iwm_speed_disk_gate(mmio, &clem->tspec);
 
     cpu->pins.irqbIn = mmio->irq_line == 0;
     cpu->pins.nmibIn = mmio->nmi_line == 0;

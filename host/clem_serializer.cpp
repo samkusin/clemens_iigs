@@ -75,7 +75,7 @@ bool loadDiskMetadata(mpack_reader_t *reader, ClemensWOZDisk &container,
     return true;
 }
 
-bool save(std::string outputPath, ClemensMachine *machine, size_t driveCount,
+bool save(std::string outputPath, ClemensMachine *machine, ClemensMMIO *mmio, size_t driveCount,
           const ClemensWOZDisk *containers, const ClemensBackendDiskDriveState *states,
           const std::vector<ClemensBackendBreakpoint> &breakpoints) {
     mpack_writer_t writer;
@@ -98,9 +98,11 @@ bool save(std::string outputPath, ClemensMachine *machine, size_t driveCount,
     //  TODO: ROM1 machine ROM version needs to be serialized.. in the clemens
     //        library so remember to do this
     clemens_serialize_machine(&writer, machine);
+    mpack_write_cstr(&writer, "mmio");
+    clemens_serialize_mmio(&writer, mmio);
 
     mpack_write_cstr(&writer, "bram");
-    mpack_write_bin(&writer, (char *)clemens_rtc_get_bram(machine, NULL), CLEM_RTC_BRAM_SIZE);
+    mpack_write_bin(&writer, (char *)clemens_rtc_get_bram(mmio, NULL), CLEM_RTC_BRAM_SIZE);
 
     //  slots and cards indices are linked 1:1 here - this means card names
     //  are considered unique - if this changes, then we'll have to redo this
@@ -109,10 +111,10 @@ bool save(std::string outputPath, ClemensMachine *machine, size_t driveCount,
         mpack_start_array(&writer, 7);
         for (int slotIndex = 0; slotIndex < 7; ++slotIndex) {
             // TODO: clemens_mmio_card_get_name()
-            const char *cardName = (machine->mmio.card_slot[slotIndex] != NULL)
-                                       ? machine->mmio.card_slot[slotIndex]->io_name(
-                                             machine->mmio.card_slot[slotIndex]->context)
-                                       : NULL;
+            const char *cardName =
+                (mmio->card_slot[slotIndex] != NULL)
+                    ? mmio->card_slot[slotIndex]->io_name(mmio->card_slot[slotIndex]->context)
+                    : NULL;
             mpack_write_cstr_or_nil(&writer, cardName);
         }
         mpack_finish_array(&writer);
@@ -121,13 +123,13 @@ bool save(std::string outputPath, ClemensMachine *machine, size_t driveCount,
     {
         mpack_build_map(&writer);
         for (int slotIndex = 0; slotIndex < 7; ++slotIndex) {
-            if (!machine->mmio.card_slot[slotIndex])
+            if (!mmio->card_slot[slotIndex])
                 continue;
-            const char *cardName = machine->mmio.card_slot[slotIndex]->io_name(
-                machine->mmio.card_slot[slotIndex]->context);
+            const char *cardName =
+                mmio->card_slot[slotIndex]->io_name(mmio->card_slot[slotIndex]->context);
             mpack_write_cstr(&writer, cardName);
             if (!strncmp(cardName, kClemensCardMockingboardName, 64)) {
-                clem_card_mockingboard_serialize(&writer, machine->mmio.card_slot[slotIndex]);
+                clem_card_mockingboard_serialize(&writer, mmio->card_slot[slotIndex]);
             } else {
                 mpack_write_nil(&writer);
             }
@@ -163,7 +165,7 @@ bool save(std::string outputPath, ClemensMachine *machine, size_t driveCount,
     return (writerError == mpack_ok);
 }
 
-bool load(std::string outputPath, ClemensMachine *machine, size_t driveCount,
+bool load(std::string outputPath, ClemensMachine *machine, ClemensMMIO *mmio, size_t driveCount,
           ClemensWOZDisk *containers, ClemensBackendDiskDriveState *states,
           std::vector<ClemensBackendBreakpoint> &breakpoints, ClemensSerializerAllocateCb alloc_cb,
           void *context) {
@@ -177,8 +179,14 @@ bool load(std::string outputPath, ClemensMachine *machine, size_t driveCount,
     }
     mpack_expect_map(&reader);
     //  "machine"
-    mpack_expect_cstr(&reader, str, sizeof(str));
+    mpack_expect_cstr_match(&reader, "machine");
     if (!clemens_unserialize_machine(&reader, machine, alloc_cb, context)) {
+        // power off the machine
+        mpack_reader_destroy(&reader);
+        return false;
+    }
+    mpack_expect_cstr_match(&reader, "mmio");
+    if (!clemens_unserialize_mmio(&reader, mmio, alloc_cb, context)) {
         // power off the machine
         mpack_reader_destroy(&reader);
         return false;
@@ -186,10 +194,10 @@ bool load(std::string outputPath, ClemensMachine *machine, size_t driveCount,
     // "bram"
     mpack_expect_cstr(&reader, str, sizeof(str));
     if (mpack_expect_bin(&reader) == CLEM_RTC_BRAM_SIZE) {
-        mpack_read_bytes(&reader, (char *)machine->mmio.dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
+        mpack_read_bytes(&reader, (char *)mmio->dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
     }
     mpack_done_bin(&reader);
-    clemens_rtc_set_bram_dirty(machine);
+    clemens_rtc_set_bram_dirty(mmio);
 
     //  slots and card data - see saveState TODOs that address why this is
     //  hardcoded for now.
@@ -223,10 +231,10 @@ bool load(std::string outputPath, ClemensMachine *machine, size_t driveCount,
             }
             if (slotId >= 0) {
                 if (!strncmp(str, slots[slotId].c_str(), sizeof(str))) {
-                    destroyCard(machine->mmio.card_slot[slotId]);
-                    machine->mmio.card_slot[slotId] = createCard(kClemensCardMockingboardName);
+                    destroyCard(mmio->card_slot[slotId]);
+                    mmio->card_slot[slotId] = createCard(kClemensCardMockingboardName);
                     if (!strncmp(str, kClemensCardMockingboardName, sizeof(str))) {
-                        clem_card_mockingboard_unserialize(&reader, machine->mmio.card_slot[slotId],
+                        clem_card_mockingboard_unserialize(&reader, mmio->card_slot[slotId],
                                                            alloc_cb, context);
                     } else {
                         mpack_expect_nil(&reader);

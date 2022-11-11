@@ -1675,6 +1675,7 @@ void clem_mmio_init(ClemensMMIO *mmio, struct ClemensMemoryPageMap **bank_page_m
     //        the likely value at reset (bit set to 0 vs 1)
     mmio->new_video_c029 = CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT;
     //  TODO: ROM 01 will not use bit 6 and expect it to be cleared
+    mmio->clocks_step_mega2 = mega2_clocks_step;
     mmio->speed_c036 = CLEM_MMIO_SPEED_FAST_ENABLED | CLEM_MMIO_SPEED_POWERED_ON;
     mmio->mega2_cycles = 0;
     mmio->last_data_address = 0xffffffff;
@@ -1757,9 +1758,6 @@ void clem_read(ClemensMachine *clem, uint8_t *data, uint16_t adr, uint8_t bank, 
         clem->cpu.pins.rwbOut = true;
         clem->cpu.pins.ioOut = io_access;
         _clem_mem_cycle(clem, mega2_access);
-        if (clem->cpu.pins.vdaOut) {
-            clem->mmio.last_data_address = (((uint32_t)bank) << 16) | adr;
-        }
     }
 }
 
@@ -1826,9 +1824,5 @@ void clem_write(ClemensMachine *clem, uint8_t data, uint16_t adr, uint8_t bank, 
         clem->cpu.pins.rwbOut = false;
         clem->cpu.pins.ioOut = io_access;
         _clem_mem_cycle(clem, mega2_access);
-        if (clem->cpu.pins.vdaOut) {
-            /* TODO: move into clemens machine to remove dependency on MMIO */
-            clem->mmio.last_data_address = (((uint32_t)bank) << 16) | adr;
-        }
     }
 }

@@ -242,7 +242,6 @@ struct ClemensInputEvent {
 struct ClemensDeviceDebugger {
     unsigned ioreg_read_ctr[256];
     unsigned ioreg_write_ctr[256];
-    char log_buffer[CLEM_DEBUG_LOG_BUFFER_SIZE];
     LoggerFn log_message;
     uint16_t pc; /* these values are passed from the CPU per frame */
     uint8_t pbr;
@@ -425,6 +424,7 @@ typedef struct ClemensMMIO {
     uint8_t new_video_c029;     // see kClemensMMIONewVideo_xxx
     uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
 
+    clem_clocks_duration_t clocks_step_mega2;
     uint64_t mega2_cycles;            // number of mega2 pulses/ticks since startup
     uint32_t timer_60hz_us;           // used for executing logic per 1/60th second
     int32_t card_expansion_rom_index; // card slot has the mutex on C800-CFFF
@@ -593,6 +593,7 @@ struct ClemensMemory {
                        uint16_t /* addr */, uint8_t /* flags */, bool * /*is_slow_access*/);
     uint8_t (*mmio_read)(struct ClemensMemory *, struct ClemensTimeSpec *, uint16_t /* addr */,
                          uint8_t /* flags*/, bool *);
+    bool (*mmio_niolc)(struct ClemensMemory *);
 };
 
 struct ClemensTimeSpec {
@@ -629,11 +630,6 @@ typedef struct ClemensMachine {
     ClemensOpcodeCallback opcode_post;
     /* logger callback (if NULL, uses stdout) */
     LoggerFn logger_fn;
-
-    /** Internal, skips mmio if in 'simple' mode */
-    bool mmio_enabled;
-    /** The Apple IIgs Mega2 + CYA I/O subsystem*/
-    ClemensMMIO mmio;
 } ClemensMachine;
 
 /**

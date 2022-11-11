@@ -909,7 +909,7 @@ static inline uint16_t _clem_read_interrupt_vector(ClemensMachine *clem, uint16_
     uint8_t tmp_data;
     uint8_t src_bank;
 
-    if (clem->mmio.mmap_register & CLEM_MEM_IO_MMAP_NIOLC) {
+    if ((*clem->mem.mmio_niolc)(&clem->mem)) {
         /* this should map to RAM and override language card bank mapping */
         src_bank = 0x00;
     } else {

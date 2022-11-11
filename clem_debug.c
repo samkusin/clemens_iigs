@@ -10,6 +10,7 @@ static FILE *g_fp_debug_out = NULL;
 static char s_clem_debug_buffer[65536 * 102];
 static unsigned s_clem_debug_cnt = 0;
 static ClemensMachine *s_clem_machine = NULL;
+static char s_log_buffer[CLEM_DEBUG_LOG_BUFFER_SIZE];
 
 //  TODO: this debug interface is a singleton.  Making this context per machine
 //        instance will take some work due to how the logger works.
@@ -20,7 +21,7 @@ void clem_debug_log(int log_level, const char *fmt, ...) {
     va_list arg_list;
     if (!s_clem_machine)
         return;
-    buffer = s_clem_machine->mmio.dev_debug.log_buffer;
+    buffer = s_log_buffer;
     va_start(arg_list, fmt);
     vsnprintf(buffer, CLEM_DEBUG_LOG_BUFFER_SIZE, fmt, arg_list);
     va_end(arg_list);
@@ -49,39 +50,22 @@ void clem_debug_trace_flush() {
     s_clem_debug_cnt = 0;
 }
 
-static void _clem_print_io_reg_counters(struct ClemensDeviceDebugger *dbg) {
-    for (unsigned i = 0; i < 256; ++i) {
-        if (dbg->ioreg_read_ctr[i] || dbg->ioreg_write_ctr[i]) {
-            CLEM_LOG("IO %02X RW (%u, %u)", i & 0xff, dbg->ioreg_read_ctr[i],
-                     dbg->ioreg_write_ctr[i]);
-        }
-    }
-}
-
 void clem_debug_reset(struct ClemensDeviceDebugger *dbg) { memset(dbg, 0, sizeof(*dbg)); }
 
-void clem_debug_counters(struct ClemensDeviceDebugger *dbg) { _clem_print_io_reg_counters(dbg); }
-
-void clem_debug_break(struct ClemensDeviceDebugger *dbg,
-                      unsigned debug_reason, unsigned param0, unsigned param1) {
+void clem_debug_break(struct ClemensDeviceDebugger *dbg, unsigned debug_reason, unsigned param0,
+                      unsigned param1) {
     CLEM_WARN("PC=%02X:%04X", dbg->pbr, dbg->pc);
     switch (debug_reason) {
     case CLEM_DEBUG_BREAK_UNIMPL_IOREAD:
-        _clem_print_io_reg_counters(dbg);
         CLEM_UNIMPLEMENTED("IO Read: %04X, %02X", param0, param1);
         break;
     case CLEM_DEBUG_BREAK_UNIMPL_IOWRITE:
-        _clem_print_io_reg_counters(dbg);
         CLEM_UNIMPLEMENTED("IO Write: %04X, %02X", param0, param1);
         break;
     default:
         break;
     }
 }
-
-void clem_debug_iwm_start(ClemensMachine *context) { clem_iwm_debug_start(&context->mmio.dev_iwm); }
-
-void clem_debug_iwm_stop(ClemensMachine *context) { clem_iwm_debug_stop(&context->mmio.dev_iwm); }
 
 struct ClemensIIGSMemoryHandle {
     uint32_t machine_addr;

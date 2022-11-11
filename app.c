@@ -23,6 +23,7 @@
  */
 int main(int argc, char *argv[]) {
     ClemensMachine machine;
+    ClemensMMIO mmio;
 
     /*  ROM 3 only */
     FILE *fp = fopen("gs_rom_3.rom", "rb");
@@ -41,17 +42,18 @@ int main(int argc, char *argv[]) {
 
     memset(&machine, 0, sizeof(machine));
     clemens_init(&machine, 1000, 1000, rom, 256 * 1024, malloc(CLEM_IIGS_BANK_SIZE),
-                 malloc(CLEM_IIGS_BANK_SIZE), malloc(CLEM_IIGS_BANK_SIZE * 16),
-                 malloc(CLEM_IIGS_EXPANSION_ROM_SIZE * 7), 16);
+                 malloc(CLEM_IIGS_BANK_SIZE), malloc(CLEM_IIGS_BANK_SIZE * 16), 16);
+    clem_mmio_init(&mmio, machine.mem.bank_page_map, machine.tspec.clocks_step_mega2,
+                   malloc(2048 * 7));
 
     machine.cpu.pins.resbIn = false;
     clemens_emulate_cpu(&machine);
-    clemens_emulate_mmio(&machine, &machine.mmio);
+    clemens_emulate_mmio(&machine, &mmio);
     machine.cpu.pins.resbIn = true;
 
     while (machine.cpu.cycles_spent < 1024) {
         clemens_emulate_cpu(&machine);
-        clemens_emulate_mmio(&machine, &machine.mmio);
+        clemens_emulate_mmio(&machine, &mmio);
     }
 
     return 0;

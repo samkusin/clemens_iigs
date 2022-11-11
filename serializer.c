@@ -246,6 +246,7 @@ struct ClemensSerializerRecord kMMIO[] = {
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, last_data_address),
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, emulator_detect),
     CLEM_SERIALIZER_RECORD_UINT8(ClemensMMIO, new_video_c029),
+    CLEM_SERIALIZER_RECORD_DURATION(ClemensMMIO, clocks_step_mega2),
     CLEM_SERIALIZER_RECORD_UINT8(ClemensMMIO, speed_c036),
     CLEM_SERIALIZER_RECORD_UINT64(ClemensMMIO, mega2_cycles),
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, timer_60hz_us),
@@ -310,10 +311,7 @@ struct ClemensSerializerRecord kMachine[] = {
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, cpu, struct Clemens65C816, kCPU),
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, tspec, struct ClemensTimeSpec, kTimeSpec),
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, mem, struct ClemensMemory, kMemory),
-    CLEM_SERIALIZER_RECORD_INT32(ClemensMachine, resb_counter),
-    CLEM_SERIALIZER_RECORD_BOOL(ClemensMachine, mmio_enabled),
-    CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, mmio, ClemensMMIO, kMMIO),
-    CLEM_SERIALIZER_RECORD_EMPTY()};
+    CLEM_SERIALIZER_RECORD_INT32(ClemensMachine, resb_counter), CLEM_SERIALIZER_RECORD_EMPTY()};
 
 // see clem_disk.h
 struct ClemensSerializerRecord kNibbleDisk[] = {
@@ -523,7 +521,6 @@ unsigned clemens_serialize_object(mpack_writer_t *writer, uintptr_t data_adr,
 
 mpack_writer_t *clemens_serialize_machine(mpack_writer_t *writer, ClemensMachine *machine) {
     struct ClemensSerializerRecord root;
-    union ClemensSerializerVariant variant;
     void *data_adr = (void *)machine;
     unsigned idx;
 
@@ -753,7 +750,6 @@ unsigned clemens_unserialize_object(mpack_reader_t *reader, uintptr_t data_adr,
 mpack_reader_t *clemens_unserialize_machine(mpack_reader_t *reader, ClemensMachine *machine,
                                             ClemensSerializerAllocateCb alloc_cb, void *context) {
     struct ClemensSerializerRecord root;
-    union ClemensSerializerVariant variant;
     void *data_adr = (void *)machine;
     unsigned idx, sz;
 
@@ -785,10 +781,37 @@ mpack_reader_t *clemens_unserialize_machine(mpack_reader_t *reader, ClemensMachi
         }
     }
 
-    /* mmio restore state */
-    if (machine->mmio_enabled) {
-        clem_mmio_restore(&machine->mmio);
+    return reader;
+}
+
+mpack_writer_t *clemens_serialize_mmio(mpack_writer_t *writer, ClemensMMIO *mmio) {
+    struct ClemensSerializerRecord root;
+    void *data_adr = (void *)mmio;
+    unsigned idx;
+
+    memset(&root, 0, sizeof(root));
+    root.type = kClemensSerializerTypeRoot;
+    root.records = &kMMIO[0];
+    clemens_serialize_object(writer, (uintptr_t)data_adr, &root);
+    return writer;
+}
+
+mpack_reader_t *clemens_unserialize_mmio(mpack_reader_t *reader, ClemensMMIO *mmio,
+                                         ClemensSerializerAllocateCb alloc_cb, void *context) {
+    struct ClemensSerializerRecord root;
+    void *data_adr = (void *)mmio;
+    unsigned idx, sz;
+
+    memset(&root, 0, sizeof(root));
+    root.type = kClemensSerializerTypeRoot;
+    root.records = &kMMIO[0];
+
+    if (clemens_unserialize_object(reader, (uintptr_t)data_adr, &root, alloc_cb, context) ==
+        CLEM_SERIALIZER_INVALID_RECORD) {
+        return NULL;
     }
+
+    clem_mmio_restore(mmio);
 
     return reader;
 }

@@ -5,30 +5,30 @@
 #include <assert.h>
 #include <stdio.h>
 
-#define CLEM_ASSERT(_cond_)                                                    \
-  do {                                                                         \
-    assert(_cond_);                                                            \
-  } while (0)
+#define CLEM_ASSERT(_cond_)                                                                        \
+    do {                                                                                           \
+        assert(_cond_);                                                                            \
+    } while (0)
 
-#define CLEM_UNIMPLEMENTED(...)                                         \
-  do {                                                                         \
-    clem_debug_log(CLEM_DEBUG_LOG_UNIMPL, __VA_ARGS__);                 \
-  } while (0)
+#define CLEM_UNIMPLEMENTED(...)                                                                    \
+    do {                                                                                           \
+        clem_debug_log(CLEM_DEBUG_LOG_UNIMPL, __VA_ARGS__);                                        \
+    } while (0)
 
-#define CLEM_WARN(...)                                                  \
-  do {                                                                         \
-    clem_debug_log(CLEM_DEBUG_LOG_WARN, __VA_ARGS__);                   \
-  } while (0)
+#define CLEM_WARN(...)                                                                             \
+    do {                                                                                           \
+        clem_debug_log(CLEM_DEBUG_LOG_WARN, __VA_ARGS__);                                          \
+    } while (0)
 
-#define CLEM_LOG(...)                                                   \
-  do {                                                                         \
-    clem_debug_log(CLEM_DEBUG_LOG_INFO, __VA_ARGS__);                   \
-  } while (0)
+#define CLEM_LOG(...)                                                                              \
+    do {                                                                                           \
+        clem_debug_log(CLEM_DEBUG_LOG_INFO, __VA_ARGS__);                                          \
+    } while (0)
 
-#define CLEM_DEBUG(...)                                                 \
-  do {                                                                         \
-    clem_debug_log(CLEM_DEBUG_LOG_DEBUG, __VA_ARGS__);                  \
-  } while (0)
+#define CLEM_DEBUG(...)                                                                            \
+    do {                                                                                           \
+        clem_debug_log(CLEM_DEBUG_LOG_DEBUG, __VA_ARGS__);                                         \
+    } while (0)
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,9 +42,6 @@ void clem_debug_log(int log_level, const char *fmt, ...);
 
 char *clem_debug_acquire_trace(unsigned amt);
 void clem_debug_trace_flush();
-
-void clem_debug_iwm_start(ClemensMachine *context);
-void clem_debug_iwm_stop(ClemensMachine *context);
 
 void clemens_debug_status_toolbox(ClemensMachine *context, unsigned id);
 

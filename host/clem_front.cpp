@@ -675,11 +675,11 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     frameWriteState_.emulatorClock.ts = state.machine->tspec.clocks_spent;
     frameWriteState_.emulatorClock.ref_step = CLEM_CLOCKS_MEGA2_CYCLE;
     //  copy over component state as needed
-    frameWriteState_.vgcModeFlags = state.machine->mmio.vgc.mode_flags;
-    frameWriteState_.irqs = state.machine->mmio.irq_line;
-    frameWriteState_.nmis = state.machine->mmio.nmi_line;
+    frameWriteState_.vgcModeFlags = state.mmio->vgc.mode_flags;
+    frameWriteState_.irqs = state.mmio->irq_line;
+    frameWriteState_.nmis = state.mmio->nmi_line;
 
-    const ClemensDeviceIWM &iwm = state.machine->mmio.dev_iwm;
+    const ClemensDeviceIWM &iwm = state.mmio->dev_iwm;
     const ClemensDrive *iwmDrive = nullptr;
     frameWriteState_.iwm.status = 0;
     if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
@@ -687,9 +687,9 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     }
     if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_35) {
         frameWriteState_.iwm.status |= kIWMStatusDrive35;
-        iwmDrive = clemens_drive_get(state.machine, kClemensDrive_3_5_D1);
+        iwmDrive = clemens_drive_get(state.mmio, kClemensDrive_3_5_D1);
     } else {
-        iwmDrive = clemens_drive_get(state.machine, kClemensDrive_5_25_D1);
+        iwmDrive = clemens_drive_get(state.mmio, kClemensDrive_5_25_D1);
     }
     if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_2) {
         frameWriteState_.iwm.status |= kIWMStatusDriveAlt;
@@ -767,12 +767,12 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
         constexpr size_t kDOCRAMSize = 65536;
 
         frameWriteState_.docRAM = (uint8_t *)frameWriteMemory_.allocate(kDOCRAMSize);
-        memcpy(frameWriteState_.docRAM, &state.machine->mmio.dev_audio.doc.sound_ram, kDOCRAMSize);
+        memcpy(frameWriteState_.docRAM, &state.mmio->dev_audio.doc.sound_ram, kDOCRAMSize);
     } else {
         frameWriteState_.memoryView = nullptr;
         frameWriteState_.docRAM = nullptr;
     }
-    frameWriteState_.doc.copyFrom(state.machine->mmio.dev_audio.doc);
+    frameWriteState_.doc.copyFrom(state.mmio->dev_audio.doc);
 
     const ClemensBackendDiskDriveState *driveState = state.diskDrives;
     for (auto &diskDrive : frameWriteState_.diskDrives) {
