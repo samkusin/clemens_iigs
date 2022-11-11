@@ -62,7 +62,7 @@ void clem_debug_reset(struct ClemensDeviceDebugger *dbg) { memset(dbg, 0, sizeof
 
 void clem_debug_counters(struct ClemensDeviceDebugger *dbg) { _clem_print_io_reg_counters(dbg); }
 
-void clem_debug_break(struct ClemensDeviceDebugger *dbg, struct Clemens65C816 *cpu,
+void clem_debug_break(struct ClemensDeviceDebugger *dbg,
                       unsigned debug_reason, unsigned param0, unsigned param1) {
     CLEM_WARN("PC=%02X:%04X", dbg->pbr, dbg->pc);
     switch (debug_reason) {

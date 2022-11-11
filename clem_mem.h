@@ -49,9 +49,9 @@ void clem_mmio_reset(struct ClemensMMIO *mmio, clem_clocks_duration_t mega2_cloc
 void clem_mmio_init(struct ClemensMMIO *mmio, struct ClemensMemoryPageMap **bank_page_map,
                     clem_clocks_duration_t mega2_clocks_step, void *slot_expansion_rom);
 
-uint8_t clem_mmio_read(ClemensMachine *clem, struct ClemensTimeSpec *tspec, uint16_t addr,
+uint8_t clem_mmio_read(struct ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_t addr,
                        uint8_t flags, bool *mega2_access);
-void clem_mmio_write(ClemensMachine *clem, struct ClemensTimeSpec *tspec, uint8_t data,
+void clem_mmio_write(struct ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t data,
                      uint16_t addr, uint8_t flags, bool *mega2_access);
 
 void clem_mmio_restore(struct ClemensMMIO *mmio);
