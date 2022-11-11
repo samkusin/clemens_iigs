@@ -687,9 +687,9 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     }
     if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_35) {
         frameWriteState_.iwm.status |= kIWMStatusDrive35;
-        iwmDrive = &state.machine->active_drives.slot5[0];
+        iwmDrive = clemens_drive_get(state.machine, kClemensDrive_3_5_D1);
     } else {
-        iwmDrive = &state.machine->active_drives.slot6[0];
+        iwmDrive = clemens_drive_get(state.machine, kClemensDrive_5_25_D1);
     }
     if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_2) {
         frameWriteState_.iwm.status |= kIWMStatusDriveAlt;

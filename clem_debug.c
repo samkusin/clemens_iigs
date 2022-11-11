@@ -64,8 +64,7 @@ void clem_debug_counters(struct ClemensDeviceDebugger *dbg) { _clem_print_io_reg
 
 void clem_debug_break(struct ClemensDeviceDebugger *dbg, struct Clemens65C816 *cpu,
                       unsigned debug_reason, unsigned param0, unsigned param1) {
-    CLEM_WARN("PC=%02X:%04X: DBR=%02X P=%02X", cpu->regs.PBR, cpu->regs.PC, cpu->regs.DBR,
-              cpu->regs.P);
+    CLEM_WARN("PC=%02X:%04X", dbg->pbr, dbg->pc);
     switch (debug_reason) {
     case CLEM_DEBUG_BREAK_UNIMPL_IOREAD:
         _clem_print_io_reg_counters(dbg);

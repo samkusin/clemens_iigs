@@ -15,19 +15,15 @@ extern "C" {
 void clem_debug_reset(struct ClemensDeviceDebugger *dbg);
 void clem_debug_counters(struct ClemensDeviceDebugger *dbg);
 
-void clem_debug_break(struct ClemensDeviceDebugger *dbg,
-                      struct Clemens65C816 *cpu, unsigned debug_reason,
-                      unsigned param0, unsigned param1);
+void clem_debug_break(struct ClemensDeviceDebugger *dbg, unsigned debug_reason, unsigned param0,
+                      unsigned param1);
 
-void clem_rtc_reset(struct ClemensDeviceRTC *rtc,
-                    clem_clocks_duration_t latency);
-void clem_rtc_set_clock_time(struct ClemensDeviceRTC *rtc,
-                             uint32_t seconds_since_1904);
+void clem_rtc_reset(struct ClemensDeviceRTC *rtc, clem_clocks_duration_t latency);
+void clem_rtc_set_clock_time(struct ClemensDeviceRTC *rtc, uint32_t seconds_since_1904);
 bool clem_rtc_clear_bram_dirty(struct ClemensDeviceRTC *rtc);
 void clem_rtc_set_bram_dirty(struct ClemensDeviceRTC *rtc);
 
-void clem_rtc_command(struct ClemensDeviceRTC *rtc, clem_clocks_time_t ts,
-                      unsigned op);
+void clem_rtc_command(struct ClemensDeviceRTC *rtc, clem_clocks_time_t ts, unsigned op);
 
 /**
  * @brief Resets the timer counters and interrupt flags
@@ -62,8 +58,7 @@ void clem_adb_reset(struct ClemensDeviceADB *adb);
  * @param adb ADB device data
  * @param input The input event from the host OS/application
  */
-void clem_adb_device_input(struct ClemensDeviceADB *adb,
-                           const struct ClemensInputEvent *input);
+void clem_adb_device_input(struct ClemensDeviceADB *adb, const struct ClemensInputEvent *input);
 
 /**
  * @brief Supplies the emulator with the current state of a toggle key
@@ -96,8 +91,7 @@ void clem_adb_glu_sync(struct ClemensDeviceADB *adb, uint32_t delta_us);
  * @param ioreg The MMIO register accessed
  * @param value The value written to the MMIO register
  */
-void clem_adb_write_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
-                           uint8_t value);
+void clem_adb_write_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_t value);
 
 /**
  * @brief Executed from the memory subsystem for MMIO
@@ -107,8 +101,7 @@ void clem_adb_write_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
  * @param flags Access flags used to determine if the read is a no-op
  * @return uint8_t The value read from the MMIO register
  */
-uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
-                             uint8_t flags);
+uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_t flags);
 
 /**
  * @brief Mouse and Apple II keyboard inputs
@@ -118,8 +111,7 @@ uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
  * @param flags
  * @return uint8_t
  */
-uint8_t clem_adb_read_mega2_switch(struct ClemensDeviceADB *adb, uint8_t ioreg,
-                                   uint8_t flags);
+uint8_t clem_adb_read_mega2_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_t flags);
 
 /**
  * @brief Resets the Sound state
@@ -134,8 +126,7 @@ void clem_sound_reset(struct ClemensDeviceAudio *glu);
  * @param glu
  * @param consumed
  */
-void clem_sound_consume_frames(struct ClemensDeviceAudio *glu,
-                               unsigned consumed);
+void clem_sound_consume_frames(struct ClemensDeviceAudio *glu, unsigned consumed);
 
 /**
  * @brief Executed frequently enough to emulate the GLU Microcontroller
@@ -143,8 +134,7 @@ void clem_sound_consume_frames(struct ClemensDeviceAudio *glu,
  * @param glu device data (1 ms worth of cycles?)
  * @param clocks Reference clock
  */
-void clem_sound_glu_sync(struct ClemensDeviceAudio *glu,
-                         struct ClemensClock *clocks);
+void clem_sound_glu_sync(struct ClemensDeviceAudio *glu, struct ClemensClock *clocks);
 
 /**
  * @brief Executed from the memory subsystem for MMIO
@@ -153,8 +143,7 @@ void clem_sound_glu_sync(struct ClemensDeviceAudio *glu,
  * @param ioreg The MMIO register accessed
  * @param value The value written to the MMIO register
  */
-void clem_sound_write_switch(struct ClemensDeviceAudio *glu, uint8_t ioreg,
-                             uint8_t value);
+void clem_sound_write_switch(struct ClemensDeviceAudio *glu, uint8_t ioreg, uint8_t value);
 
 /**
  * @brief Executed from the memory subsystem for MMIO
@@ -164,8 +153,7 @@ void clem_sound_write_switch(struct ClemensDeviceAudio *glu, uint8_t ioreg,
  * @param flags Access flags used to determine if the read is a no-op
  * @return uint8_t The value read from the MMIO register
  */
-uint8_t clem_sound_read_switch(struct ClemensDeviceAudio *glu, uint8_t ioreg,
-                               uint8_t flags);
+uint8_t clem_sound_read_switch(struct ClemensDeviceAudio *glu, uint8_t ioreg, uint8_t flags);
 
 /**
  * @brief
@@ -188,8 +176,7 @@ void clem_iwm_reset(struct ClemensDeviceIWM *iwm);
  * @param drive_type
  * @param disk
  */
-void clem_iwm_insert_disk(struct ClemensDeviceIWM *iwm,
-                          struct ClemensDrive *drive,
+void clem_iwm_insert_disk(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
                           struct ClemensNibbleDisk *disk);
 
 /**
@@ -199,8 +186,7 @@ void clem_iwm_insert_disk(struct ClemensDeviceIWM *iwm,
  * @param drive_type
  * @param disk
  */
-void clem_iwm_eject_disk(struct ClemensDeviceIWM *iwm,
-                         struct ClemensDrive *drive,
+void clem_iwm_eject_disk(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
                          struct ClemensNibbleDisk *disk);
 
 /**
@@ -212,8 +198,7 @@ void clem_iwm_eject_disk(struct ClemensDeviceIWM *iwm,
  * @return true Disk has ejected
  * @return false Disk is still ejecting
  */
-bool clem_iwm_eject_disk_async(struct ClemensDeviceIWM *iwm,
-                               struct ClemensDrive *drive,
+bool clem_iwm_eject_disk_async(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
                                struct ClemensNibbleDisk *disk);
 
 /**
@@ -227,8 +212,7 @@ bool clem_iwm_eject_disk_async(struct ClemensDeviceIWM *iwm,
  * @param drives the IWM managed drives
  * @param clock Current clock referemce time
  */
-void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm,
-                       struct ClemensDriveBay *drives,
+void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
                        struct ClemensClock *clock);
 
 /**
@@ -240,10 +224,8 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm,
  * @param ioreg The MMIO register accessed
  * @param value The value written to the MMIO register
  */
-void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm,
-                           struct ClemensDriveBay *drives,
-                           struct ClemensClock *clock, uint8_t ioreg,
-                           uint8_t value);
+void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
+                           struct ClemensClock *clock, uint8_t ioreg, uint8_t value);
 
 /**
  * @brief Executed from the memory subsystem for MMIO
@@ -255,10 +237,8 @@ void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm,
  * @param flags Access flags used to determine if the read is a no-op
  * @return uint8_t The value read from the MMIO register
  */
-uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm,
-                             struct ClemensDriveBay *drives,
-                             struct ClemensClock *clock, uint8_t ioreg,
-                             uint8_t flags);
+uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
+                             struct ClemensClock *clock, uint8_t ioreg, uint8_t flags);
 
 void clem_iwm_speed_disk_gate(ClemensMachine *clem);
 
@@ -289,8 +269,7 @@ void clem_scc_reset(struct ClemensDeviceSCC *scc);
  * @param scc
  * @param clock
  */
-void clem_scc_glu_sync(struct ClemensDeviceSCC *scc,
-                       struct ClemensClock *clock);
+void clem_scc_glu_sync(struct ClemensDeviceSCC *scc, struct ClemensClock *clock);
 
 /**
  * @brief
@@ -299,8 +278,7 @@ void clem_scc_glu_sync(struct ClemensDeviceSCC *scc,
  * @param ioreg
  * @param value
  */
-void clem_scc_write_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg,
-                           uint8_t value);
+void clem_scc_write_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t value);
 
 /**
  * @brief
@@ -310,8 +288,7 @@ void clem_scc_write_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg,
  * @param flags
  * @return uint8_t
  */
-uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg,
-                             uint8_t flags);
+uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t flags);
 
 #ifdef __cplusplus
 }

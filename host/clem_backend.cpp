@@ -377,13 +377,14 @@ bool ClemensBackend::loadSnapshot(const std::string_view &inputParam) {
     return res;
 }
 
+//  TODO: Move into Clemens API clemens_mmio_find_card_name()
 static ClemensCard *findMockingboardCard(ClemensMachine *machine) {
     for (int cardIdx = 0; cardIdx < 7; ++cardIdx) {
-        if (machine->card_slot[cardIdx]) {
-            const char *cardName =
-                machine->card_slot[cardIdx]->io_name(machine->card_slot[cardIdx]->context);
+        if (machine->mmio.card_slot[cardIdx]) {
+            const char *cardName = machine->mmio.card_slot[cardIdx]->io_name(
+                machine->mmio.card_slot[cardIdx]->context);
             if (!strcmp(cardName, kClemensCardMockingboardName)) {
-                return machine->card_slot[cardIdx];
+                return machine->mmio.card_slot[cardIdx];
             }
         }
     }
@@ -658,12 +659,13 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
     ClemensRunSampler runSampler;
 
+    //  TODO: clemens API clemens_mmio_card_insert()
     for (size_t cardIdx = 0; cardIdx < config_.cardNames.size(); ++cardIdx) {
         auto &cardName = config_.cardNames[cardIdx];
         if (!cardName.empty()) {
-            machine_.card_slot[cardIdx] = createCard(cardName.c_str());
+            machine_.mmio.card_slot[cardIdx] = createCard(cardName.c_str());
         } else {
-            machine_.card_slot[cardIdx] = NULL;
+            machine_.mmio.card_slot[cardIdx] = NULL;
         }
     }
 
@@ -989,9 +991,11 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
     saveBRAM();
 
+    //  TODO: clemens_mmio_card_eject() will clear the slot but it still needs
+    //        to be destroyed by the app
     for (int i = 0; i < 7; ++i) {
-        destroyCard(machine_.card_slot[i]);
-        machine_.card_slot[i] = NULL;
+        destroyCard(machine_.mmio.card_slot[i]);
+        machine_.mmio.card_slot[i] = NULL;
     }
 
     fmt::print("Terminated backend refresh thread.\n");

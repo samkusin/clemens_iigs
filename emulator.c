@@ -756,14 +756,12 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks
     memset(machine->mem.mega2_bank_map[0x00], 0, CLEM_IIGS_BANK_SIZE);
     machine->mem.mega2_bank_map[0x01] = (uint8_t *)e1bank;
     memset(machine->mem.mega2_bank_map[0x01], 0, CLEM_IIGS_BANK_SIZE);
-
-    for (idx = 0; idx < 7; ++idx) {
-        machine->card_slot[idx] = NULL;
-        machine->card_slot_expansion_memory[idx] = (((uint8_t *)slotExpansionROM) + (idx * 2048));
-    }
+    // machine->mem.mmio_read = &clem_mmio_read;
+    // machine->mem.mmio_write = &clem_mmio_write;
 
     machine->mmio_enabled = true;
-    clem_mmio_init(&machine->mmio, machine->mem.bank_page_map, machine->tspec.clocks_step_mega2);
+    clem_mmio_init(&machine->mmio, machine->mem.bank_page_map, machine->tspec.clocks_step_mega2,
+                   slotExpansionROM);
 
     return 0;
 }
@@ -1030,16 +1028,16 @@ struct ClemensDrive *clemens_drive_get(ClemensMachine *clem, enum ClemensDriveTy
     struct ClemensDrive *drive;
     switch (drive_type) {
     case kClemensDrive_3_5_D1:
-        drive = &clem->active_drives.slot5[0];
+        drive = &clem->mmio.active_drives.slot5[0];
         break;
     case kClemensDrive_3_5_D2:
-        drive = &clem->active_drives.slot5[1];
+        drive = &clem->mmio.active_drives.slot5[1];
         break;
     case kClemensDrive_5_25_D1:
-        drive = &clem->active_drives.slot6[0];
+        drive = &clem->mmio.active_drives.slot6[0];
         break;
     case kClemensDrive_5_25_D2:
-        drive = &clem->active_drives.slot6[1];
+        drive = &clem->mmio.active_drives.slot6[1];
         break;
     default:
         drive = NULL;
@@ -3463,15 +3461,15 @@ void clemens_emulate_mmio(ClemensMachine *clem) {
         return;
     }
     if (mmio->state_type == kClemensMMIOStateType_Reset) {
-        clem_disk_reset_drives(&clem->active_drives);
+        clem_disk_reset_drives(&clem->mmio.active_drives);
         clem_mmio_reset(mmio, clem->tspec.clocks_step_mega2);
         /* extension cards reset handling */
         clem_iwm_speed_disk_gate(clem);
         clock.ts = clem->tspec.clocks_spent;
         clock.ref_step = clem->tspec.clocks_step_mega2;
         for (i = 0; i < 7; ++i) {
-            if (clem->card_slot[i]) {
-                clem->card_slot[i]->io_reset(&clock, clem->card_slot[i]->context);
+            if (mmio->card_slot[i]) {
+                mmio->card_slot[i]->io_reset(&clock, mmio->card_slot[i]->context);
             }
         }
         clem_iwm_speed_disk_gate(clem);
@@ -3481,6 +3479,9 @@ void clemens_emulate_mmio(ClemensMachine *clem) {
     }
     if (mmio->state_type != kClemensMMIOStateType_Active)
         return;
+
+    mmio->dev_debug.pc = cpu->regs.PC;
+    mmio->dev_debug.pbr = cpu->regs.PBR;
 
     clem_iwm_speed_disk_gate(clem);
 
@@ -3503,9 +3504,9 @@ void clemens_emulate_mmio(ClemensMachine *clem) {
     card_nmis = 0;
     card_irqs = 0;
     for (i = 0; i < 7; ++i) {
-        if (!clem->card_slot[i])
+        if (!mmio->card_slot[i])
             continue;
-        card_result = (*clem->card_slot[i]->io_sync)(&clock, clem->card_slot[i]->context);
+        card_result = (*mmio->card_slot[i]->io_sync)(&clock, mmio->card_slot[i]->context);
         if (card_result & CLEM_CARD_IRQ)
             card_irqs |= (CLEM_IRQ_SLOT_1 << i);
         if (card_result & CLEM_CARD_NMI)
@@ -3513,7 +3514,7 @@ void clemens_emulate_mmio(ClemensMachine *clem) {
     }
 
     clem_vgc_sync(&mmio->vgc, &clock, clem->mem.mega2_bank_map[0], clem->mem.mega2_bank_map[1]);
-    clem_iwm_glu_sync(&mmio->dev_iwm, &clem->active_drives, &clock);
+    clem_iwm_glu_sync(&mmio->dev_iwm, &clem->mmio.active_drives, &clock);
     clem_scc_glu_sync(&mmio->dev_scc, &clock);
     clem_sound_glu_sync(&mmio->dev_audio, &clock);
 

@@ -90,7 +90,8 @@ struct ClemensSerializerRecord kDebugger[] = {
                                  ioreg_read_ctr, 256, 0),
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceDebugger, kClemensSerializerTypeUInt32,
                                  ioreg_write_ctr, 256, 0),
-    CLEM_SERIALIZER_RECORD_EMPTY()};
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensDeviceDebugger, pc),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceDebugger, pc), CLEM_SERIALIZER_RECORD_EMPTY()};
 
 struct ClemensSerializerRecord kEnsoniq[] = {
     CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceEnsoniq, dt_budget),
@@ -200,31 +201,6 @@ struct ClemensSerializerRecord kADB[] = {
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceADB, irq_line),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
-struct ClemensSerializerRecord kMMIO[] = {
-    /* all page maps are generated from mmap_register and the shadow register */
-    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, vgc, struct ClemensVGC, kVGC),
-    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_rtc, struct ClemensDeviceRTC, kRTC),
-    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_adb, struct ClemensDeviceADB, kADB),
-    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_timer, struct ClemensDeviceTimer, kTimer),
-    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_debug, struct ClemensDeviceDebugger,
-                                  kDebugger),
-    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_audio, struct ClemensDeviceAudio, kAudio),
-    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_iwm, struct ClemensDeviceIWM, kIWM),
-    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_scc, struct ClemensDeviceSCC, kSCC),
-    CLEM_SERIALIZER_RECORD_INT32(struct ClemensMMIO, state_type),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, mmap_register),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, last_data_address),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, emulator_detect),
-    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensMMIO, new_video_c029),
-    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensMMIO, speed_c036),
-    CLEM_SERIALIZER_RECORD_UINT64(struct ClemensMMIO, mega2_cycles),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, timer_60hz_us),
-    CLEM_SERIALIZER_RECORD_INT32(struct ClemensMMIO, card_expansion_rom_index),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, irq_line),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, nmi_line),
-
-    CLEM_SERIALIZER_RECORD_EMPTY()};
-
 struct ClemensSerializerRecord kDrive[] = {
     CLEM_SERIALIZER_RECORD_CUSTOM(struct ClemensDrive, disk, struct ClemensNibbleDisk,
                                   CLEM_SERIALIZER_CUSTOM_RECORD_NIBBLE_DISK),
@@ -252,6 +228,33 @@ struct ClemensSerializerRecord kDriveBay[] = {
                                          kDrive),
     CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(struct ClemensDriveBay, slot6, 2, struct ClemensDrive,
                                          kDrive),
+    CLEM_SERIALIZER_RECORD_EMPTY()};
+
+struct ClemensSerializerRecord kMMIO[] = {
+    /* all page maps are generated from mmap_register and the shadow register */
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, vgc, struct ClemensVGC, kVGC),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_rtc, struct ClemensDeviceRTC, kRTC),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_adb, struct ClemensDeviceADB, kADB),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_timer, struct ClemensDeviceTimer, kTimer),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_debug, struct ClemensDeviceDebugger,
+                                  kDebugger),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_audio, struct ClemensDeviceAudio, kAudio),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_iwm, struct ClemensDeviceIWM, kIWM),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, dev_scc, struct ClemensDeviceSCC, kSCC),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensMMIO, active_drives, struct ClemensDriveBay,
+                                  kDriveBay),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensMMIO, state_type),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, mmap_register),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, last_data_address),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, emulator_detect),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensMMIO, new_video_c029),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensMMIO, speed_c036),
+    CLEM_SERIALIZER_RECORD_UINT64(struct ClemensMMIO, mega2_cycles),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, timer_60hz_us),
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensMMIO, card_expansion_rom_index),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, irq_line),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensMMIO, nmi_line),
+
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 struct ClemensSerializerRecord kMemory[] = {
@@ -308,11 +311,10 @@ struct ClemensSerializerRecord kCPU[] = {
 struct ClemensSerializerRecord kMachine[] = {
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, cpu, struct Clemens65C816, kCPU),
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, tspec, struct ClemensTimeSpec, kTimeSpec),
+    CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, mem, struct ClemensMemory, kMemory),
     CLEM_SERIALIZER_RECORD_INT32(ClemensMachine, resb_counter),
     CLEM_SERIALIZER_RECORD_BOOL(ClemensMachine, mmio_enabled),
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, mmio, struct ClemensMMIO, kMMIO),
-    CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, active_drives, struct ClemensDriveBay, kDriveBay),
-    CLEM_SERIALIZER_RECORD_OBJECT(ClemensMachine, mem, struct ClemensMemory, kMemory),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 // see clem_disk.h

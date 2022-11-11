@@ -244,6 +244,8 @@ struct ClemensDeviceDebugger {
     unsigned ioreg_write_ctr[256];
     char log_buffer[CLEM_DEBUG_LOG_BUFFER_SIZE];
     LoggerFn log_message;
+    uint16_t pc; /* these values are passed from the CPU per frame */
+    uint8_t pbr;
 };
 
 /**
@@ -319,65 +321,6 @@ struct ClemensDeviceIWM {
     bool enable_debug; /**< If True, activates file logging */
 };
 
-/**
- * @brief Reflects the CPU state on the MMIO
- *
- */
-enum ClemensMMIOStateType {
-    kClemensMMIOStateType_None,
-    kClemensMMIOStateType_Reset,
-    kClemensMMIOStateType_Active
-};
-
-/**
- * @brief FPI + MEGA2 MMIO Interface
- *
- */
-struct ClemensMMIO {
-    /* pointer to the array of bank page map pointers initialized by the
-       parent machine
-    */
-    struct ClemensMemoryPageMap **bank_page_map;
-    /* The different page mapping types */
-    struct ClemensMemoryPageMap fpi_direct_page_map;
-    struct ClemensMemoryPageMap fpi_main_page_map;
-    struct ClemensMemoryPageMap fpi_aux_page_map;
-    struct ClemensMemoryPageMap fpi_rom_page_map;
-    struct ClemensMemoryPageMap mega2_main_page_map;
-    struct ClemensMemoryPageMap mega2_aux_page_map;
-    struct ClemensMemoryPageMap empty_page_map;
-
-    /* Shadow maps for bank 00, 01 */
-    struct ClemensMemoryShadowMap fpi_mega2_main_shadow_map;
-    struct ClemensMemoryShadowMap fpi_mega2_aux_shadow_map;
-
-    /* All devices */
-    struct ClemensVGC vgc;
-    struct ClemensDeviceRTC dev_rtc;
-    struct ClemensDeviceADB dev_adb;
-    struct ClemensDeviceTimer dev_timer;
-    struct ClemensDeviceDebugger dev_debug;
-    struct ClemensDeviceAudio dev_audio;
-    struct ClemensDeviceIWM dev_iwm;
-    struct ClemensDeviceSCC dev_scc;
-
-    /* Registers that do not fall easily within a device struct */
-    enum ClemensMMIOStateType state_type;
-    uint32_t mmap_register;     // memory map flags- CLEM_MEM_IO_MMAP_
-    uint32_t last_data_address; // used for c08x switches
-    uint32_t emulator_detect;   // used for the c04f emulator test (state)
-    uint8_t new_video_c029;     // see kClemensMMIONewVideo_xxx
-    uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
-
-    uint64_t mega2_cycles;            // number of mega2 pulses/ticks since startup
-    uint32_t timer_60hz_us;           // used for executing logic per 1/60th second
-    int32_t card_expansion_rom_index; // card slot has the mutex on C800-CFFF
-
-    /* All ticks are mega2 cycles */
-    uint32_t irq_line; // see CLEM_IRQ_XXX flags, if !=0 triggers irqb
-    uint32_t nmi_line; // see ClEM_NMI_XXX flags
-};
-
 /*  ClemensDrive Data
  */
 
@@ -422,6 +365,73 @@ struct ClemensDrive {
 struct ClemensDriveBay {
     struct ClemensDrive slot5[2];
     struct ClemensDrive slot6[2];
+};
+
+/**
+ * @brief Reflects the CPU state on the MMIO
+ *
+ */
+enum ClemensMMIOStateType {
+    kClemensMMIOStateType_None,
+    kClemensMMIOStateType_Reset,
+    kClemensMMIOStateType_Active
+};
+
+/**
+ * @brief FPI + MEGA2 MMIO Interface
+ *
+ */
+struct ClemensMMIO {
+    /** Handlers for all slots */
+    ClemensCard *card_slot[7];
+    /** Expansion ROM area for each card.  This area is paged into addressable
+     *  memory with the correct IO instructions.  Each area should be 2K in
+     *  size.  As with card slot memory, slot 3 is ignored */
+    uint8_t *card_slot_expansion_memory[7];
+    /* pointer to the array of bank page map pointers initialized by the
+       parent machine
+    */
+    struct ClemensMemoryPageMap **bank_page_map;
+    /* The different page mapping types */
+    struct ClemensMemoryPageMap fpi_direct_page_map;
+    struct ClemensMemoryPageMap fpi_main_page_map;
+    struct ClemensMemoryPageMap fpi_aux_page_map;
+    struct ClemensMemoryPageMap fpi_rom_page_map;
+    struct ClemensMemoryPageMap mega2_main_page_map;
+    struct ClemensMemoryPageMap mega2_aux_page_map;
+    struct ClemensMemoryPageMap empty_page_map;
+
+    /* Shadow maps for bank 00, 01 */
+    struct ClemensMemoryShadowMap fpi_mega2_main_shadow_map;
+    struct ClemensMemoryShadowMap fpi_mega2_aux_shadow_map;
+
+    /* All devices */
+    struct ClemensVGC vgc;
+    struct ClemensDeviceRTC dev_rtc;
+    struct ClemensDeviceADB dev_adb;
+    struct ClemensDeviceTimer dev_timer;
+    struct ClemensDeviceDebugger dev_debug;
+    struct ClemensDeviceAudio dev_audio;
+    struct ClemensDeviceIWM dev_iwm;
+    struct ClemensDeviceSCC dev_scc;
+    /* Peripherals */
+    struct ClemensDriveBay active_drives;
+
+    /* Registers that do not fall easily within a device struct */
+    enum ClemensMMIOStateType state_type;
+    uint32_t mmap_register;     // memory map flags- CLEM_MEM_IO_MMAP_
+    uint32_t last_data_address; // used for c08x switches
+    uint32_t emulator_detect;   // used for the c04f emulator test (state)
+    uint8_t new_video_c029;     // see kClemensMMIONewVideo_xxx
+    uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
+
+    uint64_t mega2_cycles;            // number of mega2 pulses/ticks since startup
+    uint32_t timer_60hz_us;           // used for executing logic per 1/60th second
+    int32_t card_expansion_rom_index; // card slot has the mutex on C800-CFFF
+
+    /* All ticks are mega2 cycles */
+    uint32_t irq_line; // see CLEM_IRQ_XXX flags, if !=0 triggers irqb
+    uint32_t nmi_line; // see ClEM_NMI_XXX flags
 };
 
 /* Note that in emulation mode, the EmulatedBrk flag should be
@@ -601,22 +611,10 @@ struct ClemensTimeSpec {
 typedef struct ClemensMachine {
     struct Clemens65C816 cpu;
     struct ClemensTimeSpec tspec;
+    struct ClemensMemory mem;
 
     /** Internal, tracks cycle count for holding down the reset key */
     int resb_counter;
-    /** Internal, skips mmio if in 'simple' mode */
-    bool mmio_enabled;
-
-    struct ClemensMMIO mmio;
-    struct ClemensDriveBay active_drives;
-    struct ClemensMemory mem;
-
-    /** Handlers for all slots */
-    ClemensCard *card_slot[7];
-    /** Expansion ROM area for each card.  This area is paged into addressable
-     *  memory with the correct IO instructions.  Each area should be 2K in
-     *  size.  As with card slot memory, slot 3 is ignored */
-    uint8_t *card_slot_expansion_memory[7];
 
     /* Optional callback for debugging purposes.
        When issued, it's guaranteed that all registers/CPU state has been
@@ -629,6 +627,11 @@ typedef struct ClemensMachine {
     ClemensOpcodeCallback opcode_post;
     /* logger callback (if NULL, uses stdout) */
     LoggerFn logger_fn;
+
+    /** Internal, skips mmio if in 'simple' mode */
+    bool mmio_enabled;
+
+    struct ClemensMMIO mmio;
 } ClemensMachine;
 
 /**
