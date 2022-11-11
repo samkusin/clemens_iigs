@@ -46,12 +46,12 @@ int main(int argc, char *argv[]) {
 
     machine.cpu.pins.resbIn = false;
     clemens_emulate_cpu(&machine);
-    clemens_emulate_mmio(&machine);
+    clemens_emulate_mmio(&machine, &machine.mmio);
     machine.cpu.pins.resbIn = true;
 
     while (machine.cpu.cycles_spent < 1024) {
         clemens_emulate_cpu(&machine);
-        clemens_emulate_mmio(&machine);
+        clemens_emulate_mmio(&machine, &machine.mmio);
     }
 
     return 0;

@@ -3457,9 +3457,8 @@ static uint8_t _clem_mmio_read_hook(struct ClemensMemory *mem, struct ClemensTim
     return clem_mmio_read((ClemensMMIO *)mem->mmio_context, tspec, addr, flags, is_slow_access);
 }
 
-void clemens_emulate_mmio(ClemensMachine *clem) {
+void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     struct Clemens65C816 *cpu = &clem->cpu;
-    ClemensMMIO *mmio = &clem->mmio;
     struct ClemensClock clock;
     uint32_t delta_mega2_cycles;
     uint32_t card_result;

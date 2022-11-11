@@ -98,7 +98,7 @@ void clemens_emulate_cpu(ClemensMachine *clem);
  *
  * @param clem
  */
-void clemens_emulate_mmio(ClemensMachine *clem);
+void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio);
 
 /**
  * @brief Defines the logger function and machine specific context.

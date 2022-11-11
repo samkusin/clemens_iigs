@@ -837,7 +837,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                    (!stepsRemaining.has_value() || *stepsRemaining > 0)) {
                 clem_clocks_time_t pre_emulate_time = machine_.tspec.clocks_spent;
                 clemens_emulate_cpu(&machine_);
-                clemens_emulate_mmio(&machine_);
+                clemens_emulate_mmio(&machine_, &machine_.mmio);
                 clem_clocks_duration_t emulate_step_time =
                     machine_.tspec.clocks_spent - pre_emulate_time;
                 clocksRemainingInTimeslice -= emulate_step_time;
