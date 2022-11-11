@@ -3449,20 +3449,17 @@ void clemens_emulate_cpu(ClemensMachine *clem) {
 static void _clem_mmio_write_hook(struct ClemensMemory *mem, struct ClemensTimeSpec *tspec,
                                   uint8_t data, uint16_t addr, uint8_t flags,
                                   bool *is_slow_access) {
-    clem_mmio_write((struct ClemensMMIO *)mem->mmio_context, tspec, data, addr, flags,
-                    is_slow_access);
+    clem_mmio_write((ClemensMMIO *)mem->mmio_context, tspec, data, addr, flags, is_slow_access);
 }
 
 static uint8_t _clem_mmio_read_hook(struct ClemensMemory *mem, struct ClemensTimeSpec *tspec,
-                                    uint8_t data, uint16_t addr, uint8_t flags,
-                                    bool *is_slow_access) {
-    return clem_mmio_read((struct ClemensMMIO *)mem->mmio_context, tspec, addr, flags,
-                          is_slow_access);
+                                    uint16_t addr, uint8_t flags, bool *is_slow_access) {
+    return clem_mmio_read((ClemensMMIO *)mem->mmio_context, tspec, addr, flags, is_slow_access);
 }
 
 void clemens_emulate_mmio(ClemensMachine *clem) {
     struct Clemens65C816 *cpu = &clem->cpu;
-    struct ClemensMMIO *mmio = &clem->mmio;
+    ClemensMMIO *mmio = &clem->mmio;
     struct ClemensClock clock;
     uint32_t delta_mega2_cycles;
     uint32_t card_result;

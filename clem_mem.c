@@ -82,8 +82,8 @@
  *      Each page has a shadow-bit to shadow writes to the Mega2 bank
  */
 
-static void _clem_mmio_memory_map(struct ClemensMMIO *mmio, uint32_t memory_flags);
-static void _clem_mmio_shadow_map(struct ClemensMMIO *mmio, uint32_t shadow_flags);
+static void _clem_mmio_memory_map(ClemensMMIO *mmio, uint32_t memory_flags);
+static void _clem_mmio_shadow_map(ClemensMMIO *mmio, uint32_t shadow_flags);
 
 static inline void _clem_mem_cycle(ClemensMachine *clem, bool mega2_access) {
     clem->tspec.clocks_spent +=
@@ -116,7 +116,7 @@ void clem_mem_create_page_mapping(struct ClemensMemoryPageInfo *page, uint8_t pa
     page->write = page_idx;
 }
 
-static void _clem_mmio_clear_irq(struct ClemensMMIO *mmio, unsigned irq_flags) {
+static void _clem_mmio_clear_irq(ClemensMMIO *mmio, unsigned irq_flags) {
     if (irq_flags & CLEM_IRQ_VGC_MASK) {
         mmio->vgc.irq_line &= ~(irq_flags & CLEM_IRQ_VGC_MASK);
         mmio->irq_line &= ~(irq_flags & CLEM_IRQ_VGC_MASK);
@@ -131,11 +131,9 @@ static void _clem_mmio_clear_irq(struct ClemensMMIO *mmio, unsigned irq_flags) {
     }
 }
 
-static inline uint8_t _clem_mmio_newvideo_c029(struct ClemensMMIO *mmio) {
-    return mmio->new_video_c029;
-}
+static inline uint8_t _clem_mmio_newvideo_c029(ClemensMMIO *mmio) { return mmio->new_video_c029; }
 
-static inline void _clem_mmio_newvideo_c029_set(struct ClemensMMIO *mmio, uint8_t value) {
+static inline void _clem_mmio_newvideo_c029_set(ClemensMMIO *mmio, uint8_t value) {
     uint8_t setflags = mmio->new_video_c029 ^ value;
     if (setflags & CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT) {
         if (!(value & CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT)) {
@@ -166,7 +164,7 @@ static inline void _clem_mmio_newvideo_c029_set(struct ClemensMMIO *mmio, uint8_
     mmio->new_video_c029 = value & ~0x1e; /* bits 1-4 are not used */
 }
 
-static void _clem_mmio_slotrom_select_c02d(struct ClemensMMIO *mmio, uint8_t data) {
+static void _clem_mmio_slotrom_select_c02d(ClemensMMIO *mmio, uint8_t data) {
     int i;
     unsigned slot_mask =
         CLEM_MEM_IO_MMAP_CROM & (~(CLEM_MEM_IO_MMAP_CXROM | CLEM_MEM_IO_MMAP_C3ROM));
@@ -186,7 +184,7 @@ static void _clem_mmio_slotrom_select_c02d(struct ClemensMMIO *mmio, uint8_t dat
     _clem_mmio_memory_map(mmio, mmap_register);
 }
 
-static uint8_t _clem_mmio_slotromsel_c02d(struct ClemensMMIO *mmio) {
+static uint8_t _clem_mmio_slotromsel_c02d(ClemensMMIO *mmio) {
     uint8_t mask = 0;
     for (int i = 1; i < 8; ++i) {
         if (i == 3)
@@ -200,7 +198,7 @@ static uint8_t _clem_mmio_slotromsel_c02d(struct ClemensMMIO *mmio) {
     return mask;
 }
 
-static inline uint8_t _clem_mmio_shadow_c035(struct ClemensMMIO *mmio) {
+static inline uint8_t _clem_mmio_shadow_c035(ClemensMMIO *mmio) {
     uint8_t result = 0;
     if (mmio->mmap_register & CLEM_MEM_IO_MMAP_NSHADOW_TXT1)
         result |= 0x01;
@@ -219,7 +217,7 @@ static inline uint8_t _clem_mmio_shadow_c035(struct ClemensMMIO *mmio) {
     return result;
 }
 
-static void _clem_mmio_shadow_c035_set(struct ClemensMMIO *mmio, uint8_t value) {
+static void _clem_mmio_shadow_c035_set(ClemensMMIO *mmio, uint8_t value) {
     unsigned mmap = mmio->mmap_register;
     if (value & 0x01)
         mmap |= CLEM_MEM_IO_MMAP_NSHADOW_TXT1;
@@ -252,7 +250,7 @@ static void _clem_mmio_shadow_c035_set(struct ClemensMMIO *mmio, uint8_t value) 
     _clem_mmio_memory_map(mmio, mmap);
 }
 
-static void _clem_mmio_speed_c036_set(struct ClemensMMIO *mmio, struct ClemensTimeSpec *tspec,
+static void _clem_mmio_speed_c036_set(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec,
                                       uint8_t value) {
     uint8_t setflags = mmio->speed_c036 ^ value;
 
@@ -284,7 +282,7 @@ static void _clem_mmio_speed_c036_set(struct ClemensMMIO *mmio, struct ClemensTi
     mmio->speed_c036 = (value & 0xdf);
 }
 
-static void _clem_mmio_mega2_inten_set(struct ClemensMMIO *mmio, uint8_t data) {
+static void _clem_mmio_mega2_inten_set(ClemensMMIO *mmio, uint8_t data) {
     if (data & 0xe0) {
         CLEM_WARN("clem_mmio: invalid inten set %02X", data);
     }
@@ -305,7 +303,7 @@ static void _clem_mmio_mega2_inten_set(struct ClemensMMIO *mmio, uint8_t data) {
     }
 }
 
-static uint8_t _clem_mmio_mega2_inten_get(struct ClemensMMIO *mmio) {
+static uint8_t _clem_mmio_mega2_inten_get(ClemensMMIO *mmio) {
     uint8_t res = 0x00;
     if (mmio->dev_timer.flags & CLEM_MMIO_TIMER_QSEC_ENABLED) {
         res |= 0x10;
@@ -316,7 +314,7 @@ static uint8_t _clem_mmio_mega2_inten_get(struct ClemensMMIO *mmio) {
     return res;
 }
 
-static uint8_t _clem_mmio_inttype_c046(struct ClemensMMIO *mmio) {
+static uint8_t _clem_mmio_inttype_c046(ClemensMMIO *mmio) {
     uint8_t result = 0x0; // mmio->irq_line ? CLEM_MMIO_INTTYPE_IRQ : 0;
 
     if (mmio->irq_line & CLEM_IRQ_TIMER_QSEC) {
@@ -332,7 +330,7 @@ static uint8_t _clem_mmio_inttype_c046(struct ClemensMMIO *mmio) {
     return result;
 }
 
-static void _clem_mmio_vgc_irq_c023_set(struct ClemensMMIO *mmio, uint8_t data) {
+static void _clem_mmio_vgc_irq_c023_set(ClemensMMIO *mmio, uint8_t data) {
     if (data & 0x4) {
         mmio->dev_timer.flags |= CLEM_MMIO_TIMER_1SEC_ENABLED;
     } else {
@@ -346,7 +344,7 @@ static void _clem_mmio_vgc_irq_c023_set(struct ClemensMMIO *mmio, uint8_t data) 
     }
 }
 
-static uint8_t _clem_mmio_vgc_irq_c023_get(struct ClemensMMIO *mmio) {
+static uint8_t _clem_mmio_vgc_irq_c023_get(ClemensMMIO *mmio) {
     uint8_t res = 0x00;
 
     if (mmio->irq_line & (CLEM_IRQ_VGC_SCAN_LINE + CLEM_IRQ_TIMER_RTC_1SEC)) {
@@ -371,7 +369,7 @@ static uint8_t _clem_mmio_vgc_irq_c023_get(struct ClemensMMIO *mmio) {
    STATEREG here:
    http://www.1000bit.it/support/manuali/apple/technotes/iigs/tn.iigs.030.html
 */
-static inline uint8_t _clem_mmio_statereg_c068(struct ClemensMMIO *mmio) {
+static inline uint8_t _clem_mmio_statereg_c068(ClemensMMIO *mmio) {
     uint8_t value = 0x00;
     if (mmio->mmap_register & CLEM_MEM_IO_MMAP_ALTZPLC) {
         value |= 0x80;
@@ -396,7 +394,7 @@ static inline uint8_t _clem_mmio_statereg_c068(struct ClemensMMIO *mmio) {
     return value;
 }
 
-static uint8_t _clem_mmio_statereg_c068_set(struct ClemensMMIO *mmio, uint8_t value) {
+static uint8_t _clem_mmio_statereg_c068_set(ClemensMMIO *mmio, uint8_t value) {
     uint32_t mmap_register = mmio->mmap_register;
     /*  ALTZP  */
     if (value & 0x80) {
@@ -452,7 +450,7 @@ static uint8_t _clem_mmio_statereg_c068_set(struct ClemensMMIO *mmio, uint8_t va
     return 0;
 }
 
-static uint8_t _clem_mmio_rw_bank_select(struct ClemensMMIO *mmio, uint16_t address) {
+static uint8_t _clem_mmio_rw_bank_select(ClemensMMIO *mmio, uint16_t address) {
     uint32_t memory_flags = mmio->mmap_register;
     uint16_t last_data_address = mmio->last_data_address & 0xffff;
     uint8_t ioreg = (address & 0xff);
@@ -542,7 +540,7 @@ static uint8_t _clem_mmio_card_io_read(ClemensCard *card, struct ClemensClock *c
     return result;
 }
 
-uint8_t clem_mmio_read(struct ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_t addr,
+uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_t addr,
                        uint8_t flags, bool *mega2_access) {
     struct ClemensClock ref_clock;
     uint8_t result = 0x00;
@@ -873,8 +871,8 @@ static void _clem_mmio_card_io_write(ClemensCard *card, struct ClemensClock *clo
     }
 }
 
-void clem_mmio_write(struct ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t data,
-                     uint16_t addr, uint8_t flags, bool *mega2_access) {
+void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t data, uint16_t addr,
+                     uint8_t flags, bool *mega2_access) {
     struct ClemensClock ref_clock;
     bool is_noop = (flags & CLEM_OP_IO_NO_OP) != 0;
     uint8_t ioreg = (addr & 0xff);
@@ -1142,7 +1140,7 @@ void clem_mmio_write(struct ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, ui
     }
 }
 
-static void _clem_mmio_shadow_map(struct ClemensMMIO *mmio, uint32_t shadow_flags) {
+static void _clem_mmio_shadow_map(ClemensMMIO *mmio, uint32_t shadow_flags) {
     /* Sets up which pages are shadowed on banks 00, 01.  Flags tested inside
        _clem_write determine if the write operation actual performs the copy to
        E0, E1
@@ -1213,7 +1211,7 @@ static void _clem_mmio_shadow_map(struct ClemensMMIO *mmio, uint32_t shadow_flag
     switches (iolc inhibit)
 
 */
-static void _clem_mmio_memory_map(struct ClemensMMIO *mmio, uint32_t memory_flags) {
+static void _clem_mmio_memory_map(ClemensMMIO *mmio, uint32_t memory_flags) {
     struct ClemensMemoryPageMap *page_map_B00;
     struct ClemensMemoryPageMap *page_map_B01;
     struct ClemensMemoryPageMap *page_map_BE0;
@@ -1544,7 +1542,7 @@ static void _clem_mmio_memory_map(struct ClemensMMIO *mmio, uint32_t memory_flag
     mmio->mmap_register = memory_flags;
 }
 
-void _clem_mmio_init_page_maps(struct ClemensMMIO *mmio, uint32_t memory_flags) {
+void _clem_mmio_init_page_maps(ClemensMMIO *mmio, uint32_t memory_flags) {
     struct ClemensMemoryPageMap *page_map;
     struct ClemensMemoryPageInfo *page;
     unsigned page_idx;
@@ -1649,7 +1647,7 @@ void _clem_mmio_init_page_maps(struct ClemensMMIO *mmio, uint32_t memory_flags) 
     clem_mmio_restore(mmio);
 }
 
-void clem_mmio_reset(struct ClemensMMIO *mmio, clem_clocks_duration_t mega2_clocks_step) {
+void clem_mmio_reset(ClemensMMIO *mmio, clem_clocks_duration_t mega2_clocks_step) {
     clem_debug_reset(&mmio->dev_debug);
     clem_timer_reset(&mmio->dev_timer);
     clem_rtc_reset(&mmio->dev_rtc, mega2_clocks_step);
@@ -1660,14 +1658,14 @@ void clem_mmio_reset(struct ClemensMMIO *mmio, clem_clocks_duration_t mega2_cloc
     clem_scc_reset(&mmio->dev_scc);
 }
 
-void clem_mmio_restore(struct ClemensMMIO *mmio) {
+void clem_mmio_restore(ClemensMMIO *mmio) {
     uint32_t memory_flags = mmio->mmap_register;
     mmio->mmap_register = 0xffffffff;
     _clem_mmio_memory_map(mmio, 0x0000000000);
     _clem_mmio_memory_map(mmio, memory_flags);
 }
 
-void clem_mmio_init(struct ClemensMMIO *mmio, struct ClemensMemoryPageMap **bank_page_map,
+void clem_mmio_init(ClemensMMIO *mmio, struct ClemensMemoryPageMap **bank_page_map,
                     clem_clocks_duration_t mega2_clocks_step, void *slot_expansion_rom) {
     int idx;
     //  Memory map starts out without shadowing, but our call to

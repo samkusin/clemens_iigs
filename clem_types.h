@@ -381,7 +381,7 @@ enum ClemensMMIOStateType {
  * @brief FPI + MEGA2 MMIO Interface
  *
  */
-struct ClemensMMIO {
+typedef struct ClemensMMIO {
     /** Handlers for all slots */
     ClemensCard *card_slot[7];
     /** Expansion ROM area for each card.  This area is paged into addressable
@@ -432,7 +432,7 @@ struct ClemensMMIO {
     /* All ticks are mega2 cycles */
     uint32_t irq_line; // see CLEM_IRQ_XXX flags, if !=0 triggers irqb
     uint32_t nmi_line; // see ClEM_NMI_XXX flags
-};
+} ClemensMMIO;
 
 /* Note that in emulation mode, the EmulatedBrk flag should be
    stored in the status register - for our purposes we mock this
@@ -633,7 +633,7 @@ typedef struct ClemensMachine {
     /** Internal, skips mmio if in 'simple' mode */
     bool mmio_enabled;
     /** The Apple IIgs Mega2 + CYA I/O subsystem*/
-    struct ClemensMMIO mmio;
+    ClemensMMIO mmio;
 } ClemensMachine;
 
 /**
