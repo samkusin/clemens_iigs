@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "emulator.h"
+#include "emulator_mmio.h"
 
 /**
  *  The Apple //gs Clements Emulator

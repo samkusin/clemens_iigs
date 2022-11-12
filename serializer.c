@@ -1,6 +1,7 @@
 #include "serializer.h"
 #include "clem_2img.h"
 #include "clem_mem.h"
+#include "clem_mmio.h"
 
 /* Serializing the Machine */
 
