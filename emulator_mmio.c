@@ -328,9 +328,9 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     }
     if (mmio->state_type == kClemensMMIOStateType_Reset) {
         clem->mem.mmio_context = mmio;
-        clem->mem.mmio_write = &_clem_mmio_write_hook;
-        clem->mem.mmio_read = &_clem_mmio_read_hook;
-        clem->mem.mmio_niolc = &_clem_mmio_niolc;
+        clem->mem.mmio_write = _clem_mmio_write_hook;
+        clem->mem.mmio_read = _clem_mmio_read_hook;
+        clem->mem.mmio_niolc = _clem_mmio_niolc;
         clem_disk_reset_drives(&mmio->active_drives);
         clem_mmio_reset(mmio, clem->tspec.clocks_step_mega2);
         /* extension cards reset handling */

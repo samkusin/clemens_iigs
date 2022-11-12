@@ -37,6 +37,17 @@ struct ClemensMemoryPageMap {
     struct ClemensMemoryShadowMap *shadow_map;
 };
 
+struct ClemensTimeSpec {
+    /* clocks spent per cycle as set by the current speed settings */
+    clem_clocks_duration_t clocks_step;
+    /* clocks spent per cycle in fast mode */
+    clem_clocks_duration_t clocks_step_fast;
+    /* typically FPI speed mhz * clocks_step_fast */
+    clem_clocks_duration_t clocks_step_mega2;
+    /* clock timer - never change once system has been started */
+    clem_clocks_time_t clocks_spent;
+};
+
 /**
  * @brief Real time clock device and BRAM interface
  *
@@ -592,17 +603,6 @@ struct ClemensMemory {
     uint8_t (*mmio_read)(struct ClemensMemory *, struct ClemensTimeSpec *, uint16_t /* addr */,
                          uint8_t /* flags*/, bool *);
     bool (*mmio_niolc)(struct ClemensMemory *);
-};
-
-struct ClemensTimeSpec {
-    /* clocks spent per cycle as set by the current speed settings */
-    clem_clocks_duration_t clocks_step;
-    /* clocks spent per cycle in fast mode */
-    clem_clocks_duration_t clocks_step_fast;
-    /* typically FPI speed mhz * clocks_step_fast */
-    clem_clocks_duration_t clocks_step_mega2;
-    /* clock timer - never change once system has been started */
-    clem_clocks_time_t clocks_spent;
 };
 
 /**
