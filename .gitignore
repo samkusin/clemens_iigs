@@ -1,6 +1,6 @@
 .vscode/
 .vs/
 build/
-build-run/
+dist/
 data/*.rom
 data/*.bin

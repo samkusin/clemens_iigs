@@ -137,6 +137,7 @@ class ClemensBackend {
     cinek::ByteBuffer romBuffer_;
     cinek::ByteBuffer diskBuffer_;
     ClemensMachine machine_;
+    ClemensMMIO mmio_;
 
     std::vector<ClemensBackendOutputText> logOutput_;
     std::vector<ClemensBackendBreakpoint> breakpoints_;

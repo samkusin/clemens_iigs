@@ -47,54 +47,49 @@ static char g_decimal_to_hex[16] = {'0', '1', '2', '3', '4', '5', '6', '7',
  * @param mega2
  * @return uint8_t*
  */
-static inline uint8_t *_clem_get_memory_bank(ClemensMachine *clem, uint8_t bank,
-                                             bool *mega2) {
-  if (bank == 0xe0 || bank == 0xe1) {
-    *mega2 = true;
-    return clem->mega2_bank_map[bank & 0x1];
-  }
-  return clem->fpi_bank_map[bank];
+static inline uint8_t *_clem_get_memory_bank(ClemensMachine *clem, uint8_t bank, bool *mega2) {
+    if (bank == 0xe0 || bank == 0xe1) {
+        *mega2 = true;
+        return clem->mem.mega2_bank_map[bank & 0x1];
+    }
+    return clem->mem.fpi_bank_map[bank];
 }
 
-static inline uint32_t _clem_calc_cycles_diff(uint32_t cycles_a,
-                                              uint32_t cycles_b) {
-  uint32_t diff = cycles_b - cycles_a;
-  if (cycles_b > cycles_a) {
-    return cycles_b - cycles_a;
-  } else {
-    return cycles_b + (UINT32_MAX - cycles_a) + 1;
-  }
+static inline uint32_t _clem_calc_cycles_diff(uint32_t cycles_a, uint32_t cycles_b) {
+    uint32_t diff = cycles_b - cycles_a;
+    if (cycles_b > cycles_a) {
+        return cycles_b - cycles_a;
+    } else {
+        return cycles_b + (UINT32_MAX - cycles_a) + 1;
+    }
 }
 
-static inline unsigned clem_util_timer_decrement(unsigned timer_ns,
+static inline unsigned clem_util_timer_decrement(unsigned timer_ns, unsigned dt_ns) {
+    return (timer_ns - dt_ns < timer_ns) ? (timer_ns - dt_ns) : 0;
+}
+
+static inline unsigned clem_util_timer_increment(unsigned timer_ns, unsigned timer_max_ns,
                                                  unsigned dt_ns) {
-  return (timer_ns - dt_ns < timer_ns) ? (timer_ns - dt_ns) : 0;
+    if (timer_ns + dt_ns > timer_ns) {
+        timer_ns += dt_ns;
+    } else {
+        timer_ns = UINT32_MAX;
+    }
+    if (timer_ns > timer_max_ns) {
+        timer_ns = timer_max_ns;
+    }
+    return timer_ns;
 }
 
-static inline unsigned clem_util_timer_increment(unsigned timer_ns,
-                                                 unsigned timer_max_ns,
-                                                 unsigned dt_ns) {
-  if (timer_ns + dt_ns > timer_ns) {
-    timer_ns += dt_ns;
-  } else {
-    timer_ns = UINT32_MAX;
-  }
-  if (timer_ns > timer_max_ns) {
-    timer_ns = timer_max_ns;
-  }
-  return timer_ns;
-}
-
-static bool _clem_util_hex_value(uint32_t *value, const char *start,
-                                 const char *end) {
-  uint8_t hex;
-  while (start != end) {
-    *value <<= 4;
-    hex = *start;
-    if (hex == 0xff)
-      return false;
-    *value |= g_hex_to_decimal[hex];
-    ++start;
-  }
-  return true;
+static bool _clem_util_hex_value(uint32_t *value, const char *start, const char *end) {
+    uint8_t hex;
+    while (start != end) {
+        *value <<= 4;
+        hex = *start;
+        if (hex == 0xff)
+            return false;
+        *value |= g_hex_to_decimal[hex];
+        ++start;
+    }
+    return true;
 }

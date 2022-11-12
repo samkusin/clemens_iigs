@@ -38,26 +38,11 @@
 extern "C" {
 #endif
 
-void clem_mem_create_page_mapping(
-    struct ClemensMemoryPageInfo* page,
-    uint8_t page_idx,
-    uint8_t bank_read_idx,
-    uint8_t bank_write_idx
-);
+void clem_mem_create_page_mapping(struct ClemensMemoryPageInfo *page, uint8_t page_idx,
+                                  uint8_t bank_read_idx, uint8_t bank_write_idx);
 
-void clem_read(ClemensMachine* clem, uint8_t* data, uint16_t adr, uint8_t bank,
-               uint8_t flags);
-void clem_write(ClemensMachine* clem, uint8_t data, uint16_t adr,
-                uint8_t bank, uint8_t flags);
-
-void clem_mmio_reset(struct ClemensMMIO* mmio,
-                     clem_clocks_duration_t mega2_clocks_step);
-
-void clem_mmio_init(struct ClemensMMIO *mmio,
-                    struct ClemensMemoryPageMap **bank_page_map,
-                    clem_clocks_duration_t mega2_clocks_step);
-
-void clem_mmio_restore(struct ClemensMMIO* mmio);
+void clem_read(ClemensMachine *clem, uint8_t *data, uint16_t adr, uint8_t bank, uint8_t flags);
+void clem_write(ClemensMachine *clem, uint8_t data, uint16_t adr, uint8_t bank, uint8_t flags);
 
 #ifdef __cplusplus
 }

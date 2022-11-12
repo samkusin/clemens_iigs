@@ -5,6 +5,7 @@
 #include "clem_program_trace.hpp"
 #include "clem_serializer.hpp"
 #include "emulator.h"
+#include "emulator_mmio.h"
 #include "iocards/mockingboard.h"
 
 #include <charconv>
@@ -150,6 +151,7 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config &config,
     }
 
     memset(&machine_, 0, sizeof(machine_));
+    memset(&mmio_, 0, sizeof(mmio_));
     clemens_host_setup(&machine_, &ClemensBackend::emulatorLog, this);
 
     switch (config_.type) {
@@ -261,7 +263,7 @@ bool ClemensBackend::writeProtectDisk(const std::string_view &inputParam) {
         return false;
     auto driveParam = inputParam.substr(0, sepPos);
     auto driveType = ClemensDiskUtilities::getDriveType(driveParam);
-    auto *drive = clemens_drive_get(&machine_, driveType);
+    auto *drive = clemens_drive_get(&mmio_, driveType);
     if (!drive || !drive->has_disk)
         return false;
 
@@ -360,7 +362,7 @@ void ClemensBackend::saveMachine(std::string path) {
 
 bool ClemensBackend::saveSnapshot(const std::string_view &inputParam) {
     auto outputPath = std::filesystem::path(CLEM_HOST_SNAPSHOT_DIR) / inputParam;
-    return ClemensSerializer::save(outputPath.string(), &machine_, diskContainers_.size(),
+    return ClemensSerializer::save(outputPath.string(), &machine_, &mmio_, diskContainers_.size(),
                                    diskContainers_.data(), diskDrives_.data(), breakpoints_);
 }
 
@@ -370,20 +372,21 @@ void ClemensBackend::loadMachine(std::string path) {
 
 bool ClemensBackend::loadSnapshot(const std::string_view &inputParam) {
     auto outputPath = std::filesystem::path(CLEM_HOST_SNAPSHOT_DIR) / inputParam;
-    bool res = ClemensSerializer::load(outputPath.string(), &machine_, diskContainers_.size(),
-                                       diskContainers_.data(), diskDrives_.data(), breakpoints_,
-                                       &ClemensBackend::unserializeAllocate, this);
+    bool res = ClemensSerializer::load(
+        outputPath.string(), &machine_, &mmio_, diskContainers_.size(), diskContainers_.data(),
+        diskDrives_.data(), breakpoints_, &ClemensBackend::unserializeAllocate, this);
     saveBRAM();
     return res;
 }
 
-static ClemensCard *findMockingboardCard(ClemensMachine *machine) {
+//  TODO: Move into Clemens API clemens_mmio_find_card_name()
+static ClemensCard *findMockingboardCard(ClemensMMIO *mmio) {
     for (int cardIdx = 0; cardIdx < 7; ++cardIdx) {
-        if (machine->card_slot[cardIdx]) {
+        if (mmio->card_slot[cardIdx]) {
             const char *cardName =
-                machine->card_slot[cardIdx]->io_name(machine->card_slot[cardIdx]->context);
+                mmio->card_slot[cardIdx]->io_name(mmio->card_slot[cardIdx]->context);
             if (!strcmp(cardName, kClemensCardMockingboardName)) {
-                return machine->card_slot[cardIdx];
+                return mmio->card_slot[cardIdx];
             }
         }
     }
@@ -415,7 +418,7 @@ bool ClemensBackend::loadDisk(ClemensDriveType driveType, bool allowBlank) {
                 diskContainers_[driveType].nib = &disks_[driveType];
                 auto parseBuffer = cinek::ConstCastRange<uint8_t>(bits);
                 if (ClemensDiskUtilities::parseWOZ(&diskContainers_[driveType], parseBuffer)) {
-                    if (clemens_assign_disk(&machine_, driveType, &disks_[driveType])) {
+                    if (clemens_assign_disk(&mmio_, driveType, &disks_[driveType])) {
                         return true;
                     }
                 }
@@ -424,7 +427,7 @@ bool ClemensBackend::loadDisk(ClemensDriveType driveType, bool allowBlank) {
     } else if (allowBlank) {
         resetDisk(driveType);
         if (ClemensDiskUtilities::createWOZ(&diskContainers_[driveType], &disks_[driveType])) {
-            if (clemens_assign_disk(&machine_, driveType, &disks_[driveType])) {
+            if (clemens_assign_disk(&mmio_, driveType, &disks_[driveType])) {
                 return true;
             }
         }
@@ -539,7 +542,7 @@ void ClemensBackend::inputEvent(const ClemensInputEvent &input) {
 }
 
 void ClemensBackend::inputMachine(const std::string_view &inputParam) {
-    if (!clemens_is_mmio_initialized(&machine_)) {
+    if (!clemens_is_initialized_simple(&machine_)) {
         return;
     }
     auto equalsTokenPos = inputParam.find('=');
@@ -560,7 +563,7 @@ void ClemensBackend::inputMachine(const std::string_view &inputParam) {
             inputEvent.value_a = (int16_t)std::stol(std::string(inputValueA));
             inputEvent.value_b = (int16_t)std::stol(std::string(inputValueB));
             inputEvent.adb_key_toggle_mask = std::stoul(std::string(inputModifiers));
-            clemens_input(&machine_, &inputEvent);
+            clemens_input(&mmio_, &inputEvent);
         }
     }
 }
@@ -645,9 +648,9 @@ void ClemensBackend::queueToFront(const Command &cmd) {
     commandQueueCondition_.notify_one();
 }
 
-static int64_t calculateClocksPerTimeslice(ClemensMachine *machine, unsigned hz) {
+static int64_t calculateClocksPerTimeslice(ClemensMMIO *mmio, unsigned hz) {
     bool is_machine_slow;
-    return int64_t(clemens_clocks_per_second(machine, &is_machine_slow) / hz);
+    return int64_t(clemens_clocks_per_second(mmio, &is_machine_slow) / hz);
 }
 
 void ClemensBackend::main(PublishStateDelegate publishDelegate) {
@@ -658,18 +661,19 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
     ClemensRunSampler runSampler;
 
+    //  TODO: clemens API clemens_mmio_card_insert()
     for (size_t cardIdx = 0; cardIdx < config_.cardNames.size(); ++cardIdx) {
         auto &cardName = config_.cardNames[cardIdx];
         if (!cardName.empty()) {
-            machine_.card_slot[cardIdx] = createCard(cardName.c_str());
+            mmio_.card_slot[cardIdx] = createCard(cardName.c_str());
         } else {
-            machine_.card_slot[cardIdx] = NULL;
+            mmio_.card_slot[cardIdx] = NULL;
         }
     }
 
     fmt::print("Starting backend thread.\n");
 
-    ClemensCard *mockingboard = findMockingboardCard(&machine_);
+    ClemensCard *mockingboard = findMockingboardCard(&mmio_);
     uint64_t publishSeqNo = 0;
     unsigned emulatorRefreshFrequency = 60;
     auto fixedFrameInterval =
@@ -710,7 +714,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             case Command::ResetMachine:
                 resetMachine();
                 isMachineReady = true;
-                mockingboard = findMockingboardCard(&machine_);
+                mockingboard = findMockingboardCard(&mmio_);
                 break;
             case Command::SetHostUpdateFrequency:
                 emulatorRefreshFrequency = std::stoul(command.operand);
@@ -784,7 +788,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                 break;
             case Command::LoadMachine:
                 if (loadSnapshot(command.operand)) {
-                    mockingboard = findMockingboardCard(&machine_);
+                    mockingboard = findMockingboardCard(&mmio_);
                 } else {
                     commandFailed = true;
                 }
@@ -823,19 +827,21 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                 (std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) +
                  kEpoch1904To1970Seconds);
 
-            clemens_rtc_set(&machine_, (unsigned)epoch_time_1904);
+            clemens_rtc_set(&mmio_, (unsigned)epoch_time_1904);
 
-            auto lastClocksSpent = machine_.clocks_spent;
+            auto lastClocksSpent = machine_.tspec.clocks_spent;
             int64_t clocksPerTimeslice =
-                calculateClocksPerTimeslice(&machine_, emulatorRefreshFrequency);
+                calculateClocksPerTimeslice(&mmio_, emulatorRefreshFrequency);
             clocksRemainingInTimeslice += clocksPerTimeslice;
 
             machine_.cpu.cycles_spent = 0;
             while (clocksRemainingInTimeslice > 0 &&
                    (!stepsRemaining.has_value() || *stepsRemaining > 0)) {
-                clem_clocks_time_t pre_emulate_time = machine_.clocks_spent;
-                clemens_emulate(&machine_);
-                clem_clocks_duration_t emulate_step_time = machine_.clocks_spent - pre_emulate_time;
+                clem_clocks_time_t pre_emulate_time = machine_.tspec.clocks_spent;
+                clemens_emulate_cpu(&machine_);
+                clemens_emulate_mmio(&machine_, &mmio_);
+                clem_clocks_duration_t emulate_step_time =
+                    machine_.tspec.clocks_spent - pre_emulate_time;
                 clocksRemainingInTimeslice -= emulate_step_time;
                 if (stepsRemaining.has_value()) {
                     stepsRemaining = *stepsRemaining - 1;
@@ -866,21 +872,22 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                 currentFrameTimePoint - lastFrameTimePoint);
             lastFrameTimePoint = currentFrameTimePoint;
 
-            runSampler.update(fixedFrameInterval, actualFrameInterval,
-                              (clem_clocks_duration_t)(machine_.clocks_spent - lastClocksSpent),
-                              machine_.cpu.cycles_spent);
+            runSampler.update(
+                fixedFrameInterval, actualFrameInterval,
+                (clem_clocks_duration_t)(machine_.tspec.clocks_spent - lastClocksSpent),
+                machine_.cpu.cycles_spent);
 
             for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end();
                  ++diskDriveIt) {
                 auto &diskDrive = *diskDriveIt;
                 auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
                 auto driveType = static_cast<ClemensDriveType>(driveIndex);
-                auto *clemensDrive = clemens_drive_get(&machine_, driveType);
+                auto *clemensDrive = clemens_drive_get(&mmio_, driveType);
                 diskDrive.isSpinning = clemensDrive->is_spindle_on;
                 diskDrive.isWriteProtected = clemensDrive->disk.is_write_protected;
                 diskDrive.saveFailed = false;
                 if (diskDrive.isEjecting) {
-                    if (clemens_eject_disk_async(&machine_, driveType, &disks_[driveIndex])) {
+                    if (clemens_eject_disk_async(&mmio_, driveType, &disks_[driveIndex])) {
                         diskDrive.isEjecting = false;
                         if (!saveDisk(driveType))
                             diskDrive.saveFailed = true;
@@ -902,7 +909,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
                 auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
                 auto driveType = static_cast<ClemensDriveType>(driveIndex);
-                if (clemens_eject_disk_async(&machine_, driveType, &disks_[driveIndex])) {
+                if (clemens_eject_disk_async(&mmio_, driveType, &disks_[driveIndex])) {
                     saveDisk(driveType);
                     localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", diskDrive.imagePath);
                 }
@@ -923,12 +930,12 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         //        again as needed next timeslice.
         if (publishState) {
             ClemensBackendState publishedState{};
-            publishedState.mmio_was_initialized = clemens_is_mmio_initialized(&machine_);
+            publishedState.mmio_was_initialized = clemens_is_initialized_simple(&machine_);
             if (publishedState.mmio_was_initialized) {
-                clemens_get_monitor(&publishedState.monitor, &machine_);
-                clemens_get_text_video(&publishedState.text, &machine_);
-                clemens_get_graphics_video(&publishedState.graphics, &machine_);
-                if (clemens_get_audio(&publishedState.audio, &machine_)) {
+                clemens_get_monitor(&publishedState.monitor, &mmio_);
+                clemens_get_text_video(&publishedState.text, &mmio_);
+                clemens_get_graphics_video(&publishedState.graphics, &machine_, &mmio_);
+                if (clemens_get_audio(&publishedState.audio, &mmio_)) {
                     if (mockingboard) {
                         auto &audio = publishedState.audio;
                         float *audio_frame_head = reinterpret_cast<float *>(
@@ -942,6 +949,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             publishedState.isRunning = isRunning;
             publishedState.isTracing = programTrace_ != nullptr;
             publishedState.machine = &machine_;
+            publishedState.mmio = &mmio_;
             publishedState.seqno = publishSeqNo;
             publishedState.fps = runSampler.sampledFramesPerSecond;
             publishedState.hostCPUID = clem_host_get_processor_number();
@@ -973,7 +981,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
             publishDelegate(publishedState);
             if (publishedState.mmio_was_initialized) {
-                clemens_audio_next_frame(&machine_, publishedState.audio.frame_count);
+                clemens_audio_next_frame(&mmio_, publishedState.audio.frame_count);
             }
             logOutput_.clear();
             loggedInstructions_.clear();
@@ -986,9 +994,11 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
     saveBRAM();
 
+    //  TODO: clemens_mmio_card_eject() will clear the slot but it still needs
+    //        to be destroyed by the app
     for (int i = 0; i < 7; ++i) {
-        destroyCard(machine_.card_slot[i]);
-        machine_.card_slot[i] = NULL;
+        destroyCard(mmio_.card_slot[i]);
+        mmio_.card_slot[i] = NULL;
     }
 
     fmt::print("Terminated backend refresh thread.\n");
@@ -1089,9 +1099,9 @@ void ClemensBackend::initApple2GS() {
         clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle, romBuffer_.getHead(),
                      romBuffer_.getSize(), slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
                      slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
-                     slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount),
-                     slabMemory_.allocate(2048 * 7), //  TODO: placeholder
-                     kFPIBankCount);
+                     slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount), kFPIBankCount);
+    clem_mmio_init(&mmio_, &machine_.dev_debug, machine_.mem.bank_page_map,
+                   machine_.tspec.clocks_step_mega2, slabMemory_.allocate(2048 * 7));
     if (result < 0) {
         fmt::print("Clemens library failed to initialize with err code (%d)\n", result);
         return;
@@ -1106,12 +1116,12 @@ void ClemensBackend::initApple2GS() {
     audioMixBuffer.frame_count = audioMixBuffer.frames_per_second / 4;
     audioMixBuffer.data =
         (uint8_t *)(slabMemory_.allocate(audioMixBuffer.frame_count * audioMixBuffer.stride));
-    clemens_assign_audio_mix_buffer(&machine_, &audioMixBuffer);
+    clemens_assign_audio_mix_buffer(&mmio_, &audioMixBuffer);
 }
 
 void ClemensBackend::saveBRAM() {
     bool isDirty = false;
-    const uint8_t *bram = clemens_rtc_get_bram(&machine_, &isDirty);
+    const uint8_t *bram = clemens_rtc_get_bram(&mmio_, &isDirty);
     if (!isDirty)
         return;
 
@@ -1126,7 +1136,7 @@ void ClemensBackend::saveBRAM() {
 void ClemensBackend::loadBRAM() {
     std::ifstream bramFile("clem.bram", std::ios::binary);
     if (bramFile.is_open()) {
-        bramFile.read((char *)machine_.mmio.dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
+        bramFile.read((char *)mmio_.dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
     } else {
         //  TODO: display warning?
     }
