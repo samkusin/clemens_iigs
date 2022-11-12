@@ -2,6 +2,7 @@
 #include "clem_disk_utils.hpp"
 #include "clem_host_utils.hpp"
 #include "emulator.h"
+#include "emulator_mmio.h"
 #include "serializer.h"
 
 #include "fmt/format.h"

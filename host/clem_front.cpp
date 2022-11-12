@@ -7,6 +7,7 @@
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
 #include "emulator.h"
+#include "emulator_mmio.h"
 #include "version.h"
 
 #include "cinek/encode.h"

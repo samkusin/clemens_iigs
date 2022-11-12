@@ -240,8 +240,6 @@ struct ClemensInputEvent {
 };
 
 struct ClemensDeviceDebugger {
-    unsigned ioreg_read_ctr[256];
-    unsigned ioreg_write_ctr[256];
     LoggerFn log_message;
     uint16_t pc; /* these values are passed from the CPU per frame */
     uint8_t pbr;
@@ -405,11 +403,11 @@ typedef struct ClemensMMIO {
     struct ClemensMemoryShadowMap fpi_mega2_aux_shadow_map;
 
     /* All devices */
+    struct ClemensDeviceDebugger *dev_debug;
     struct ClemensVGC vgc;
     struct ClemensDeviceRTC dev_rtc;
     struct ClemensDeviceADB dev_adb;
     struct ClemensDeviceTimer dev_timer;
-    struct ClemensDeviceDebugger dev_debug;
     struct ClemensDeviceAudio dev_audio;
     struct ClemensDeviceIWM dev_iwm;
     struct ClemensDeviceSCC dev_scc;
@@ -624,6 +622,7 @@ typedef struct ClemensMachine {
        updated (and can be viewed as an accurate state of the machine after
        running the opcode)
     */
+    struct ClemensDeviceDebugger dev_debug;
     uint32_t debug_flags; // See enum kClemensDebugFlag_
     void *debug_user_ptr;
     /* opcode print callback */

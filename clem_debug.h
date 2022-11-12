@@ -36,6 +36,10 @@ extern "C" {
 
 typedef struct ClemensMachine ClemensMachine;
 
+void clem_debug_reset(struct ClemensDeviceDebugger *dbg);
+void clem_debug_break(struct ClemensDeviceDebugger *dbg, unsigned debug_reason, unsigned param0,
+                      unsigned param1);
+
 void clem_debug_context(ClemensMachine *context);
 
 void clem_debug_log(int log_level, const char *fmt, ...);

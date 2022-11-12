@@ -12,11 +12,6 @@
 extern "C" {
 #endif
 
-void clem_debug_reset(struct ClemensDeviceDebugger *dbg);
-
-void clem_debug_break(struct ClemensDeviceDebugger *dbg, unsigned debug_reason, unsigned param0,
-                      unsigned param1);
-
 void clem_rtc_reset(struct ClemensDeviceRTC *rtc, clem_clocks_duration_t latency);
 void clem_rtc_set_clock_time(struct ClemensDeviceRTC *rtc, uint32_t seconds_since_1904);
 bool clem_rtc_clear_bram_dirty(struct ClemensDeviceRTC *rtc);

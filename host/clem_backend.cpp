@@ -5,6 +5,7 @@
 #include "clem_program_trace.hpp"
 #include "clem_serializer.hpp"
 #include "emulator.h"
+#include "emulator_mmio.h"
 #include "iocards/mockingboard.h"
 
 #include <charconv>
@@ -1099,8 +1100,8 @@ void ClemensBackend::initApple2GS() {
                      romBuffer_.getSize(), slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
                      slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
                      slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount), kFPIBankCount);
-    clem_mmio_init(&mmio_, machine_.mem.bank_page_map, machine_.tspec.clocks_step_mega2,
-                   slabMemory_.allocate(2048 * 7));
+    clem_mmio_init(&mmio_, &machine_.dev_debug, machine_.mem.bank_page_map,
+                   machine_.tspec.clocks_step_mega2, slabMemory_.allocate(2048 * 7));
     if (result < 0) {
         fmt::print("Clemens library failed to initialize with err code (%d)\n", result);
         return;
