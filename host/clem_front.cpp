@@ -577,6 +577,7 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
     ClemensTraceExecutedInstruction::initialize();
 
     initDebugIODescriptors();
+    clem_joystick_open_devices(CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT);
 
     audio_.start();
     config_.type = ClemensBackend::Config::Type::Apple2GS;
@@ -600,6 +601,7 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
 ClemensFrontend::~ClemensFrontend() {
     backend_ = nullptr;
     audio_.stop();
+    clem_joystick_close_devices();
     delete[] thisFrameAudioBuffer_.getHead();
     delete[] lastCommandState_.audioBuffer.getHead();
     free(frameWriteMemory_.getHead());
@@ -850,12 +852,27 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     }
 }
 
+void ClemensFrontend::pollJoystickDevices() {
+    ClemensHostJoystick joysticks[CLEM_HOST_JOYSTICK_LIMIT];
+    unsigned count = clem_joystick_poll(joysticks);
+    if (count <= 0) {
+    } else {
+        for (unsigned i = 0; i < count; ++i) {
+            if (joysticks[i].isConnected) {
+                fmt::print("Joy {}: {},{},{:08X}\n", i, joysticks[i].x[0], joysticks[i].y[0],
+                           joysticks[i].buttons);
+            }
+        }
+    }
+}
+
 void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInterop &interop) {
     //  send commands to emulator thread
     //  get results from emulator thread
     //    video, audio, machine state, etc
-    //
-    //  developer_layout(width, height, deltaTime);
+
+    pollJoystickDevices();
+
     bool isNewFrame = false;
     bool isBackendTerminated = false;
     std::unique_lock<std::mutex> frameLock(frameMutex_);
