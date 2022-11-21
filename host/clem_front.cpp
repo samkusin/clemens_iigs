@@ -854,16 +854,47 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
 
 void ClemensFrontend::pollJoystickDevices() {
     ClemensHostJoystick joysticks[CLEM_HOST_JOYSTICK_LIMIT];
-    unsigned count = clem_joystick_poll(joysticks);
-    if (count <= 0) {
-    } else {
-        for (unsigned i = 0; i < count; ++i) {
-            if (joysticks[i].isConnected) {
-                fmt::print("Joy {}: {},{},{:08X}\n", i, joysticks[i].x[0], joysticks[i].y[0],
-                           joysticks[i].buttons);
+    unsigned deviceCount = clem_joystick_poll(joysticks);
+    unsigned joystickCount = 0;
+    ClemensInputEvent inputs[2];
+    constexpr int32_t kGameportAxisMagnitude =
+        CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX - CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MIN;
+    constexpr int32_t kHostAxisMagnitude = CLEM_HOST_JOYSTICK_AXIS_DELTA * 2;
+    for (unsigned i = 0; i < deviceCount; ++i) {
+        if (joysticks[i].isConnected) {
+            //  TODO: select (x,y)[0] or (x,y)[1] based on user preference for
+            //        console style controllers (left or right stick, left always for now)
+            auto &input = inputs[joystickCount];
+            input.type = kClemensInputType_Paddle;
+            input.value_a = (int16_t)((int32_t)(joysticks[i].x[0] + CLEM_HOST_JOYSTICK_AXIS_DELTA) *
+                                      kGameportAxisMagnitude / kHostAxisMagnitude);
+            input.value_b = (int16_t)((int32_t)(joysticks[i].y[0] + CLEM_HOST_JOYSTICK_AXIS_DELTA) *
+                                      kGameportAxisMagnitude / kHostAxisMagnitude);
+            input.gameport_button_mask = 0;
+            //  TODO: again, select button 1 or 2 based on user configuration
+            if (joysticks[i].buttons & CLEM_HOST_JOYSTICK_BUTTON_A) {
+                input.gameport_button_mask |= 0x1;
             }
+            if (joysticks[i].buttons & CLEM_HOST_JOYSTICK_BUTTON_B) {
+                input.gameport_button_mask |= 0x2;
+            }
+            joystickCount++;
+            if (joystickCount == 1) {
+                input.gameport_button_mask |= CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_0;
+            }
+            if (joystickCount == 2) {
+                input.gameport_button_mask |= CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_1;
+            }
+            if (joystickCount >= 2)
+                break;
         }
     }
+    if (joystickCount < 1)
+        return;
+    backend_->inputEvent(inputs[0]);
+    if (joystickCount < 2)
+        return;
+    backend_->inputEvent(inputs[1]);
 }
 
 void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInterop &interop) {

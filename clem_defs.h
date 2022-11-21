@@ -64,6 +64,18 @@
 #define CLEM_ADB_KEYB_BUFFER_LIMIT     8
 #define CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK 0x0000001
 
+/** Gameport support - note that paddle axis values range from 0 to 1023, and
+ *  there's support for up to 8 buttons.  Of course the Apple 2 only supports
+ *  two buttons (possibly more with extended gameport support).  A host can
+ *  supply states for up to 8 buttons, and the emulator can tread buttons 0, 2,
+ *  4, and so on as 'button 0' and 1, 3, 5, ... as 'button 1' as an option
+ */
+#define CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_0 0x0000000
+#define CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_1 0x8000000
+#define CLEM_GAMEPORT_BUTTON_MASK_BUTTONS    0x00000ff
+#define CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MIN  0
+#define CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX  1023
+
 /** General Machine Settings */
 #define CLEM_IIGS_PAGE_SIZE               256
 #define CLEM_IIGS_BANK_SIZE               (64 * 1024)

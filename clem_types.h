@@ -88,8 +88,18 @@ struct ClemensDeviceMouse {
 };
 
 struct ClemensDeviceGameport {
-    uint8_t paddle[4];
-    uint8_t btn_mask;
+    /* value is from 0 to CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX or at UINT_MAX if
+       the value is not set by the host per frame. */
+    uint16_t paddle[4];
+    /* on PTRIG, paddle_timer[x] takes on the time value calculated from the
+       input paddle value (if the paddle value is at UINT_MAX per above, then
+       paddle_timer[x] == 0, which becomes a no-op during the sync()).  Otherwise
+       every frame the timer value is decremented and when reaching 0, flips the
+       paddle high bit off at PADDLn */
+    clem_clocks_duration_t paddle_timer[4];
+    /* C064...C067 bit 7 maps to items 0 - 4. */
+    uint8_t paddle_timer_state[4];
+    uint8_t btn_mask[2];
     uint8_t ann_mask;
 };
 
@@ -227,7 +237,8 @@ enum ClemensInputType {
     kClemensInputType_KeyUp,
     kClemensInputType_MouseButtonDown,
     kClemensInputType_MouseButtonUp,
-    kClemensInputType_MouseMove
+    kClemensInputType_MouseMove,
+    kClemensInputType_Paddle
 };
 
 /**
@@ -243,11 +254,18 @@ struct ClemensInputEvent {
        Mouse pointer deltas as reported by host scaled for the ADB.  These are
        in the range of +- 64 and are packed into the value (upper + lower 16 bits
        for Y and X respectively.)
+
+       Gameport values for each paddle are stored as X = value_a, Y = value_b
+       Forward two joystick input by toggling the gameport_button_mask with
+       CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_0 or CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_1
     */
     int16_t value_a;
     int16_t value_b;
     /* Key toggle mask */
-    unsigned adb_key_toggle_mask;
+    union {
+        unsigned adb_key_toggle_mask;
+        unsigned gameport_button_mask;
+    };
 };
 
 struct ClemensDeviceDebugger {

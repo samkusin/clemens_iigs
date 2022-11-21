@@ -266,7 +266,7 @@
  * to disable Transwarp (not IIgs fast mode).
  * - http://www.faqs.org/faqs/apple2/faq/part3/
  */
-#define CLEM_MMIO_REG_PADDL_RESET 0x70
+#define CLEM_MMIO_REG_PTRIG 0x70
 /** Write 1 to disable transwarp, 0 to enable (no-op on Clemens) */
 #define CLEM_MMIO_REG_C074_TRANSWARP 0x74
 /** R1 - LC Bank 2, Read RAM, Write Protect */
