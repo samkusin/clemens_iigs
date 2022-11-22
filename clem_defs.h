@@ -73,8 +73,15 @@
 #define CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_0 0x0000000
 #define CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_1 0x8000000
 #define CLEM_GAMEPORT_BUTTON_MASK_BUTTONS    0x00000ff
-#define CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MIN  0
-#define CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX  1023
+/* Changing this value could affect integer math calculations in clem_adb.c
+   regarding discharge time for the capacitor used in the emualated gameport
+   timing circuit */
+#define CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX 1023
+/* Ohms - Maximum potentiometer resistance of 150kOhms */
+#define CLEM_GAMEPORT_PADDLE_RESISTANCE 150000
+/* Nanofarads - used for calculation purposes (0.022 uF capacitor) */
+#define CLEM_GAMEPORT_PADDLE_CAPACITANCE_NF     22
+#define CLEM_GAMEPORT_PADDLE_AXIS_VALUE_INVALID 0xffff
 
 /** General Machine Settings */
 #define CLEM_IIGS_PAGE_SIZE               256

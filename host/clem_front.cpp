@@ -857,8 +857,7 @@ void ClemensFrontend::pollJoystickDevices() {
     unsigned deviceCount = clem_joystick_poll(joysticks);
     unsigned joystickCount = 0;
     ClemensInputEvent inputs[2];
-    constexpr int32_t kGameportAxisMagnitude =
-        CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX - CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MIN;
+    constexpr int32_t kGameportAxisMagnitude = CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX;
     constexpr int32_t kHostAxisMagnitude = CLEM_HOST_JOYSTICK_AXIS_DELTA * 2;
     for (unsigned i = 0; i < deviceCount; ++i) {
         if (joysticks[i].isConnected) {

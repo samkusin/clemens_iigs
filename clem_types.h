@@ -96,7 +96,7 @@ struct ClemensDeviceGameport {
        paddle_timer[x] == 0, which becomes a no-op during the sync()).  Otherwise
        every frame the timer value is decremented and when reaching 0, flips the
        paddle high bit off at PADDLn */
-    clem_clocks_duration_t paddle_timer[4];
+    uint32_t paddle_timer_ns[4];
     /* C064...C067 bit 7 maps to items 0 - 4. */
     uint8_t paddle_timer_state[4];
     uint8_t btn_mask[2];

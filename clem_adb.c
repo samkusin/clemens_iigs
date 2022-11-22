@@ -1,6 +1,7 @@
 #include "clem_debug.h"
 #include "clem_device.h"
 #include "clem_mmio_defs.h"
+#include "clem_util.h"
 
 #include <string.h>
 
@@ -127,6 +128,8 @@
 #define CLEM_ADB_GLU_SRQ_60HZ_CYCLES 600
 
 void clem_adb_reset(struct ClemensDeviceADB *adb) {
+    int i;
+
     adb->version = CLEM_ADB_ROM_3; /* TODO - input to reset? */
     adb->mode_flags = CLEM_ADB_MODE_AUTOPOLL_KEYB | CLEM_ADB_MODE_AUTOPOLL_MOUSE;
     adb->keyb.reset_key = false;
@@ -134,10 +137,12 @@ void clem_adb_reset(struct ClemensDeviceADB *adb) {
     adb->mouse.size = 0;
     adb->gameport.ann_mask = 0;
     adb->gameport.btn_mask[0] = adb->gameport.btn_mask[1] = 0;
-    adb->gameport.paddle_timer_state[0] = 0;
-    adb->gameport.paddle_timer_state[1] = 0;
-    adb->gameport.paddle_timer_state[2] = 0;
-    adb->gameport.paddle_timer_state[3] = 0;
+
+    for (i = 0; i < 4; ++i) {
+        adb->gameport.paddle[i] = CLEM_GAMEPORT_PADDLE_AXIS_VALUE_INVALID;
+        adb->gameport.paddle_timer_ns[i] = 0;
+        adb->gameport.paddle_timer_state[i] = 0;
+    }
 }
 
 static void _clem_adb_expect_data(struct ClemensDeviceADB *adb, uint8_t data_limit) {
@@ -1773,6 +1778,27 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
     }
 }
 
+void _clem_gameport_sync(struct ClemensDeviceGameport *gameport, uint32_t delta_us) {
+    int paddle_index;
+    uint32_t charge_time;
+    uint32_t delta_ns = delta_us * 1000;
+    for (paddle_index = 0; paddle_index < 4; ++paddle_index) {
+        //
+        if (!gameport->paddle_timer_state[paddle_index])
+            continue;
+        gameport->paddle[paddle_index] = CLEM_GAMEPORT_PADDLE_AXIS_VALUE_INVALID;
+        charge_time = gameport->paddle_timer_ns[paddle_index];
+        if (!charge_time)
+            continue;
+        charge_time = clem_util_timer_decrement(charge_time, delta_ns);
+        if (charge_time == 0) {
+            gameport->paddle_timer_state[paddle_index] = 0x00;
+        }
+        gameport->paddle_timer_ns[paddle_index] = charge_time;
+    }
+    //  TODO!
+}
+
 void clem_adb_glu_sync(struct ClemensDeviceADB *adb, uint32_t delta_us) {
     adb->poll_timer_us += delta_us;
     adb->keyb.timer_us += delta_us;
@@ -1827,10 +1853,23 @@ void clem_adb_glu_sync(struct ClemensDeviceADB *adb, uint32_t delta_us) {
     } else {
         adb->cmd_flags &= ~CLEM_ADB_C026_SRQ;
     }
+
+    _clem_gameport_sync(&adb->gameport, delta_us);
 }
 
 void _clem_adb_gameport_paddle(struct ClemensDeviceADB *adb, unsigned paddle_xy_id, int16_t x,
                                int16_t y, uint8_t buttons) {
+    unsigned index = paddle_xy_id << 1;
+    adb->gameport.paddle[index] = x;
+    adb->gameport.paddle[index + 1] = y;
+    adb->gameport.btn_mask[paddle_xy_id] = buttons;
+}
+
+void _clem_adb_gameport_reset(struct ClemensDeviceADB *adb) {
+    //  set up timing logic during sync()
+    uint64_t ns;
+    int index;
+
     // translate x and y from the linear 0-1023 range to 150Kohm variable resistor
     // operating on a circuit with a 0.022 microfarad capacitor.  The resulting
     // changing time of the capacitor is the time it takes from paddle input
@@ -1838,11 +1877,32 @@ void _clem_adb_gameport_paddle(struct ClemensDeviceADB *adb, unsigned paddle_xy_
     //
     // Hence the standard analog component equation for time to capacitor change
     //    T = RC where R = 0 to 1.5e5 scaled from axis value 0 to 1023
-}
 
-void _clem_adb_gameport_reset(struct ClemensDeviceADB *adb) {
     //  reset paddle timers to their values calculated from the paddle inputs if set
     //  before calling sync()
+
+    //  R = Rmax * PDL/PDLmax
+    //  t = RC  (C = 0.22 uF)
+    //  t = R * (0.022*1e-6 F)
+    //  seconds  = (Rmax * PDL / PDLmax)  * 0.022 * 1e-6
+    //  microseconds = Rmax * (PDL / PDLmax) * 0.022
+    //  nanoseconds = Rmax * PDL * 22 / PDLmax
+    //
+    for (index = 0; index < 4; ++index) {
+        if (adb->gameport.paddle[index] != CLEM_GAMEPORT_PADDLE_AXIS_VALUE_INVALID) {
+            ns = (CLEM_GAMEPORT_PADDLE_RESISTANCE * (uint32_t)adb->gameport.paddle[index] *
+                  CLEM_GAMEPORT_PADDLE_CAPACITANCE_NF) /
+                 CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX;
+            // 2us additional delay as suggested from 7-29 of Understanding the Apple //e
+            // this conveniently allows us to treat a zero time as meaning 'no input'
+            // from the gameport
+            ns += 2000;
+            adb->gameport.paddle_timer_ns[index] = ns;
+        } else {
+            adb->gameport.paddle_timer_ns[index] = 0;
+        }
+        adb->gameport.paddle_timer_state[index] = 0x80;
+    }
 }
 
 void clem_adb_device_input(struct ClemensDeviceADB *adb, const struct ClemensInputEvent *input) {
