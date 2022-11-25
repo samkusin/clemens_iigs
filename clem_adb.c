@@ -1786,7 +1786,6 @@ void _clem_gameport_sync(struct ClemensDeviceGameport *gameport, uint32_t delta_
         //
         if (!gameport->paddle_timer_state[paddle_index])
             continue;
-        gameport->paddle[paddle_index] = CLEM_GAMEPORT_PADDLE_AXIS_VALUE_INVALID;
         charge_time = gameport->paddle_timer_ns[paddle_index];
         if (!charge_time)
             continue;
@@ -1863,6 +1862,7 @@ void _clem_adb_gameport_paddle(struct ClemensDeviceADB *adb, unsigned paddle_xy_
     adb->gameport.paddle[index] = x;
     adb->gameport.paddle[index + 1] = y;
     adb->gameport.btn_mask[paddle_xy_id] = buttons;
+    adb->gameport.btn_mask[paddle_xy_id ^ 1] = 0;
 }
 
 void _clem_adb_gameport_reset(struct ClemensDeviceADB *adb) {
@@ -1890,13 +1890,7 @@ void _clem_adb_gameport_reset(struct ClemensDeviceADB *adb) {
     //
     for (index = 0; index < 4; ++index) {
         if (adb->gameport.paddle[index] != CLEM_GAMEPORT_PADDLE_AXIS_VALUE_INVALID) {
-            ns = (CLEM_GAMEPORT_PADDLE_RESISTANCE * (uint32_t)adb->gameport.paddle[index] *
-                  CLEM_GAMEPORT_PADDLE_CAPACITANCE_NF) /
-                 CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX;
-            // 2us additional delay as suggested from 7-29 of Understanding the Apple //e
-            // this conveniently allows us to treat a zero time as meaning 'no input'
-            // from the gameport
-            ns += 2000;
+            ns = CLEM_GAMEPORT_CALCULATE_TIME_NS(adb, index);
             adb->gameport.paddle_timer_ns[index] = ns;
         } else {
             adb->gameport.paddle_timer_ns[index] = 0;
@@ -1943,9 +1937,14 @@ void clem_adb_device_input(struct ClemensDeviceADB *adb, const struct ClemensInp
         _clem_adb_glu_queue_mouse(adb, input->value_a, input->value_b);
         break;
     case kClemensInputType_Paddle:
-        _clem_adb_gameport_paddle(adb, input->gameport_button_mask >> 31, input->value_a,
-                                  input->value_b,
-                                  input->gameport_button_mask & CLEM_GAMEPORT_BUTTON_MASK_BUTTONS);
+        _clem_adb_gameport_paddle(
+            adb, input->gameport_button_mask >> 31, input->value_a, input->value_b,
+            (uint8_t)(input->gameport_button_mask & CLEM_GAMEPORT_BUTTON_MASK_BUTTONS));
+        break;
+    case kClemensInputType_PaddleDisconnected:
+        _clem_adb_gameport_paddle(adb, input->gameport_button_mask >> 31,
+                                  CLEM_GAMEPORT_PADDLE_AXIS_VALUE_INVALID,
+                                  CLEM_GAMEPORT_PADDLE_AXIS_VALUE_INVALID, 0);
         break;
     }
 
@@ -2265,26 +2264,26 @@ uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_
             adb->irq_line &= ~(CLEM_IRQ_ADB_MOUSE_EVT);
         }
         return tmp;
-    case CLEM_MMIO_REG_BTN0:
+    case CLEM_MMIO_REG_SW0:
         if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_APPLE) {
             return 0x80;
         } else if (adb->gameport.btn_mask[0] & 0x55) {
             return 0x80;
         }
         break;
-    case CLEM_MMIO_REG_BTN1:
+    case CLEM_MMIO_REG_SW1:
         if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_OPTION) {
             return 0x80;
         } else if (adb->gameport.btn_mask[0] & 0xAA) {
             return 0x80;
         }
         break;
-    case CLEM_MMIO_REG_BTN2:
+    case CLEM_MMIO_REG_SW2:
         if (adb->gameport.btn_mask[1] & 0x55) { // button 0, 2, 4, ...
             return 0x80;
         }
         break;
-    case CLEM_MMIO_REG_BTN3:
+    case CLEM_MMIO_REG_SW3:
         if (adb->gameport.btn_mask[1] & 0xAA) { // button 1, 3, 5, ...
             return 0x80;
         }

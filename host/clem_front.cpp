@@ -455,25 +455,25 @@ void initDebugIODescriptors() {
         "Sets hi-res graphics mode",
     };
     //  TODO: 0x58 - 0x5F
-    sDebugIODescriptors[CLEM_MMIO_REG_BTN3] = ClemensIODescriptor{
+    sDebugIODescriptors[CLEM_MMIO_REG_SW3] = ClemensIODescriptor{
         "BUTN3",
         "",
         "Reads switch 3",
         "",
     };
-    sDebugIODescriptors[CLEM_MMIO_REG_BTN0] = ClemensIODescriptor{
+    sDebugIODescriptors[CLEM_MMIO_REG_SW0] = ClemensIODescriptor{
         "BUTN0",
         "",
         "Reads switch 0 open apple",
         "",
     };
-    sDebugIODescriptors[CLEM_MMIO_REG_BTN1] = ClemensIODescriptor{
+    sDebugIODescriptors[CLEM_MMIO_REG_SW1] = ClemensIODescriptor{
         "BUTN1",
         "",
         "Reads switch 1 closed apple",
         "",
     };
-    sDebugIODescriptors[CLEM_MMIO_REG_BTN2] = ClemensIODescriptor{
+    sDebugIODescriptors[CLEM_MMIO_REG_SW2] = ClemensIODescriptor{
         "BUTN2",
         "",
         "Reads switch 2",
@@ -572,7 +572,8 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
           (std::filesystem::current_path() / std::filesystem::path(CLEM_HOST_LIBRARY_DIR))
               .string()},
       diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0),
-      debugIOMode_(DebugIOMode::Core), guiMode_(GUIMode::Emulator) {
+      debugIOMode_(DebugIOMode::Core), validJoystickIds_{-1, -1, -1, -1},
+      guiMode_(GUIMode::Emulator) {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -859,33 +860,42 @@ void ClemensFrontend::pollJoystickDevices() {
     ClemensInputEvent inputs[2];
     constexpr int32_t kGameportAxisMagnitude = CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX;
     constexpr int32_t kHostAxisMagnitude = CLEM_HOST_JOYSTICK_AXIS_DELTA * 2;
-    for (unsigned i = 0; i < deviceCount; ++i) {
-        if (joysticks[i].isConnected) {
+    unsigned index;
+    for (index = 0; index < (unsigned)validJoystickIds_.size(); ++index) {
+        if (index >= deviceCount || joystickCount >= 2)
+            break;
+        auto &input = inputs[joystickCount];
+        if (joysticks[index].isConnected) {
+            validJoystickIds_[index] = index;
             //  TODO: select (x,y)[0] or (x,y)[1] based on user preference for
             //        console style controllers (left or right stick, left always for now)
-            auto &input = inputs[joystickCount];
             input.type = kClemensInputType_Paddle;
-            input.value_a = (int16_t)((int32_t)(joysticks[i].x[0] + CLEM_HOST_JOYSTICK_AXIS_DELTA) *
-                                      kGameportAxisMagnitude / kHostAxisMagnitude);
-            input.value_b = (int16_t)((int32_t)(joysticks[i].y[0] + CLEM_HOST_JOYSTICK_AXIS_DELTA) *
-                                      kGameportAxisMagnitude / kHostAxisMagnitude);
+            input.value_a =
+                (int16_t)((int32_t)(joysticks[index].x[0] + CLEM_HOST_JOYSTICK_AXIS_DELTA) *
+                          kGameportAxisMagnitude / kHostAxisMagnitude);
+            input.value_b =
+                (int16_t)((int32_t)(joysticks[index].y[0] + CLEM_HOST_JOYSTICK_AXIS_DELTA) *
+                          kGameportAxisMagnitude / kHostAxisMagnitude);
             input.gameport_button_mask = 0;
             //  TODO: again, select button 1 or 2 based on user configuration
-            if (joysticks[i].buttons & CLEM_HOST_JOYSTICK_BUTTON_A) {
+            if (joysticks[index].buttons & CLEM_HOST_JOYSTICK_BUTTON_A) {
                 input.gameport_button_mask |= 0x1;
             }
-            if (joysticks[i].buttons & CLEM_HOST_JOYSTICK_BUTTON_B) {
+            if (joysticks[index].buttons & CLEM_HOST_JOYSTICK_BUTTON_B) {
                 input.gameport_button_mask |= 0x2;
             }
             joystickCount++;
-            if (joystickCount == 1) {
-                input.gameport_button_mask |= CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_0;
-            }
-            if (joystickCount == 2) {
-                input.gameport_button_mask |= CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_1;
-            }
-            if (joystickCount >= 2)
-                break;
+        } else if (validJoystickIds_[index] != -1) {
+            input.type = kClemensInputType_PaddleDisconnected;
+            input.gameport_button_mask = 0;
+            joystickCount++;
+            validJoystickIds_[index] = -1;
+        }
+        if (joystickCount == 1) {
+            input.gameport_button_mask |= CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_0;
+        }
+        if (joystickCount == 2) {
+            input.gameport_button_mask |= CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_1;
         }
     }
     if (joystickCount < 1)

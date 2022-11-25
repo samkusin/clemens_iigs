@@ -250,6 +250,8 @@ class ClemensFrontend {
     static ImU8 imguiMemoryEditorRead(const ImU8 *mem_ptr, size_t off);
     static void imguiMemoryEditorWrite(ImU8 *mem_ptr, size_t off, ImU8 value);
 
+    std::array<int, 4> validJoystickIds_;
+
     void pollJoystickDevices();
 
   private:

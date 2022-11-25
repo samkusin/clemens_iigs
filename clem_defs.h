@@ -70,9 +70,9 @@
  *  supply states for up to 8 buttons, and the emulator can tread buttons 0, 2,
  *  4, and so on as 'button 0' and 1, 3, 5, ... as 'button 1' as an option
  */
-#define CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_0 0x0000000
-#define CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_1 0x8000000
-#define CLEM_GAMEPORT_BUTTON_MASK_BUTTONS    0x00000ff
+#define CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_0 0x00000000
+#define CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_1 0x80000000
+#define CLEM_GAMEPORT_BUTTON_MASK_BUTTONS    0x000000ff
 /* Changing this value could affect integer math calculations in clem_adb.c
    regarding discharge time for the capacitor used in the emualated gameport
    timing circuit */
@@ -82,6 +82,25 @@
 /* Nanofarads - used for calculation purposes (0.022 uF capacitor) */
 #define CLEM_GAMEPORT_PADDLE_CAPACITANCE_NF     22
 #define CLEM_GAMEPORT_PADDLE_AXIS_VALUE_INVALID 0xffff
+/* 2us additional delay as suggested from 7-29 of Understanding the Apple //e
+   this conveniently allows us to treat a zero time as meaning 'no input'
+   from the gameport
+*/
+#define CLEM_GAMEPORT_PADDLE_TIME_INTIIAL_NS 2000
+
+/*
+   R = Rmax * PDL/PDLmax
+   t = RC  (C = 0.22 uF)
+   t = R * (0.022*1e-6 F)
+   seconds  = (Rmax * PDL / PDLmax)  * 0.022 * 1e-6
+   microseconds = Rmax * (PDL / PDLmax) * 0.022
+   nanoseconds = Rmax * PDL * 22 / PDLmax
+*/
+#define CLEM_GAMEPORT_CALCULATE_TIME_NS(_adb_, _index_)                                            \
+    (((CLEM_GAMEPORT_PADDLE_RESISTANCE * (uint32_t)((_adb_)->gameport.paddle[_index_]) *           \
+       CLEM_GAMEPORT_PADDLE_CAPACITANCE_NF) /                                                      \
+      CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX) +                                                       \
+     CLEM_GAMEPORT_PADDLE_TIME_INTIIAL_NS)
 
 /** General Machine Settings */
 #define CLEM_IIGS_PAGE_SIZE               256

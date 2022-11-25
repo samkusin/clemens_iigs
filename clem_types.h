@@ -238,7 +238,8 @@ enum ClemensInputType {
     kClemensInputType_MouseButtonDown,
     kClemensInputType_MouseButtonUp,
     kClemensInputType_MouseMove,
-    kClemensInputType_Paddle
+    kClemensInputType_Paddle,
+    kClemensInputType_PaddleDisconnected
 };
 
 /**

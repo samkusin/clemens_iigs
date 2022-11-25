@@ -234,13 +234,13 @@
 #define CLEM_MMIO_REG_AN3_ON  0x5F
 
 /** Joystick Button 3 */
-#define CLEM_MMIO_REG_BTN3 0x60
+#define CLEM_MMIO_REG_SW3 0x60
 /** Open Apple Key or Joystick Button 0 */
-#define CLEM_MMIO_REG_BTN0 0x61
+#define CLEM_MMIO_REG_SW0 0x61
 /** Solid Apple Key or Joystick Button 1 */
-#define CLEM_MMIO_REG_BTN1 0x62
+#define CLEM_MMIO_REG_SW1 0x62
 /** Joystick Button 2 */
-#define CLEM_MMIO_REG_BTN2 0x63
+#define CLEM_MMIO_REG_SW2 0x63
 /** Paddle 0 */
 #define CLEM_MMIO_REG_PADDL0 0x64
 /** Paddle 1 */

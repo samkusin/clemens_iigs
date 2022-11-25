@@ -763,8 +763,8 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     case CLEM_MMIO_REG_AN1_ON:
     case CLEM_MMIO_REG_AN2_OFF:
     case CLEM_MMIO_REG_AN2_ON:
-    case CLEM_MMIO_REG_BTN0:
-    case CLEM_MMIO_REG_BTN1:
+    case CLEM_MMIO_REG_SW0:
+    case CLEM_MMIO_REG_SW1:
         result = clem_adb_read_switch(&mmio->dev_adb, ioreg, flags);
         break;
     case CLEM_MMIO_REG_AN3_OFF:

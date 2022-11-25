@@ -177,7 +177,7 @@ static unsigned _clem_joystick_dinput(ClemensHostJoystick *joysticks) {
     int i, btn;
     HRESULT hr;
     DIJOYSTATE state;
-    for (i = 0; i < s_DInputDeviceCount; ++i) {
+    for (i = 0; i < s_DInputDeviceCount; ++i, ++count) {
         joyinfo = &s_DInputDevices[i];
         if (!joyinfo->device) {
             joysticks[i].isConnected = false;
@@ -196,7 +196,6 @@ static unsigned _clem_joystick_dinput(ClemensHostJoystick *joysticks) {
                 }
             }
             joysticks[i].isConnected = true;
-            count = i + 1;
         } else {
             if (hr == DIERR_INPUTLOST) {
                 if (GetForegroundWindow() == GetActiveWindow()) {
@@ -211,7 +210,7 @@ static unsigned _clem_joystick_dinput(ClemensHostJoystick *joysticks) {
 
 static unsigned _clem_joystick_xinput(ClemensHostJoystick *joysticks) {
     unsigned count = 0;
-    for (unsigned i = 0; i < 4; ++i) {
+    for (unsigned i = 0; i < 4; ++i, ++count) {
         if (i >= CLEM_HOST_JOYSTICK_LIMIT)
             break;
         XINPUT_STATE state;
@@ -219,7 +218,6 @@ static unsigned _clem_joystick_xinput(ClemensHostJoystick *joysticks) {
         joysticks[i].isConnected = (result == ERROR_SUCCESS && state.dwPacketNumber);
         if (!joysticks[i].isConnected)
             continue;
-        count = i + 1;
         memset(&joysticks[i], 0, sizeof(ClemensHostJoystick));
         if (state.Gamepad.wButtons & XINPUT_GAMEPAD_A) {
             joysticks[i].buttons |= CLEM_HOST_JOYSTICK_BUTTON_A;

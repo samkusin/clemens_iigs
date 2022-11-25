@@ -5,6 +5,9 @@ add_subdirectory(unity)
 add_executable(test_emulate_minimal test_emulate_minimal.c)
 target_link_libraries(test_emulate_minimal clemens_65816 unity)
 
+add_executable(test_gameport test_gameport.c)
+target_link_libraries(test_gameport clemens_65816_mmio unity)
+
 # add_library(test_lib util.c)
 # target_link_libraries(test_lib clemens_65816 unity)
 

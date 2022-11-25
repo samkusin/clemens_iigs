@@ -533,12 +533,14 @@ void ClemensBackend::resetDisk(ClemensDriveType driveType) {
     }
 }
 
-static const char *sInputKeys[] = {"", "keyD", "keyU", "mouseD", "mouseU", "mouse", "padl", NULL};
+static const char *sInputKeys[] = {"",      "keyD", "keyU",   "mouseD", "mouseU",
+                                   "mouse", "padl", "nopadl", NULL};
 
 void ClemensBackend::inputEvent(const ClemensInputEvent &input) {
     CK_ASSERT_RETURN(*sInputKeys[input.type] != '\0');
     Command cmd{Command::Input};
-    if (input.type == kClemensInputType_Paddle) {
+    if (input.type == kClemensInputType_Paddle ||
+        input.type == kClemensInputType_PaddleDisconnected) {
         cmd.operand = fmt::format("{}={},{},{}", sInputKeys[input.type], input.value_a,
                                   input.value_b, input.gameport_button_mask);
     } else {
@@ -571,7 +573,8 @@ void ClemensBackend::inputMachine(const std::string_view &inputParam) {
             inputValueB = inputValueB.substr(0, commaPos);
             inputEvent.value_a = (int16_t)std::stol(std::string(inputValueA));
             inputEvent.value_b = (int16_t)std::stol(std::string(inputValueB));
-            if (inputEvent.type == kClemensInputType_Paddle) {
+            if (inputEvent.type == kClemensInputType_Paddle ||
+                inputEvent.type == kClemensInputType_PaddleDisconnected) {
                 inputEvent.gameport_button_mask = std::stoul(std::string(inputModifiers));
             } else {
                 inputEvent.adb_key_toggle_mask = std::stoul(std::string(inputModifiers));
