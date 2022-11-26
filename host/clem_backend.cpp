@@ -547,9 +547,7 @@ void ClemensBackend::inputEvent(const ClemensInputEvent &input) {
         cmd.operand = fmt::format("{}={},{},{}", sInputKeys[input.type], input.value_a,
                                   input.value_b, input.adb_key_toggle_mask);
     }
-    queue(Command{
-        Command::Input,
-    });
+    queue(cmd);
 }
 
 void ClemensBackend::inputMachine(const std::string_view &inputParam) {

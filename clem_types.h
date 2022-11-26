@@ -88,6 +88,7 @@ struct ClemensDeviceMouse {
 };
 
 struct ClemensDeviceGameport {
+    clem_clocks_time_t ts_last_frame;
     /* value is from 0 to CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX or at UINT_MAX if
        the value is not set by the host per frame. */
     uint16_t paddle[4];

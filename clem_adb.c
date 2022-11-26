@@ -1778,24 +1778,32 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
     }
 }
 
-void _clem_gameport_sync(struct ClemensDeviceGameport *gameport, uint32_t delta_us) {
+void clem_gameport_sync(struct ClemensDeviceGameport *gameport, struct ClemensClock *clocks) {
+    clem_clocks_duration_t dt_clocks = clocks->ts - gameport->ts_last_frame;
+    unsigned delta_ns = (unsigned)(clem_calc_ns_step_from_clocks(dt_clocks, clocks->ref_step));
     int paddle_index;
     uint32_t charge_time;
-    uint32_t delta_ns = delta_us * 1000;
     for (paddle_index = 0; paddle_index < 4; ++paddle_index) {
         //
         if (!gameport->paddle_timer_state[paddle_index])
             continue;
         charge_time = gameport->paddle_timer_ns[paddle_index];
+        // if (paddle_index == 0)
+        //     printf("SYNC: PDL(%d) TIME0: %u ns\n", paddle_index, charge_time);
         if (!charge_time)
             continue;
+        // if (paddle_index == 0)
+        //     printf("SYNC: PDL(%d) TIME1: %u ns\n", paddle_index, charge_time);
         charge_time = clem_util_timer_decrement(charge_time, delta_ns);
         if (charge_time == 0) {
+            //    printf("SYNC: PDL(%d) STATE %02X = %02X\n", paddle_index,
+            //           gameport->paddle_timer_state[paddle_index], 0x00);
             gameport->paddle_timer_state[paddle_index] = 0x00;
         }
         gameport->paddle_timer_ns[paddle_index] = charge_time;
     }
-    //  TODO!
+
+    gameport->ts_last_frame = clocks->ts;
 }
 
 void clem_adb_glu_sync(struct ClemensDeviceADB *adb, uint32_t delta_us) {
@@ -1852,8 +1860,6 @@ void clem_adb_glu_sync(struct ClemensDeviceADB *adb, uint32_t delta_us) {
     } else {
         adb->cmd_flags &= ~CLEM_ADB_C026_SRQ;
     }
-
-    _clem_gameport_sync(&adb->gameport, delta_us);
 }
 
 void _clem_adb_gameport_paddle(struct ClemensDeviceADB *adb, unsigned paddle_xy_id, int16_t x,
@@ -1889,9 +1895,13 @@ void _clem_adb_gameport_reset(struct ClemensDeviceADB *adb) {
     //  nanoseconds = Rmax * PDL * 22 / PDLmax
     //
     for (index = 0; index < 4; ++index) {
+        if (index < 2) {
+        }
         if (adb->gameport.paddle[index] != CLEM_GAMEPORT_PADDLE_AXIS_VALUE_INVALID) {
             ns = CLEM_GAMEPORT_CALCULATE_TIME_NS(adb, index);
-            adb->gameport.paddle_timer_ns[index] = ns;
+            adb->gameport.paddle_timer_ns[index] = (uint32_t)ns;
+            // printf("GPRT: RESET PDL(%d): %u, TIME: %u\n", index, adb->gameport.paddle[index],
+            //        (uint32_t)ns);
         } else {
             adb->gameport.paddle_timer_ns[index] = 0;
         }
@@ -2123,6 +2133,7 @@ void clem_adb_write_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_t 
         _clem_adb_write_cmd(adb, value);
         break;
     case CLEM_MMIO_REG_PTRIG:
+        // printf("MMIO: PTRIG WRITE\n");
         _clem_adb_gameport_reset(adb);
         break;
     default:
@@ -2290,6 +2301,7 @@ uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_
         break;
     case CLEM_MMIO_REG_PTRIG:
         if (!is_noop) {
+            // printf("MMIO: PTRIG READ\n");
             _clem_adb_gameport_reset(adb);
         }
         break;
@@ -2297,6 +2309,10 @@ uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_
     case CLEM_MMIO_REG_PADDL1:
     case CLEM_MMIO_REG_PADDL2:
     case CLEM_MMIO_REG_PADDL3:
+        // if (!is_noop) {
+        //     printf("MMIO: PDL(%u) = %02x\n", ioreg - CLEM_MMIO_REG_PADDL0,
+        //            adb->gameport.paddle_timer_state[ioreg - CLEM_MMIO_REG_PADDL0]);
+        // }
         return adb->gameport.paddle_timer_state[ioreg - CLEM_MMIO_REG_PADDL0];
     case CLEM_MMIO_REG_AN0_OFF:
         adb->gameport.ann_mask &= ~0x1;

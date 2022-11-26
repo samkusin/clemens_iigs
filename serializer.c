@@ -73,6 +73,7 @@ struct ClemensSerializerRecord kADBMouse[] = {
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 struct ClemensSerializerRecord kGameport[] = {
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceGameport, ts_last_frame),
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceGameport, kClemensSerializerTypeUInt16, paddle,
                                  4, 0),
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceGameport, kClemensSerializerTypeDuration,

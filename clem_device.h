@@ -71,10 +71,18 @@ void clem_adb_device_key_toggle(struct ClemensDeviceADB *adb, unsigned enabled);
 uint8_t *clem_adb_ascii_from_a2code(unsigned input);
 
 /**
+ * @brief
+ *
+ * @param gameport
+ * @param clocks
+ */
+void clem_gameport_sync(struct ClemensDeviceGameport *gameport, struct ClemensClock *clocks);
+
+/**
  * @brief Executed frequently enough to emulate the GLU Microcontroller
  *
  * @param adb ADB device data (1 ms worth of cycles?)
- * @param delta_us Microsecond increment since last sync
+ * @param clocks Microsecond increment since last sync
  */
 void clem_adb_glu_sync(struct ClemensDeviceADB *adb, uint32_t delta_us);
 

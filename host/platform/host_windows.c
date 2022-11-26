@@ -2,6 +2,8 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+
+#include <Dbt.h>
 #include <Xinput.h>
 
 #define DIRECTINPUT_VERSION 0x0800
@@ -51,6 +53,8 @@ static IDirectInput8 *s_DInput = NULL;
 static unsigned s_Provider = CLEM_HOST_JOYSTICK_PROVIDER_NONE;
 static DIJOYCONFIG s_DInputJoyConfig;
 static bool s_hasPreferredJoyCfg = false;
+static HHOOK s_win32Hook = NULL;
+static BOOL s_flushDevices = FALSE;
 
 static BOOL CALLBACK _clem_joystick_dinput_enum_cb(LPCDIDEVICEINSTANCE instance, LPVOID userData) {
     IDirectInputDevice8 *device = NULL;
@@ -63,7 +67,8 @@ static BOOL CALLBACK _clem_joystick_dinput_enum_cb(LPCDIDEVICEINSTANCE instance,
     hr = IDirectInput8_CreateDevice(s_DInput, &instance->guidInstance, &device, NULL);
     if (hr == DI_OK) {
         IDirectInputDevice8_SetCooperativeLevel(device, GetActiveWindow(),
-                                                DISCL_FOREGROUND | DISCL_EXCLUSIVE);
+                                                DISCL_BACKGROUND | DISCL_NONEXCLUSIVE);
+        // DISCL_FOREGROUND | DISCL_EXCLUSIVE);
         IDirectInputDevice8_SetDataFormat(device, &c_dfDIJoystick);
         IDirectInputDevice8_Acquire(device);
     }
@@ -114,17 +119,40 @@ static LONG _clem_joystick_estimated_deadzone() {
     return (CLEM_HOST_JOYSTICK_AXIS_DELTA + CLEM_HOST_JOYSTICK_AXIS_DELTA) * 5 / 100;
 }
 
-static void _clem_joystick_dinput_start() {
-    HANDLE win32AppInstance = GetModuleHandle(NULL);
-    HRESULT hr = DirectInput8Create(win32AppInstance, DIRECTINPUT_VERSION, &IID_IDirectInput8,
-                                    (LPVOID)&s_DInput, NULL);
-    int i;
-    if (hr != DI_OK) {
-        printf("Failed to initialize DirectInput provider: DirectInput8Create (%08x)\n", hr);
-        return;
+static LRESULT _clem_win32_hook(int code, WPARAM wParam, LPARAM lParam) {
+    CWPSTRUCT *msg;
+    if (code >= 0) {
+        msg = (CWPSTRUCT *)lParam;
+        if (msg->message == WM_DEVICECHANGE) {
+            switch (msg->wParam) {
+            case DBT_DEVNODES_CHANGED:
+                s_flushDevices = TRUE;
+                break;
+            }
+        }
     }
+    return CallNextHookEx(NULL, code, wParam, lParam);
+}
 
+static void _clem_joystick_dinput_devices_release() {
+    if (s_DInputDeviceCount > 0) {
+        while (s_DInputDeviceCount) {
+            --s_DInputDeviceCount;
+            if (s_DInputDevices[s_DInputDeviceCount].device) {
+                IDirectInputDevice8_Release(s_DInputDevices[s_DInputDeviceCount].device);
+                s_DInputDevices[s_DInputDeviceCount].device = NULL;
+            }
+        }
+    }
+}
+
+static void _clem_joystick_dinput_enum() {
     IDirectInputJoyConfig8 *joyConfigI;
+    HRESULT hr;
+    int i;
+
+    _clem_joystick_dinput_devices_release();
+
     hr = IDirectInput8_QueryInterface(s_DInput, &IID_IDirectInputJoyConfig8, (void **)&joyConfigI);
     if (FAILED(hr)) {
         printf("Failed to initialize DirectInput provider: Query IDirectInputJoyConfig8 (%08x)\n",
@@ -156,6 +184,27 @@ static void _clem_joystick_dinput_start() {
     }
 }
 
+static void _clem_joystick_dinput_start() {
+    //  to detect device attach and detach and work with the application's windows
+    //  event handler, inject a hook callback to
+    HANDLE win32AppInstance = GetModuleHandle(NULL);
+    DWORD win32ThreadID = GetCurrentThreadId();
+    HRESULT hr;
+
+    s_flushDevices = FALSE;
+    s_win32Hook = SetWindowsHookExA(WH_CALLWNDPROC, (HOOKPROC)&_clem_win32_hook, win32AppInstance,
+                                    win32ThreadID);
+
+    hr = DirectInput8Create(win32AppInstance, DIRECTINPUT_VERSION, &IID_IDirectInput8,
+                            (LPVOID)&s_DInput, NULL);
+    if (hr != DI_OK) {
+        printf("Failed to initialize DirectInput provider: DirectInput8Create (%08x)\n", hr);
+        return;
+    }
+
+    _clem_joystick_dinput_enum();
+}
+
 static int16_t _clem_joystick_dinput_clamp_axis(LONG value, LONG deadzone) {
     int axisThreshLeft = -(deadzone / 2);
     int axisThreshRight = (deadzone / 2);
@@ -177,6 +226,12 @@ static unsigned _clem_joystick_dinput(ClemensHostJoystick *joysticks) {
     int i, btn;
     HRESULT hr;
     DIJOYSTATE state;
+
+    if (s_flushDevices) {
+        _clem_joystick_dinput_enum();
+        s_flushDevices = FALSE;
+    }
+
     for (i = 0; i < s_DInputDeviceCount; ++i, ++count) {
         joyinfo = &s_DInputDevices[i];
         if (!joyinfo->device) {
@@ -269,18 +324,14 @@ void clem_joystick_close_devices() {
         XInputEnable(FALSE);
         break;
     case CLEM_HOST_JOYSTICK_PROVIDER_DINPUT:
-        if (s_DInputDeviceCount > 0) {
-            while (s_DInputDeviceCount) {
-                --s_DInputDeviceCount;
-                if (s_DInputDevices[s_DInputDeviceCount].device) {
-                    IDirectInputDevice8_Release(s_DInputDevices[s_DInputDeviceCount].device);
-                    s_DInputDevices[s_DInputDeviceCount].device = NULL;
-                }
-            }
-        }
+        _clem_joystick_dinput_devices_release();
         if (s_DInput) {
             IDirectInput8_Release(s_DInput);
             s_DInput = NULL;
+        }
+        if (s_win32Hook) {
+            UnhookWindowsHookEx(s_win32Hook);
+            s_win32Hook = NULL;
         }
         break;
     }
