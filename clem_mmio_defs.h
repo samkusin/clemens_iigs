@@ -234,13 +234,13 @@
 #define CLEM_MMIO_REG_AN3_ON  0x5F
 
 /** Joystick Button 3 */
-#define CLEM_MMIO_REG_BTN3 0x60
+#define CLEM_MMIO_REG_SW3 0x60
 /** Open Apple Key or Joystick Button 0 */
-#define CLEM_MMIO_REG_BTN0 0x61
+#define CLEM_MMIO_REG_SW0 0x61
 /** Solid Apple Key or Joystick Button 1 */
-#define CLEM_MMIO_REG_BTN1 0x62
+#define CLEM_MMIO_REG_SW1 0x62
 /** Joystick Button 2 */
-#define CLEM_MMIO_REG_BTN2 0x63
+#define CLEM_MMIO_REG_SW2 0x63
 /** Paddle 0 */
 #define CLEM_MMIO_REG_PADDL0 0x64
 /** Paddle 1 */
@@ -266,7 +266,7 @@
  * to disable Transwarp (not IIgs fast mode).
  * - http://www.faqs.org/faqs/apple2/faq/part3/
  */
-#define CLEM_MMIO_REG_PADDL_RESET 0x70
+#define CLEM_MMIO_REG_PTRIG 0x70
 /** Write 1 to disable transwarp, 0 to enable (no-op on Clemens) */
 #define CLEM_MMIO_REG_C074_TRANSWARP 0x74
 /** R1 - LC Bank 2, Read RAM, Write Protect */

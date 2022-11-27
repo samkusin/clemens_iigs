@@ -390,6 +390,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     clem_iwm_glu_sync(&mmio->dev_iwm, &mmio->active_drives, &clock);
     clem_scc_glu_sync(&mmio->dev_scc, &clock);
     clem_sound_glu_sync(&mmio->dev_audio, &clock);
+    clem_gameport_sync(&mmio->dev_adb.gameport, &clock);
 
     /* background execution of some async devices on the 60 hz timer */
     while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {

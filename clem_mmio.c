@@ -763,8 +763,8 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     case CLEM_MMIO_REG_AN1_ON:
     case CLEM_MMIO_REG_AN2_OFF:
     case CLEM_MMIO_REG_AN2_ON:
-    case CLEM_MMIO_REG_BTN0:
-    case CLEM_MMIO_REG_BTN1:
+    case CLEM_MMIO_REG_SW0:
+    case CLEM_MMIO_REG_SW1:
         result = clem_adb_read_switch(&mmio->dev_adb, ioreg, flags);
         break;
     case CLEM_MMIO_REG_AN3_OFF:
@@ -783,7 +783,7 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     case CLEM_MMIO_REG_PADDL1:
     case CLEM_MMIO_REG_PADDL2:
     case CLEM_MMIO_REG_PADDL3:
-    case CLEM_MMIO_REG_PADDL_RESET:
+    case CLEM_MMIO_REG_PTRIG:
         /* note c071 - 7f are reserved for ROM access - used for the
            BRK interrupt */
         result = clem_adb_read_switch(&mmio->dev_adb, ioreg, flags);
@@ -1040,22 +1040,22 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
     case CLEM_MMIO_REG_PADDL1:
     case CLEM_MMIO_REG_PADDL2:
     case CLEM_MMIO_REG_PADDL3:
-    case CLEM_MMIO_REG_PADDL_RESET:
-    case CLEM_MMIO_REG_PADDL_RESET + 0x1:
-    case CLEM_MMIO_REG_PADDL_RESET + 0x2:
-    case CLEM_MMIO_REG_PADDL_RESET + 0x3:
+    case CLEM_MMIO_REG_PTRIG:
+    case CLEM_MMIO_REG_PTRIG + 0x1:
+    case CLEM_MMIO_REG_PTRIG + 0x2:
+    case CLEM_MMIO_REG_PTRIG + 0x3:
     case CLEM_MMIO_REG_C074_TRANSWARP:
-    case CLEM_MMIO_REG_PADDL_RESET + 0x5:
-    case CLEM_MMIO_REG_PADDL_RESET + 0x6:
-    case CLEM_MMIO_REG_PADDL_RESET + 0x7:
-    case CLEM_MMIO_REG_PADDL_RESET + 0x8:
-    case CLEM_MMIO_REG_PADDL_RESET + 0x9:
-    case CLEM_MMIO_REG_PADDL_RESET + 0xa:
-    case CLEM_MMIO_REG_PADDL_RESET + 0xb:
-    case CLEM_MMIO_REG_PADDL_RESET + 0xc:
-    case CLEM_MMIO_REG_PADDL_RESET + 0xd:
-    case CLEM_MMIO_REG_PADDL_RESET + 0xe:
-    case CLEM_MMIO_REG_PADDL_RESET + 0xf:
+    case CLEM_MMIO_REG_PTRIG + 0x5:
+    case CLEM_MMIO_REG_PTRIG + 0x6:
+    case CLEM_MMIO_REG_PTRIG + 0x7:
+    case CLEM_MMIO_REG_PTRIG + 0x8:
+    case CLEM_MMIO_REG_PTRIG + 0x9:
+    case CLEM_MMIO_REG_PTRIG + 0xa:
+    case CLEM_MMIO_REG_PTRIG + 0xb:
+    case CLEM_MMIO_REG_PTRIG + 0xc:
+    case CLEM_MMIO_REG_PTRIG + 0xd:
+    case CLEM_MMIO_REG_PTRIG + 0xe:
+    case CLEM_MMIO_REG_PTRIG + 0xf:
         clem_adb_write_switch(&mmio->dev_adb, ioreg, data);
         break;
     case CLEM_MMIO_REG_AN3_OFF:

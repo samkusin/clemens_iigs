@@ -455,25 +455,25 @@ void initDebugIODescriptors() {
         "Sets hi-res graphics mode",
     };
     //  TODO: 0x58 - 0x5F
-    sDebugIODescriptors[CLEM_MMIO_REG_BTN3] = ClemensIODescriptor{
+    sDebugIODescriptors[CLEM_MMIO_REG_SW3] = ClemensIODescriptor{
         "BUTN3",
         "",
         "Reads switch 3",
         "",
     };
-    sDebugIODescriptors[CLEM_MMIO_REG_BTN0] = ClemensIODescriptor{
+    sDebugIODescriptors[CLEM_MMIO_REG_SW0] = ClemensIODescriptor{
         "BUTN0",
         "",
         "Reads switch 0 open apple",
         "",
     };
-    sDebugIODescriptors[CLEM_MMIO_REG_BTN1] = ClemensIODescriptor{
+    sDebugIODescriptors[CLEM_MMIO_REG_SW1] = ClemensIODescriptor{
         "BUTN1",
         "",
         "Reads switch 1 closed apple",
         "",
     };
-    sDebugIODescriptors[CLEM_MMIO_REG_BTN2] = ClemensIODescriptor{
+    sDebugIODescriptors[CLEM_MMIO_REG_SW2] = ClemensIODescriptor{
         "BUTN2",
         "",
         "Reads switch 2",
@@ -572,11 +572,13 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
           (std::filesystem::current_path() / std::filesystem::path(CLEM_HOST_LIBRARY_DIR))
               .string()},
       diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0),
-      debugIOMode_(DebugIOMode::Core), guiMode_(GUIMode::Emulator) {
+      debugIOMode_(DebugIOMode::Core), validJoystickIds_{-1, -1, -1, -1},
+      guiMode_(GUIMode::Emulator) {
 
     ClemensTraceExecutedInstruction::initialize();
 
     initDebugIODescriptors();
+    clem_joystick_open_devices(CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT);
 
     audio_.start();
     config_.type = ClemensBackend::Config::Type::Apple2GS;
@@ -600,6 +602,7 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
 ClemensFrontend::~ClemensFrontend() {
     backend_ = nullptr;
     audio_.stop();
+    clem_joystick_close_devices();
     delete[] thisFrameAudioBuffer_.getHead();
     delete[] lastCommandState_.audioBuffer.getHead();
     free(frameWriteMemory_.getHead());
@@ -850,12 +853,66 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     }
 }
 
+void ClemensFrontend::pollJoystickDevices() {
+    ClemensHostJoystick joysticks[CLEM_HOST_JOYSTICK_LIMIT];
+    unsigned deviceCount = clem_joystick_poll(joysticks);
+    unsigned joystickCount = 0;
+    ClemensInputEvent inputs[2];
+    constexpr int32_t kGameportAxisMagnitude = CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX;
+    constexpr int32_t kHostAxisMagnitude = CLEM_HOST_JOYSTICK_AXIS_DELTA * 2;
+    unsigned index;
+    for (index = 0; index < (unsigned)validJoystickIds_.size(); ++index) {
+        if (index >= deviceCount || joystickCount >= 2)
+            break;
+        auto &input = inputs[joystickCount];
+        if (joysticks[index].isConnected) {
+            validJoystickIds_[index] = index;
+            //  TODO: select (x,y)[0] or (x,y)[1] based on user preference for
+            //        console style controllers (left or right stick, left always for now)
+            input.type = kClemensInputType_Paddle;
+            input.value_a =
+                (int16_t)((int32_t)(joysticks[index].x[0] + CLEM_HOST_JOYSTICK_AXIS_DELTA) *
+                          kGameportAxisMagnitude / kHostAxisMagnitude);
+            input.value_b =
+                (int16_t)((int32_t)(joysticks[index].y[0] + CLEM_HOST_JOYSTICK_AXIS_DELTA) *
+                          kGameportAxisMagnitude / kHostAxisMagnitude);
+            input.gameport_button_mask = 0;
+            //  TODO: again, select button 1 or 2 based on user configuration
+            if (joysticks[index].buttons & CLEM_HOST_JOYSTICK_BUTTON_A) {
+                input.gameport_button_mask |= 0x1;
+            }
+            if (joysticks[index].buttons & CLEM_HOST_JOYSTICK_BUTTON_B) {
+                input.gameport_button_mask |= 0x2;
+            }
+            joystickCount++;
+        } else if (validJoystickIds_[index] != -1) {
+            input.type = kClemensInputType_PaddleDisconnected;
+            input.gameport_button_mask = 0;
+            joystickCount++;
+            validJoystickIds_[index] = -1;
+        }
+        if (joystickCount == 1) {
+            input.gameport_button_mask |= CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_0;
+        }
+        if (joystickCount == 2) {
+            input.gameport_button_mask |= CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_1;
+        }
+    }
+    if (joystickCount < 1)
+        return;
+    backend_->inputEvent(inputs[0]);
+    if (joystickCount < 2)
+        return;
+    backend_->inputEvent(inputs[1]);
+}
+
 void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInterop &interop) {
     //  send commands to emulator thread
     //  get results from emulator thread
     //    video, audio, machine state, etc
-    //
-    //  developer_layout(width, height, deltaTime);
+
+    pollJoystickDevices();
+
     bool isNewFrame = false;
     bool isBackendTerminated = false;
     std::unique_lock<std::mutex> frameLock(frameMutex_);

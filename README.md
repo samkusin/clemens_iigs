@@ -139,6 +139,7 @@ The following packages must be installed to successfully build the binary.
 * libxi-dev
 * mesa-common-dev
 * libasound-dev
+* uuid-dev
 
 #### Commands
 
