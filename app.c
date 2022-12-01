@@ -42,15 +42,14 @@ int main(int argc, char *argv[]) {
     fclose(fp);
 
     memset(&machine, 0, sizeof(machine));
+    memset(&mmio, 0, sizeof(mmio));
     clemens_init(&machine, 1000, 1000, rom, 256 * 1024, malloc(CLEM_IIGS_BANK_SIZE),
                  malloc(CLEM_IIGS_BANK_SIZE), malloc(CLEM_IIGS_BANK_SIZE * 16), 16);
     clem_mmio_init(&mmio, &machine.dev_debug, machine.mem.bank_page_map,
                    machine.tspec.clocks_step_mega2, malloc(2048 * 7));
 
     machine.cpu.pins.resbIn = false;
-    clemens_emulate_cpu(&machine);
-    clemens_emulate_mmio(&machine, &mmio);
-    machine.cpu.pins.resbIn = true;
+    machine.resb_counter = 3;
 
     while (machine.cpu.cycles_spent < 1024) {
         clemens_emulate_cpu(&machine);

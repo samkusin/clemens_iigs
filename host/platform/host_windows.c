@@ -47,10 +47,15 @@ struct ClemensHostJoystickInfo {
     IDirectInputDevice8 *device;
     LONG axisDeadZoneX, axisDeadZoneY;
 };
+enum ClemensHostJoystickProvider {
+    kClemensHostJoystick_None,
+    kClemensHostJoystick_XInput,
+    kClemensHostJoystick_DInput
+};
 static struct ClemensHostJoystickInfo s_DInputDevices[CLEM_HOST_JOYSTICK_LIMIT];
 static unsigned s_DInputDeviceCount = 0;
 static IDirectInput8 *s_DInput = NULL;
-static unsigned s_Provider = CLEM_HOST_JOYSTICK_PROVIDER_NONE;
+static enum ClemensHostJoystickProvider s_Provider = kClemensHostJoystick_None;
 static DIJOYCONFIG s_DInputJoyConfig;
 static bool s_hasPreferredJoyCfg = false;
 static HHOOK s_win32Hook = NULL;
@@ -294,23 +299,24 @@ static unsigned _clem_joystick_xinput(ClemensHostJoystick *joysticks) {
     return count;
 }
 
-void clem_joystick_open_devices(unsigned provider) {
-    switch (provider) {
-    case CLEM_HOST_JOYSTICK_PROVIDER_XINPUT:
-        XInputEnable(TRUE);
-        break;
-    case CLEM_HOST_JOYSTICK_PROVIDER_DINPUT:
-        _clem_joystick_dinput_start();
-        break;
+void clem_joystick_open_devices(const char *provider) {
+    if (s_Provider != kClemensHostJoystick_None) {
+        return;
     }
-    s_Provider = provider;
+    if (strncmp(provider, CLEM_HOST_JOYSTICK_PROVIDER_XINPUT, 32) == 0) {
+        XInputEnable(TRUE);
+        s_Provider = kClemensHostJoystick_XInput;
+    } else if (strncmp(provider, CLEM_HOST_JOYSTICK_PROVIDER_DINPUT, 32) == 0) {
+        _clem_joystick_dinput_start();
+        s_Provider = kClemensHostJoystick_DInput;
+    }
 }
 
 unsigned clem_joystick_poll(ClemensHostJoystick *joysticks) {
     switch (s_Provider) {
-    case CLEM_HOST_JOYSTICK_PROVIDER_XINPUT:
+    case kClemensHostJoystick_XInput:
         return _clem_joystick_xinput(joysticks);
-    case CLEM_HOST_JOYSTICK_PROVIDER_DINPUT:
+    case kClemensHostJoystick_DInput:
         return _clem_joystick_dinput(joysticks);
     }
     return 0;
@@ -320,10 +326,10 @@ void clem_joystick_close_devices() {
     int i;
 
     switch (s_Provider) {
-    case CLEM_HOST_JOYSTICK_PROVIDER_XINPUT:
+    case kClemensHostJoystick_XInput:
         XInputEnable(FALSE);
         break;
-    case CLEM_HOST_JOYSTICK_PROVIDER_DINPUT:
+    case kClemensHostJoystick_DInput:
         _clem_joystick_dinput_devices_release();
         if (s_DInput) {
             IDirectInput8_Release(s_DInput);
@@ -335,5 +341,5 @@ void clem_joystick_close_devices() {
         }
         break;
     }
-    s_Provider = CLEM_HOST_JOYSTICK_PROVIDER_NONE;
+    s_Provider = kClemensHostJoystick_None;
 }

@@ -24,14 +24,14 @@
 
 #define CLEM_HOST_JOYSTICK_AXIS_DELTA 1023
 
-#define CLEM_HOST_JOYSTICK_PROVIDER_NONE    0
-#define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT 1
 #if defined(CLEMENS_PLATFORM_WINDOWS)
-#define CLEM_HOST_JOYSTICK_PROVIDER_DINPUT 1
-#define CLEM_HOST_JOYSTICK_PROVIDER_XINPUT 2
+#define CLEM_HOST_JOYSTICK_PROVIDER_DINPUT "dinput"
+#define CLEM_HOST_JOYSTICK_PROVIDER_XINPUT "xinput"
+#define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT CLEM_HOST_JOYSTICK_PROVIDER_DINPUT
 #elif defined(CLEMENS_PLATFORM_LINUX)
-#define CLEM_HOST_JOYSTICK_PROVIDED_EVDEV 1
+#define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT ""
 #endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -73,9 +73,9 @@ void clem_host_uuid_gen(ClemensHostUUID *uuid);
 /**
  * @brief Initializes the joystick system
  *
- * @param provider OS specific (Windows: 0 = XInput, 1 = DirectInput)
+ * @param provider OS specific (Windows: "xinput", "dinput"; Linux: "{evdev root dir}")
  */
-void clem_joystick_open_devices(unsigned provider);
+void clem_joystick_open_devices(const char* provider);
 
 /**
  * @brief Return joystick data for up to 4 devices
