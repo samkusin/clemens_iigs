@@ -884,6 +884,9 @@ void ClemensFrontend::pollJoystickDevices() {
             if (joysticks[index].buttons & CLEM_HOST_JOYSTICK_BUTTON_B) {
                 input.gameport_button_mask |= 0x2;
             }
+            // printf("SKS: [%u] - A:(%d,%d)  B:(%d,%d)  BTN:%08X\n", index, joysticks[index].x[0],
+            //        joysticks[index].y[0], joysticks[index].x[1], joysticks[index].y[1],
+            //        joysticks[index].buttons);
             joystickCount++;
         } else if (validJoystickIds_[index] != -1) {
             input.type = kClemensInputType_PaddleDisconnected;

@@ -7,6 +7,7 @@
 
 #define _GNU_SOURCE
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <linux/input.h>
 #include <stdbool.h>
@@ -53,6 +54,7 @@ struct ClemensEvdevAxis {
     int min_value;
     int max_value;
     int deadzone;
+    int value;
 };
 
 //  support only X and Y axis - for gamepads or devices with two sticks, RX, RY
@@ -63,6 +65,7 @@ struct ClemensHostJoystickInfo {
     int fd;
     unsigned avail_axis;
     struct ClemensEvdevAxis axis_info[CLEM_HOST_EVDEV_AXIS_LIMIT];
+    unsigned buttons;
     bool connected;
 };
 
@@ -110,6 +113,7 @@ static int _clem_joystick_evdev_assign_device(int device_index) {
             s_joysticks[avail_index].axis_info[axis_type].min_value = axis_info.minimum;
             s_joysticks[avail_index].axis_info[axis_type].max_value = axis_info.maximum;
             s_joysticks[avail_index].axis_info[axis_type].deadzone = axis_info.flat;
+            s_joysticks[avail_index].axis_info[axis_type].value = 0;
             has_deadzones = has_deadzones || axis_info.flat > 0;
             ++axis_count;
         }
@@ -129,7 +133,7 @@ static int _clem_joystick_evdev_assign_device(int device_index) {
     }
     */
     if (axis_count > 0 && has_deadzones) {
-        printf("host_linux: evdev joystick %d: %s detected.\n", avail_index,
+        printf("host_linux: evdev joystick %d: %s detected.\n", device_index,
                s_joysticks[avail_index].name);
         for (i = 0; i < CLEM_HOST_EVDEV_AXIS_LIMIT; ++i) {
             if (avail_axis & (1 << i)) {
@@ -139,10 +143,12 @@ static int _clem_joystick_evdev_assign_device(int device_index) {
                        s_joysticks[avail_index].axis_info[i].deadzone);
             }
         }
+        printf("host_linux: assigning device slot %d\n", device_index);
         printf("\n");
     } else {
         if (axis_count > 0) {
-            printf("host_linux: evdev device %d: %s\n", avail_index, s_joysticks[avail_index].name);
+            printf("host_linux: evdev device %d: %s\n", device_index,
+                   s_joysticks[avail_index].name);
             printf("            Has absolute axis values but no deadzone.\n"
                    "            Assumption is this is not a real joystick, ignoring.\n");
             printf("\n");
@@ -154,6 +160,7 @@ static int _clem_joystick_evdev_assign_device(int device_index) {
     }
 
     s_joysticks[avail_index].avail_axis = avail_axis;
+    s_joysticks[avail_index].buttons = 0;
     s_joysticks[avail_index].connected = true;
     s_joysticks[avail_index].fd = fd;
     s_joysticks[avail_index].device_id = device_index;
@@ -161,15 +168,27 @@ static int _clem_joystick_evdev_assign_device(int device_index) {
     return avail_index;
 }
 
+static void _clem_joystick_evdev_close(struct ClemensHostJoystickInfo *device) {
+    if (device->device_id < 0)
+        return;
+
+    if (device->fd >= 0) {
+        close(device->fd);
+    }
+    device->connected = false;
+    device->fd = -1;
+}
+
+static int _clem_joystick_evdev_normalize_value(int value, struct ClemensEvdevAxis *axis) {
+    float scalar = 2.0f * (value - axis->min_value) / (axis->max_value - axis->min_value) - 1.0f;
+    return (int)(scalar * CLEM_HOST_JOYSTICK_AXIS_DELTA);
+}
+
 static void _clem_joystick_evdev_clear_devices() {
     unsigned i;
     for (i = 0; i < CLEM_HOST_JOYSTICK_LIMIT; ++i) {
+        _clem_joystick_evdev_close(&s_joysticks[i]);
         s_joysticks[i].device_id = -1;
-        if (s_joysticks[i].fd >= 0) {
-            close(s_joysticks[i].fd);
-        }
-        s_joysticks[i].connected = false;
-        s_joysticks[i].fd = -1;
     }
 }
 
@@ -214,12 +233,86 @@ void _clem_joystick_evdev_enum_devices() {
     closedir(dir);
 }
 
+bool _clem_joystick_poll_one(ClemensHostJoystick *joystick,
+                             struct ClemensHostJoystickInfo *device) {
+    struct input_event event;
+    int result;
+    if (device->connected) {
+
+        while ((result = read(device->fd, &event, sizeof(event))) > 0) {
+            switch (event.type) {
+            case EV_ABS:
+                if (event.code < ABS_TOOL_WIDTH) {
+                    if (event.code == ABS_X) {
+                        device->axis_info[ABS_X].value = _clem_joystick_evdev_normalize_value(
+                            event.value, &device->axis_info[ABS_X]);
+                    } else if (event.code == ABS_Y) {
+                        device->axis_info[ABS_Y].value = _clem_joystick_evdev_normalize_value(
+                            event.value, &device->axis_info[ABS_Y]);
+                    } else if (event.code == ABS_RX) {
+                        device->axis_info[ABS_RX].value = _clem_joystick_evdev_normalize_value(
+                            event.value, &device->axis_info[ABS_RX]);
+                    } else if (event.code == ABS_RY) {
+                        device->axis_info[ABS_RY].value = _clem_joystick_evdev_normalize_value(
+                            event.value, &device->axis_info[ABS_RY]);
+                    }
+                }
+                break;
+            case EV_KEY:
+                if (event.code >= BTN_JOYSTICK && event.code <= BTN_THUMBR) {
+                    if (event.value) {
+                        device->buttons |= (1 << (event.code - BTN_JOYSTICK));
+                    } else {
+                        device->buttons &= ~(1 << (event.code - BTN_JOYSTICK));
+                    }
+                }
+                break;
+            }
+        }
+        if (result == 0 || errno == EAGAIN) {
+            joystick->buttons = device->buttons;
+            joystick->x[0] = (int16_t)device->axis_info[ABS_X].value;
+            joystick->y[0] = (int16_t)device->axis_info[ABS_Y].value;
+            joystick->x[1] = (int16_t)device->axis_info[ABS_RX].value;
+            joystick->y[1] = (int16_t)device->axis_info[ABS_RY].value;
+        } else if (result < 0) {
+            printf("host_linux: DISCONNECTED %d - evice failed with error %d ", device->device_id,
+                   errno);
+            _clem_joystick_evdev_close(device);
+        }
+    } else {
+        //  TODO: retry connection by opening the device again
+    }
+    return device->connected;
+}
+
 void clem_joystick_open_devices(const char *provider) {
     (void)provider;
     printf("host_linux: enumerating joystick devices with evdev\n");
+    _clem_joystick_evdev_clear_devices();
     _clem_joystick_evdev_enum_devices();
 }
 
-unsigned clem_joystick_poll(ClemensHostJoystick *joysticks) { return 0; }
+unsigned clem_joystick_poll(ClemensHostJoystick *joysticks) {
+    unsigned valid_device_count = 0;
+    unsigned device_index;
 
-void clem_joystick_close_devices() {}
+    for (device_index = 0; device_index < CLEM_HOST_JOYSTICK_LIMIT; ++device_index) {
+        struct ClemensHostJoystickInfo *joystick_info = &s_joysticks[device_index];
+        if (joystick_info->device_id == -1) {
+            joysticks[device_index].isConnected = false;
+            continue;
+        }
+        ++valid_device_count;
+        if (joystick_info->connected) {
+            joysticks[device_index].isConnected =
+                _clem_joystick_poll_one(&joysticks[device_index], joystick_info);
+        } else {
+            joysticks[device_index].isConnected = false;
+        }
+    }
+
+    return CLEM_HOST_JOYSTICK_LIMIT;
+}
+
+void clem_joystick_close_devices() { _clem_joystick_evdev_clear_devices(); }
