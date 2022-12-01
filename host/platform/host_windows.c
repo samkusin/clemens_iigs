@@ -299,14 +299,14 @@ static unsigned _clem_joystick_xinput(ClemensHostJoystick *joysticks) {
     return count;
 }
 
-void clem_joystick_open_devices(const char* provider) {
+void clem_joystick_open_devices(const char *provider) {
     if (s_Provider != kClemensHostJoystick_None) {
         return;
     }
-    if (strncmp(provider, CLEM_HOST_JOYSTICK_PROVIDER_XINPUT) == 0) {
+    if (strncmp(provider, CLEM_HOST_JOYSTICK_PROVIDER_XINPUT, 32) == 0) {
         XInputEnable(TRUE);
         s_Provider = kClemensHostJoystick_XInput;
-    } else if (strncmp(provider, CLEM_HOST_JOYSTICK_PROVIDER_DINPUT) == 0) {
+    } else if (strncmp(provider, CLEM_HOST_JOYSTICK_PROVIDER_DINPUT, 32) == 0) {
         _clem_joystick_dinput_start();
         s_Provider = kClemensHostJoystick_DInput;
     }
