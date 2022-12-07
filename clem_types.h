@@ -390,9 +390,21 @@ struct ClemensDrive {
     unsigned random_bit_index;
 };
 
+struct ClemensSmartPortUnit {
+    /** A unique (to the emulator) ID Identifying the Smartport device
+        implementation.   This in tandem with `device` is the custom state
+        implemented for the device (i.e A specific HD brand, etc). */
+    unsigned device_id;
+    /** Device implemented in this unit.  This must be provided at emulator startup */
+    void *device;
+    /** The UnitID Assigned by the host as sent via the ID Definition command*/
+    uint8_t unit_id;
+};
+
 struct ClemensDriveBay {
     struct ClemensDrive slot5[2];
     struct ClemensDrive slot6[2];
+    struct ClemensSmartPortUnit smartport[1];
 };
 
 /**

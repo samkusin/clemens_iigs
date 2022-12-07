@@ -74,4 +74,5 @@ target_include_directories(clemens_mpack_format
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
 add_subdirectory(iocards)
+add_subdirectory(smartport)
 add_subdirectory(host)

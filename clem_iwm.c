@@ -361,13 +361,18 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
         next_clock.ts = iwm->last_clocks_ts;
         next_clock.ref_step = clock->ref_step;
         while (lss_time_left_ns >= iwm->lss_update_dt_ns) {
-            struct ClemensDrive *drive = NULL;
+            struct ClemensDrive *drive;
             bool write_signal = false;
             if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
                 drive = &drives->slot5[drive_index];
                 clem_disk_read_and_position_head_35(drive, &iwm->io_flags, iwm->out_phase,
                                                     iwm->lss_update_dt_ns);
-            } else if (!iwm->enable2) {
+            } else {
+
+                //  TODO: if the smartport device is on, need to modify the I/O going
+                //  into the Disk II drive.
+                //  For example, /ENABLE2 going HIGH will turn off the drive
+                //  and the drive pointer will be NULL
                 drive = &drives->slot6[drive_index];
                 clem_disk_read_and_position_head_525(drive, &iwm->io_flags, iwm->out_phase,
                                                      iwm->lss_update_dt_ns);
@@ -383,7 +388,7 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
 
             if ((iwm->state & CLEM_IWM_STATE_WRITE_MASK) && iwm->async_write_mode) {
                 write_signal = _clem_iwm_lss_write_async(iwm, clock, iwm->lss_update_dt_ns);
-            } else {
+            } else if (drive) {
                 write_signal = _clem_iwm_lss(iwm, drive, &next_clock);
             }
             if (iwm->state & CLEM_IWM_STATE_WRITE_MASK) {
@@ -412,11 +417,7 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
                 if (iwm->enable_debug) {
                     _clem_iwm_debug(iwm, drive, clock);
                 }
-                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-                    clem_disk_update_head(drive, &iwm->io_flags, iwm->lss_update_dt_ns);
-                } else {
-                    clem_disk_update_head(drive, &iwm->io_flags, iwm->lss_update_dt_ns);
-                }
+                clem_disk_update_head(drive, &iwm->io_flags, iwm->lss_update_dt_ns);
             }
 
             lss_time_left_ns -= iwm->lss_update_dt_ns;
