@@ -367,6 +367,9 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
         next_clock.ts = iwm->last_clocks_ts;
         next_clock.ref_step = clock->ref_step;
         while (lss_time_left_ns >= iwm->lss_update_dt_ns) {
+            unsigned disk_delta_ns = (iwm->lss_update_dt_ns == CLEM_IWM_SYNC_FRAME_NS_FAST)
+                                         ? CLEM_IWM_SYNC_DISK_FRAME_NS_FAST
+                                         : CLEM_IWM_SYNC_DISK_FRAME_NS;
             struct ClemensDrive *drive = _clem_iwm_select_drive(iwm, drives);
             bool write_signal = false;
             /* the phase flags as they travel downstream the bus */
@@ -389,10 +392,10 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
             if (drive) {
                 if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
                     clem_disk_read_and_position_head_35(drive, &iwm->io_flags, out_phase,
-                                                        iwm->lss_update_dt_ns);
+                                                        disk_delta_ns);
                 } else {
                     clem_disk_read_and_position_head_525(drive, &iwm->io_flags, out_phase,
-                                                         iwm->lss_update_dt_ns);
+                                                         disk_delta_ns);
                 }
             }
 
@@ -405,7 +408,7 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
                 }
             }
             if ((iwm->state & CLEM_IWM_STATE_WRITE_MASK) && iwm->async_write_mode) {
-                write_signal = _clem_iwm_lss_write_async(iwm, clock, iwm->lss_update_dt_ns);
+                write_signal = _clem_iwm_lss_write_async(iwm, clock, disk_delta_ns);
             } else if (drive) {
                 write_signal = _clem_iwm_lss(iwm, drive, &next_clock);
             }
@@ -435,7 +438,7 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
                 if (iwm->enable_debug) {
                     _clem_iwm_debug(iwm, drive, clock);
                 }
-                clem_disk_update_head(drive, &iwm->io_flags, iwm->lss_update_dt_ns);
+                clem_disk_update_head(drive, &iwm->io_flags, disk_delta_ns);
             }
 
             lss_time_left_ns -= iwm->lss_update_dt_ns;
