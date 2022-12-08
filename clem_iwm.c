@@ -357,38 +357,37 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
     unsigned delta_ns, lss_time_left_ns;
     struct ClemensClock next_clock;
 
-    if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
-        delta_ns =
-            clem_calc_ns_step_from_clocks((clock->ts - iwm->last_clocks_ts), clock->ref_step);
-        lss_time_left_ns = delta_ns;
+    delta_ns = clem_calc_ns_step_from_clocks((clock->ts - iwm->last_clocks_ts), clock->ref_step);
+    lss_time_left_ns = delta_ns;
 
-        /* Move shared _clem_iwm_lss logic up here. */
-        /* catch up the LSS from the last sync to the current time */
-        next_clock.ts = iwm->last_clocks_ts;
-        next_clock.ref_step = clock->ref_step;
-        while (lss_time_left_ns >= iwm->lss_update_dt_ns) {
-            unsigned disk_delta_ns = (iwm->lss_update_dt_ns == CLEM_IWM_SYNC_FRAME_NS_FAST)
-                                         ? CLEM_IWM_SYNC_DISK_FRAME_NS_FAST
-                                         : CLEM_IWM_SYNC_DISK_FRAME_NS;
-            struct ClemensDrive *drive = _clem_iwm_select_drive(iwm, drives);
-            bool write_signal = false;
-            /* the phase flags as they travel downstream the bus */
-            unsigned out_phase = iwm->out_phase;
-            iwm->enable2 = false;
-            if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35)) {
-                //  /ENABLE2 handling for SmartPort and Disk II is handled implicitly
-                //  by the drive pointer. Basically if the SmartPort bus is enabled,
-                //  the 5.25" disk is disabled.
-                if (clem_smartport_do_reset(drives->smartport, 1, &iwm->io_flags, &out_phase,
-                                            iwm->lss_update_dt_ns)) {
-                    CLEM_LOG("IWM: SmartPort bus reset");
-                }
-                if (clem_smartport_do_enable(drives->smartport, 1, &iwm->io_flags, &out_phase,
-                                             iwm->lss_update_dt_ns)) {
-                    iwm->enable2 = true;
-                    drive = NULL; //  Disk II disabled
-                }
+    /* Move shared _clem_iwm_lss logic up here. */
+    /* catch up the LSS from the last sync to the current time */
+    next_clock.ts = iwm->last_clocks_ts;
+    next_clock.ref_step = clock->ref_step;
+    while (lss_time_left_ns >= iwm->lss_update_dt_ns) {
+        unsigned disk_delta_ns = (iwm->lss_update_dt_ns == CLEM_IWM_SYNC_FRAME_NS_FAST)
+                                     ? CLEM_IWM_SYNC_DISK_FRAME_NS_FAST
+                                     : CLEM_IWM_SYNC_DISK_FRAME_NS;
+        struct ClemensDrive *drive = _clem_iwm_select_drive(iwm, drives);
+        bool write_signal = false;
+        /* the phase flags as they travel downstream the bus */
+        unsigned out_phase = iwm->out_phase;
+        iwm->enable2 = false;
+        if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35)) {
+            //  /ENABLE2 handling for SmartPort and Disk II is handled implicitly
+            //  by the drive pointer. Basically if the SmartPort bus is enabled,
+            //  the 5.25" disk is disabled.
+            if (clem_smartport_do_reset(drives->smartport, 1, &iwm->io_flags, &out_phase,
+                                        iwm->lss_update_dt_ns)) {
+                // CLEM_LOG("IWM: SmartPort bus reset");
             }
+            if (clem_smartport_do_enable(drives->smartport, 1, &iwm->io_flags, &out_phase,
+                                         iwm->lss_update_dt_ns)) {
+                iwm->enable2 = true;
+                drive = NULL; //  Disk II disabled
+            }
+        }
+        if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
             if (drive) {
                 if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
                     clem_disk_read_and_position_head_35(drive, &iwm->io_flags, out_phase,
@@ -420,10 +419,10 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
                 }
             } else {
                 /* read mode - data = latch except when holding the current read byte
-                   note, that the LSS ROM does this for us, but when IIgs latch mode is
-                   enabled, we need to extend the life of the read-value on the data
-                   'bus'.  once the hold has expired, we can resume updating the
-                   'bus' with the latch's current value*/
+                note, that the LSS ROM does this for us, but when IIgs latch mode is
+                enabled, we need to extend the life of the read-value on the data
+                'bus'.  once the hold has expired, we can resume updating the
+                'bus' with the latch's current value*/
                 iwm->io_flags &= ~CLEM_IWM_FLAG_WRITE_REQUEST;
                 /*
                 if ((iwm->latch & 0x80) && iwm->latch_mode) {
@@ -440,18 +439,16 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
                 }
                 clem_disk_update_head(drive, &iwm->io_flags, disk_delta_ns);
             }
-
-            lss_time_left_ns -= iwm->lss_update_dt_ns;
-            next_clock.ts +=
-                clem_calc_clocks_step_from_ns(iwm->lss_update_dt_ns, next_clock.ref_step);
         }
-        /* handle the 1 second drive motor timer */
-        if (iwm->ns_drive_hold > 0) {
-            iwm->ns_drive_hold = clem_util_timer_decrement(iwm->ns_drive_hold, delta_ns);
-            if (iwm->ns_drive_hold == 0 || iwm->timer_1sec_disabled) {
-                CLEM_LOG("IWM: turning drive off in sync");
-                _clem_drive_off(iwm);
-            }
+        lss_time_left_ns -= iwm->lss_update_dt_ns;
+        next_clock.ts += clem_calc_clocks_step_from_ns(iwm->lss_update_dt_ns, next_clock.ref_step);
+    }
+    /* handle the 1 second drive motor timer */
+    if (iwm->ns_drive_hold > 0) {
+        iwm->ns_drive_hold = clem_util_timer_decrement(iwm->ns_drive_hold, delta_ns);
+        if (iwm->ns_drive_hold == 0 || iwm->timer_1sec_disabled) {
+            CLEM_LOG("IWM: turning drive off in sync");
+            _clem_drive_off(iwm);
         }
     }
 
