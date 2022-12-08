@@ -13,6 +13,7 @@
 #include "clem_device.h"
 #include "clem_drive.h"
 #include "clem_mmio_defs.h"
+#include "clem_smartport.h"
 #include "clem_util.h"
 
 #include <inttypes.h>
@@ -152,6 +153,9 @@ bool clem_iwm_eject_disk_async(struct ClemensDeviceIWM *iwm, struct ClemensDrive
 
 struct ClemensDrive *_clem_iwm_select_drive(struct ClemensDeviceIWM *iwm,
                                             struct ClemensDriveBay *drive_bay) {
+    // TODO: nit optimization, could cache the current drive pointer and alter
+    //       its value based on state changes described below versus per frame
+    //       since this is called every frame
     struct ClemensDrive *drives;
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
         drives = drive_bay->slot5;
@@ -160,9 +164,10 @@ struct ClemensDrive *_clem_iwm_select_drive(struct ClemensDeviceIWM *iwm,
     }
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1) {
         return &drives[0];
-    } else {
+    } else if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) {
         return &drives[1];
     }
+    return NULL;
 }
 
 static void _clem_iwm_reset_lss(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
@@ -170,7 +175,9 @@ static void _clem_iwm_reset_lss(struct ClemensDeviceIWM *iwm, struct ClemensDriv
     struct ClemensDrive *drive = _clem_iwm_select_drive(iwm, drives);
     iwm->ns_drive_hold = 0;
     iwm->last_clocks_ts = clock->ts;
-    clem_disk_start_drive(drive);
+    if (drive) {
+        clem_disk_start_drive(drive);
+    }
 }
 
 #define CLEM_IWM_WRITE_REG_STATUS_MASK    0xffff0000
@@ -348,7 +355,6 @@ static void _clem_drive_off(struct ClemensDeviceIWM *iwm) {
 void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
                        struct ClemensClock *clock) {
     unsigned delta_ns, lss_time_left_ns;
-    int drive_index = (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 1 : 0;
     struct ClemensClock next_clock;
 
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
@@ -361,22 +367,35 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
         next_clock.ts = iwm->last_clocks_ts;
         next_clock.ref_step = clock->ref_step;
         while (lss_time_left_ns >= iwm->lss_update_dt_ns) {
-            struct ClemensDrive *drive;
+            struct ClemensDrive *drive = _clem_iwm_select_drive(iwm, drives);
             bool write_signal = false;
-            if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-                drive = &drives->slot5[drive_index];
-                clem_disk_read_and_position_head_35(drive, &iwm->io_flags, iwm->out_phase,
-                                                    iwm->lss_update_dt_ns);
-            } else {
-
-                //  TODO: if the smartport device is on, need to modify the I/O going
-                //  into the Disk II drive.
-                //  For example, /ENABLE2 going HIGH will turn off the drive
-                //  and the drive pointer will be NULL
-                drive = &drives->slot6[drive_index];
-                clem_disk_read_and_position_head_525(drive, &iwm->io_flags, iwm->out_phase,
-                                                     iwm->lss_update_dt_ns);
+            /* the phase flags as they travel downstream the bus */
+            unsigned out_phase = iwm->out_phase;
+            iwm->enable2 = false;
+            if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35)) {
+                //  /ENABLE2 handling for SmartPort and Disk II is handled implicitly
+                //  by the drive pointer. Basically if the SmartPort bus is enabled,
+                //  the 5.25" disk is disabled.
+                if (clem_smartport_do_reset(drives->smartport, 1, &iwm->io_flags, &out_phase,
+                                            iwm->lss_update_dt_ns)) {
+                    CLEM_LOG("IWM: SmartPort bus reset");
+                }
+                if (clem_smartport_do_enable(drives->smartport, 1, &iwm->io_flags, &out_phase,
+                                             iwm->lss_update_dt_ns)) {
+                    iwm->enable2 = true;
+                    drive = NULL; //  Disk II disabled
+                }
             }
+            if (drive) {
+                if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+                    clem_disk_read_and_position_head_35(drive, &iwm->io_flags, out_phase,
+                                                        iwm->lss_update_dt_ns);
+                } else {
+                    clem_disk_read_and_position_head_525(drive, &iwm->io_flags, out_phase,
+                                                         iwm->lss_update_dt_ns);
+                }
+            }
+
             if (iwm->state & CLEM_IWM_STATE_WRITE_MASK) {
                 /* write mode */
                 if (!(iwm->io_flags & CLEM_IWM_FLAG_WRITE_REQUEST)) {
@@ -385,7 +404,6 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
                         drive->write_pulse = false;
                 }
             }
-
             if ((iwm->state & CLEM_IWM_STATE_WRITE_MASK) && iwm->async_write_mode) {
                 write_signal = _clem_iwm_lss_write_async(iwm, clock, iwm->lss_update_dt_ns);
             } else if (drive) {
@@ -512,15 +530,6 @@ void _clem_iwm_io_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *d
             } else {
                 iwm->out_phase &= ~(1 << ((ioreg - CLEM_MMIO_REG_IWM_PHASE0_LO) >> 1));
             }
-            //  Ch 7 IIgs Firmware Reference on /ENABLE2 when high disables Disk II devices
-            //  (does not apply to Apple Disk 3.5)
-            if ((iwm->out_phase & 2) && (iwm->out_phase & 8)) {
-                /* PH1 and PH3 ON this sets the ENABLE2 line (for other
-                   smartport devices) */
-                iwm->enable2 = true;
-            } else {
-                iwm->enable2 = false;
-            }
         }
         break;
     }
@@ -634,12 +643,6 @@ static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM *iwm) {
     }
 
     if (iwm->io_flags & CLEM_IWM_FLAG_WRPROTECT_SENSE) {
-        result |= 0x80;
-    }
-    if (iwm->enable2) {
-        /* Forcing ACK on the SmartPort bus to indicate the bus is no longer busy.
-           This will obviously need to change when Smartport support is actually
-           implemented. */
         result |= 0x80;
     }
     /* mode flags reflected here */

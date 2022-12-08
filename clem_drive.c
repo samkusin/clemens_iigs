@@ -207,12 +207,6 @@ unsigned clem_drive_step(struct ClemensDrive *drive, unsigned *io_flags, int qtr
                          unsigned track_cur_pos, unsigned dt_ns) {
     bool is_drive_525 = (*io_flags & CLEM_IWM_FLAG_DRIVE_35) ? false : true;
     if (qtr_track_index != drive->qtr_track_index && drive->has_disk) {
-        /*
-        CLEM_LOG("IWM: Disk525[%u]: Motor: %u; Head @ (%d,%d)",
-            (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
-            (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0,
-            qtr_track_index / 4, qtr_track_index % 4);
-        */
         if (drive->disk.meta_track_map[drive->qtr_track_index] !=
             drive->disk.meta_track_map[qtr_track_index]) {
             /* force lookup of the real track if the arm has changed */

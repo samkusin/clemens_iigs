@@ -80,6 +80,45 @@ struct ClemensClock {
 #define clem_calc_clocks_step_from_ns(_ns_, _clocks_step_reference_)                               \
     ((clem_clocks_duration_t)((_ns_) * (_clocks_step_reference_)) / CLEM_MEGA2_CYCLE_NS)
 
+/**
+ * @brief Defines the abstract interface to SmartPort based hardware
+ *
+ * To initialize, a SmartPort implementation should provide an intialization
+ * function (for example):
+ *      my_smartport_device_initialize(struct ClemensSmartPortUnit* unit)
+ *
+ * The implemenation should initialize whatever structures it needs for the
+ * unit.  For convenience/dependency injection purposes, a 'device' pointer
+ * and 'device_id' is provided inside this struct and should be filled so that
+ * the host can access this information if needed (for debugging, internal
+ * state management, etc.)
+ *
+ */
+struct ClemensSmartPortUnit {
+    /** A unique (to the emulator) ID Identifying the Smartport device
+        implementation.   This in tandem with `device` is the custom state
+        implemented for the device (i.e A specific HD brand, etc). */
+    unsigned device_id;
+    /** Device implemented in this unit.  This must be provided at emulator startup */
+    void *device;
+    /** Smartport bus resident on a bus being reset */
+    unsigned (*bus_reset)(struct ClemensSmartPortUnit *context, unsigned phase_flags,
+                          unsigned delta_ns);
+    /** Smartport bus resident on an enabled bus */
+    unsigned (*bus_enable)(struct ClemensSmartPortUnit *context, unsigned phase_flags,
+                           unsigned delta_ns);
+
+    /* Note these memebers are managed by the emulator and should not be modified
+       unless you know what you're doing!
+    */
+    /** The UnitID Assigned by the host as sent via the ID Definition command*/
+    uint8_t unit_id;
+};
+
+/**
+ * @brief Defines the abstract interface to slot-based card hardware
+ *
+ */
 typedef struct {
     void *context;
     void (*io_reset)(struct ClemensClock *clock, void *context);
