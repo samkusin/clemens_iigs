@@ -281,8 +281,7 @@ static void _clem_iwm_debug(struct ClemensDeviceIWM *iwm, struct ClemensDrive *d
     }
 }
 
-static bool _clem_iwm_lss(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
-                          struct ClemensClock *clock) {
+static bool _clem_iwm_lss(struct ClemensDeviceIWM *iwm, struct ClemensClock *clock) {
     /* Uses the Disk II sequencer.
        Some assumptions taken from Understanding the Apple //e
        Generally speaking, our IO reads for status, handshake and writes for
@@ -365,35 +364,45 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
     next_clock.ts = iwm->last_clocks_ts;
     next_clock.ref_step = clock->ref_step;
     while (lss_time_left_ns >= iwm->lss_update_dt_ns) {
+        //  NOTE: Disk speed is 'slower' than IWM per frame update time, which
+        //        is a pecularity of this implementation.  Basically the IWM
+        //        runs at a factor of the system clock we emulate (1.023mhz for
+        //        the mega 2, hence two or 4 updates per cycle here).
+        //
+        //        Disk timings (i.e. bit pulse timings for nibblized disks) are
+        //        easier to grok using fractions of microseconds (250, 500 ns)
+        //        So this is reflected by the configured speed of the IWM
+        //        at 1x or 2x speed.
+        //
+        //        Also, this IWM only supports one clock speed (so emulating a
+        //        7mhz vs 8mhz clock is unnecessary - we can use old Disk II
+        //        controller clock speeds (2mhz, 1mhz) instead.
+        //
         unsigned disk_delta_ns = (iwm->lss_update_dt_ns == CLEM_IWM_SYNC_FRAME_NS_FAST)
                                      ? CLEM_IWM_SYNC_DISK_FRAME_NS_FAST
                                      : CLEM_IWM_SYNC_DISK_FRAME_NS;
         struct ClemensDrive *drive = _clem_iwm_select_drive(iwm, drives);
         bool write_signal = false;
-        /* the phase flags as they travel downstream the bus */
-        unsigned out_phase = iwm->out_phase;
         iwm->enable2 = false;
         if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35)) {
             //  /ENABLE2 handling for SmartPort and Disk II is handled implicitly
             //  by the drive pointer. Basically if the SmartPort bus is enabled,
             //  the 5.25" disk is disabled.
-            if (clem_smartport_do_reset(drives->smartport, 1, &iwm->io_flags, &out_phase,
-                                        iwm->lss_update_dt_ns)) {
-                // CLEM_LOG("IWM: SmartPort bus reset");
-            }
-            if (clem_smartport_do_enable(drives->smartport, 1, &iwm->io_flags, &out_phase,
-                                         iwm->lss_update_dt_ns)) {
-                iwm->enable2 = true;
-                drive = NULL; //  Disk II disabled
+            iwm->enable2 = clem_smartport_bus(drives->smartport, 1, &iwm->io_flags, &iwm->out_phase,
+                                              disk_delta_ns);
+            if (iwm->enable2 && iwm->state == CLEM_IWM_STATE_WRITE_DATA &&
+                (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
+                printf("SmartPort: DATA SENT = %02X\n", iwm->data);
+                drive = NULL;
             }
         }
         if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
             if (drive) {
                 if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-                    clem_disk_read_and_position_head_35(drive, &iwm->io_flags, out_phase,
+                    clem_disk_read_and_position_head_35(drive, &iwm->io_flags, iwm->out_phase,
                                                         disk_delta_ns);
                 } else {
-                    clem_disk_read_and_position_head_525(drive, &iwm->io_flags, out_phase,
+                    clem_disk_read_and_position_head_525(drive, &iwm->io_flags, iwm->out_phase,
                                                          disk_delta_ns);
                 }
             }
@@ -408,8 +417,8 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
             }
             if ((iwm->state & CLEM_IWM_STATE_WRITE_MASK) && iwm->async_write_mode) {
                 write_signal = _clem_iwm_lss_write_async(iwm, clock, disk_delta_ns);
-            } else if (drive) {
-                write_signal = _clem_iwm_lss(iwm, drive, &next_clock);
+            } else {
+                write_signal = _clem_iwm_lss(iwm, &next_clock);
             }
             if (iwm->state & CLEM_IWM_STATE_WRITE_MASK) {
                 if (write_signal) {
@@ -617,10 +626,8 @@ void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
         clem_iwm_glu_sync(iwm, drives, clock);
         _clem_iwm_io_switch(iwm, drives, clock, ioreg, CLEM_IO_WRITE);
         if (ioreg & 1) {
-            if (!iwm->enable2) {
-                iwm->data = value;
-                iwm->lss_write_reg |= CLEM_IWM_WRITE_REG_DATA;
-            }
+            iwm->data = value;
+            iwm->lss_write_reg |= CLEM_IWM_WRITE_REG_DATA;
             switch (iwm->state) {
             case CLEM_IWM_STATE_WRITE_MODE:
                 _clem_iwm_write_mode(iwm, value);
@@ -671,9 +678,6 @@ static uint8_t _clem_iwm_read_handshake(struct ClemensDeviceIWM *iwm, struct Cle
     bool sync_fast_mode = iwm->lss_update_dt_ns == CLEM_IWM_SYNC_FRAME_NS_FAST;
     unsigned ns_write_overflow =
         sync_fast_mode ? (8 * 2 * 4 * iwm->lss_update_dt_ns) : (8 * 4 * 4 * iwm->lss_update_dt_ns);
-    if (iwm->enable2) {
-        return result;
-    }
     result |= 0x1f; /* SWIM ref p.11 bits 0-5 are always 1 */
     if (iwm->lss_write_reg & CLEM_IWM_WRITE_REG_ASYNC_ACTIVE) {
         if (iwm->lss_write_reg & CLEM_IWM_WRITE_REG_DATA) {
@@ -725,7 +729,7 @@ uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBa
                 result = _clem_iwm_read_handshake(iwm, clock, is_noop);
                 break;
             default:
-                if (iwm->enable2) {
+                if (iwm->enable2 && !(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
                     /* all ones, empty (SWIM Chip Ref p 11 doc) */
                     result = 0xff;
                 } else {

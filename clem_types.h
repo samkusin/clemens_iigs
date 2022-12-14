@@ -6,6 +6,7 @@
 
 #include "clem_defs.h"
 #include "clem_disk.h"
+#include "clem_smartport.h"
 
 typedef struct ClemensMachine ClemensMachine;
 typedef void (*LoggerFn)(int level, ClemensMachine *machine, const char *msg);

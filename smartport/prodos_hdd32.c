@@ -1,1 +1,1 @@
-int g_foo;
+#include "prodos_hdd32.h"

@@ -685,6 +685,8 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         }
     }
 
+    mmio_.active_drives.smartport[0].device_id = CLEM_SMARTPORT_DEVICE_ID_REFERENCE;
+
     fmt::print("Starting backend thread.\n");
 
     ClemensCard *mockingboard = findMockingboardCard(&mmio_);
