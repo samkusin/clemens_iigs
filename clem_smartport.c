@@ -22,16 +22,24 @@
 #define CLEM_SMARTPORT_UNIT_STATE_PACKET_END      0x00020004
 #define CLEM_SMARTPORT_UNIT_STATE_PACKET_BAD      0x0002ffff
 #define CLEM_SMARTPORT_UNIT_STATE_EXECUTING       0x00030000
-#define CLEM_SMARTPORT_UNIT_STATE_ACK             0x00040000
+#define CLEM_SMARTPORT_UNIT_STATE_RESPONSE        0x00040000
+#define CLEM_SMARTPORT_UNIT_STATE_COMPLETE        0x00050000
 
 #define CLEM_SMARTPORT_BUS_WRITE 1
-#define CLEM_SMARTPORT_BUS_DATA  2
-#define CLEM_SMARTPORT_BUS_REQ   4
+#define CLEM_SMARTPORT_BUS_READ  2
+#define CLEM_SMARTPORT_BUS_DATA  4
+#define CLEM_SMARTPORT_BUS_REQ   8
 
 static inline void _clem_smartport_packet_state(struct ClemensSmartPortUnit *unit,
                                                 unsigned packet_state) {
     unit->packet_state = packet_state;
     unit->packet_state_byte_cnt = 0;
+}
+
+static inline uint8_t _clem_smartport_encode_byte(uint8_t data, uint8_t *chksum) {
+    data |= 0x80;
+    *chksum ^= data;
+    return data;
 }
 
 static void _clem_smartport_packet_decode_data(uint8_t *dest, unsigned dest_size,
@@ -68,6 +76,113 @@ static void _clem_smartport_packet_decode_data(uint8_t *dest, unsigned dest_size
     }
 }
 
+static unsigned _clem_smartport_packet_encode_data(uint8_t *out, unsigned out_limit,
+                                                   struct ClemensSmartPortPacket *packet,
+                                                   uint8_t unit_id) {
+    unsigned out_size = 0;
+    unsigned index;
+    uint8_t chksum = 0x00;
+    uint8_t odd_cnt = (uint8_t)(packet->contents_length % 7);
+    uint8_t g7_cnt = (uint8_t)(packet->contents_length / 7);
+    uint8_t tmp;
+    uint16_t raw_contents_size;
+
+    uint8_t *packet_src;
+
+    //  sync bytes
+    while (out_size < out_limit && out_size < 6) {
+        out[out_size++] = 0xFF;
+    }
+    if (out_size + 8 <= out_limit) {
+        //  NOTE: checksum is performed on the encoded bytes (high bit on)
+        //        which differs from how the checksum is calculated for the
+        //        contents (see below.)
+        out[out_size++] = 0xC3;
+        out[out_size++] = _clem_smartport_encode_byte(0x00, &chksum);
+        out[out_size++] = _clem_smartport_encode_byte(unit_id, &chksum);
+        if (packet->type == kClemensSmartPortPacketType_Command) {
+            tmp = 0x00;
+        } else if (packet->type == kClemensSmartPortPacketType_Status) {
+            tmp = 0x01;
+        } else if (packet->type == kClemensSmartPortPacketType_Data) {
+            tmp = 0x02;
+        } else {
+            tmp = 0x7F;
+        }
+        out[out_size++] = _clem_smartport_encode_byte(tmp, &chksum);
+        if (packet->is_extended) {
+            out[out_size++] = _clem_smartport_encode_byte(0x40, &chksum);
+        } else {
+            out[out_size++] = _clem_smartport_encode_byte(0x00, &chksum);
+        }
+        out[out_size++] = _clem_smartport_encode_byte(packet->status, &chksum);
+        out[out_size++] = _clem_smartport_encode_byte(odd_cnt, &chksum);
+        out[out_size++] = _clem_smartport_encode_byte(g7_cnt, &chksum);
+    }
+    raw_contents_size = odd_cnt > 0 ? odd_cnt + 1 : 0;
+    raw_contents_size += (g7_cnt * 8);
+    packet_src = packet->contents;
+    if (out_size + raw_contents_size < out_limit) {
+        //  NOTE: checksums only on the decoded contents, so perform the checksum
+        //        calculation on the source bytes
+        tmp = 0;
+        for (index = 0; index < (unsigned)odd_cnt; ++index) {
+            if (packet_src[index] & 0x80) {
+                tmp |= 1;
+            }
+            tmp <<= 1;
+        }
+        //  if odd_cnt == 6 (the maximum), bit 0 will be 0 at this point, so
+        //  the shift calculation below should work.
+        tmp <<= (6 - odd_cnt);
+        if (odd_cnt > 0) {
+            out[out_size++] = 0x80 | tmp;
+            while (odd_cnt > 0) {
+                out[out_size++] = 0x80 | packet_src[0];
+                chksum ^= packet_src[0];
+                ++packet_src;
+                --odd_cnt;
+            }
+        }
+        while (g7_cnt > 0) {
+            tmp = (packet_src[0] & 0x80) >> 1;
+            tmp |= ((packet_src[1] & 0x80) >> 2);
+            tmp |= ((packet_src[2] & 0x80) >> 3);
+            tmp |= ((packet_src[3] & 0x80) >> 4);
+            tmp |= ((packet_src[4] & 0x80) >> 5);
+            tmp |= ((packet_src[5] & 0x80) >> 6);
+            tmp |= ((packet_src[6] & 0x80) >> 7);
+            out[out_size++] = 0x80 | tmp;
+            out[out_size++] = 0x80 | packet_src[0];
+            chksum ^= packet_src[0];
+            out[out_size++] = 0x80 | packet_src[1];
+            chksum ^= packet_src[1];
+            out[out_size++] = 0x80 | packet_src[2];
+            chksum ^= packet_src[2];
+            out[out_size++] = 0x80 | packet_src[3];
+            chksum ^= packet_src[3];
+            out[out_size++] = 0x80 | packet_src[4];
+            chksum ^= packet_src[4];
+            out[out_size++] = 0x80 | packet_src[5];
+            chksum ^= packet_src[5];
+            out[out_size++] = 0x80 | packet_src[6];
+            chksum ^= packet_src[6];
+            --g7_cnt;
+        }
+    }
+    if (out_size + 3 <= out_limit) {
+        tmp = 0x80 | (chksum & 0x40) | 0x20 | (chksum & 0x10) | 0x08 | (chksum & 0x04) | 0x02 |
+              (chksum & 0x1);
+        out[out_size++] = tmp;
+        tmp = (chksum & 0x80) | 0x40 | (chksum & 0x20) | 0x10 | (chksum & 0x08) | 0x04 |
+              (chksum & 0x02);
+        out[out_size++] = 0x80 | (tmp >> 1);
+        out[out_size++] = 0xC8;
+    }
+
+    return out_size;
+}
+
 static bool _clem_smartport_handle_packet(struct ClemensSmartPortUnit *unit, unsigned delta_ns) {
     //  Parse the decoded packet based on the packet type (For commands, obtain the command type
     //  and parameter count, for example)
@@ -75,8 +190,13 @@ static bool _clem_smartport_handle_packet(struct ClemensSmartPortUnit *unit, uns
         uint8_t command_type = unit->packet.contents[0];
         switch (command_type) {
         case CLEM_SMARTPORT_COMMAND_INIT:
+            CLEM_DEBUG("SmartPort: [%02X] INIT", unit->unit_id);
             unit->unit_id = unit->packet.dest_unit_id;
             unit->ph3_latch_lo = false;
+            //  generate response
+            unit->packet.status = 0x00;
+            unit->packet.dest_unit_id = unit->packet.source_unit_id;
+            unit->packet.source_unit_id = unit->unit_id;
             return true;
         default:
             CLEM_ASSERT(false);
@@ -86,30 +206,34 @@ static bool _clem_smartport_handle_packet(struct ClemensSmartPortUnit *unit, uns
     return false;
 }
 
-static void _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit, unsigned bus_in,
-                                          unsigned delta_ns) {
+static unsigned _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit, unsigned bus_state,
+                                              unsigned delta_ns) {
     uint8_t *data_tail;
     uint8_t *data_start;
 
-    if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_EXECUTING) {
-        //  must wait until the host has marked the request as 'done' before acknowledging
-        //  packet's exectuion has completed.
-        if (_clem_smartport_handle_packet(unit, delta_ns)) {
-            unit->packet_state = CLEM_SMARTPORT_UNIT_STATE_ACK;
-        }
-    } else if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_ACK) {
-        if (!(bus_in & CLEM_SMARTPORT_BUS_REQ)) {
+    if (!(bus_state & CLEM_SMARTPORT_BUS_REQ)) {
+        if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_EXECUTING) {
+            //  must wait until the host has marked the request as 'done' before acknowledging
+            //  packet's exectuion has completed.
+            if (_clem_smartport_handle_packet(unit, delta_ns)) {
+                _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_RESPONSE);
+                unit->data_size = _clem_smartport_packet_encode_data(
+                    unit->data, CLEM_SMARTPORT_DATA_BUFFER_LIMIT, &unit->packet, unit->unit_id);
+                unit->ack_hi = true;
+                //  setup IWM 'read from drive'
+                unit->data_pulse_count = 0;
+                unit->data_bit_count = 0;
+            }
+        } else if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_COMPLETE) {
+            _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_READY);
             unit->ack_hi = true;
-            unit->packet_state = CLEM_SMARTPORT_UNIT_STATE_READY;
         }
+        return bus_state;
     }
 
-    if (!(bus_in & CLEM_SMARTPORT_BUS_REQ))
-        return;
-
-    if (bus_in & CLEM_SMARTPORT_BUS_WRITE) {
+    if (bus_state & CLEM_SMARTPORT_BUS_WRITE) {
         //  write into data buffer from the disk port
-        bool data_signal = (bus_in & CLEM_SMARTPORT_BUS_DATA) != 0;
+        bool data_signal = (bus_state & CLEM_SMARTPORT_BUS_DATA) != 0;
         if (data_signal != unit->write_signal) {
             unit->data_reg |= 1;
         } else {
@@ -127,7 +251,7 @@ static void _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit, uns
                         unit->packet_state_byte_cnt++;
                     } else {
                         CLEM_LOG("SmartPort: Data overrun at unit %u, device %u", unit->unit_id,
-                                 unit->device_id);
+                                 unit->device.device_id);
                     }
                     unit->data_reg = 0;
                     unit->data_bit_count = 0;
@@ -136,10 +260,34 @@ static void _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit, uns
                 }
             }
         }
+    } else if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_RESPONSE) {
+        bus_state &= ~CLEM_SMARTPORT_BUS_DATA;
+        unit->data_pulse_count++;
+        if ((unit->data_pulse_count % 8) == 0) {
+            bus_state |= CLEM_SMARTPORT_BUS_READ;
+            if (unit->data_bit_count == 0) {
+                if (unit->packet_state_byte_cnt >= unit->data_size) {
+                    _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_COMPLETE);
+                    return bus_state;
+                } else {
+                    unit->data_reg = unit->data[unit->packet_state_byte_cnt++];
+                    printf("SmartPort <= %02X\n", unit->data_reg);
+                    unit->data_bit_count = 8;
+                }
+            }
+            --unit->data_bit_count;
+            if (unit->data_reg & 0x80) {
+                bus_state |= CLEM_SMARTPORT_BUS_DATA;
+            }
+            unit->data_reg <<= 1;
+        }
+        return bus_state;
+    } else if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_COMPLETE) {
+        unit->ack_hi = false;
     }
 
     if (unit->packet_state_byte_cnt < 1)
-        return;
+        return bus_state;
 
     data_start = unit->data + unit->data_size - unit->packet_state_byte_cnt;
     data_tail = unit->data + unit->data_size;
@@ -192,6 +340,9 @@ static void _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit, uns
             _clem_smartport_packet_decode_data(unit->packet.contents, unit->packet_cntr, data_start,
                                                unit->packet.contents_length >> 8,
                                                unit->packet.contents_length & 0xff);
+            // store off the actual length of the packet in bytes vs its group/odd count
+            unit->packet.contents_length =
+                (unit->packet.contents_length >> 8) * 7 + (unit->packet.contents_length & 0xff);
             _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_PACKET_CHECKSUM);
         }
         break;
@@ -204,13 +355,21 @@ static void _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit, uns
         break;
     case CLEM_SMARTPORT_UNIT_STATE_PACKET_END:
         if (data_tail[-1] == 0xC8) {
-            _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_EXECUTING);
-            unit->ack_hi = false;
+            //  INIT commands are ignored if our device was already set by
+            //  an earlier INIT and the unit wasn't reset
+            if (unit->unit_id && unit->packet.dest_unit_id != unit->unit_id) {
+                _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_READY);
+            } else {
+                _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_EXECUTING);
+                unit->ack_hi = false;
+            }
         } else {
             _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_PACKET_BAD);
         }
         break;
     }
+
+    return bus_state;
 }
 
 /*
@@ -248,7 +407,7 @@ bool clem_smartport_bus(struct ClemensSmartPortUnit *unit, unsigned unit_count, 
     bool is_ack_hi = false;
 
     for (; unit < unit_end; unit++) {
-        if (unit->device_id == 0)
+        if (unit->device.device_id == 0)
             continue;
         if (select_bits == CLEM_SMARTPORT_BUS_RESET_PHASE) {
             unit->unit_id = 0x00;
@@ -275,7 +434,7 @@ bool clem_smartport_bus(struct ClemensSmartPortUnit *unit, unsigned unit_count, 
                     bus_state |= CLEM_SMARTPORT_BUS_DATA;
                 }
             }
-            _clem_smartport_bus_handshake(unit, bus_state, delta_ns);
+            bus_state = _clem_smartport_bus_handshake(unit, bus_state, delta_ns);
         } else {
             unit->bus_enabled = false;
         }
@@ -303,8 +462,18 @@ bool clem_smartport_bus(struct ClemensSmartPortUnit *unit, unsigned unit_count, 
             *io_flags &= ~CLEM_IWM_FLAG_WRPROTECT_SENSE;
         }
 
-        printf("SmartPort: REQ: %u,  ACK: %u\n", (select_bits & 1) != 0, is_ack_hi);
+        *io_flags &= ~CLEM_IWM_FLAG_READ_DATA;
+        if (bus_state & CLEM_SMARTPORT_BUS_READ) {
+            *io_flags |= CLEM_IWM_FLAG_PULSE_HIGH;
+            if (bus_state & CLEM_SMARTPORT_BUS_DATA) {
+                *io_flags |= CLEM_IWM_FLAG_READ_DATA;
+            }
+        } else {
+            *io_flags &= ~CLEM_IWM_FLAG_PULSE_HIGH;
+        }
+
+        //    printf("SmartPort: REQ: %u,  ACK: %u\n", (select_bits & 1) != 0, is_ack_hi);
     }
 
-    return unit->bus_enabled;
+    return is_bus_enabled;
 }

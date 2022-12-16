@@ -390,9 +390,13 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
             //  the 5.25" disk is disabled.
             iwm->enable2 = clem_smartport_bus(drives->smartport, 1, &iwm->io_flags, &iwm->out_phase,
                                               disk_delta_ns);
-            if (iwm->enable2 && iwm->state == CLEM_IWM_STATE_WRITE_DATA &&
-                (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
-                printf("SmartPort: DATA SENT = %02X\n", iwm->data);
+            if (iwm->enable2) {
+                /*
+                if (iwm->state == CLEM_IWM_STATE_WRITE_DATA &&
+                    (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
+                    printf("SmartPort: DATA SENT = %02X\n", iwm->data);
+                }
+                */
                 drive = NULL;
             }
         }

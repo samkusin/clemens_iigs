@@ -34,12 +34,12 @@ enum ClemensSmartPortPacketType {
  *
  */
 struct ClemensSmartPortPacket {
+    /** Indicates how the packet should be handled by the recipient */
+    enum ClemensSmartPortPacketType type;
     /** Where the packet originates from (0 = host, > 0 are bus residents) */
     uint8_t source_unit_id;
     /** Where the packet is going (0 = host, > 0 are bus residents)*/
     uint8_t dest_unit_id;
-    /** Indicates how the packet should be handled by the recipient */
-    enum ClemensSmartPortPacketType type;
     /** An extended SmartPort call (certain fields are extended) */
     uint8_t is_extended;
     /** Value is used by status and data packet types, and error code for commands */
@@ -48,6 +48,18 @@ struct ClemensSmartPortPacket {
     uint16_t contents_length;
     /*  Decoded contents (8-bit values) */
     uint8_t contents[CLEM_SMARTPORT_CONTENTS_LIMIT];
+};
+
+struct ClemensSmartPortDevice {
+    unsigned device_id;
+    void *device_data;
+
+    /** Smartport bus resident on a bus being reset */
+    unsigned (*bus_reset)(struct ClemensSmartPortDevice *context, unsigned phase_flags,
+                          unsigned delta_ns);
+    /** Smartport bus resident on an enabled bus */
+    unsigned (*bus_enable)(struct ClemensSmartPortDevice *context, unsigned phase_flags,
+                           unsigned delta_ns);
 };
 
 /**
@@ -65,18 +77,7 @@ struct ClemensSmartPortPacket {
  *
  */
 struct ClemensSmartPortUnit {
-    /** A unique (to the emulator) ID Identifying the Smartport device
-        implementation.   This in tandem with `device` is the custom state
-        implemented for the device (i.e A specific HD brand, etc). */
-    unsigned device_id;
-    /** Device implemented in this unit.  This must be provided at emulator startup */
-    void *device;
-    /** Smartport bus resident on a bus being reset */
-    unsigned (*bus_reset)(struct ClemensSmartPortUnit *context, unsigned phase_flags,
-                          unsigned delta_ns);
-    /** Smartport bus resident on an enabled bus */
-    unsigned (*bus_enable)(struct ClemensSmartPortUnit *context, unsigned phase_flags,
-                           unsigned delta_ns);
+    struct ClemensSmartPortDevice device;
 
     /* Note these memebers are managed by the emulator and should not be modified
        unless you know what you're doing!
