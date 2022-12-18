@@ -23,7 +23,9 @@
 #define CLEM_SMARTPORT_UNIT_STATE_PACKET_BAD      0x0002ffff
 #define CLEM_SMARTPORT_UNIT_STATE_EXECUTING       0x00030000
 #define CLEM_SMARTPORT_UNIT_STATE_RESPONSE        0x00040000
-#define CLEM_SMARTPORT_UNIT_STATE_COMPLETE        0x00050000
+#define CLEM_SMARTPORT_UNIT_STATE_DATA            0x00050000
+#define CLEM_SMARTPORT_UNIT_STATE_COMPLETE        0x000f0000
+#define CLEM_SMARTPORT_UNIT_STATE_ABORT_COMMAND   0x80000000
 
 #define CLEM_SMARTPORT_BUS_WRITE 1
 #define CLEM_SMARTPORT_BUS_READ  2
@@ -32,6 +34,31 @@
 
 static inline void _clem_smartport_packet_state(struct ClemensSmartPortUnit *unit,
                                                 unsigned packet_state) {
+    if (unit->packet_state == packet_state)
+        return;
+
+    switch (packet_state) {
+    case CLEM_SMARTPORT_UNIT_STATE_READY:
+        unit->command_id = 0xff;
+        unit->ack_hi = true;
+        break;
+    case CLEM_SMARTPORT_UNIT_STATE_EXECUTING:
+        unit->command_id = unit->packet.contents[0];
+        unit->ack_hi = false;
+        break;
+    case CLEM_SMARTPORT_UNIT_STATE_RESPONSE:
+        unit->data_pulse_count = 0;
+        unit->data_bit_count = 0;
+        unit->ack_hi = true;
+        break;
+    case CLEM_SMARTPORT_UNIT_STATE_COMPLETE:
+        unit->ack_hi = false;
+        break;
+    case CLEM_SMARTPORT_UNIT_STATE_PACKET_BAD:
+        unit->ack_hi = false;
+        break;
+    }
+
     unit->packet_state = packet_state;
     unit->packet_state_byte_cnt = 0;
 }
@@ -76,9 +103,9 @@ static void _clem_smartport_packet_decode_data(uint8_t *dest, unsigned dest_size
     }
 }
 
-static unsigned _clem_smartport_packet_encode_data(uint8_t *out, unsigned out_limit,
-                                                   struct ClemensSmartPortPacket *packet,
-                                                   uint8_t unit_id) {
+static bool _clem_smartport_packet_encode_data(uint8_t *out, unsigned *out_limit,
+                                               struct ClemensSmartPortPacket *packet,
+                                               uint8_t unit_id) {
     unsigned out_size = 0;
     unsigned index;
     uint8_t chksum = 0x00;
@@ -90,120 +117,197 @@ static unsigned _clem_smartport_packet_encode_data(uint8_t *out, unsigned out_li
     uint8_t *packet_src;
 
     //  sync bytes
-    while (out_size < out_limit && out_size < 6) {
-        out[out_size++] = 0xFF;
+    if (out_size + 6 > *out_limit) {
+        *out_limit = out_size;
+        return false;
     }
-    if (out_size + 8 <= out_limit) {
-        //  NOTE: checksum is performed on the encoded bytes (high bit on)
-        //        which differs from how the checksum is calculated for the
-        //        contents (see below.)
-        out[out_size++] = 0xC3;
+    out[out_size++] = 0xFF;
+    out[out_size++] = 0x3F;
+    out[out_size++] = 0xCF;
+    out[out_size++] = 0xF3;
+    out[out_size++] = 0xFC;
+    out[out_size++] = 0xFF;
+
+    if (out_size + 8 > *out_limit) {
+        *out_limit = out_size;
+        return false;
+    }
+    //  NOTE: checksum is performed on the encoded bytes (high bit on)
+    //        which differs from how the checksum is calculated for the
+    //        contents (see below.)
+    out[out_size++] = 0xC3;
+    out[out_size++] = _clem_smartport_encode_byte(0x00, &chksum);
+    out[out_size++] = _clem_smartport_encode_byte(unit_id, &chksum);
+    if (packet->type == kClemensSmartPortPacketType_Command) {
+        tmp = 0x00;
+    } else if (packet->type == kClemensSmartPortPacketType_Status) {
+        tmp = 0x01;
+    } else if (packet->type == kClemensSmartPortPacketType_Data) {
+        tmp = 0x02;
+    } else {
+        tmp = 0x7F;
+    }
+    out[out_size++] = _clem_smartport_encode_byte(tmp, &chksum);
+    if (packet->is_extended) {
+        out[out_size++] = _clem_smartport_encode_byte(0x40, &chksum);
+    } else {
         out[out_size++] = _clem_smartport_encode_byte(0x00, &chksum);
-        out[out_size++] = _clem_smartport_encode_byte(unit_id, &chksum);
-        if (packet->type == kClemensSmartPortPacketType_Command) {
-            tmp = 0x00;
-        } else if (packet->type == kClemensSmartPortPacketType_Status) {
-            tmp = 0x01;
-        } else if (packet->type == kClemensSmartPortPacketType_Data) {
-            tmp = 0x02;
-        } else {
-            tmp = 0x7F;
-        }
-        out[out_size++] = _clem_smartport_encode_byte(tmp, &chksum);
-        if (packet->is_extended) {
-            out[out_size++] = _clem_smartport_encode_byte(0x40, &chksum);
-        } else {
-            out[out_size++] = _clem_smartport_encode_byte(0x00, &chksum);
-        }
-        out[out_size++] = _clem_smartport_encode_byte(packet->status, &chksum);
-        out[out_size++] = _clem_smartport_encode_byte(odd_cnt, &chksum);
-        out[out_size++] = _clem_smartport_encode_byte(g7_cnt, &chksum);
     }
+    out[out_size++] = _clem_smartport_encode_byte(packet->status, &chksum);
+    out[out_size++] = _clem_smartport_encode_byte(odd_cnt, &chksum);
+    out[out_size++] = _clem_smartport_encode_byte(g7_cnt, &chksum);
+
     raw_contents_size = odd_cnt > 0 ? odd_cnt + 1 : 0;
     raw_contents_size += (g7_cnt * 8);
     packet_src = packet->contents;
-    if (out_size + raw_contents_size < out_limit) {
-        //  NOTE: checksums only on the decoded contents, so perform the checksum
-        //        calculation on the source bytes
-        tmp = 0;
-        for (index = 0; index < (unsigned)odd_cnt; ++index) {
-            if (packet_src[index] & 0x80) {
-                tmp |= 1;
-            }
-            tmp <<= 1;
+
+    if (out_size + raw_contents_size > *out_limit) {
+        *out_limit = out_size;
+        return false;
+    }
+    //  NOTE: checksums only on the decoded contents, so perform the checksum
+    //        calculation on the source bytes
+    tmp = 0;
+    for (index = 0; index < (unsigned)odd_cnt; ++index) {
+        if (packet_src[index] & 0x80) {
+            tmp |= 1;
         }
-        //  if odd_cnt == 6 (the maximum), bit 0 will be 0 at this point, so
-        //  the shift calculation below should work.
-        tmp <<= (6 - odd_cnt);
-        if (odd_cnt > 0) {
-            out[out_size++] = 0x80 | tmp;
-            while (odd_cnt > 0) {
-                out[out_size++] = 0x80 | packet_src[0];
-                chksum ^= packet_src[0];
-                ++packet_src;
-                --odd_cnt;
-            }
-        }
-        while (g7_cnt > 0) {
-            tmp = (packet_src[0] & 0x80) >> 1;
-            tmp |= ((packet_src[1] & 0x80) >> 2);
-            tmp |= ((packet_src[2] & 0x80) >> 3);
-            tmp |= ((packet_src[3] & 0x80) >> 4);
-            tmp |= ((packet_src[4] & 0x80) >> 5);
-            tmp |= ((packet_src[5] & 0x80) >> 6);
-            tmp |= ((packet_src[6] & 0x80) >> 7);
-            out[out_size++] = 0x80 | tmp;
+        tmp <<= 1;
+    }
+    //  if odd_cnt == 6 (the maximum), bit 0 will be 0 at this point, so
+    //  the shift calculation below should work.
+    tmp <<= (6 - odd_cnt);
+    if (odd_cnt > 0) {
+        out[out_size++] = 0x80 | tmp;
+        while (odd_cnt > 0) {
             out[out_size++] = 0x80 | packet_src[0];
             chksum ^= packet_src[0];
-            out[out_size++] = 0x80 | packet_src[1];
-            chksum ^= packet_src[1];
-            out[out_size++] = 0x80 | packet_src[2];
-            chksum ^= packet_src[2];
-            out[out_size++] = 0x80 | packet_src[3];
-            chksum ^= packet_src[3];
-            out[out_size++] = 0x80 | packet_src[4];
-            chksum ^= packet_src[4];
-            out[out_size++] = 0x80 | packet_src[5];
-            chksum ^= packet_src[5];
-            out[out_size++] = 0x80 | packet_src[6];
-            chksum ^= packet_src[6];
-            --g7_cnt;
+            ++packet_src;
+            --odd_cnt;
         }
     }
-    if (out_size + 3 <= out_limit) {
-        tmp = 0x80 | (chksum & 0x40) | 0x20 | (chksum & 0x10) | 0x08 | (chksum & 0x04) | 0x02 |
-              (chksum & 0x1);
-        out[out_size++] = tmp;
-        tmp = (chksum & 0x80) | 0x40 | (chksum & 0x20) | 0x10 | (chksum & 0x08) | 0x04 |
-              (chksum & 0x02);
-        out[out_size++] = 0x80 | (tmp >> 1);
-        out[out_size++] = 0xC8;
+    while (g7_cnt > 0) {
+        tmp = (packet_src[0] & 0x80) >> 1;
+        tmp |= ((packet_src[1] & 0x80) >> 2);
+        tmp |= ((packet_src[2] & 0x80) >> 3);
+        tmp |= ((packet_src[3] & 0x80) >> 4);
+        tmp |= ((packet_src[4] & 0x80) >> 5);
+        tmp |= ((packet_src[5] & 0x80) >> 6);
+        tmp |= ((packet_src[6] & 0x80) >> 7);
+        out[out_size++] = 0x80 | tmp;
+        out[out_size++] = 0x80 | packet_src[0];
+        chksum ^= packet_src[0];
+        out[out_size++] = 0x80 | packet_src[1];
+        chksum ^= packet_src[1];
+        out[out_size++] = 0x80 | packet_src[2];
+        chksum ^= packet_src[2];
+        out[out_size++] = 0x80 | packet_src[3];
+        chksum ^= packet_src[3];
+        out[out_size++] = 0x80 | packet_src[4];
+        chksum ^= packet_src[4];
+        out[out_size++] = 0x80 | packet_src[5];
+        chksum ^= packet_src[5];
+        out[out_size++] = 0x80 | packet_src[6];
+        chksum ^= packet_src[6];
+        --g7_cnt;
     }
 
-    return out_size;
+    if (out_size + 3 > *out_limit) {
+        *out_limit = out_size;
+        return false;
+    }
+    tmp = 0x80 | (chksum & 0x40) | 0x20 | (chksum & 0x10) | 0x08 | (chksum & 0x04) | 0x02 |
+          (chksum & 0x1);
+    out[out_size++] = tmp;
+    tmp =
+        (chksum & 0x80) | 0x40 | (chksum & 0x20) | 0x10 | (chksum & 0x08) | 0x04 | (chksum & 0x02);
+    out[out_size++] = 0x80 | (tmp >> 1);
+    out[out_size++] = 0xC8;
+
+    *out_limit = out_size;
+
+    return true;
 }
 
-static bool _clem_smartport_handle_packet(struct ClemensSmartPortUnit *unit, unsigned delta_ns) {
+static unsigned _clem_smartport_packet_encode_response(struct ClemensSmartPortUnit *unit,
+                                                       uint8_t dest_unit_id, uint8_t status) {
+    unit->packet.status = status;
+    unit->packet.dest_unit_id = dest_unit_id;
+    unit->packet.source_unit_id = unit->unit_id;
+    unit->data_size = CLEM_SMARTPORT_DATA_BUFFER_LIMIT;
+    if (!_clem_smartport_packet_encode_data(unit->data, &unit->data_size, &unit->packet,
+                                            unit->unit_id)) {
+        return CLEM_SMARTPORT_UNIT_STATE_ABORT_COMMAND;
+    }
+    return CLEM_SMARTPORT_UNIT_STATE_RESPONSE;
+};
+
+static unsigned _clem_smartport_handle_packet(struct ClemensSmartPortUnit *unit,
+                                              unsigned delta_ns) {
     //  Parse the decoded packet based on the packet type (For commands, obtain the command type
     //  and parameter count, for example)
+    unsigned next_state = unit->packet_state;
+    uint8_t call_status;
+
     if (unit->packet.type == kClemensSmartPortPacketType_Command) {
-        uint8_t command_type = unit->packet.contents[0];
-        switch (command_type) {
+        switch (unit->command_id) {
         case CLEM_SMARTPORT_COMMAND_INIT:
-            CLEM_DEBUG("SmartPort: [%02X] INIT", unit->unit_id);
+            CLEM_DEBUG("SmartPort: [%02X] Init", unit->unit_id);
             unit->unit_id = unit->packet.dest_unit_id;
             unit->ph3_latch_lo = false;
+            if (unit->device.do_reset) {
+                (*unit->device.do_reset)(&unit->device, delta_ns);
+            }
             //  generate response
-            unit->packet.status = 0x00;
-            unit->packet.dest_unit_id = unit->packet.source_unit_id;
-            unit->packet.source_unit_id = unit->unit_id;
-            return true;
+            next_state =
+                _clem_smartport_packet_encode_response(unit, unit->packet.source_unit_id, 0x00);
+            break;
+        case CLEM_SMARTPORT_COMMAND_STATUS:
+            break;
+        case CLEM_SMARTPORT_COMMAND_READBLOCK:
+            CLEM_DEBUG("SmartPort: [%02X] ReadBlock", unit->unit_id);
+            //(*unit->device.read_block)() break;
+            // if read_block has completed, encode and return response
+            // if read_block is in progress return executing...
+            if (unit->device.do_read_block) {
+                call_status = (*unit->device.do_read_block)(&unit->device, &unit->packet,
+                                                            unit->unit_id, delta_ns);
+            } else {
+                call_status = CLEM_SMARTPORT_STATUS_CODE_OFFLINE;
+            }
+            next_state = _clem_smartport_packet_encode_response(unit, unit->packet.source_unit_id,
+                                                                call_status);
+            break;
+        case CLEM_SMARTPORT_COMMAND_WRITEBLOCK:
+            CLEM_DEBUG("SmartPort: [%02X] WriteBlock", unit->unit_id);
+            next_state = CLEM_SMARTPORT_UNIT_STATE_DATA;
+            break;
+        case CLEM_SMARTPORT_COMMAND_FORMAT:
+            break;
+        case CLEM_SMARTPORT_COMMAND_CONTROL:
+            break;
         default:
-            CLEM_ASSERT(false);
+            CLEM_WARN("SmartPort: [%02X] Unhandled command %02X", unit->unit_id, unit->command_id);
+            next_state = CLEM_SMARTPORT_UNIT_STATE_ABORT_COMMAND;
             break;
         }
+    } else if (unit->packet.type == kClemensSmartPortPacketType_Data) {
+        switch (unit->command_id) {
+        case CLEM_SMARTPORT_COMMAND_WRITEBLOCK:
+            if (unit->device.do_write_block) {
+                call_status = (*unit->device.do_write_block)(&unit->device, &unit->packet,
+                                                             unit->unit_id, delta_ns);
+            } else {
+                call_status = CLEM_SMARTPORT_STATUS_CODE_OFFLINE;
+            }
+            next_state = _clem_smartport_packet_encode_response(unit, unit->packet.source_unit_id,
+                                                                call_status);
+            break;
+        }
+    } else {
+        next_state = CLEM_SMARTPORT_UNIT_STATE_ABORT_COMMAND;
     }
-    return false;
+    return next_state;
 }
 
 static unsigned _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit, unsigned bus_state,
@@ -213,20 +317,13 @@ static unsigned _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit,
 
     if (!(bus_state & CLEM_SMARTPORT_BUS_REQ)) {
         if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_EXECUTING) {
-            //  must wait until the host has marked the request as 'done' before acknowledging
-            //  packet's exectuion has completed.
-            if (_clem_smartport_handle_packet(unit, delta_ns)) {
-                _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_RESPONSE);
-                unit->data_size = _clem_smartport_packet_encode_data(
-                    unit->data, CLEM_SMARTPORT_DATA_BUFFER_LIMIT, &unit->packet, unit->unit_id);
-                unit->ack_hi = true;
-                //  setup IWM 'read from drive'
-                unit->data_pulse_count = 0;
-                unit->data_bit_count = 0;
-            }
+            _clem_smartport_packet_state(unit, _clem_smartport_handle_packet(unit, delta_ns));
         } else if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_COMPLETE) {
             _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_READY);
-            unit->ack_hi = true;
+        } else if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_PACKET_BAD) {
+            //  TODO: we should probably send a response or some type?
+            _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_READY);
+            printf("SmartPort: [%02X] received a bad packet\n", unit->unit_id);
         }
         return bus_state;
     }
@@ -282,8 +379,6 @@ static unsigned _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit,
             unit->data_reg <<= 1;
         }
         return bus_state;
-    } else if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_COMPLETE) {
-        unit->ack_hi = false;
     }
 
     if (unit->packet_state_byte_cnt < 1)
@@ -294,6 +389,9 @@ static unsigned _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit,
 
     switch (unit->packet_state) {
     case CLEM_SMARTPORT_UNIT_STATE_READY:
+        _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_PACKET);
+        break;
+    case CLEM_SMARTPORT_UNIT_STATE_DATA:
         _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_PACKET);
         break;
     case CLEM_SMARTPORT_UNIT_STATE_PACKET:
@@ -355,13 +453,22 @@ static unsigned _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit,
         break;
     case CLEM_SMARTPORT_UNIT_STATE_PACKET_END:
         if (data_tail[-1] == 0xC8) {
-            //  INIT commands are ignored if our device was already set by
-            //  an earlier INIT and the unit wasn't reset
-            if (unit->unit_id && unit->packet.dest_unit_id != unit->unit_id) {
-                _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_READY);
-            } else {
+            //  Ignore
+            //  unit->packet_ours = true;
+            if (unit->packet.type == kClemensSmartPortPacketType_Command) {
+                unit->command_id = unit->packet.contents[0];
+            }
+            if (!unit->unit_id && unit->command_id == CLEM_SMARTPORT_COMMAND_INIT) {
                 _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_EXECUTING);
-                unit->ack_hi = false;
+            } else if (unit->unit_id && unit->packet.dest_unit_id == unit->unit_id) {
+                _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_EXECUTING);
+            } else {
+                //  TODO: implement logic to ignore the remaining command as this state
+                //        change will still result in reading packet data.  Fortunately
+                //        we only support one device on this bus, so it won't matter...
+                //        YET
+                //  unit->packet_ours = false;
+                _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_READY);
             }
         } else {
             _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_PACKET_BAD);
@@ -423,6 +530,7 @@ bool clem_smartport_bus(struct ClemensSmartPortUnit *unit, unsigned unit_count, 
                 unit->write_signal = 0;
                 unit->ack_hi = true;
                 unit->bus_enabled = true;
+                unit->command_id = 0xff;
                 _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_READY);
             }
             if ((select_bits & 1) != 0) {

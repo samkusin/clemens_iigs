@@ -250,6 +250,7 @@ struct ClemensSerializerRecord kSmartPort[] = {
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, write_signal),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, unit_id),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, ack_hi),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, command_id),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, data_pulse_count),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, data_bit_count),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, packet_state),

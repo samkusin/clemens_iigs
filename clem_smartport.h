@@ -15,8 +15,24 @@
 */
 #define CLEM_SMARTPORT_CONTENTS_LIMIT 576
 
-/* The INIT command that sends the assigned unit ID to the target device */
-#define CLEM_SMARTPORT_COMMAND_INIT 0x05
+/* SmartPort Block Device Commands */
+#define CLEM_SMARTPORT_COMMAND_STATUS     0x00
+#define CLEM_SMARTPORT_COMMAND_READBLOCK  0x01
+#define CLEM_SMARTPORT_COMMAND_WRITEBLOCK 0x02
+#define CLEM_SMARTPORT_COMMAND_FORMAT     0x03
+#define CLEM_SMARTPORT_COMMAND_CONTROL    0x04
+#define CLEM_SMARTPORT_COMMAND_INIT       0x05
+
+/** Status codes returned from SmartPort calls - 0x7f is reserved for async wait
+ *  by the SmartPort emulator for device implementations to return that the operation
+ *  is imcomplete and to keep polling until its finished with one of the other
+ *  result codes.
+ */
+#define CLEM_SMARTPORT_STATUS_CODE_BAD_CMD 0x01
+#define CLEM_SMARTPORT_STATUS_CODE_BUS_ERR 0x06
+#define CLEM_SMARTPORT_STATUS_CODE_IO_ERR  0x27
+#define CLEM_SMARTPORT_STATUS_CODE_OFFLINE 0x2f
+#define CLEM_SMARTPORT_STATUS_CODE_WAIT    0x7f
 
 #ifdef __cplusplus
 extern "C" {
@@ -55,11 +71,15 @@ struct ClemensSmartPortDevice {
     void *device_data;
 
     /** Smartport bus resident on a bus being reset */
-    unsigned (*bus_reset)(struct ClemensSmartPortDevice *context, unsigned phase_flags,
-                          unsigned delta_ns);
-    /** Smartport bus resident on an enabled bus */
-    unsigned (*bus_enable)(struct ClemensSmartPortDevice *context, unsigned phase_flags,
-                           unsigned delta_ns);
+    uint8_t (*do_reset)(struct ClemensSmartPortDevice *context, unsigned delta_ns);
+    /** Read a block from the device and store into packet when response state is returned*/
+    uint8_t (*do_read_block)(struct ClemensSmartPortDevice *context,
+                             struct ClemensSmartPortPacket *packet, uint8_t unit_id,
+                             unsigned delta_ns);
+    /** Write a block to the device and store into packet when response state is returned */
+    uint8_t (*do_write_block)(struct ClemensSmartPortDevice *context,
+                              struct ClemensSmartPortPacket *packet, uint8_t unit_id,
+                              unsigned delta_ns);
 };
 
 /**
@@ -94,6 +114,8 @@ struct ClemensSmartPortUnit {
     uint8_t unit_id;
     /** ACK signal */
     uint8_t ack_hi;
+    /** Active command for multi packet commands (i.e. WriteBlock)*/
+    uint8_t command_id;
 
     /** Used to accumulate bytes to be serialized/unserliazed to bus */
     unsigned data_pulse_count;
