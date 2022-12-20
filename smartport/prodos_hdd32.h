@@ -2,6 +2,7 @@
 #define CLEM_SMARTPORT_PRODOS_HDD32_H
 
 #include "clem_shared.h"
+#include "clem_smartport.h"
 
 typedef struct mpack_writer_t mpack_writer_t;
 typedef struct mpack_reader_t mpack_reader_t;
@@ -10,14 +11,29 @@ typedef struct mpack_reader_t mpack_reader_t;
 extern "C" {
 #endif
 
+/**
+ * @brief Defines a shallow implementation of a simple Hard Drive interface
+ */
 struct ClemensProdosHDD32 {
     void *user_context;
     unsigned drive_index;
     unsigned block_limit;
-    unsigned (*read_block)(void *user_context, unsigned drive_index, unsigned block_index,
-                           uint8_t *buffer);
-    unsigned (*write_block)(void *user_context, unsigned drive_index, unsigned block_index,
-                            const uint8_t *buffer);
+
+    /**
+     * @brief Callback to read a block of data from the host resident drive
+     *
+     */
+    uint8_t (*read_block)(void *user_context, unsigned drive_index, unsigned block_index,
+                          uint8_t *buffer);
+    /**
+     * @brief Call to write data to the host resident drive
+     *
+     */
+    uint8_t (*write_block)(void *user_context, unsigned drive_index, unsigned block_index,
+                           const uint8_t *buffer);
+    /** Flush the host resideent device (write all contents, etc - This is optional depending on
+     *  how read_block and write_block were implemented.*/
+    uint8_t (*flush)(void *user_context, unsigned drive_index);
 };
 
 void clem_smartport_prodos_hdd32_initialize(struct ClemensSmartPortDevice *device,

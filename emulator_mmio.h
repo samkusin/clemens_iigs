@@ -101,6 +101,36 @@ bool clemens_eject_disk_async(ClemensMMIO *mmio, enum ClemensDriveType drive_typ
                               struct ClemensNibbleDisk *disk);
 
 /**
+ * @brief Assigns a SmartPort device to one of the available SmartPort slots.
+ *
+ * Note, that the any device *contexts* are assumed to be managed by the calling
+ * application.  The device object itself is copied to one of the available slots.
+ *
+ * @param mmio
+ * @param drive_index Always 0 for now
+ * @param device This object is copied into one the available slots
+ * @return true
+ * @return false
+ */
+bool clemens_assign_smartport_disk(ClemensMMIO *mmio, unsigned drive_index,
+                                   struct ClemensSmartPortDevice *device);
+
+/**
+ * @brief Unassigned the designated SmartPort device.
+ *
+ * The device data is copied into the passed device struct and cleared from the
+ * active drive bay.
+ *
+ * @param mmio
+ * @param drive_index The device at this index is removed.
+ * @param device The assigned device is copied into this structure.
+ * @return true
+ * @return false
+ */
+void clemens_remove_smartport_disk(ClemensMMIO *mmio, unsigned drive_index,
+                                   struct ClemensSmartPortDevice *device);
+
+/**
  * @brief Forwards input from ths host machine to the ADB
  *
  * @param mmio

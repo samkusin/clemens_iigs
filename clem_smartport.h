@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+/** Number of drives supported at one time on the system */
+#define CLEM_SMARTPORT_DRIVE_LIMIT 1
+
 /* SmartPort devices by ID */
 #define CLEM_SMARTPORT_DEVICE_ID_NONE         0
 #define CLEM_SMARTPORT_DEVICE_ID_REFERENCE    1
@@ -28,11 +31,13 @@
  *  is imcomplete and to keep polling until its finished with one of the other
  *  result codes.
  */
-#define CLEM_SMARTPORT_STATUS_CODE_BAD_CMD 0x01
-#define CLEM_SMARTPORT_STATUS_CODE_BUS_ERR 0x06
-#define CLEM_SMARTPORT_STATUS_CODE_IO_ERR  0x27
-#define CLEM_SMARTPORT_STATUS_CODE_OFFLINE 0x2f
-#define CLEM_SMARTPORT_STATUS_CODE_WAIT    0x7f
+#define CLEM_SMARTPORT_STATUS_CODE_OK            0x00
+#define CLEM_SMARTPORT_STATUS_CODE_BAD_CMD       0x01
+#define CLEM_SMARTPORT_STATUS_CODE_BUS_ERR       0x06
+#define CLEM_SMARTPORT_STATUS_CODE_IO_ERR        0x27
+#define CLEM_SMARTPORT_STATUS_CODE_INVALID_BLOCK 0x2D
+#define CLEM_SMARTPORT_STATUS_CODE_OFFLINE       0x2f
+#define CLEM_SMARTPORT_STATUS_CODE_WAIT          0x7f
 
 #ifdef __cplusplus
 extern "C" {

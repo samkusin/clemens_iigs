@@ -4,25 +4,25 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define CLEM_DISK_TYPE_NONE                 0
-#define CLEM_DISK_TYPE_5_25                 1
-#define CLEM_DISK_TYPE_3_5                  2
+#define CLEM_DISK_TYPE_NONE 0
+#define CLEM_DISK_TYPE_5_25 1
+#define CLEM_DISK_TYPE_3_5  2
 
 /* value from woz spec - evaluate if this can be used for blank disks */
-#define CLEM_DISK_DEFAULT_TRACK_BIT_LENGTH_525  51200
+#define CLEM_DISK_DEFAULT_TRACK_BIT_LENGTH_525 51200
 /* value from dsk2woz2 */
-#define CLEM_DISK_BLANK_TRACK_BIT_LENGTH_525    50624
+#define CLEM_DISK_BLANK_TRACK_BIT_LENGTH_525 50624
 
 /*  Track Limit for 'nibble-like' disks (i.e. not Smartport drives) */
-#define CLEM_DISK_LIMIT_QTR_TRACKS              160
+#define CLEM_DISK_LIMIT_QTR_TRACKS 160
 /*  Always 16 sectors per track on DOS/ProDOS 5.25" disks */
-#define CLEM_DISK_525_NUM_SECTORS_PER_TRACK     16
+#define CLEM_DISK_525_NUM_SECTORS_PER_TRACK 16
 
 /*  3.5" drives have variable spin speed to maximize space - and these speeds
     are divided into regions, where outer regions have more sectors vs inner
     regions.  See the declared globals below
 */
-#define CLEM_DISK_35_NUM_REGIONS                5
+#define CLEM_DISK_35_NUM_REGIONS 5
 
 /* From ProDOS firmware for 3.5" Apple Disk Drive Format
    Routine from ROM 03 - ff/4197 - ff/428d
@@ -82,20 +82,18 @@ extern unsigned g_clem_track_start_per_region_35[CLEM_DISK_35_NUM_REGIONS + 1];
 }
 #endif
 
-#define CLEM_DISK_525_BYTES_PER_TRACK        (13 * 512)
-
-#define CLEM_DISK_35_BYTES_TRACK_GAP_1       500
-#define CLEM_DISK_35_BYTES_TRACK_GAP_3       53
-#define CLEM_DISK_35_BYTES_PER_SECTOR_BASE   728
-#define CLEM_DISK_35_BYTES_PER_SECTOR       \
+/** Note, these values are for nibbilized data that are most useful for WOZ images. */
+#define CLEM_DISK_525_BYTES_PER_TRACK      (13 * 512)
+#define CLEM_DISK_35_BYTES_TRACK_GAP_1     500
+#define CLEM_DISK_35_BYTES_TRACK_GAP_3     53
+#define CLEM_DISK_35_BYTES_PER_SECTOR_BASE 728
+#define CLEM_DISK_35_BYTES_PER_SECTOR                                                              \
     (CLEM_DISK_35_BYTES_PER_SECTOR_BASE + CLEM_DISK_35_BYTES_TRACK_GAP_3)
-#define CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(_sectors_) ( \
-    1 + (CLEM_DISK_35_BYTES_TRACK_GAP_1 - CLEM_DISK_35_BYTES_TRACK_GAP_3) + \
-    ((_sectors_) * CLEM_DISK_35_BYTES_PER_SECTOR))
-
+#define CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(_sectors_)                                            \
+    (1 + (CLEM_DISK_35_BYTES_TRACK_GAP_1 - CLEM_DISK_35_BYTES_TRACK_GAP_3) +                       \
+     ((_sectors_)*CLEM_DISK_35_BYTES_PER_SECTOR))
 #define CLEM_DISK_525_MAX_DATA_SIZE (50 * CLEM_DISK_525_BYTES_PER_TRACK)
-#define CLEM_DISK_35_MAX_DATA_SIZE (160 * CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(12))
-
+#define CLEM_DISK_35_MAX_DATA_SIZE  (160 * CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(12))
 
 #ifdef __cplusplus
 extern "C" {
@@ -106,12 +104,12 @@ extern "C" {
  *
  */
 enum ClemensDriveType {
-  kClemensDrive_Invalid = -1,
-  kClemensDrive_3_5_D1 = 0,
-  kClemensDrive_3_5_D2,
-  kClemensDrive_5_25_D1,
-  kClemensDrive_5_25_D2,
-  kClemensDrive_Count
+    kClemensDrive_Invalid = -1,
+    kClemensDrive_3_5_D1 = 0,
+    kClemensDrive_3_5_D2,
+    kClemensDrive_5_25_D1,
+    kClemensDrive_5_25_D2,
+    kClemensDrive_Count
 };
 
 /**
@@ -119,12 +117,12 @@ enum ClemensDriveType {
  *
  */
 struct ClemensNibbleDisk {
-    unsigned disk_type;                 /* see CLEM_DISK_TYPE_XXX defines */
-    unsigned bit_timing_ns;             /* time to read (and write?) */
+    unsigned disk_type;     /* see CLEM_DISK_TYPE_XXX defines */
+    unsigned bit_timing_ns; /* time to read (and write?) */
     unsigned track_count;
 
-    bool is_write_protected;            /**< Write protected data */
-    bool is_double_sided;               /**< track 1, 3, 5 represents side 2 */
+    bool is_write_protected; /**< Write protected data */
+    bool is_double_sided;    /**< track 1, 3, 5 represents side 2 */
 
     /* maps quarter tracks (for 5.25) and 80 tracks per side (for 3.25).  the
        drive head mechanism should track current head position by the meta
@@ -146,8 +144,8 @@ struct ClemensNibbleDisk {
        values within the INFO chunk (written out to max_track_size_bytes), and
        can be released upon eject
     */
-    uint8_t* bits_data;
-    uint8_t* bits_data_end;
+    uint8_t *bits_data;
+    uint8_t *bits_data_end;
 };
 
 #ifdef __cplusplus

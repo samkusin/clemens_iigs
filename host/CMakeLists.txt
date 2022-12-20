@@ -49,6 +49,7 @@ add_executable(clemens_iigs
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_import_disk.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_program_trace.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_serializer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_smartport_disk.cpp"
     ${FMT_SOURCES}
     ${SOKOL_SOURCES}
     ${IMGUI_SOURCES})

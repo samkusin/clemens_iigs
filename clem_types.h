@@ -394,7 +394,7 @@ struct ClemensDrive {
 struct ClemensDriveBay {
     struct ClemensDrive slot5[2];
     struct ClemensDrive slot6[2];
-    struct ClemensSmartPortUnit smartport[1];
+    struct ClemensSmartPortUnit smartport[CLEM_SMARTPORT_DRIVE_LIMIT];
 };
 
 /**

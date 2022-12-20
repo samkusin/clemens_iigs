@@ -2,6 +2,7 @@
 #define CLEM_HOST_BACKEND_HPP
 
 #include "clem_host_shared.hpp"
+#include "clem_smartport_disk.hpp"
 
 #include "cinek/buffer.hpp"
 #include "cinek/fixedstack.hpp"
@@ -108,6 +109,10 @@ class ClemensBackend {
     bool loadDisk(ClemensDriveType driveType, bool allowBlank);
     bool saveDisk(ClemensDriveType driveType);
     void resetDisk(ClemensDriveType driveType);
+
+    void loadSmartPortDisk(unsigned driveIndex);
+    bool saveSmartPortDisk(unsigned driveIndex);
+
     cinek::ByteBuffer loadROM(const char *romPathname);
 
     //  TODO: These methods could be moved into a subclass as they are specific
@@ -145,6 +150,8 @@ class ClemensBackend {
     std::array<ClemensWOZDisk, kClemensDrive_Count> diskContainers_;
     std::array<ClemensNibbleDisk, kClemensDrive_Count> disks_;
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives_;
+    std::array<ClemensBackendDiskDriveState, 1> smartPortDrives_;
+    std::array<ClemensSmartPortDisk, 1> smartPortDisks_;
 
     std::unique_ptr<ClemensProgramTrace> programTrace_;
 

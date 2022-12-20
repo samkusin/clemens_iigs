@@ -42,6 +42,7 @@ struct ClemensBackendDiskDriveState {
 struct ClemensBackendConfig {
     enum class Type { Apple2GS };
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDriveStates;
+    std::array<ClemensBackendDiskDriveState, 1> smartPortDriveStates;
     std::array<std::string, 7> cardNames;
     std::vector<ClemensBackendBreakpoint> breakpoints;
     unsigned audioSamplesPerSecond;
