@@ -18,6 +18,7 @@ struct ClemensProdosHDD32 {
     void *user_context;
     unsigned drive_index;
     unsigned block_limit;
+    unsigned current_block_index;
 
     /**
      * @brief Callback to read a block of data from the host resident drive

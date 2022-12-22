@@ -23,7 +23,8 @@
 #define CLEM_SMARTPORT_UNIT_STATE_PACKET_BAD      0x0002ffff
 #define CLEM_SMARTPORT_UNIT_STATE_EXECUTING       0x00030000
 #define CLEM_SMARTPORT_UNIT_STATE_RESPONSE        0x00040000
-#define CLEM_SMARTPORT_UNIT_STATE_DATA            0x00050000
+#define CLEM_SMARTPORT_UNIT_STATE_PENDING_DATA    0x00050000
+#define CLEM_SMARTPORT_UNIT_STATE_EXPECT_DATA     0x00060000
 #define CLEM_SMARTPORT_UNIT_STATE_COMPLETE        0x000f0000
 #define CLEM_SMARTPORT_UNIT_STATE_ABORT_COMMAND   0x80000000
 
@@ -43,10 +44,14 @@ static inline void _clem_smartport_packet_state(struct ClemensSmartPortUnit *uni
         unit->ack_hi = true;
         break;
     case CLEM_SMARTPORT_UNIT_STATE_EXECUTING:
-        unit->command_id = unit->packet.contents[0];
         unit->ack_hi = false;
         break;
     case CLEM_SMARTPORT_UNIT_STATE_RESPONSE:
+        unit->data_pulse_count = 0;
+        unit->data_bit_count = 0;
+        unit->ack_hi = true;
+        break;
+    case CLEM_SMARTPORT_UNIT_STATE_EXPECT_DATA:
         unit->data_pulse_count = 0;
         unit->data_bit_count = 0;
         unit->ack_hi = true;
@@ -170,13 +175,9 @@ static bool _clem_smartport_packet_encode_data(uint8_t *out, unsigned *out_limit
     tmp = 0;
     for (index = 0; index < (unsigned)odd_cnt; ++index) {
         if (packet_src[index] & 0x80) {
-            tmp |= 1;
+            tmp |= (1 << (6 - index));
         }
-        tmp <<= 1;
     }
-    //  if odd_cnt == 6 (the maximum), bit 0 will be 0 at this point, so
-    //  the shift calculation below should work.
-    tmp <<= (6 - odd_cnt);
     if (odd_cnt > 0) {
         out[out_size++] = 0x80 | tmp;
         while (odd_cnt > 0) {
@@ -209,6 +210,7 @@ static bool _clem_smartport_packet_encode_data(uint8_t *out, unsigned *out_limit
         chksum ^= packet_src[5];
         out[out_size++] = 0x80 | packet_src[6];
         chksum ^= packet_src[6];
+        packet_src += 7;
         --g7_cnt;
     }
 
@@ -247,6 +249,7 @@ static unsigned _clem_smartport_handle_packet(struct ClemensSmartPortUnit *unit,
     //  Parse the decoded packet based on the packet type (For commands, obtain the command type
     //  and parameter count, for example)
     unsigned next_state = unit->packet_state;
+    unsigned u32;
     uint8_t call_status;
 
     if (unit->packet.type == kClemensSmartPortPacketType_Command) {
@@ -256,33 +259,65 @@ static unsigned _clem_smartport_handle_packet(struct ClemensSmartPortUnit *unit,
             unit->unit_id = unit->packet.dest_unit_id;
             unit->ph3_latch_lo = false;
             if (unit->device.do_reset) {
-                (*unit->device.do_reset)(&unit->device, delta_ns);
+                /* This is not a necessary override */
+                call_status = (*unit->device.do_reset)(&unit->device, delta_ns);
+            } else {
+                call_status = CLEM_SMARTPORT_STATUS_CODE_OK;
             }
             //  generate response
-            next_state =
-                _clem_smartport_packet_encode_response(unit, unit->packet.source_unit_id, 0x00);
+            next_state = _clem_smartport_packet_encode_response(unit, unit->packet.source_unit_id,
+                                                                call_status);
             break;
         case CLEM_SMARTPORT_COMMAND_STATUS:
+            CLEM_DEBUG("SmartPort: [%02X] Status", unit->unit_id);
+            if (unit->device.do_status) {
+                call_status = (*unit->device.do_status)(&unit->device, &unit->packet,
+                                                        unit->packet.status, delta_ns);
+            } else {
+                call_status = CLEM_SMARTPORT_STATUS_CODE_BAD_CTL;
+            }
+            unit->packet.type = kClemensSmartPortPacketType_Status;
+            next_state = _clem_smartport_packet_encode_response(unit, unit->packet.source_unit_id,
+                                                                call_status);
             break;
         case CLEM_SMARTPORT_COMMAND_READBLOCK:
             CLEM_DEBUG("SmartPort: [%02X] ReadBlock", unit->unit_id);
-            //(*unit->device.read_block)() break;
-            // if read_block has completed, encode and return response
-            // if read_block is in progress return executing...
+            u32 = ((unsigned)(unit->packet.contents[6]) << 16) |
+                  ((unsigned)(unit->packet.contents[5]) << 8) | unit->packet.contents[4];
             if (unit->device.do_read_block) {
-                call_status = (*unit->device.do_read_block)(&unit->device, &unit->packet,
-                                                            unit->unit_id, delta_ns);
+                call_status =
+                    (*unit->device.do_read_block)(&unit->device, &unit->packet, u32, delta_ns);
             } else {
                 call_status = CLEM_SMARTPORT_STATUS_CODE_OFFLINE;
+            }
+            if (call_status == CLEM_SMARTPORT_STATUS_CODE_OK) {
+                unit->packet.type = kClemensSmartPortPacketType_Data;
+            } else {
+                unit->packet.type = kClemensSmartPortPacketType_Status;
             }
             next_state = _clem_smartport_packet_encode_response(unit, unit->packet.source_unit_id,
                                                                 call_status);
             break;
         case CLEM_SMARTPORT_COMMAND_WRITEBLOCK:
+            /* WriteBlock will expect two Host initiated transactions, and as such
+               we allow the implementation to handle both transactions.  The implementation
+               must assume this and return a response after the data transmission. */
             CLEM_DEBUG("SmartPort: [%02X] WriteBlock", unit->unit_id);
-            next_state = CLEM_SMARTPORT_UNIT_STATE_DATA;
+            u32 = ((unsigned)(unit->packet.contents[6]) << 16) |
+                  ((unsigned)(unit->packet.contents[5]) << 8) | unit->packet.contents[4];
+            if (unit->device.do_write_block) {
+                (*unit->device.do_write_block)(&unit->device, &unit->packet, u32, delta_ns);
+            }
+            next_state = CLEM_SMARTPORT_UNIT_STATE_PENDING_DATA;
             break;
         case CLEM_SMARTPORT_COMMAND_FORMAT:
+            if (unit->device.do_format) {
+                call_status = (*unit->device.do_format)(&unit->device, &unit->packet, delta_ns);
+            } else {
+                call_status = CLEM_SMARTPORT_STATUS_CODE_OK;
+            }
+            next_state = _clem_smartport_packet_encode_response(unit, unit->packet.source_unit_id,
+                                                                call_status);
             break;
         case CLEM_SMARTPORT_COMMAND_CONTROL:
             break;
@@ -291,21 +326,20 @@ static unsigned _clem_smartport_handle_packet(struct ClemensSmartPortUnit *unit,
             next_state = CLEM_SMARTPORT_UNIT_STATE_ABORT_COMMAND;
             break;
         }
-    } else if (unit->packet.type == kClemensSmartPortPacketType_Data) {
+    } else {
         switch (unit->command_id) {
         case CLEM_SMARTPORT_COMMAND_WRITEBLOCK:
             if (unit->device.do_write_block) {
                 call_status = (*unit->device.do_write_block)(&unit->device, &unit->packet,
-                                                             unit->unit_id, delta_ns);
+                                                             0xffffffff, delta_ns);
             } else {
                 call_status = CLEM_SMARTPORT_STATUS_CODE_OFFLINE;
             }
+            unit->packet.type = kClemensSmartPortPacketType_Status;
             next_state = _clem_smartport_packet_encode_response(unit, unit->packet.source_unit_id,
                                                                 call_status);
             break;
         }
-    } else {
-        next_state = CLEM_SMARTPORT_UNIT_STATE_ABORT_COMMAND;
     }
     return next_state;
 }
@@ -320,6 +354,8 @@ static unsigned _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit,
             _clem_smartport_packet_state(unit, _clem_smartport_handle_packet(unit, delta_ns));
         } else if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_COMPLETE) {
             _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_READY);
+        } else if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_PENDING_DATA) {
+            _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_EXPECT_DATA);
         } else if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_PACKET_BAD) {
             //  TODO: we should probably send a response or some type?
             _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_READY);
@@ -343,7 +379,7 @@ static unsigned _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit,
                 unit->data_bit_count++;
                 if (unit->data_bit_count >= 8) {
                     if (unit->data_size < CLEM_SMARTPORT_DATA_BUFFER_LIMIT) {
-                        printf("SmartPort => %02X\n", unit->data_reg);
+                        // printf("SmartPort => %02X\n", unit->data_reg);
                         unit->data[unit->data_size++] = unit->data_reg;
                         unit->packet_state_byte_cnt++;
                     } else {
@@ -368,7 +404,7 @@ static unsigned _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit,
                     return bus_state;
                 } else {
                     unit->data_reg = unit->data[unit->packet_state_byte_cnt++];
-                    printf("SmartPort <= %02X\n", unit->data_reg);
+                    // printf("SmartPort <= %02X\n", unit->data_reg);
                     unit->data_bit_count = 8;
                 }
             }
@@ -391,7 +427,7 @@ static unsigned _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit,
     case CLEM_SMARTPORT_UNIT_STATE_READY:
         _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_PACKET);
         break;
-    case CLEM_SMARTPORT_UNIT_STATE_DATA:
+    case CLEM_SMARTPORT_UNIT_STATE_EXPECT_DATA:
         _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_PACKET);
         break;
     case CLEM_SMARTPORT_UNIT_STATE_PACKET:

@@ -170,7 +170,11 @@ unsigned clemens_out_hex_data_from_memory(char *hex, const uint8_t *memory,
                                           unsigned out_hex_byte_limit, unsigned adr);
 
 /**
- * @brief Writes memory from the machine to the output buffer in raw bytes
+ * @brief Reads memory from the machine and copies to the output buffer in raw bytes
+ *
+ * This copies memory directly from the RAM bank, bypassing bank mapping (i.e)
+ * bank 0 reads the physical bank 0 and ignores settings such as RAMRD on the
+ * //gs.
  *
  * Note, adr is almost always 0 unless copying a portial bank.   In that case
  * if adr + out_byte_cnt > 64K, this API will copy the data into the out buffer

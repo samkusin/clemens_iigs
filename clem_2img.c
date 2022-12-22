@@ -319,7 +319,7 @@ bool clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uint8_t
         _encode_u32(&image_cur, 0);
     }
     _encode_u32(&image_cur, CLEM_2IMG_HEADER_BYTE_SIZE);
-    _encode_mem(&image_cur, disk->data, source_size, overlapped);
+    _encode_u32(&image_cur, source_size);
     if (creator_size > 0) {
         _encode_u32(&image_cur, CLEM_2IMG_HEADER_BYTE_SIZE + source_size);
         _encode_u32(&image_cur, (uint32_t)(creator_size));
@@ -351,7 +351,7 @@ bool clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uint8_t
 
 bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, uint8_t *image,
                                uint8_t *image_end, uint32_t image_data_offset) {
-    uint32_t disk_size = (uint32_t)(image_end - image);
+    uint32_t disk_size = (uint32_t)(image_end - image) - image_data_offset;
 
     strncpy(disk->creator, "CLEM", sizeof(disk->creator));
 
@@ -370,15 +370,15 @@ bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, ui
 
     /* TODO: support creator data and comments */
     disk->image_buffer = image;
-    disk->image_buffer_length = disk_size;
+    disk->image_buffer_length = (uint32_t)(image_end - image);
     disk->image_data_offset = image_data_offset;
 
     disk->data = disk->image_buffer + disk->image_data_offset;
     disk->data_end = disk->data + disk_size;
 
-    disk->creator_data = (char *)image + disk_size;
+    disk->creator_data = (char *)disk->data_end;
     disk->creator_data_end = disk->creator_data;
-    disk->comment = (char *)image + disk_size;
+    disk->comment = disk->creator_data_end;
     disk->comment_end = disk->comment;
 
     disk->version = 0x0001;

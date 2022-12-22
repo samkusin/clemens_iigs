@@ -136,7 +136,8 @@ void clemens_remove_smartport_disk(ClemensMMIO *mmio, unsigned drive_index,
         return;
     memcpy(device, &mmio->active_drives.smartport[drive_index].device,
            sizeof(struct ClemensSmartPortDevice));
-    memset(device, 0, sizeof(struct ClemensSmartPortDevice));
+    memset(&mmio->active_drives.smartport[drive_index].device, 0,
+           sizeof(struct ClemensSmartPortDevice));
     mmio->active_drives.smartport[drive_index].unit_id = 0;
 }
 

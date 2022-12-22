@@ -34,6 +34,7 @@
 #define CLEM_SMARTPORT_STATUS_CODE_OK            0x00
 #define CLEM_SMARTPORT_STATUS_CODE_BAD_CMD       0x01
 #define CLEM_SMARTPORT_STATUS_CODE_BUS_ERR       0x06
+#define CLEM_SMARTPORT_STATUS_CODE_BAD_CTL       0x21
 #define CLEM_SMARTPORT_STATUS_CODE_IO_ERR        0x27
 #define CLEM_SMARTPORT_STATUS_CODE_INVALID_BLOCK 0x2D
 #define CLEM_SMARTPORT_STATUS_CODE_OFFLINE       0x2f
@@ -79,12 +80,18 @@ struct ClemensSmartPortDevice {
     uint8_t (*do_reset)(struct ClemensSmartPortDevice *context, unsigned delta_ns);
     /** Read a block from the device and store into packet when response state is returned*/
     uint8_t (*do_read_block)(struct ClemensSmartPortDevice *context,
-                             struct ClemensSmartPortPacket *packet, uint8_t unit_id,
+                             struct ClemensSmartPortPacket *packet, unsigned block_index,
                              unsigned delta_ns);
     /** Write a block to the device and store into packet when response state is returned */
     uint8_t (*do_write_block)(struct ClemensSmartPortDevice *context,
-                              struct ClemensSmartPortPacket *packet, uint8_t unit_id,
+                              struct ClemensSmartPortPacket *packet, unsigned block_index,
                               unsigned delta_ns);
+    /** Retrieve a status block from the device */
+    uint8_t (*do_status)(struct ClemensSmartPortDevice *context,
+                         struct ClemensSmartPortPacket *packet, uint8_t status, unsigned delta_ns);
+    /** Retrieve a status block from the device */
+    uint8_t (*do_format)(struct ClemensSmartPortDevice *context,
+                         struct ClemensSmartPortPacket *packet, unsigned delta_ns);
 };
 
 /**
