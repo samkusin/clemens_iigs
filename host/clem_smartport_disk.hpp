@@ -14,7 +14,10 @@ class ClemensSmartPortDisk {
 
     ClemensSmartPortDisk();
     ClemensSmartPortDisk(std::vector<uint8_t> data);
+    ClemensSmartPortDisk(ClemensSmartPortDisk &&other);
     ~ClemensSmartPortDisk();
+
+    ClemensSmartPortDisk &operator=(ClemensSmartPortDisk &&other);
 
     void write(unsigned block_index, const uint8_t *data);
     void read(unsigned block_index, uint8_t *data);

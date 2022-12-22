@@ -332,6 +332,7 @@ bool ClemensBackend::programTrace(const std::string_view &inputParam) {
     }
     auto path = param;
     if (programTrace_ == nullptr && op == "on") {
+        nextTraceSeq_ = 0;
         programTrace_ = std::make_unique<ClemensProgramTrace>();
         programTrace_->enableToolboxLogging(true);
         fmt::print("Program trace enabled\n");
@@ -549,6 +550,7 @@ void ClemensBackend::loadSmartPortDisk(unsigned driveIndex) {
     if (input.is_open()) {
         auto sz = input.seekg(0, std::ios_base::end).tellg();
         std::vector<uint8_t> buffer(sz);
+        input.seekg(0);
         input.read((char *)buffer.data(), sz);
         smartPortDisks_[driveIndex] = ClemensSmartPortDisk(std::move(buffer));
     } else {
@@ -556,15 +558,20 @@ void ClemensBackend::loadSmartPortDisk(unsigned driveIndex) {
             ClemensSmartPortDisk(std::move(ClemensSmartPortDisk::createData(8192)));
     }
     ClemensSmartPortDevice device;
-    smartPortDisks_[driveIndex].createSmartPortDevice(&device);
     clemens_assign_smartport_disk(&mmio_, driveIndex,
                                   smartPortDisks_[driveIndex].createSmartPortDevice(&device));
 }
 
 bool ClemensBackend::saveSmartPortDisk(unsigned driveIndex) {
-
-    // save from our HDD slot
-    return false;
+    auto &drive = smartPortDrives_[driveIndex];
+    auto &disk = smartPortDisks_[driveIndex].getDisk();
+    std::ofstream out(drive.imagePath, std::ios_base::out | std::ios_base::binary);
+    if (out.fail())
+        return false;
+    out.write((char *)disk.image_buffer, disk.image_buffer_length);
+    if (out.fail() || out.bad())
+        return false;
+    return true;
 }
 
 static const char *sInputKeys[] = {"",      "keyD", "keyU",   "mouseD", "mouseU",
@@ -1229,7 +1236,8 @@ void ClemensBackend::emulatorOpcodeCallback(struct ClemensInstruction *inst, con
                                             void *this_ptr) {
     auto *host = reinterpret_cast<ClemensBackend *>(this_ptr);
     if (host->programTrace_) {
-        host->programTrace_->addExecutedInstruction(*inst, operand, host->machine_);
+        host->programTrace_->addExecutedInstruction(host->nextTraceSeq_++, *inst, operand,
+                                                    host->machine_);
     }
     if (!host->areInstructionsLogged_)
         return;

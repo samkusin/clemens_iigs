@@ -153,6 +153,7 @@ class ClemensBackend {
     std::array<ClemensBackendDiskDriveState, 1> smartPortDrives_;
     std::array<ClemensSmartPortDisk, 1> smartPortDisks_;
 
+    uint64_t nextTraceSeq_;
     std::unique_ptr<ClemensProgramTrace> programTrace_;
 
     int logLevel_;

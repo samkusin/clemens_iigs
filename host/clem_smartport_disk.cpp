@@ -18,6 +18,17 @@ std::vector<uint8_t> ClemensSmartPortDisk::createData(unsigned block_count) {
 
 ClemensSmartPortDisk::ClemensSmartPortDisk() : disk_{} {}
 
+ClemensSmartPortDisk::ClemensSmartPortDisk(ClemensSmartPortDisk &&other)
+    : image_(std::move(other.image_)) {
+    clem_2img_parse_header(&disk_, image_.data(), image_.data() + image_.size());
+}
+
+ClemensSmartPortDisk &ClemensSmartPortDisk::operator=(ClemensSmartPortDisk &&other) {
+    image_ = std::move(other.image_);
+    clem_2img_parse_header(&disk_, image_.data(), image_.data() + image_.size());
+    return *this;
+}
+
 ClemensSmartPortDisk::ClemensSmartPortDisk(std::vector<uint8_t> data)
     : disk_{}, image_(std::move(data)) {
 
@@ -46,12 +57,22 @@ void ClemensSmartPortDisk::read(unsigned block_index, uint8_t *data) {
 
 uint8_t ClemensSmartPortDisk::doReadBlock(void *userContext, unsigned driveIndex,
                                           unsigned blockIndex, uint8_t *buffer) {
-    return CLEM_SMARTPORT_STATUS_CODE_OFFLINE;
+    auto *self = reinterpret_cast<ClemensSmartPortDisk *>(userContext);
+    const uint8_t *data_head = self->disk_.data;
+    if (blockIndex >= self->disk_.block_count)
+        return CLEM_SMARTPORT_STATUS_CODE_INVALID_BLOCK;
+    memcpy(buffer, data_head + blockIndex * 512, 512);
+    return CLEM_SMARTPORT_STATUS_CODE_OK;
 }
 
 uint8_t ClemensSmartPortDisk::doWriteBlock(void *userContext, unsigned driveIndex,
                                            unsigned blockIndex, const uint8_t *buffer) {
-    return CLEM_SMARTPORT_STATUS_CODE_OFFLINE;
+    auto *self = reinterpret_cast<ClemensSmartPortDisk *>(userContext);
+    uint8_t *data_head = self->disk_.data;
+    if (blockIndex >= self->disk_.block_count)
+        return CLEM_SMARTPORT_STATUS_CODE_INVALID_BLOCK;
+    memcpy(data_head + blockIndex * 512, buffer, 512);
+    return CLEM_SMARTPORT_STATUS_CODE_OK;
 }
 
 uint8_t ClemensSmartPortDisk::doFlush(void *userCcontext, unsigned driveIndex) {
