@@ -271,8 +271,7 @@ static unsigned _clem_smartport_handle_packet(struct ClemensSmartPortUnit *unit,
         case CLEM_SMARTPORT_COMMAND_STATUS:
             CLEM_DEBUG("SmartPort: [%02X] Status", unit->unit_id);
             if (unit->device.do_status) {
-                call_status = (*unit->device.do_status)(&unit->device, &unit->packet,
-                                                        unit->packet.status, delta_ns);
+                call_status = (*unit->device.do_status)(&unit->device, &unit->packet, delta_ns);
             } else {
                 call_status = CLEM_SMARTPORT_STATUS_CODE_BAD_CTL;
             }

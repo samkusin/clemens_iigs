@@ -590,7 +590,10 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
     thisFrameAudioBuffer_ = cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
 
     config_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
-    config_.smartPortDriveStates[0].imagePath = "test.2mg";
+    // TODO: This should be selectable like regular drives - this will require some
+    //       UI to make it happen
+    config_.smartPortDriveStates[0].imagePath =
+        (std::filesystem::path(diskLibraryRootPath_) / "smartport.2mg").string();
     backend_ = createBackend();
 
     debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;

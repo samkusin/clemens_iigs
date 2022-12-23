@@ -44,11 +44,11 @@ static uint8_t _do_write_block(struct ClemensSmartPortDevice *context,
 }
 
 static uint8_t _do_status(struct ClemensSmartPortDevice *context,
-                          struct ClemensSmartPortPacket *packet, uint8_t status,
-                          unsigned delta_ns) {
+                          struct ClemensSmartPortPacket *packet, unsigned delta_ns) {
     struct ClemensProdosHDD32 *hdd = (struct ClemensProdosHDD32 *)context->device_data;
     uint16_t clen = 0;
     uint8_t result = CLEM_SMARTPORT_STATUS_CODE_OK;
+    uint8_t status = packet->contents[4];
 
     switch (status) {
     case 0x00:                           /* 4 byte device status */
