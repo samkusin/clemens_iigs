@@ -1594,11 +1594,11 @@ void _clem_mmio_init_page_maps(ClemensMMIO *mmio, uint32_t memory_flags) {
     mmio->bank_page_map[0x00] = &mmio->fpi_main_page_map;
     mmio->bank_page_map[0x01] = &mmio->fpi_aux_page_map;
 
-    for (bank_idx = 0x02; bank_idx < CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT; ++bank_idx) {
+    for (bank_idx = 0x02; bank_idx < mmio->fpi_ram_bank_count; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->fpi_direct_page_map;
     }
     /* TODO: handle expansion RAM */
-    for (bank_idx = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT; bank_idx < 0x80; ++bank_idx) {
+    for (bank_idx = mmio->fpi_ram_bank_count; bank_idx < 0x80; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->empty_page_map;
     }
     /* Handles unavailable banks beyond the 0x80 bank IIgs hard RAM limit */
@@ -1644,7 +1644,8 @@ void clem_mmio_restore(ClemensMMIO *mmio) {
 
 void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
                     struct ClemensMemoryPageMap **bank_page_map,
-                    clem_clocks_duration_t mega2_clocks_step, void *slot_expansion_rom) {
+                    clem_clocks_duration_t mega2_clocks_step, void *slot_expansion_rom,
+                    unsigned int fpi_ram_bank_count) {
     int idx;
     //  Memory map starts out without shadowing, but our call to
     //  init_page_maps will initialize the memory map on IIgs reset
@@ -1660,6 +1661,7 @@ void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
     mmio->last_data_address = 0xffffffff;
     mmio->bank_page_map = bank_page_map;
     mmio->emulator_detect = CLEM_MMIO_EMULATOR_DETECT_IDLE;
+    mmio->fpi_ram_bank_count = fpi_ram_bank_count;
     mmio->card_expansion_rom_index = -1;
 
     for (idx = 0; idx < 7; ++idx) {

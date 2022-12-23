@@ -1170,7 +1170,7 @@ cinek::ByteBuffer ClemensBackend::loadROM(const char *romPathname) {
 }
 
 void ClemensBackend::initApple2GS() {
-    const unsigned kFPIBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT;
+    const unsigned kFPIBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_LIMIT;
     const uint32_t kClocksPerFastCycle = CLEM_CLOCKS_FAST_CYCLE;
     const uint32_t kClocksPerSlowCycle = CLEM_CLOCKS_MEGA2_CYCLE;
     int result =
@@ -1179,7 +1179,7 @@ void ClemensBackend::initApple2GS() {
                      slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
                      slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount), kFPIBankCount);
     clem_mmio_init(&mmio_, &machine_.dev_debug, machine_.mem.bank_page_map,
-                   machine_.tspec.clocks_step_mega2, slabMemory_.allocate(2048 * 7));
+                   machine_.tspec.clocks_step_mega2, slabMemory_.allocate(2048 * 7), kFPIBankCount);
     if (result < 0) {
         fmt::print("Clemens library failed to initialize with err code (%d)\n", result);
         return;
