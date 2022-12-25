@@ -306,6 +306,7 @@ bool load(std::string outputPath, ClemensMachine *machine, ClemensMMIO *mmio, si
     mpack_expect_cstr_match(&reader, "disks");
     {
         unsigned count = mpack_expect_array(&reader);
+        count = std::min(count, (unsigned)driveCount);
         for (size_t driveIndex = 0; driveIndex < count; ++driveIndex) {
             if (!loadDiskMetadata(&reader, containers[driveIndex], driveStates[driveIndex])) {
                 fmt::print(
@@ -322,6 +323,7 @@ bool load(std::string outputPath, ClemensMachine *machine, ClemensMMIO *mmio, si
     mpack_expect_cstr_match(&reader, "smartport");
     {
         unsigned count = mpack_expect_array(&reader);
+        count = std::min(count, (unsigned)smartPortCount);
         for (size_t driveIndex = 0; driveIndex < count; ++driveIndex) {
             if (!loadSmartPortMetadata(&reader, &mmio->active_drives.smartport[driveIndex].device,
                                        smartPortDisks[driveIndex], smartPortStates[driveIndex],

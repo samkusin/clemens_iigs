@@ -57,7 +57,7 @@ void ClemensSmartPortDisk::read(unsigned block_index, uint8_t *data) {
     memcpy(data, disk_.data + block_index * 512, 512);
 }
 
-uint8_t ClemensSmartPortDisk::doReadBlock(void *userContext, unsigned driveIndex,
+uint8_t ClemensSmartPortDisk::doReadBlock(void *userContext, unsigned /*driveIndex */,
                                           unsigned blockIndex, uint8_t *buffer) {
     auto *self = reinterpret_cast<ClemensSmartPortDisk *>(userContext);
     const uint8_t *data_head = self->disk_.data;
@@ -67,7 +67,7 @@ uint8_t ClemensSmartPortDisk::doReadBlock(void *userContext, unsigned driveIndex
     return CLEM_SMARTPORT_STATUS_CODE_OK;
 }
 
-uint8_t ClemensSmartPortDisk::doWriteBlock(void *userContext, unsigned driveIndex,
+uint8_t ClemensSmartPortDisk::doWriteBlock(void *userContext, unsigned /*driveIndex*/,
                                            unsigned blockIndex, const uint8_t *buffer) {
     auto *self = reinterpret_cast<ClemensSmartPortDisk *>(userContext);
     uint8_t *data_head = self->disk_.data;
@@ -77,7 +77,7 @@ uint8_t ClemensSmartPortDisk::doWriteBlock(void *userContext, unsigned driveInde
     return CLEM_SMARTPORT_STATUS_CODE_OK;
 }
 
-uint8_t ClemensSmartPortDisk::doFlush(void *userCcontext, unsigned driveIndex) {
+uint8_t ClemensSmartPortDisk::doFlush(void * /*userContext*/, unsigned /*driveIndex*/) {
     return CLEM_SMARTPORT_STATUS_CODE_OFFLINE;
 }
 

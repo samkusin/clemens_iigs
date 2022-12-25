@@ -2,6 +2,7 @@
 #define CLEM_TYPES_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "clem_defs.h"
