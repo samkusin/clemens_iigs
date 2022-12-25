@@ -117,6 +117,30 @@ bool clemens_eject_disk_async(ClemensMMIO *mmio, enum ClemensDriveType drive_typ
     return true;
 }
 
+bool clemens_assign_smartport_disk(ClemensMMIO *mmio, unsigned drive_index,
+                                   struct ClemensSmartPortDevice *device) {
+    if (drive_index >= CLEM_SMARTPORT_DRIVE_LIMIT)
+        return false;
+    memcpy(&mmio->active_drives.smartport[drive_index].device, device,
+           sizeof(struct ClemensSmartPortDevice));
+    return true;
+}
+
+void clemens_remove_smartport_disk(ClemensMMIO *mmio, unsigned drive_index,
+                                   struct ClemensSmartPortDevice *device) {
+    if (drive_index >= CLEM_SMARTPORT_DRIVE_LIMIT)
+        return;
+
+    if (mmio->active_drives.smartport[drive_index].device.device_id ==
+        CLEM_SMARTPORT_DEVICE_ID_NONE)
+        return;
+    memcpy(device, &mmio->active_drives.smartport[drive_index].device,
+           sizeof(struct ClemensSmartPortDevice));
+    memset(&mmio->active_drives.smartport[drive_index].device, 0,
+           sizeof(struct ClemensSmartPortDevice));
+    mmio->active_drives.smartport[drive_index].unit_id = 0;
+}
+
 ClemensMonitor *clemens_get_monitor(ClemensMonitor *monitor, ClemensMMIO *mmio) {
     struct ClemensVGC *vgc = &mmio->vgc;
 

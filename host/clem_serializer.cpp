@@ -1,15 +1,33 @@
 #include "clem_serializer.hpp"
 #include "clem_disk_utils.hpp"
 #include "clem_host_utils.hpp"
+#include "clem_smartport_disk.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 #include "serializer.h"
+#include "smartport/prodos_hdd32.h"
 
 #include "fmt/format.h"
 
 #include "iocards/mockingboard.h"
 
 namespace ClemensSerializer {
+
+void saveBackendDiskDriveState(mpack_writer_t *writer, const ClemensBackendDiskDriveState &state) {
+    mpack_write_cstr(writer, "image");
+    mpack_write_cstr(writer, state.imagePath.c_str());
+    mpack_write_cstr(writer, "ejecting");
+    mpack_write_bool(writer, state.isEjecting);
+}
+
+void loadBackendDiskDriveState(mpack_reader_t *reader, ClemensBackendDiskDriveState &state) {
+    char value[1024];
+    mpack_expect_cstr_match(reader, "image");
+    mpack_expect_cstr(reader, value, sizeof(value));
+    state.imagePath = value;
+    mpack_expect_cstr_match(reader, "ejecting");
+    state.isEjecting = mpack_expect_bool(reader);
+}
 
 void saveDiskMetadata(mpack_writer_t *writer, const ClemensWOZDisk &container,
                       const ClemensBackendDiskDriveState &state) {
@@ -20,10 +38,7 @@ void saveDiskMetadata(mpack_writer_t *writer, const ClemensWOZDisk &container,
 
     mpack_build_map(writer);
 
-    mpack_write_cstr(writer, "image");
-    mpack_write_cstr(writer, state.imagePath.c_str());
-    mpack_write_cstr(writer, "ejecting");
-    mpack_write_bool(writer, state.isEjecting);
+    saveBackendDiskDriveState(writer, state);
 
     //  we only need to serialize the WOZ INFO header since the TMAP and TRKS
     //  chunks are defined in the nibblized disk
@@ -49,13 +64,9 @@ bool loadDiskMetadata(mpack_reader_t *reader, ClemensWOZDisk &container,
     //  unserialize the WOZ header
     //  the nibbilized disk is unserialized into the machine object and is not
     //    handled here
-    char value[256];
     mpack_expect_map(reader);
-    mpack_expect_cstr_match(reader, "image");
-    mpack_expect_cstr(reader, value, sizeof(value));
-    state.imagePath = value;
-    mpack_expect_cstr_match(reader, "ejecting");
-    state.isEjecting = mpack_expect_bool(reader);
+
+    loadBackendDiskDriveState(reader, state);
 
     //  we only need to serialize the WOZ INFO header since the TMAP and TRKS
     //  chunks are defined in the nibblized disk
@@ -76,8 +87,38 @@ bool loadDiskMetadata(mpack_reader_t *reader, ClemensWOZDisk &container,
     return true;
 }
 
+void saveSmartPortMetadata(mpack_writer_t *writer, ClemensSmartPortDevice *device,
+                           const ClemensSmartPortDisk &disk,
+                           const ClemensBackendDiskDriveState &state) {
+    mpack_build_map(writer);
+
+    saveBackendDiskDriveState(writer, state);
+
+    mpack_write_cstr(writer, "disk");
+    disk.serialize(writer, device);
+
+    mpack_complete_map(writer);
+}
+
+bool loadSmartPortMetadata(mpack_reader_t *reader, ClemensSmartPortDevice *device,
+                           ClemensSmartPortDisk &disk, ClemensBackendDiskDriveState &state,
+                           ClemensSerializerAllocateCb alloc_cb, void *context) {
+    mpack_expect_map(reader);
+
+    loadBackendDiskDriveState(reader, state);
+
+    mpack_expect_cstr_match(reader, "disk");
+    disk.unserialize(reader, device, alloc_cb, context);
+
+    mpack_done_map(reader);
+
+    return true;
+}
+
 bool save(std::string outputPath, ClemensMachine *machine, ClemensMMIO *mmio, size_t driveCount,
-          const ClemensWOZDisk *containers, const ClemensBackendDiskDriveState *states,
+          const ClemensWOZDisk *containers, const ClemensBackendDiskDriveState *driveStates,
+          size_t smartPortCount, const ClemensSmartPortDisk *smartPortDisks,
+          const ClemensBackendDiskDriveState *smartPortStates,
           const std::vector<ClemensBackendBreakpoint> &breakpoints) {
     mpack_writer_t writer;
     //  this save buffer is probably, unnecessarily big - but it's just used for
@@ -139,9 +180,18 @@ bool save(std::string outputPath, ClemensMachine *machine, ClemensMMIO *mmio, si
     }
     mpack_write_cstr(&writer, "disks");
     {
-        mpack_start_array(&writer, kClemensDrive_Count);
+        mpack_start_array(&writer, driveCount);
         for (size_t driveIndex = 0; driveIndex < driveCount; ++driveIndex) {
-            saveDiskMetadata(&writer, containers[driveIndex], states[driveIndex]);
+            saveDiskMetadata(&writer, containers[driveIndex], driveStates[driveIndex]);
+        }
+        mpack_finish_array(&writer);
+    }
+    mpack_write_cstr(&writer, "smartport");
+    {
+        mpack_start_array(&writer, smartPortCount);
+        for (size_t driveIndex = 0; driveIndex < smartPortCount; ++driveIndex) {
+            saveSmartPortMetadata(&writer, &mmio->active_drives.smartport[driveIndex].device,
+                                  smartPortDisks[driveIndex], smartPortStates[driveIndex]);
         }
         mpack_finish_array(&writer);
     }
@@ -167,7 +217,9 @@ bool save(std::string outputPath, ClemensMachine *machine, ClemensMMIO *mmio, si
 }
 
 bool load(std::string outputPath, ClemensMachine *machine, ClemensMMIO *mmio, size_t driveCount,
-          ClemensWOZDisk *containers, ClemensBackendDiskDriveState *states,
+          ClemensWOZDisk *containers, ClemensBackendDiskDriveState *driveStates,
+          size_t smartPortCount, ClemensSmartPortDisk *smartPortDisks,
+          ClemensBackendDiskDriveState *smartPortStates,
           std::vector<ClemensBackendBreakpoint> &breakpoints, ClemensSerializerAllocateCb alloc_cb,
           void *context) {
     char str[256];
@@ -253,14 +305,34 @@ bool load(std::string outputPath, ClemensMachine *machine, ClemensMMIO *mmio, si
     //  unserialized inside clemens_unserialize_machine
     mpack_expect_cstr_match(&reader, "disks");
     {
-        mpack_expect_array(&reader);
-        for (size_t driveIndex = 0; driveIndex < driveCount; ++driveIndex) {
-            if (!loadDiskMetadata(&reader, containers[driveIndex], states[driveIndex])) {
+        unsigned count = mpack_expect_array(&reader);
+        count = std::min(count, (unsigned)driveCount);
+        for (size_t driveIndex = 0; driveIndex < count; ++driveIndex) {
+            if (!loadDiskMetadata(&reader, containers[driveIndex], driveStates[driveIndex])) {
                 fmt::print(
                     "Loading emulator snapshot failed due to disk image '{}' at drive '{}'.",
-                    states[driveIndex].imagePath.empty() ? "none defined"
-                                                         : states[driveIndex].imagePath,
+                    driveStates[driveIndex].imagePath.empty() ? "none defined"
+                                                              : driveStates[driveIndex].imagePath,
                     ClemensDiskUtilities::getDriveName(static_cast<ClemensDriveType>(driveIndex)));
+                return false;
+            }
+        }
+        mpack_done_array(&reader);
+    }
+
+    mpack_expect_cstr_match(&reader, "smartport");
+    {
+        unsigned count = mpack_expect_array(&reader);
+        count = std::min(count, (unsigned)smartPortCount);
+        for (size_t driveIndex = 0; driveIndex < count; ++driveIndex) {
+            if (!loadSmartPortMetadata(&reader, &mmio->active_drives.smartport[driveIndex].device,
+                                       smartPortDisks[driveIndex], smartPortStates[driveIndex],
+                                       alloc_cb, context)) {
+                fmt::print(
+                    "Loading emulator snapshot failed due to SmartPort image '{}' at drive '{}'.",
+                    driveStates[driveIndex].imagePath.empty() ? "none defined"
+                                                              : driveStates[driveIndex].imagePath,
+                    driveIndex);
                 return false;
             }
         }

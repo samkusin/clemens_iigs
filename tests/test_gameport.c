@@ -5,6 +5,7 @@
 #include "clem_mmio_defs.h"
 
 #include <stdio.h>
+#include <string.h>
 
 //  This test just checks the 'ADB' component for gameport functionality (i.e.
 //  not the CPU side)

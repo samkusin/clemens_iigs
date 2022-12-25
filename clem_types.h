@@ -2,10 +2,12 @@
 #define CLEM_TYPES_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "clem_defs.h"
 #include "clem_disk.h"
+#include "clem_smartport.h"
 
 typedef struct ClemensMachine ClemensMachine;
 typedef void (*LoggerFn)(int level, ClemensMachine *machine, const char *msg);
@@ -324,7 +326,7 @@ struct ClemensDeviceIWM {
     /** Drive I/O */
     unsigned io_flags;  /**< Disk port I/O flags */
     unsigned out_phase; /**< PH0-PH3 bits sent to drive */
-    bool enable2;       /**< ENABLE2 line */
+    bool enable2;       /**< Disk II disabled (enable2 high) */
 
     /** Internal Registers */
     uint8_t data;          /**< IO switch data (D0-D7) */
@@ -393,6 +395,7 @@ struct ClemensDrive {
 struct ClemensDriveBay {
     struct ClemensDrive slot5[2];
     struct ClemensDrive slot6[2];
+    struct ClemensSmartPortUnit smartport[CLEM_SMARTPORT_DRIVE_LIMIT];
 };
 
 /**
@@ -452,6 +455,7 @@ typedef struct ClemensMMIO {
     uint32_t emulator_detect;   // used for the c04f emulator test (state)
     uint8_t new_video_c029;     // see kClemensMMIONewVideo_xxx
     uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
+    uint8_t fpi_ram_bank_count; // the number of RAM banks available to the memory mapper
 
     clem_clocks_duration_t clocks_step_mega2;
     uint64_t mega2_cycles;            // number of mega2 pulses/ticks since startup

@@ -267,6 +267,20 @@ void clem_iwm_debug_stop(struct ClemensDeviceIWM *iwm);
 /**
  * @brief
  *
+ * @param unit
+ * @param unit_count
+ * @param io_flags
+ * @param out_phase
+ * @param delta_ns
+ * @return true
+ * @return false
+ */
+bool clem_smartport_bus(struct ClemensSmartPortUnit *unit, unsigned unit_count, unsigned *io_flags,
+                        unsigned *out_phase, unsigned delta_ns);
+
+/**
+ * @brief
+ *
  * @param scc
  */
 void clem_scc_reset(struct ClemensDeviceSCC *scc);

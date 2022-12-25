@@ -22,6 +22,7 @@ add_library(clemens_65816_mmio STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_mmio.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_rtc.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_scc.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_smartport.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_timer.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_vgc.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_woz.c"
@@ -74,4 +75,5 @@ target_include_directories(clemens_mpack_format
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
 add_subdirectory(iocards)
+add_subdirectory(smartport)
 add_subdirectory(host)

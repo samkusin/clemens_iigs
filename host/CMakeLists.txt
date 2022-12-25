@@ -49,6 +49,7 @@ add_executable(clemens_iigs
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_import_disk.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_program_trace.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_serializer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_smartport_disk.cpp"
     ${FMT_SOURCES}
     ${SOKOL_SOURCES}
     ${IMGUI_SOURCES})
@@ -62,6 +63,7 @@ target_link_libraries(clemens_iigs
         clemens_65816_render
         clemens_65816_serializer
         clemens_65816_iocards
+        clemens_65816_smartport_devices
         imgui)
 
 target_compile_features( clemens_iigs PRIVATE cxx_std_17 )

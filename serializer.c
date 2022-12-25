@@ -226,11 +226,50 @@ struct ClemensSerializerRecord kDrive[] = {
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, random_bit_index),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
+struct ClemensSerializerRecord kSmartPortPacket[] = {
+    CLEM_SERIALIZER_RECORD_INT32(struct ClemensSmartPortPacket, type),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortPacket, source_unit_id),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortPacket, dest_unit_id),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortPacket, is_extended),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortPacket, status),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortPacket, contents_length),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensSmartPortPacket, kClemensSerializerTypeUInt8, contents,
+                                CLEM_SMARTPORT_CONTENTS_LIMIT, 0),
+    CLEM_SERIALIZER_RECORD_EMPTY()};
+
+struct ClemensSerializerRecord kSmartPortDevice[] = {
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortDevice, device_id),
+    CLEM_SERIALIZER_RECORD_EMPTY()};
+
+struct ClemensSerializerRecord kSmartPort[] = {
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensSmartPortUnit, device,
+                                  struct ClemensSmartPortDevice, kSmartPortDevice),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, bus_enabled),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, ph3_latch_lo),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, data_reg),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, write_signal),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, unit_id),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, ack_hi),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, command_id),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, data_pulse_count),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, data_bit_count),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, packet_state),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, packet_state_byte_cnt),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, packet_cntr),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, data_size),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensSmartPortUnit, kClemensSerializerTypeUInt8, data, 
+                                CLEM_SMARTPORT_DATA_BUFFER_LIMIT, 0),
+    CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensSmartPortUnit, packet,
+                                  struct ClemensSmartPortPacket, kSmartPortPacket),
+    CLEM_SERIALIZER_RECORD_EMPTY()};
+
 struct ClemensSerializerRecord kDriveBay[] = {
     CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(struct ClemensDriveBay, slot5, 2, struct ClemensDrive,
                                          kDrive),
     CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(struct ClemensDriveBay, slot6, 2, struct ClemensDrive,
                                          kDrive),
+    CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(struct ClemensDriveBay, smartport, 1, struct ClemensDrive,
+                                         kSmartPort),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 struct ClemensSerializerRecord kMMIO[] = {
@@ -478,6 +517,7 @@ static unsigned clemens_serialize_custom(mpack_writer_t *writer, void *ptr, unsi
     struct ClemensAudioMixBuffer *audio_mix_buffer;
     struct ClemensNibbleDisk *nib_disk;
     struct ClemensClock *clock;
+    struct ClemensSmartPortDevice *smartport_device;
 
     unsigned blob_size;
 

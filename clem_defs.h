@@ -107,7 +107,7 @@
 #define CLEM_IIGS_BANK_SIZE               (64 * 1024)
 #define CLEM_IIGS_ROM3_SIZE               (CLEM_IIGS_BANK_SIZE * 4)
 #define CLEM_IIGS_EXPANSION_ROM_SIZE      2048
-#define CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT 16
+#define CLEM_IIGS_FPI_MAIN_RAM_BANK_LIMIT 64
 #define CLEM_IIGS_EMPTY_RAM_BANK          0x81
 
 /** Vector addresses */
@@ -149,8 +149,8 @@
 #define CLEM_IRQ_SLOT_5         (0x01000000)
 #define CLEM_IRQ_SLOT_6         (0x02000000)
 #define CLEM_IRQ_SLOT_7         (0x04000000)
-//#define CLEM_CARD_NMI (0x40000000)
-//#define CLEM_CARD_IRQ (0x80000000)
+// #define CLEM_CARD_NMI (0x40000000)
+// #define CLEM_CARD_IRQ (0x80000000)
 
 /** NMI line masks for card slot triggers */
 #define CLEM_NMI_CARD_MASK (0x000000ff)

@@ -80,6 +80,10 @@ struct ClemensClock {
 #define clem_calc_clocks_step_from_ns(_ns_, _clocks_step_reference_)                               \
     ((clem_clocks_duration_t)((_ns_) * (_clocks_step_reference_)) / CLEM_MEGA2_CYCLE_NS)
 
+/**
+ * @brief Defines the abstract interface to slot-based card hardware
+ *
+ */
 typedef struct {
     void *context;
     void (*io_reset)(struct ClemensClock *clock, void *context);

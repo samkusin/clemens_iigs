@@ -137,6 +137,7 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config &config,
 
     diskContainers_.fill(ClemensWOZDisk{});
     diskDrives_.fill(ClemensBackendDiskDriveState{});
+    smartPortDrives_.fill(ClemensBackendDiskDriveState{});
 
     loggedInstructions_.reserve(10000);
 
@@ -176,6 +177,14 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config &config,
             fmt::print("Loaded image '{}' into drive {}\n", diskDrives_[driveIndex].imagePath,
                        ClemensDiskUtilities::getDriveName(driveType));
         }
+    }
+
+    for (size_t driveIndex = 0; driveIndex < smartPortDrives_.size(); ++driveIndex) {
+        if (smartPortDrives_[driveIndex].imagePath.empty())
+            continue;
+        loadSmartPortDisk(driveIndex);
+        fmt::print("Loaded SmartPort image '{}' into drive {}\n",
+                   smartPortDrives_[driveIndex].imagePath, driveIndex);
     }
 
     //  Everything is ready for the main thread
@@ -323,6 +332,7 @@ bool ClemensBackend::programTrace(const std::string_view &inputParam) {
     }
     auto path = param;
     if (programTrace_ == nullptr && op == "on") {
+        nextTraceSeq_ = 0;
         programTrace_ = std::make_unique<ClemensProgramTrace>();
         programTrace_->enableToolboxLogging(true);
         fmt::print("Program trace enabled\n");
@@ -363,7 +373,9 @@ void ClemensBackend::saveMachine(std::string path) {
 bool ClemensBackend::saveSnapshot(const std::string_view &inputParam) {
     auto outputPath = std::filesystem::path(CLEM_HOST_SNAPSHOT_DIR) / inputParam;
     return ClemensSerializer::save(outputPath.string(), &machine_, &mmio_, diskContainers_.size(),
-                                   diskContainers_.data(), diskDrives_.data(), breakpoints_);
+                                   diskContainers_.data(), diskDrives_.data(),
+                                   CLEM_SMARTPORT_DRIVE_LIMIT, smartPortDisks_.data(),
+                                   smartPortDrives_.data(), breakpoints_);
 }
 
 void ClemensBackend::loadMachine(std::string path) {
@@ -374,7 +386,8 @@ bool ClemensBackend::loadSnapshot(const std::string_view &inputParam) {
     auto outputPath = std::filesystem::path(CLEM_HOST_SNAPSHOT_DIR) / inputParam;
     bool res = ClemensSerializer::load(
         outputPath.string(), &machine_, &mmio_, diskContainers_.size(), diskContainers_.data(),
-        diskDrives_.data(), breakpoints_, &ClemensBackend::unserializeAllocate, this);
+        diskDrives_.data(), CLEM_SMARTPORT_DRIVE_LIMIT, smartPortDisks_.data(),
+        smartPortDrives_.data(), breakpoints_, &ClemensBackend::unserializeAllocate, this);
     saveBRAM();
     return res;
 }
@@ -404,9 +417,9 @@ uint8_t *ClemensBackend::unserializeAllocate(unsigned sz, void *context) {
 
 bool ClemensBackend::loadDisk(ClemensDriveType driveType, bool allowBlank) {
     diskBuffer_.reset();
-
-    std::ifstream input(diskDrives_[driveType].imagePath,
-                        std::ios_base::in | std::ios_base::binary);
+    auto imagePath =
+        std::filesystem::path(config_.diskLibraryRootPath) / diskDrives_[driveType].imagePath;
+    std::ifstream input(imagePath, std::ios_base::in | std::ios_base::binary);
     if (input.is_open()) {
         input.seekg(0, std::ios_base::end);
         size_t inputImageSize = input.tellg();
@@ -446,7 +459,11 @@ bool ClemensBackend::saveDisk(ClemensDriveType driveType) {
     if (!clem_woz_serialize(&diskContainers_[driveType], writeOut.first, &writeOutCount)) {
         return false;
     }
-    std::ofstream out(diskDrives_[driveType].imagePath, std::ios_base::out | std::ios_base::binary);
+
+    auto imagePath =
+        std::filesystem::path(config_.diskLibraryRootPath) / diskDrives_[driveType].imagePath;
+
+    std::ofstream out(imagePath, std::ios_base::out | std::ios_base::binary);
     if (out.fail())
         return false;
     out.write((char *)writeOut.first, writeOutCount);
@@ -531,6 +548,39 @@ void ClemensBackend::resetDisk(ClemensDriveType driveType) {
         assert(false);
         break;
     }
+}
+
+void ClemensBackend::loadSmartPortDisk(unsigned driveIndex) {
+    //  load into our HDD slot
+    auto imagePath =
+        std::filesystem::path(config_.diskLibraryRootPath) / smartPortDrives_[driveIndex].imagePath;
+    std::ifstream input(imagePath, std::ios_base::in | std::ios_base::binary);
+    if (input.is_open()) {
+        auto sz = input.seekg(0, std::ios_base::end).tellg();
+        std::vector<uint8_t> buffer(sz);
+        input.seekg(0);
+        input.read((char *)buffer.data(), sz);
+        smartPortDisks_[driveIndex] = ClemensSmartPortDisk(std::move(buffer));
+    } else {
+        smartPortDisks_[driveIndex] =
+            ClemensSmartPortDisk(std::move(ClemensSmartPortDisk::createData(8192)));
+    }
+    ClemensSmartPortDevice device;
+    clemens_assign_smartport_disk(&mmio_, driveIndex,
+                                  smartPortDisks_[driveIndex].createSmartPortDevice(&device));
+}
+
+bool ClemensBackend::saveSmartPortDisk(unsigned driveIndex) {
+    auto &drive = smartPortDrives_[driveIndex];
+    auto &disk = smartPortDisks_[driveIndex].getDisk();
+    auto imagePath = std::filesystem::path(config_.diskLibraryRootPath) / drive.imagePath;
+    std::ofstream out(imagePath, std::ios_base::out | std::ios_base::binary);
+    if (out.fail())
+        return false;
+    out.write((char *)disk.image_buffer, disk.image_buffer_length);
+    if (out.fail() || out.bad())
+        return false;
+    return true;
 }
 
 static const char *sInputKeys[] = {"",      "keyD", "keyU",   "mouseD", "mouseU",
@@ -804,6 +854,9 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                 if (loadSnapshot(command.operand)) {
                     mockingboard = findMockingboardCard(&mmio_);
                 } else {
+                    //  TODO: this should force a restart - hopefully the
+                    //        frontend will save the current state prior to loading
+                    //        a new one to avoid data loss.
                     commandFailed = true;
                 }
                 break;
@@ -927,6 +980,18 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                     saveDisk(driveType);
                     localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", diskDrive.imagePath);
                 }
+            }
+            for (auto hardDriveIt = smartPortDrives_.begin(); hardDriveIt != smartPortDrives_.end();
+                 ++hardDriveIt) {
+                auto &drive = *hardDriveIt;
+                if (drive.imagePath.empty())
+                    continue;
+                auto driveIndex = unsigned(hardDriveIt - smartPortDrives_.begin());
+                ClemensSmartPortDevice device;
+                clemens_remove_smartport_disk(&mmio_, driveIndex, &device);
+                smartPortDisks_[driveIndex].destroySmartPortDevice(&device);
+                saveSmartPortDisk(driveIndex);
+                localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", drive.imagePath);
             }
             publishState = true;
             updateSeqNo = true;
@@ -1087,6 +1152,15 @@ void ClemensBackend::initEmulatedDiskLocalStorage() {
         diskDrive.saveFailed = false;
         diskDrive.imagePath = config_.diskDriveStates[driveIndex].imagePath;
     }
+
+    for (size_t driveIndex = 0; driveIndex < smartPortDrives_.size(); ++driveIndex) {
+        auto &diskDrive = smartPortDrives_[driveIndex];
+        diskDrive.isEjecting = false;
+        diskDrive.isSpinning = false;
+        diskDrive.isWriteProtected = true;
+        diskDrive.saveFailed = false;
+        diskDrive.imagePath = config_.smartPortDriveStates[driveIndex].imagePath;
+    }
 }
 
 cinek::ByteBuffer ClemensBackend::loadROM(const char *romPathname) {
@@ -1106,7 +1180,7 @@ cinek::ByteBuffer ClemensBackend::loadROM(const char *romPathname) {
 }
 
 void ClemensBackend::initApple2GS() {
-    const unsigned kFPIBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_COUNT;
+    const unsigned kFPIBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_LIMIT;
     const uint32_t kClocksPerFastCycle = CLEM_CLOCKS_FAST_CYCLE;
     const uint32_t kClocksPerSlowCycle = CLEM_CLOCKS_MEGA2_CYCLE;
     int result =
@@ -1115,7 +1189,7 @@ void ClemensBackend::initApple2GS() {
                      slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
                      slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount), kFPIBankCount);
     clem_mmio_init(&mmio_, &machine_.dev_debug, machine_.mem.bank_page_map,
-                   machine_.tspec.clocks_step_mega2, slabMemory_.allocate(2048 * 7));
+                   machine_.tspec.clocks_step_mega2, slabMemory_.allocate(2048 * 7), kFPIBankCount);
     if (result < 0) {
         fmt::print("Clemens library failed to initialize with err code (%d)\n", result);
         return;
@@ -1172,7 +1246,8 @@ void ClemensBackend::emulatorOpcodeCallback(struct ClemensInstruction *inst, con
                                             void *this_ptr) {
     auto *host = reinterpret_cast<ClemensBackend *>(this_ptr);
     if (host->programTrace_) {
-        host->programTrace_->addExecutedInstruction(*inst, operand, host->machine_);
+        host->programTrace_->addExecutedInstruction(host->nextTraceSeq_++, *inst, operand,
+                                                    host->machine_);
     }
     if (!host->areInstructionsLogged_)
         return;
