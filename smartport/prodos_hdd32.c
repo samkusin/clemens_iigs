@@ -94,6 +94,12 @@ static uint8_t _do_status(struct ClemensSmartPortDevice *context,
 
 ////////////////////////////////////////////////////////////////////////////////
 
+struct ClemensSerializerRecord kDevice[] = {
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensProdosHDD32, drive_index),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensProdosHDD32, block_limit),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensProdosHDD32, current_block_index),
+    CLEM_SERIALIZER_RECORD_EMPTY()};
+
 void clem_smartport_prodos_hdd32_initialize(struct ClemensSmartPortDevice *device,
                                             struct ClemensProdosHDD32 *impl) {
 
@@ -114,12 +120,28 @@ void clem_smartport_prodos_hdd32_uninitialize(struct ClemensSmartPortDevice *dev
 }
 
 void clem_smartport_prodos_hdd32_serialize(mpack_writer_t *writer,
-                                           struct ClemensSmartPortDevice *device) {
-    struct ClemensProdosHDD32 *hdd = (struct ClemensProdosHDD32 *)device->device_data;
+                                           struct ClemensSmartPortDevice *device,
+                                           const struct ClemensProdosHDD32 *hdd) {
+    struct ClemensSerializerRecord root;
+    if (device->device_id != CLEM_SMARTPORT_DEVICE_ID_PRODOS_HDD32)
+        return;
+    memset(&root, 0, sizeof(root));
+    root.type = kClemensSerializerTypeRoot;
+    root.records = &kDevice[0];
+    clemens_serialize_object(writer, (uintptr_t)hdd, &root);
 }
 
-void clem_smartport_prodos_hdd32_unserialize(mpack_reader_t *reader,
+bool clem_smartport_prodos_hdd32_unserialize(mpack_reader_t *reader,
                                              struct ClemensSmartPortDevice *device,
+                                             struct ClemensProdosHDD32 *hdd,
                                              ClemensSerializerAllocateCb alloc_cb, void *context) {
-    struct ClemensProdosHDD32 *hdd = (struct ClemensProdosHDD32 *)device->device_data;
+    struct ClemensSerializerRecord root;
+    if (device->device_id != CLEM_SMARTPORT_DEVICE_ID_PRODOS_HDD32)
+        return false;
+    memset(&root, 0, sizeof(root));
+    root.type = kClemensSerializerTypeRoot;
+    root.records = &kDevice[0];
+    clemens_unserialize_object(reader, (uintptr_t)hdd, &root, alloc_cb, context);
+    device->device_data = hdd;
+    return true;
 }

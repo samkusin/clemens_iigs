@@ -590,10 +590,11 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
     thisFrameAudioBuffer_ = cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
 
     config_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
+
+    config_.diskLibraryRootPath = diskLibraryRootPath_;
     // TODO: This should be selectable like regular drives - this will require some
     //       UI to make it happen
-    config_.smartPortDriveStates[0].imagePath =
-        (std::filesystem::path(diskLibraryRootPath_) / "smartport.2mg").string();
+    config_.smartPortDriveStates[0].imagePath = std::filesystem::path("smartport.2mg").string();
     backend_ = createBackend();
 
     debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;
@@ -1308,7 +1309,8 @@ void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType) {
             diskLibrary_.iterate([&selectedPath](const ClemensDiskLibrary::DiskEntry &entry) {
                 auto relativePath = entry.location.parent_path().filename() / entry.location.stem();
                 if (ImGui::Selectable(relativePath.string().c_str())) {
-                    selectedPath = entry.location.string();
+                    selectedPath =
+                        entry.location.parent_path().filename() / entry.location.filename();
                 }
             });
             if (!selectedPath.empty()) {

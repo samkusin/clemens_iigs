@@ -233,8 +233,8 @@ struct ClemensSerializerRecord kSmartPortPacket[] = {
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortPacket, is_extended),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortPacket, status),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortPacket, contents_length),
-    CLEM_SERIALIZER_RECORD_BLOB(struct ClemensSmartPortPacket, contents,
-                                CLEM_SMARTPORT_CONTENTS_LIMIT),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensSmartPortPacket, kClemensSerializerTypeUInt8, contents,
+                                CLEM_SMARTPORT_CONTENTS_LIMIT, 0),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 struct ClemensSerializerRecord kSmartPortDevice[] = {
@@ -257,8 +257,8 @@ struct ClemensSerializerRecord kSmartPort[] = {
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, packet_state_byte_cnt),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, packet_cntr),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, data_size),
-    CLEM_SERIALIZER_RECORD_BLOB(struct ClemensSmartPortUnit, data,
-                                CLEM_SMARTPORT_DATA_BUFFER_LIMIT),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensSmartPortUnit, kClemensSerializerTypeUInt8, data, 
+                                CLEM_SMARTPORT_DATA_BUFFER_LIMIT, 0),
     CLEM_SERIALIZER_RECORD_OBJECT(struct ClemensSmartPortUnit, packet,
                                   struct ClemensSmartPortPacket, kSmartPortPacket),
     CLEM_SERIALIZER_RECORD_EMPTY()};

@@ -30,6 +30,10 @@ class ClemensSmartPortDisk {
     ClemensSmartPortDevice *createSmartPortDevice(ClemensSmartPortDevice *device);
     void destroySmartPortDevice(ClemensSmartPortDevice *device);
 
+    void serialize(mpack_writer_t *writer, ClemensSmartPortDevice *device) const;
+    void unserialize(mpack_reader_t *reader, ClemensSmartPortDevice *device,
+                     ClemensSerializerAllocateCb alloc_cb, void *context);
+
   private:
     static uint8_t doReadBlock(void *userContext, unsigned driveIndex, unsigned blockIndex,
                                uint8_t *buffer);

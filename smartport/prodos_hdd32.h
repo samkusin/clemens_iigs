@@ -4,6 +4,8 @@
 #include "clem_shared.h"
 #include "clem_smartport.h"
 
+#include <stdbool.h>
+
 typedef struct mpack_writer_t mpack_writer_t;
 typedef struct mpack_reader_t mpack_reader_t;
 
@@ -41,9 +43,11 @@ void clem_smartport_prodos_hdd32_initialize(struct ClemensSmartPortDevice *devic
                                             struct ClemensProdosHDD32 *impl);
 void clem_smartport_prodos_hdd32_uninitialize(struct ClemensSmartPortDevice *device);
 void clem_smartport_prodos_hdd32_serialize(mpack_writer_t *writer,
-                                           struct ClemensSmartPortDevice *device);
-void clem_smartport_prodos_hdd32_unserialize(mpack_reader_t *reader,
+                                           struct ClemensSmartPortDevice *device,
+                                           const struct ClemensProdosHDD32 *hdd);
+bool clem_smartport_prodos_hdd32_unserialize(mpack_reader_t *reader,
                                              struct ClemensSmartPortDevice *device,
+                                             struct ClemensProdosHDD32 *hdd,
                                              ClemensSerializerAllocateCb alloc_cb, void *context);
 
 #ifdef __cplusplus
