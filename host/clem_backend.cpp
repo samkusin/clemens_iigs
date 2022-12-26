@@ -1044,6 +1044,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                 publishedState.bpHitIndex = *hitBreakpoint;
             }
             publishedState.diskDrives = diskDrives_.data();
+            publishedState.smartDrives = smartPortDrives_.data();
             publishedState.commandFailed = std::move(commandFailed);
             publishedState.commandType = std::move(commandType);
             publishedState.message = std::move(debugMessage);

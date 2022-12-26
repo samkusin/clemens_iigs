@@ -52,6 +52,8 @@ class ClemensFrontend {
     void doMachineDiskDisplay();
     void doMachineDiskSelection(ClemensDriveType driveType);
     void doMachineDiskStatus(ClemensDriveType driveType);
+    void doMachineSmartDriveSelection(unsigned driveIndex);
+    void doMachineSmartDriveStatus(unsigned driveIndex);
     void doMachineCPUInfoDisplay();
     void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU, float screenV);
     void doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize);
@@ -149,6 +151,7 @@ class ClemensFrontend {
         int logLevel;
 
         std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives;
+        std::array<ClemensBackendDiskDriveState, CLEM_SMARTPORT_DRIVE_LIMIT> smartDrives;
 
         float emulatorSpeedMhz;
         ClemensClock emulatorClock;

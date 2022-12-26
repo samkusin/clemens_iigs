@@ -787,6 +787,11 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
         diskDrive = *driveState;
         ++driveState;
     }
+    driveState = state.smartDrives;
+    for (auto &smartDrive : frameWriteState_.smartDrives) {
+        smartDrive = *driveState;
+        ++driveState;
+    }
 
     frameWriteState_.breakpoints = frameWriteMemory_.allocateArray<ClemensBackendBreakpoint>(
         state.bpBufferEnd - state.bpBufferStart);
@@ -1111,8 +1116,10 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
 
     backend_->publish();
 
-    if (ImGui::IsKeyPressed(ImGuiKey_Space) && ImGui::GetIO().KeyAlt && ImGui::GetIO().KeySuper) {
-        emulatorHasMouseFocus_ = false;
+    if (ImGui::IsKeyDown(ImGuiKey_LeftAlt) && ImGui::IsKeyDown(ImGuiKey_RightAlt)) {
+        if (ImGui::IsKeyReleased(ImGuiKey_LeftCtrl) || ImGui::IsKeyReleased(ImGuiKey_RightCtrl)) {
+            emulatorHasMouseFocus_ = false;
+        }
     }
 
     interop.mouseLock = emulatorHasMouseFocus_;
@@ -1259,6 +1266,12 @@ void ClemensFrontend::doMachineDiskDisplay() {
     doMachineDiskStatus(kClemensDrive_5_25_D2);
     ImGui::TableNextColumn();
     doMachineDiskSelection(kClemensDrive_5_25_D2);
+    //  TODO: Hard drive selection
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    doMachineSmartDriveStatus(0);
+    ImGui::TableNextColumn();
+    doMachineSmartDriveSelection(0);
     ImGui::EndTable();
 }
 
@@ -1335,6 +1348,30 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType) {
     if (ImGui::Checkbox("", &wp)) {
         backend_->writeProtectDisk(driveType, wp);
     }
+}
+
+void ClemensFrontend::doMachineSmartDriveSelection(unsigned driveIndex) {
+    const ClemensBackendDiskDriveState &drive = frameReadState_.smartDrives[driveIndex];
+    const char *imageName;
+    if (drive.isEjecting) {
+        imageName = "Ejecting...";
+    } else if (drive.imagePath.empty()) {
+        imageName = "- Empty";
+    } else {
+        imageName = drive.imagePath.c_str();
+    }
+    char comboName[32];
+    snprintf(comboName, sizeof(comboName), "Smart D%u", driveIndex + 1);
+
+    if (ImGui::BeginCombo(comboName, imageName, ImGuiComboFlags_NoArrowButton)) {
+        ImGui::Selectable(imageName);
+        ImGui::EndCombo();
+    }
+}
+
+void ClemensFrontend::doMachineSmartDriveStatus(unsigned /*driveIndex */) {
+    // const ClemensBackendDiskDriveState &drive = frameReadState_.smartDrives[driveIndex];
+    // ImGui::Text(drive.imagePath.c_str());
 }
 
 #define CLEM_HOST_GUI_CPU_PINS_COLOR(_field_)                                                      \
@@ -2510,21 +2547,19 @@ std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath
         case kClemensDrive_3_5_D1:
         case kClemensDrive_3_5_D2:
             if (disk->nib->disk_type != CLEM_DISK_TYPE_3_5) {
-                return std::make_pair(
-                    fmt::format(
-                        "Disk image {} with type 3.5 doesn't match drive with required format {}",
-                        imagePath, sDriveDescription[driveType]),
-                    false);
+                return std::make_pair(fmt::format("Disk image {} with type 3.5 doesn't match "
+                                                  "drive with required format {}",
+                                                  imagePath, sDriveDescription[driveType]),
+                                      false);
             }
             break;
         case kClemensDrive_5_25_D1:
         case kClemensDrive_5_25_D2:
             if (disk->nib->disk_type != CLEM_DISK_TYPE_5_25) {
-                return std::make_pair(
-                    fmt::format(
-                        "Disk image {} with type 5.25 doesn't match drive with required format {}",
-                        imagePath, sDriveDescription[driveType]),
-                    false);
+                return std::make_pair(fmt::format("Disk image {} with type 5.25 doesn't match "
+                                                  "drive with required format {}",
+                                                  imagePath, sDriveDescription[driveType]),
+                                      false);
             }
             break;
         default:

@@ -135,6 +135,7 @@ struct ClemensBackendState {
     const ClemensBackendBreakpoint *bpBufferEnd;
     std::optional<unsigned> bpHitIndex;
     const ClemensBackendDiskDriveState *diskDrives;
+    const ClemensBackendDiskDriveState *smartDrives;
     const ClemensBackendExecutedInstruction *logInstructionStart;
     const ClemensBackendExecutedInstruction *logInstructionEnd;
 
