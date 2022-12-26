@@ -622,9 +622,12 @@ void ClemensFrontend::input(ClemensInputEvent input) {
         }
     }
     if (emulatorHasKeyboardFocus_ && input.type != kClemensInputType_None) {
+        constexpr float kMouseScalar = 1.25f;
         if (input.type == kClemensInputType_MouseMove) {
-            input.value_a = std::clamp(input.value_a, (int16_t)(-63), (int16_t)(63));
-            input.value_b = std::clamp(input.value_b, (int16_t)(-63), (int16_t)(63));
+            input.value_a =
+                std::clamp(int16_t(input.value_a * kMouseScalar), (int16_t)(-63), (int16_t)(63));
+            input.value_b =
+                std::clamp(int16_t(input.value_b * kMouseScalar), (int16_t)(-63), (int16_t)(63));
         }
         backend_->inputEvent(input);
     }
@@ -2030,10 +2033,17 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
                                           float screenV) {
     ImGui::SetNextWindowPos(rootAnchor);
     ImGui::SetNextWindowSize(rootSize);
+    if (emulatorHasKeyboardFocus_) {
+        // Focus for the next frame will be evaluated inside the window block
+        // Here we want the emulator to intercept all keyboard input
+        ImGui::SetNextWindowFocus();
+        emulatorHasKeyboardFocus_ = false;
+    }
     ImGui::Begin("Display", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
                      ImGuiWindowFlags_NoMove);
+    ImGui::BeginChild("DisplayView");
     ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // No tint
     ImTextureID texId{(void *)((uintptr_t)display_.getScreenTarget().id)};
     ImVec2 p = ImGui::GetCursorScreenPos();
@@ -2051,16 +2061,21 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
         ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y),
         ImVec2(0, screenV0), ImVec2(screenU, screenV1), ImGui::GetColorU32(tint_col));
 
-    if (ImGui::IsWindowFocused()) {
-        ImGui::SetKeyboardFocusHere(0);
-        emulatorHasKeyboardFocus_ = true;
-    } else {
-        emulatorHasKeyboardFocus_ = false;
-    }
+    //  This logic is rather convoluted - we have two focus types and this logic is
+    //  an attempt to determine the user's intent regarding where keyboard and mouse
+    //  input goes (to the emulator vs GUI.)  Basically if the mouse pointer is in
+    //  the emulator view, all keyboard input goes to the view.  If the user mouse-clicks
+    //  inside the emulator view, all input goes to the view.
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !emulatorHasMouseFocus_) {
         emulatorHasMouseFocus_ = ImGui::IsWindowHovered();
     }
+    emulatorHasKeyboardFocus_ = emulatorHasMouseFocus_;
+    if (ImGui::IsWindowFocused()) {
+        emulatorHasKeyboardFocus_ = true;
+    }
+    emulatorHasKeyboardFocus_ = emulatorHasKeyboardFocus_ || ImGui::IsWindowHovered();
 
+    ImGui::EndChild();
     ImGui::End();
 }
 
