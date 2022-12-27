@@ -37,6 +37,42 @@ static ClemensFrontend *g_Host = nullptr;
 static sg_pass_action g_sgPassAction;
 static unsigned g_ADBKeyToggleMask = 0;
 
+#ifdef _WIN32
+static bool g_escapeKeyDown = false;
+
+static sapp_keycode onKeyDown(const sapp_event *evt) {
+    if (evt->modifiers & (SAPP_MODIFIER_CTRL + SAPP_MODIFIER_ALT)) {
+        if (evt->key_code == SAPP_KEYCODE_F1 && !g_escapeKeyDown) {
+            printf("ESCAPE DOWN\n");
+            g_escapeKeyDown = true;
+            return SAPP_KEYCODE_ESCAPE;
+        }
+    }
+    if (evt->key_code == SAPP_KEYCODE_ESCAPE) {
+        if (g_escapeKeyDown)
+            return SAPP_KEYCODE_INVALID;
+    }
+    return evt->key_code;
+}
+
+static sapp_keycode onKeyUp(const sapp_event *evt) {
+    if (g_escapeKeyDown) {
+        if (evt->key_code == SAPP_KEYCODE_F1) {
+            printf("ESCAPE UP\n");
+            g_escapeKeyDown = false;
+            return SAPP_KEYCODE_ESCAPE;
+        } else if (evt->key_code == SAPP_KEYCODE_ESCAPE) {
+            return SAPP_KEYCODE_INVALID;
+        }
+    }
+    return evt->key_code;
+}
+#else
+static sapp_keycode onKeyDown(const sapp_event *evt) { return evt->key_code; }
+
+static sapp_keycode onKeyUp(const sapp_event *evt) { return evt->key_code; }
+#endif
+
 std::array<int16_t, 512> g_sokolToADBKey;
 
 cinek::ByteBuffer loadFont(const char *pathname) {
@@ -249,14 +285,28 @@ static void onFrame() {
 
 static void onEvent(const sapp_event *evt) {
     struct ClemensInputEvent clemInput {};
+
+    simgui_handle_event(evt);
+
+    sapp_keycode keycode;
+
     switch (evt->type) {
+    case SAPP_EVENTTYPE_UNFOCUSED:
+        g_Host->lostFocus();
+        break;
     case SAPP_EVENTTYPE_KEY_DOWN:
-        clemInput.value_a = g_sokolToADBKey[evt->key_code];
-        clemInput.type = kClemensInputType_KeyDown;
+        keycode = onKeyDown(evt);
+        if (keycode != SAPP_KEYCODE_INVALID) {
+            clemInput.value_a = g_sokolToADBKey[keycode];
+            clemInput.type = kClemensInputType_KeyDown;
+        }
         break;
     case SAPP_EVENTTYPE_KEY_UP:
-        clemInput.value_a = g_sokolToADBKey[evt->key_code];
-        clemInput.type = kClemensInputType_KeyUp;
+        keycode = onKeyUp(evt);
+        if (keycode != SAPP_KEYCODE_INVALID) {
+            clemInput.value_a = g_sokolToADBKey[keycode];
+            clemInput.type = kClemensInputType_KeyUp;
+        }
         break;
     case SAPP_EVENTTYPE_MOUSE_DOWN:
         clemInput.type = kClemensInputType_MouseButtonDown;
@@ -290,8 +340,6 @@ static void onEvent(const sapp_event *evt) {
         clemInput.adb_key_toggle_mask = g_ADBKeyToggleMask;
         g_Host->input(clemInput);
     }
-
-    simgui_handle_event(evt);
 }
 
 static void onCleanup() {

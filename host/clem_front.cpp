@@ -633,6 +633,11 @@ void ClemensFrontend::input(ClemensInputEvent input) {
     }
 }
 
+void ClemensFrontend::lostFocus() {
+    emulatorHasMouseFocus_ = false;
+    emulatorHasKeyboardFocus_ = false;
+}
+
 std::unique_ptr<ClemensBackend> ClemensFrontend::createBackend() {
     constexpr unsigned refreshFrequency_ = 60;
     auto backend = std::make_unique<ClemensBackend>(

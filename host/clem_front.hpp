@@ -36,6 +36,8 @@ class ClemensFrontend {
     void frame(int width, int height, double deltaTime, FrameAppInterop &interop);
     //  application input from OS
     void input(ClemensInputEvent input);
+    //  application lost focus
+    void lostFocus();
 
   private:
     template <typename TBufferType> friend struct FormatView;
