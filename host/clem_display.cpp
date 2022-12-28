@@ -216,7 +216,7 @@ ClemensDisplayProvider::ClemensDisplayProvider(const cinek::ByteBuffer &systemFo
         kAlternateSetToGlyph[i] = (0x140 + i) | ((0x140 + i) << 16);
         kAlternateSetToGlyph[i + 0x20] = (0x120 + i) | ((0x120 + i) << 16);
         kAlternateSetToGlyph[i + 0x40] = (0x80 + i) | ((0x80 + i) << 16);
-        kAlternateSetToGlyph[i + 0x60] = (0x60 + i) | ((0x160 + i) << 16);
+        kAlternateSetToGlyph[i + 0x60] = (0x160 + i) | ((0x160 + i) << 16);
         kAlternateSetToGlyph[i + 0x80] = (0x40 + i) | ((0x40 + i) << 16);
         kAlternateSetToGlyph[i + 0xA0] = (0x20 + i) | ((0x20 + i) << 16);
         kAlternateSetToGlyph[i + 0xC0] = (0x40 + i) | ((0x40 + i) << 16);
@@ -642,7 +642,6 @@ auto ClemensDisplay::renderTextPlane(DrawVertex *vertices, const ClemensVideo &v
         int row = i + video.scanline_start;
         const uint8_t *scanline = memory + video.scanlines[row].offset;
         for (int j = 0; j < video.scanline_byte_cnt; ++j) {
-            //  TODO: handle flashing chars
             unsigned glyphIndex;
             const uint8_t charIndex = scanline[j];
             if (useAlternateCharacterSet) {
