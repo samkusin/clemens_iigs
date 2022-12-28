@@ -14,12 +14,15 @@ This is a running todo list.
 * Emulator detection of ROM version through introspection
 * Speed up disk access when reading/writing (fast mode for emulation)
 * Smartport Hard Drive Support
-* ROM 01
 * Joystick/Paddle Support
 * Refactor tests with new test backend
+* ADB fixes (control panel hotkey and some fixes regarding ADB keyboard status and interrupts)
 
 ### Miscellaneous
 
+* ROM 01 and Introspect ROM version from binary
+* Introspect Mouse Position from memory in E1/E0 (may depend on ROM version) for
+  emulation without mouselock
 * CYA vs MEGA2 I/O access speeds
   * Some CYA registers are still "slow" so resolve these so they run at the IIgs
     fast speed
