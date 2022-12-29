@@ -77,7 +77,10 @@
 #define CLEM_ADB_CMD_DEVICE_POLL_3      0xf0
 
 /* c026 status flags */
-#define CLEM_ADB_C026_SRQ 0x08
+#define CLEM_ADB_C026_RECV_READY 0x80
+#define CLEM_ADB_C026_DESK_MGR   0x20
+#define CLEM_ADB_C026_SRQ        0x08
+#define CLEM_ADB_C026_RECV_CNT   0x07
 
 /* c027 status flags */
 #define CLEM_ADB_C027_CMD_FULL 0x01
@@ -137,11 +140,26 @@ void clem_adb_reset(struct ClemensDeviceADB *adb) {
     adb->mouse.size = 0;
     adb->gameport.ann_mask = 0;
     adb->gameport.btn_mask[0] = adb->gameport.btn_mask[1] = 0;
+    adb->irq_dispatch = 0;
 
     for (i = 0; i < 4; ++i) {
         adb->gameport.paddle[i] = CLEM_GAMEPORT_PADDLE_AXIS_VALUE_INVALID;
         adb->gameport.paddle_timer_ns[i] = 0;
         adb->gameport.paddle_timer_state[i] = 0;
+    }
+}
+
+static inline void _clem_adb_irq_dispatch(struct ClemensDeviceADB *adb, uint32_t irq) {
+    //  Mouse SRQs are not supported per HW Reference
+    //  Keyboard Interrupts (not SRQs) are also not supported per HW Reference
+    if ((irq & CLEM_IRQ_ADB_DATA) && (adb->cmd_status & CLEM_ADB_C027_DATA_IRQ)) {
+        adb->irq_dispatch |= CLEM_IRQ_ADB_DATA;
+    }
+    if ((irq & CLEM_IRQ_ADB_KEYB_SRQ) && (adb->keyb_reg[3] & CLEM_ADB_GLU_REG3_MASK_SRQ)) {
+        adb->irq_dispatch |= CLEM_IRQ_ADB_KEYB_SRQ;
+    }
+    if ((irq & CLEM_IRQ_ADB_MOUSE_EVT) && (adb->cmd_status & CLEM_ADB_C027_MOUSE_IRQ)) {
+        adb->irq_dispatch |= CLEM_IRQ_ADB_MOUSE_EVT;
     }
 }
 
@@ -160,21 +178,23 @@ static void _clem_adb_add_data(struct ClemensDeviceADB *adb, uint8_t value) {
         return;
     }
     adb->cmd_data[adb->cmd_data_sent++] = value;
-    adb->cmd_status |= CLEM_ADB_C027_CMD_FULL;
 }
 
-static void _clem_adb_send_result(struct ClemensDeviceADB *adb, uint8_t data_limit) {
-    unsigned i;
+static void _clem_adb_glu_command_done(struct ClemensDeviceADB *adb) {
+    adb->state = CLEM_ADB_STATE_READY;
+    adb->cmd_data_sent = 0;
+    adb->cmd_data_recv = 0;
+    adb->cmd_data_limit = 0;
+}
 
+static void _clem_adb_glu_result_init(struct ClemensDeviceADB *adb, uint8_t data_limit) {
     adb->state = CLEM_ADB_STATE_RESULT_DATA;
     adb->cmd_data_sent = 0;
     adb->cmd_data_recv = 0;
     adb->cmd_data_limit = data_limit;
 }
 
-static void _clem_adb_send_none(struct ClemensDeviceADB *adb) { adb->state = CLEM_ADB_STATE_READY; }
-
-static void _clem_adb_add_result(struct ClemensDeviceADB *adb, uint8_t value) {
+static void _clem_adb_glu_result_data(struct ClemensDeviceADB *adb, uint8_t value) {
     CLEM_ASSERT(adb->state == CLEM_ADB_STATE_RESULT_DATA);
     if (adb->cmd_data_sent >= adb->cmd_data_limit) {
         CLEM_ASSERT(false);
@@ -183,6 +203,17 @@ static void _clem_adb_add_result(struct ClemensDeviceADB *adb, uint8_t value) {
     }
     adb->cmd_data[adb->cmd_data_sent++] = value;
     adb->cmd_status |= CLEM_ADB_C027_DATA_FULL;
+    _clem_adb_irq_dispatch(adb, CLEM_IRQ_ADB_DATA);
+}
+
+static void _clem_adb_glu_device_response(struct ClemensDeviceADB *adb, uint8_t len) {
+    adb->state = CLEM_ADB_STATE_READY;
+    adb->cmd_data_sent = 0;
+    adb->cmd_data_recv = 0;
+    adb->cmd_data_limit = len;
+    adb->cmd_flags |= CLEM_ADB_C026_RECV_READY;
+    adb->cmd_flags &= ~CLEM_ADB_C026_RECV_CNT;
+    adb->cmd_flags |= (len & CLEM_ADB_C026_RECV_CNT);
 }
 
 /*
@@ -1346,6 +1377,16 @@ static uint8_t _clem_adb_glu_keyb_parse(struct ClemensDeviceADB *adb, uint8_t ke
             ascii_key = ascii_table[0];
         }
     }
+
+    //  special key combos that are detected by reading c026 - inform interrupt
+    //  handler that this has occurred.
+    if (is_key_down && key_index == CLEM_ADB_KEY_ESCAPE) {
+        if ((modifiers & CLEM_ADB_GLU_REG2_KEY_CTRL) && (modifiers & CLEM_ADB_GLU_REG2_KEY_APPLE)) {
+            adb->cmd_flags |= CLEM_ADB_C026_DESK_MGR;
+            _clem_adb_irq_dispatch(adb, CLEM_IRQ_ADB_DATA);
+        }
+    }
+
     if (ascii_key != 0xff) {
         // CLEM_LOG("SKS: ascii: %02X", ascii_key);
         if (is_key_down) {
@@ -1508,9 +1549,7 @@ static void _clem_adb_glu_mouse_talk(struct ClemensDeviceADB *adb) {
 
     adb->cmd_status |= CLEM_ADB_C027_MOUSE_FULL;
 
-    if (adb->cmd_status & CLEM_ADB_C027_MOUSE_IRQ) {
-        adb->irq_line |= CLEM_IRQ_ADB_MOUSE_EVT;
-    }
+    _clem_adb_irq_dispatch(adb, CLEM_IRQ_ADB_MOUSE_EVT);
 }
 
 static void _clem_adb_glu_set_mode_flags(struct ClemensDeviceADB *adb, unsigned mode_flags) {
@@ -1570,6 +1609,7 @@ static void _clem_adb_glu_enable_srq(struct ClemensDeviceADB *adb, unsigned devi
             adb->keyb_reg[3] |= CLEM_ADB_GLU_REG3_MASK_SRQ;
         } else {
             adb->keyb_reg[3] &= ~CLEM_ADB_GLU_REG3_MASK_SRQ;
+            adb->irq_line &= ~CLEM_IRQ_ADB_KEYB_SRQ;
         }
         break;
 
@@ -1578,6 +1618,7 @@ static void _clem_adb_glu_enable_srq(struct ClemensDeviceADB *adb, unsigned devi
             adb->mouse_reg[3] |= CLEM_ADB_GLU_REG3_MASK_SRQ;
         } else {
             adb->mouse_reg[3] &= ~CLEM_ADB_GLU_REG3_MASK_SRQ;
+            adb->irq_line &= ~CLEM_IRQ_ADB_MOUSE_SRQ;
         }
         break;
     default:
@@ -1667,23 +1708,23 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
     switch (adb->cmd_reg) {
     case CLEM_ADB_CMD_ABORT:
         CLEM_LOG("ADB: ABORT");
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_command_done(adb);
         return;
     case CLEM_ADB_CMD_SET_MODES:
         CLEM_LOG("ADB: SET_MODES %02X", adb->cmd_data[0]);
         _clem_adb_glu_set_mode_flags(adb, adb->cmd_data[0]);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_command_done(adb);
         break;
     case CLEM_ADB_CMD_CLEAR_MODES:
         CLEM_LOG("ADB: CLEAR_MODES %02X", adb->cmd_data[0]);
         _clem_adb_glu_clear_mode_flags(adb, adb->cmd_data[0]);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_command_done(adb);
         break;
     case CLEM_ADB_CMD_SET_CONFIG:
         CLEM_LOG("ADB: CONFIG: %02X %02X %02X", adb->cmd_data[0], adb->cmd_data[1],
                  adb->cmd_data[2]);
         _clem_adb_glu_set_config(adb, adb->cmd_data[0], adb->cmd_data[1], adb->cmd_data[2]);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_command_done(adb);
         return;
     case CLEM_ADB_CMD_SYNC:
         CLEM_LOG("ADB: SYNC: %02X %02X %02X %02X", adb->cmd_data[0], adb->cmd_data[1],
@@ -1692,31 +1733,31 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
                  adb->cmd_data[6], adb->cmd_data[7]);
         _clem_adb_glu_set_mode_flags(adb, adb->cmd_data[0]);
         _clem_adb_glu_set_config(adb, adb->cmd_data[0], adb->cmd_data[1], adb->cmd_data[2]);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_command_done(adb);
         return;
     case CLEM_ADB_CMD_WRITE_RAM:
         CLEM_LOG("ADB: WRITE RAM: %02X:%02X", adb->cmd_data[0], adb->cmd_data[1]);
         adb->ram[adb->cmd_data[0]] = adb->cmd_data[1];
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_command_done(adb);
         return;
     case CLEM_ADB_CMD_READ_MEM:
         CLEM_LOG("ADB: READ RAM: %02X:%02X", adb->cmd_data[0], adb->cmd_data[1]);
-        _clem_adb_send_result(adb, 1);
-        _clem_adb_add_result(adb,
-                             _clem_adb_glu_read_memory(adb, adb->cmd_data[0], adb->cmd_data[1]));
+        _clem_adb_glu_result_init(adb, 1);
+        _clem_adb_glu_result_data(
+            adb, _clem_adb_glu_read_memory(adb, adb->cmd_data[0], adb->cmd_data[1]));
         return;
     case CLEM_ADB_CMD_VERSION:
         CLEM_LOG("ADB: GET VERSION (%02X)", adb->version);
-        _clem_adb_send_result(adb, 1);
-        _clem_adb_add_result(adb, (uint8_t)adb->version);
+        _clem_adb_glu_result_init(adb, 1);
+        _clem_adb_glu_result_data(adb, (uint8_t)adb->version);
         return;
     case CLEM_ADB_CMD_UNDOCUMENTED_12:
         CLEM_LOG("ADB: UNDOC 12: %02X, %02X", adb->cmd_data[0], adb->cmd_data[1]);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_command_done(adb);
         break;
     case CLEM_ADB_CMD_UNDOCUMENTED_13:
         CLEM_LOG("ADB: UNDOC 13: %02X, %02X", adb->cmd_data[0], adb->cmd_data[1]);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_command_done(adb);
         break;
     default:
         device_command = adb->cmd_reg & 0xf0;
@@ -1725,25 +1766,21 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
     }
 
     switch (device_command) {
-    case 0:
-        _clem_adb_send_none(adb);
-        break;
-
     case CLEM_ADB_CMD_DEVICE_ENABLE_SRQ:
         CLEM_LOG("ADB: ENABLE SRQ: %0X", device_address);
         _clem_adb_glu_enable_srq(adb, device_address, true);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_device_response(adb, 0);
         break;
 
     case CLEM_ADB_CMD_DEVICE_FLUSH:
         CLEM_UNIMPLEMENTED("ADB: FLUSH: %0X", device_address);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_device_response(adb, 0);
         break;
 
     case CLEM_ADB_CMD_DEVICE_DISABLE_SRQ:
         CLEM_LOG("ADB: DISABLE SRQ: %0X", device_address);
         _clem_adb_glu_enable_srq(adb, device_address, false);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_device_response(adb, 0);
         break;
 
     case CLEM_ADB_CMD_DEVICE_XMIT_2_R0:
@@ -1753,27 +1790,27 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
         CLEM_LOG("ADB: XMIT2 ADR: %0X", device_address);
         _clem_adb_glu_set_register(adb, (device_command & 0x80) >> 4, device_address,
                                    adb->cmd_data[0], adb->cmd_data[1]);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_device_response(adb, 0);
         break;
 
     case CLEM_ADB_CMD_DEVICE_POLL_0:
         CLEM_UNIMPLEMENTED("ADB: Poll 0: %0X", device_address);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_device_response(adb, 0);
         break;
 
     case CLEM_ADB_CMD_DEVICE_POLL_1:
         CLEM_UNIMPLEMENTED("ADB: Poll 1: %0X", device_address);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_device_response(adb, 0);
         break;
 
     case CLEM_ADB_CMD_DEVICE_POLL_2:
         CLEM_UNIMPLEMENTED("ADB: Poll 2: %0X", device_address);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_device_response(adb, 0);
         break;
 
     case CLEM_ADB_CMD_DEVICE_POLL_3:
         CLEM_UNIMPLEMENTED("ADB: Poll 3: %0X", device_address);
-        _clem_adb_send_none(adb);
+        _clem_adb_glu_device_response(adb, 0);
         break;
     }
 }
@@ -1823,9 +1860,8 @@ void clem_adb_glu_sync(struct ClemensDeviceADB *adb, uint32_t delta_us) {
         } else if (adb->keyb_reg[3] & CLEM_ADB_GLU_REG3_MASK_SRQ) {
             if (adb->keyb.size > 0) {
                 _clem_adb_glu_keyb_talk(adb);
-                adb->irq_line |= CLEM_IRQ_ADB_KEYB_SRQ;
-            } else {
-                adb->irq_line &= ~CLEM_IRQ_ADB_KEYB_SRQ;
+                _clem_adb_irq_dispatch(adb, CLEM_IRQ_ADB_KEYB_SRQ);
+                printf("Key SRQ ON\n");
             }
         }
         adb->poll_timer_us -= CLEM_MEGA2_CYCLES_PER_60TH;
@@ -1840,6 +1876,7 @@ void clem_adb_glu_sync(struct ClemensDeviceADB *adb, uint32_t delta_us) {
             ++adb->cmd_data_recv;
         }
         if (adb->cmd_data_sent == adb->cmd_data_recv) {
+            //  no more data available for the command register
             adb->cmd_status &= ~CLEM_ADB_C027_CMD_FULL;
         }
         if (adb->cmd_data_recv >= adb->cmd_data_limit) {
@@ -1850,15 +1887,11 @@ void clem_adb_glu_sync(struct ClemensDeviceADB *adb, uint32_t delta_us) {
         break;
     }
 
-    if (adb->state == CLEM_ADB_STATE_RESULT_DATA && (adb->cmd_status & CLEM_ADB_C027_DATA_IRQ)) {
-        if (adb->cmd_data_sent > adb->cmd_data_recv) {
-            adb->irq_line |= CLEM_IRQ_ADB_DATA;
-        }
-    }
+    adb->irq_line |= adb->irq_dispatch;
+    adb->irq_dispatch = 0;
+
     if (adb->irq_line & (CLEM_IRQ_ADB_KEYB_SRQ + CLEM_IRQ_ADB_MOUSE_SRQ)) {
         adb->cmd_flags |= CLEM_ADB_C026_SRQ;
-    } else {
-        adb->cmd_flags &= ~CLEM_ADB_C026_SRQ;
     }
 }
 
@@ -1994,7 +2027,7 @@ static void _clem_adb_start_cmd(struct ClemensDeviceADB *adb, uint8_t value) {
     bool parsed_command = true;
 
     adb->cmd_reg = value;
-    adb->cmd_status |= CLEM_ADB_C027_CMD_FULL;
+    adb->cmd_flags &= ~(CLEM_ADB_C026_RECV_READY + CLEM_ADB_C026_RECV_CNT);
 
     switch (value) {
     case CLEM_ADB_CMD_ABORT:
@@ -2090,10 +2123,12 @@ static void _clem_adb_start_cmd(struct ClemensDeviceADB *adb, uint8_t value) {
 static void _clem_adb_write_cmd(struct ClemensDeviceADB *adb, uint8_t value) {
     switch (adb->state) {
     case CLEM_ADB_STATE_READY:
+        adb->cmd_status |= CLEM_ADB_C027_CMD_FULL;
         _clem_adb_start_cmd(adb, value);
         break;
     case CLEM_ADB_STATE_CMD_DATA:
         CLEM_LOG("ADB: Command Data [%02X]:%02X", adb->cmd_data_sent, value);
+        adb->cmd_status |= CLEM_ADB_C027_CMD_FULL;
         _clem_adb_add_data(adb, value);
         break;
     }
@@ -2126,7 +2161,6 @@ void clem_adb_write_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_t 
         }
         if (value & CLEM_ADB_C027_KEY_IRQ) {
             CLEM_WARN("ADB: Unimplemented keyboard interrupts! write %02X,%02X", ioreg, value);
-            ;
         }
         break;
     case CLEM_MMIO_REG_ADB_CMD_DATA:
@@ -2144,11 +2178,16 @@ void clem_adb_write_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_t 
 
 static uint8_t _clem_adb_read_cmd(struct ClemensDeviceADB *adb, uint8_t flags) {
     uint8_t result = 0x00;
+    /* generally speaking, when we read from here, the data */
     switch (adb->state) {
     case CLEM_ADB_STATE_READY:
-        /* TODO: cmd_flags returned? */
+        result = adb->cmd_flags;
         if (!CLEM_IS_IO_NO_OP(flags)) {
             adb->cmd_status &= ~CLEM_ADB_C027_CMD_FULL;
+            adb->irq_line &= ~CLEM_IRQ_ADB_DATA;
+            adb->cmd_flags = 0;
+            /* TODO if response data was queued (sent) then switch state to
+             * CLEM_ADB_STATE_RESULT_DATA */
         }
         break;
     case CLEM_ADB_STATE_CMD_DATA:
@@ -2165,7 +2204,7 @@ static uint8_t _clem_adb_read_cmd(struct ClemensDeviceADB *adb, uint8_t flags) {
                 adb->irq_line &= ~CLEM_IRQ_ADB_DATA;
             }
             if (adb->cmd_data_recv >= adb->cmd_data_limit) {
-                _clem_adb_send_none(adb);
+                _clem_adb_glu_command_done(adb);
             }
         }
         break;
@@ -2229,7 +2268,6 @@ uint8_t clem_adb_read_mega2_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, 
     }
     switch (ioreg) {
     case CLEM_MMIO_REG_KEYB_READ:
-        /* FIXME: HWRef says this is cleared when reading here */
         if (!is_noop) {
             adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
             // CLEM_LOG("c0%02x: %02X", ioreg, adb->io_key_last_ascii);
@@ -2239,8 +2277,8 @@ uint8_t clem_adb_read_mega2_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, 
         /* clear strobe bit and return any-key status */
         if (!is_noop) {
             adb->io_key_last_ascii &= ~0x80;
-            //  CLEM_LOG("c0%02x: %02X, %02X", ioreg, adb->is_asciikey_down, adb->io_key_last_ascii
-            //  & 0x7f);
+            //  CLEM_LOG("c0%02x: %02X, %02X", ioreg, adb->is_asciikey_down,
+            //  adb->io_key_last_ascii & 0x7f);
         }
         return (adb->is_asciikey_down ? 0x80 : 0x00) | (adb->io_key_last_ascii & 0x7f);
     case CLEM_MMIO_REG_MEGA2_MOUSE_DX:
@@ -2265,11 +2303,13 @@ uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_
     case CLEM_MMIO_REG_ADB_CMD_DATA:
         return _clem_adb_read_cmd(adb, flags);
     case CLEM_MMIO_REG_ADB_STATUS:
-        /* FIXME: HWRef docs are vague here - which bits are actually
-           cleared? keyboard data bit only according to the HWRef.  But FW
-           Ref says 'never use, won't work' for the keyboard bits here...
+        /* FIXME: report back if cmd_flags is set to some value as this was
+                  likely triggered by a data interrupt
         */
         tmp = adb->cmd_status;
+        if (adb->cmd_flags != 0) {
+            tmp |= CLEM_ADB_C027_DATA_FULL;
+        }
         if (!is_noop) {
             adb->cmd_status &= ~(CLEM_ADB_C027_KEY_FULL);
             adb->irq_line &= ~(CLEM_IRQ_ADB_MOUSE_EVT);

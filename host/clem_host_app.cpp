@@ -43,7 +43,6 @@ static bool g_escapeKeyDown = false;
 static sapp_keycode onKeyDown(const sapp_event *evt) {
     if (evt->modifiers & (SAPP_MODIFIER_CTRL + SAPP_MODIFIER_ALT)) {
         if (evt->key_code == SAPP_KEYCODE_F1 && !g_escapeKeyDown) {
-            printf("ESCAPE DOWN\n");
             g_escapeKeyDown = true;
             return SAPP_KEYCODE_ESCAPE;
         }
@@ -58,7 +57,6 @@ static sapp_keycode onKeyDown(const sapp_event *evt) {
 static sapp_keycode onKeyUp(const sapp_event *evt) {
     if (g_escapeKeyDown) {
         if (evt->key_code == SAPP_KEYCODE_F1) {
-            printf("ESCAPE UP\n");
             g_escapeKeyDown = false;
             return SAPP_KEYCODE_ESCAPE;
         } else if (evt->key_code == SAPP_KEYCODE_ESCAPE) {

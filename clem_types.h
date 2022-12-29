@@ -135,7 +135,8 @@ struct ClemensDeviceADB {
 
     uint8_t ram[256]; /**< Microcontroller RAM */
 
-    uint32_t irq_line; /**< IRQ flags passed to machine */
+    uint32_t irq_dispatch; /* IRQ should be dispatched next sync */
+    uint32_t irq_line;     /**< IRQ flags passed to machine */
 };
 
 struct ClemensDeviceSCC {
