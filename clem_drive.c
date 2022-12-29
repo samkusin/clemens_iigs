@@ -123,7 +123,7 @@ static void _clem_disk_reset_drive(struct ClemensDrive *drive) {
 void clem_disk_start_drive(struct ClemensDrive *drive) {
     drive->ctl_switch = 0;
     drive->track_byte_index = 0;
-    drive->track_bit_shift = 0;
+    drive->track_bit_shift = 7;
     drive->pulse_ns = 0;
     drive->read_buffer = 0;
 }
@@ -244,11 +244,8 @@ unsigned clem_drive_step(struct ClemensDrive *drive, unsigned *io_flags, int qtr
     drive->track_byte_index = track_cur_pos / 8;
     drive->track_bit_shift = 7 - (track_cur_pos % 8);
     drive->pulse_ns = clem_util_timer_increment(drive->pulse_ns, 1000000, dt_ns);
-    if (!drive->has_disk) {
-        return track_cur_pos;
-    }
     if (drive->pulse_ns >= drive->disk.bit_timing_ns) {
-        bool valid_disk_data = drive->real_track_index != 0xff &&
+        bool valid_disk_data = drive->has_disk && drive->real_track_index != 0xff &&
                                drive->disk.track_initialized[drive->real_track_index];
         *io_flags |= CLEM_IWM_FLAG_PULSE_HIGH;
         /* read a pulse from the bitstream, following WOZ emulation suggestions
@@ -383,7 +380,7 @@ void clem_disk_update_head(struct ClemensDrive *drive, unsigned *io_flags, unsig
         drive->write_pulse = write_pulse;
 
         if (drive->track_bit_shift == 0) {
-            drive->track_bit_shift = 8;
+            drive->track_bit_shift = 7;
             /*
             if (*io_flags & CLEM_IWM_FLAG_WRITE_REQUEST) {
                 CLEM_LOG("diskwr(%u:%u): %02X",
@@ -394,8 +391,9 @@ void clem_disk_update_head(struct ClemensDrive *drive, unsigned *io_flags, unsig
             }
             */
             ++drive->track_byte_index;
+        } else {
+            --drive->track_bit_shift;
         }
-        --drive->track_bit_shift;
         drive->pulse_ns = 0;
         /*drive->pulse_ns = drive->pulse_ns - drive->disk.bit_timing_ns; */
     } else {

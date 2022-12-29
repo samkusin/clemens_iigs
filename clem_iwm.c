@@ -419,7 +419,8 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
                         drive->write_pulse = false;
                 }
             }
-            if ((iwm->state & CLEM_IWM_STATE_WRITE_MASK) && iwm->async_write_mode) {
+            if ((iwm->state & CLEM_IWM_STATE_WRITE_MASK) && iwm->async_write_mode &&
+                ((iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) || iwm->enable2)) {
                 write_signal = _clem_iwm_lss_write_async(iwm, clock, disk_delta_ns);
             } else {
                 write_signal = _clem_iwm_lss(iwm, &next_clock);
