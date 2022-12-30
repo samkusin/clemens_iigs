@@ -622,12 +622,20 @@ void ClemensFrontend::input(ClemensInputEvent input) {
         }
     }
     if (emulatorHasKeyboardFocus_ && input.type != kClemensInputType_None) {
+        constexpr float kMouseScalar = 1.25f;
         if (input.type == kClemensInputType_MouseMove) {
-            input.value_a = std::clamp(input.value_a, (int16_t)(-63), (int16_t)(63));
-            input.value_b = std::clamp(input.value_b, (int16_t)(-63), (int16_t)(63));
+            input.value_a =
+                std::clamp(int16_t(input.value_a * kMouseScalar), (int16_t)(-63), (int16_t)(63));
+            input.value_b =
+                std::clamp(int16_t(input.value_b * kMouseScalar), (int16_t)(-63), (int16_t)(63));
         }
         backend_->inputEvent(input);
     }
+}
+
+void ClemensFrontend::lostFocus() {
+    emulatorHasMouseFocus_ = false;
+    emulatorHasKeyboardFocus_ = false;
 }
 
 std::unique_ptr<ClemensBackend> ClemensFrontend::createBackend() {
@@ -760,6 +768,9 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     frameWriteState_.ioPage = (uint8_t *)frameWriteMemory_.allocate(256);
     memcpy(frameWriteState_.ioPage, state.ioPageValues, 256);
 
+    frameWriteState_.bram = (uint8_t *)frameWriteMemory_.allocate(CLEM_RTC_BRAM_SIZE);
+    memcpy(frameWriteState_.bram, state.mmio->dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
+
     frameWriteState_.memoryViewBank = state.debugMemoryPage;
     if (!state.isRunning) {
         frameWriteState_.memoryView = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
@@ -785,6 +796,11 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     const ClemensBackendDiskDriveState *driveState = state.diskDrives;
     for (auto &diskDrive : frameWriteState_.diskDrives) {
         diskDrive = *driveState;
+        ++driveState;
+    }
+    driveState = state.smartDrives;
+    for (auto &smartDrive : frameWriteState_.smartDrives) {
+        smartDrive = *driveState;
         ++driveState;
     }
 
@@ -1067,18 +1083,24 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         }
     }
 
-    const int kLineSpacing = ImGui::GetTextLineHeightWithSpacing();
-    const int kTerminalViewHeight = std::max(kLineSpacing * 6, int(height * 0.33f));
-    const int kMachineStateViewWidth = std::max(int(width * 0.40f), 480);
-    const int kMonitorX = kMachineStateViewWidth;
-    const int kMonitorViewWidth = width - kMonitorX;
-    const int kMonitorViewHeight = height - kTerminalViewHeight;
+    const ImGuiStyle &kMainStyle = ImGui::GetStyle();
+    const ImVec2 kWindowBoundary(kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.x,
+                                 kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.y);
+    const float kLineSpacing = ImGui::GetTextLineHeightWithSpacing();
+    const float kMachineStateViewWidth = std::max(int(width * 0.40f), 480);
+    const float kMonitorX = kMachineStateViewWidth;
+    const float kMonitorViewWidth = width - kMonitorX;
+    const float kInfoBarHeight = kLineSpacing + kWindowBoundary.y * 2;
+    const float kTerminalViewHeight =
+        std::max(kLineSpacing * 6 + kWindowBoundary.y * 2, height * 0.33f) - kInfoBarHeight;
+    const float kMonitorViewHeight = height - kInfoBarHeight - kTerminalViewHeight;
     ImVec2 monitorSize(kMonitorViewWidth, kMonitorViewHeight);
 
     doMachineStateLayout(ImVec2(0, 0), ImVec2(kMachineStateViewWidth, height));
     doMachineViewLayout(ImVec2(kMonitorX, 0), monitorSize, screenUVs[0], screenUVs[1]);
-    doMachineTerminalLayout(ImVec2(kMonitorX, height - kTerminalViewHeight),
-                            ImVec2(width - kMonitorX, kTerminalViewHeight));
+    doMachineInfoBar(ImVec2(kMonitorX, monitorSize.y), ImVec2(kMonitorViewWidth, kInfoBarHeight));
+    doMachineTerminalLayout(ImVec2(kMonitorX, monitorSize.y + kInfoBarHeight),
+                            ImVec2(kMonitorViewWidth, kTerminalViewHeight));
     switch (guiMode_) {
     case GUIMode::ImportDiskModal:
     case GUIMode::BlankDiskModal:
@@ -1111,8 +1133,10 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
 
     backend_->publish();
 
-    if (ImGui::IsKeyPressed(ImGuiKey_Space) && ImGui::GetIO().KeyAlt && ImGui::GetIO().KeySuper) {
-        emulatorHasMouseFocus_ = false;
+    if (ImGui::IsKeyDown(ImGuiKey_LeftAlt) && ImGui::IsKeyDown(ImGuiKey_RightAlt)) {
+        if (ImGui::IsKeyReleased(ImGuiKey_LeftCtrl) || ImGui::IsKeyReleased(ImGuiKey_RightCtrl)) {
+            emulatorHasMouseFocus_ = false;
+        }
     }
 
     interop.mouseLock = emulatorHasMouseFocus_;
@@ -1259,6 +1283,12 @@ void ClemensFrontend::doMachineDiskDisplay() {
     doMachineDiskStatus(kClemensDrive_5_25_D2);
     ImGui::TableNextColumn();
     doMachineDiskSelection(kClemensDrive_5_25_D2);
+    //  TODO: Hard drive selection
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    doMachineSmartDriveStatus(0);
+    ImGui::TableNextColumn();
+    doMachineSmartDriveSelection(0);
     ImGui::EndTable();
 }
 
@@ -1324,6 +1354,23 @@ void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType) {
             diskComboStateFlags_ &= ~(1 << driveType);
         }
     }
+    ImGui::SameLine();
+
+    const ImColor kRed(255, 0, 0, 255);
+    const ImColor kDark(64, 64, 64, 255);
+    ImGuiStyle &style = ImGui::GetStyle();
+    ImVec2 screenPos = ImGui::GetCursorScreenPos();
+    const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
+    const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
+    screenPos.x += style.ItemSpacing.x;
+    screenPos.y += lineHeight * 0.5f;
+    ImGui::Dummy(ImVec2(lineHeight, lineHeight));
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    if (drive.isSpinning) {
+        drawList->AddCircleFilled(screenPos, circleRadius, kRed);
+    } else {
+        drawList->AddCircleFilled(screenPos, circleRadius, kDark);
+    }
 }
 
 void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType) {
@@ -1335,6 +1382,47 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType) {
     if (ImGui::Checkbox("", &wp)) {
         backend_->writeProtectDisk(driveType, wp);
     }
+}
+
+void ClemensFrontend::doMachineSmartDriveSelection(unsigned driveIndex) {
+    const ClemensBackendDiskDriveState &drive = frameReadState_.smartDrives[driveIndex];
+    const char *imageName;
+    if (drive.isEjecting) {
+        imageName = "Ejecting...";
+    } else if (drive.imagePath.empty()) {
+        imageName = "- Empty";
+    } else {
+        imageName = drive.imagePath.c_str();
+    }
+    char comboName[32];
+    snprintf(comboName, sizeof(comboName), "Smart D%u", driveIndex + 1);
+
+    if (ImGui::BeginCombo(comboName, imageName, ImGuiComboFlags_NoArrowButton)) {
+        ImGui::Selectable(imageName);
+        ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    //  TODO: repeated code but fix when we ensure this works for SmartPort drives
+    const ImColor kRed(255, 0, 0, 255);
+    const ImColor kDark(64, 64, 64, 255);
+    ImGuiStyle &style = ImGui::GetStyle();
+    ImVec2 screenPos = ImGui::GetCursorScreenPos();
+    const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
+    const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
+    screenPos.x += style.ItemSpacing.x;
+    screenPos.y += lineHeight * 0.5f;
+    ImGui::Dummy(ImVec2(lineHeight, lineHeight));
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    if (drive.isSpinning) {
+        drawList->AddCircleFilled(screenPos, circleRadius, kRed);
+    } else {
+        drawList->AddCircleFilled(screenPos, circleRadius, kDark);
+    }
+}
+
+void ClemensFrontend::doMachineSmartDriveStatus(unsigned /*driveIndex */) {
+    // const ClemensBackendDiskDriveState &drive = frameReadState_.smartDrives[driveIndex];
+    // ImGui::Text(drive.imagePath.c_str());
 }
 
 #define CLEM_HOST_GUI_CPU_PINS_COLOR(_field_)                                                      \
@@ -1993,10 +2081,17 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
                                           float screenV) {
     ImGui::SetNextWindowPos(rootAnchor);
     ImGui::SetNextWindowSize(rootSize);
+    if (emulatorHasKeyboardFocus_) {
+        // Focus for the next frame will be evaluated inside the window block
+        // Here we want the emulator to intercept all keyboard input
+        ImGui::SetNextWindowFocus();
+        emulatorHasKeyboardFocus_ = false;
+    }
     ImGui::Begin("Display", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
                      ImGuiWindowFlags_NoMove);
+    ImGui::BeginChild("DisplayView");
     ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // No tint
     ImTextureID texId{(void *)((uintptr_t)display_.getScreenTarget().id)};
     ImVec2 p = ImGui::GetCursorScreenPos();
@@ -2014,14 +2109,63 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
         ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y),
         ImVec2(0, screenV0), ImVec2(screenU, screenV1), ImGui::GetColorU32(tint_col));
 
-    if (ImGui::IsWindowFocused()) {
-        ImGui::SetKeyboardFocusHere(0);
-        emulatorHasKeyboardFocus_ = true;
-    } else {
-        emulatorHasKeyboardFocus_ = false;
-    }
+    //  This logic is rather convoluted - we have two focus types and this logic is
+    //  an attempt to determine the user's intent regarding where keyboard and mouse
+    //  input goes (to the emulator vs GUI.)  Basically if the mouse pointer is in
+    //  the emulator view, all keyboard input goes to the view.  If the user mouse-clicks
+    //  inside the emulator view, all input goes to the view.
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !emulatorHasMouseFocus_) {
         emulatorHasMouseFocus_ = ImGui::IsWindowHovered();
+    }
+    emulatorHasKeyboardFocus_ = emulatorHasMouseFocus_;
+    if (ImGui::IsWindowFocused()) {
+        emulatorHasKeyboardFocus_ = true;
+    }
+    emulatorHasKeyboardFocus_ = emulatorHasKeyboardFocus_ || ImGui::IsWindowHovered();
+
+    ImGui::EndChild();
+    ImGui::End();
+}
+
+void ClemensFrontend::doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize) {
+    //  Display Power Status, Disk Drive Status, SmartPort Status, MouseLock,
+    //  Key Focus
+    const ImColor kGreen(0, 255, 0, 255);
+    const ImColor kDark(64, 64, 64, 255);
+    const uint8_t *ioPage = frameReadState_.ioPage;
+    const uint8_t *bram = frameReadState_.bram;
+
+    ImGui::SetNextWindowPos(rootAnchor);
+    ImGui::SetNextWindowSize(rootSize);
+    ImGui::Begin("InfoBar", nullptr,
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove);
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    ImVec2 screenPos;
+    ImVec2 cursorPos;
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const float kCellPaddingX = style.CellPadding.x;
+    float lineHeight = ImGui::GetTextLineHeightWithSpacing();
+    float circleHeight = ImGui::GetTextLineHeight() * 0.5f;
+    ImGui::TextUnformatted("1Mhz: ");
+    ImGui::SameLine(0.0f, 0.0f);
+    screenPos = ImGui::GetCursorScreenPos();
+    screenPos.y += lineHeight * 0.5f;
+    if (!bram || bram[CLEM_RTC_BRAM_SYSTEM_SPEED] != 0x00) {
+        drawList->AddCircleFilled(screenPos, circleHeight, kDark);
+    } else {
+        drawList->AddCircleFilled(screenPos, circleHeight, kGreen);
+    }
+    cursorPos.x = ImGui::GetCursorStartPos().x + rootSize.x * 0.20f;
+    cursorPos.y = ImGui::GetCursorPosY();
+    ImGui::SameLine(cursorPos.x, 0.0f);
+
+    if (emulatorHasMouseFocus_) {
+        ImGui::TextUnformatted("Press both ALT keys and CTRL to unlock mouse");
+    } else if (emulatorHasKeyboardFocus_) {
+        ImGui::Text("Click in View to lock mouse input");
+    } else {
+        ImGui::Text("Move mouse into view for key input");
     }
 
     ImGui::End();
@@ -2510,21 +2654,19 @@ std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath
         case kClemensDrive_3_5_D1:
         case kClemensDrive_3_5_D2:
             if (disk->nib->disk_type != CLEM_DISK_TYPE_3_5) {
-                return std::make_pair(
-                    fmt::format(
-                        "Disk image {} with type 3.5 doesn't match drive with required format {}",
-                        imagePath, sDriveDescription[driveType]),
-                    false);
+                return std::make_pair(fmt::format("Disk image {} with type 3.5 doesn't match "
+                                                  "drive with required format {}",
+                                                  imagePath, sDriveDescription[driveType]),
+                                      false);
             }
             break;
         case kClemensDrive_5_25_D1:
         case kClemensDrive_5_25_D2:
             if (disk->nib->disk_type != CLEM_DISK_TYPE_5_25) {
-                return std::make_pair(
-                    fmt::format(
-                        "Disk image {} with type 5.25 doesn't match drive with required format {}",
-                        imagePath, sDriveDescription[driveType]),
-                    false);
+                return std::make_pair(fmt::format("Disk image {} with type 5.25 doesn't match "
+                                                  "drive with required format {}",
+                                                  imagePath, sDriveDescription[driveType]),
+                                      false);
             }
             break;
         default:

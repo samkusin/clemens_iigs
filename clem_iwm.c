@@ -346,8 +346,19 @@ static bool _clem_iwm_lss(struct ClemensDeviceIWM *iwm, struct ClemensClock *clo
     return (iwm->lss_state & 0x8) != 0;
 }
 
-static void _clem_drive_off(struct ClemensDeviceIWM *iwm) {
-    iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_ON;
+static void _clem_iwm_drive_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
+                                   unsigned io_flags) {
+    struct ClemensDrive *drive;
+    if (io_flags == iwm->io_flags)
+        return;
+    drive = _clem_iwm_select_drive(iwm, drives);
+    if (drive)
+        drive->is_spindle_on = false;
+    iwm->io_flags = io_flags;
+}
+
+static void _clem_drive_off(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives) {
+    _clem_iwm_drive_switch(iwm, drives, iwm->io_flags & ~CLEM_IWM_FLAG_DRIVE_ON);
     CLEM_DEBUG("IWM: turning drive off now");
 }
 
@@ -419,7 +430,8 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
                         drive->write_pulse = false;
                 }
             }
-            if ((iwm->state & CLEM_IWM_STATE_WRITE_MASK) && iwm->async_write_mode) {
+            if ((iwm->state & CLEM_IWM_STATE_WRITE_MASK) && iwm->async_write_mode &&
+                ((iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) || iwm->enable2)) {
                 write_signal = _clem_iwm_lss_write_async(iwm, clock, disk_delta_ns);
             } else {
                 write_signal = _clem_iwm_lss(iwm, &next_clock);
@@ -461,7 +473,7 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
         iwm->ns_drive_hold = clem_util_timer_decrement(iwm->ns_drive_hold, delta_ns);
         if (iwm->ns_drive_hold == 0 || iwm->timer_1sec_disabled) {
             CLEM_LOG("IWM: turning drive off in sync");
-            _clem_drive_off(iwm);
+            _clem_drive_off(iwm, drives);
         }
     }
 
@@ -486,7 +498,7 @@ void _clem_iwm_io_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *d
     case CLEM_MMIO_REG_IWM_DRIVE_DISABLE:
         if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
             if (iwm->timer_1sec_disabled) {
-                _clem_drive_off(iwm);
+                _clem_drive_off(iwm, drives);
             } else if (iwm->ns_drive_hold == 0) {
                 iwm->ns_drive_hold = CLEM_1SEC_NS;
             }
@@ -495,7 +507,7 @@ void _clem_iwm_io_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *d
     case CLEM_MMIO_REG_IWM_DRIVE_ENABLE:
         if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
             CLEM_DEBUG("IWM: turning drive on");
-            iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_ON;
+            _clem_iwm_drive_switch(iwm, drives, iwm->io_flags | CLEM_IWM_FLAG_DRIVE_ON);
             _clem_iwm_reset_lss(iwm, drives, clock);
         } else if (iwm->ns_drive_hold > 0) {
             iwm->ns_drive_hold = 0;
@@ -505,9 +517,9 @@ void _clem_iwm_io_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *d
         /*if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1)) {
         }
         */
-        iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_2;
+        _clem_iwm_drive_switch(iwm, drives, iwm->io_flags & ~CLEM_IWM_FLAG_DRIVE_2);
         if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1)) {
-            iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_1;
+            _clem_iwm_drive_switch(iwm, drives, iwm->io_flags | CLEM_IWM_FLAG_DRIVE_1);
             _clem_iwm_reset_lss(iwm, drives, clock);
         }
         break;
@@ -516,11 +528,9 @@ void _clem_iwm_io_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *d
         if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2)) {
         }
         */
-
-        iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_1;
+        _clem_iwm_drive_switch(iwm, drives, iwm->io_flags & ~CLEM_IWM_FLAG_DRIVE_1);
         if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2)) {
-            iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_2;
-            ;
+            _clem_iwm_drive_switch(iwm, drives, iwm->io_flags | CLEM_IWM_FLAG_DRIVE_2);
             _clem_iwm_reset_lss(iwm, drives, clock);
         }
         break;
@@ -614,12 +624,12 @@ void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
         if (value & 0x40) {
             if (!(old_io_flags & CLEM_IWM_FLAG_DRIVE_35)) {
                 CLEM_DEBUG("IWM: setting 3.5 drive mode");
-                iwm->io_flags |= CLEM_IWM_FLAG_DRIVE_35;
+                _clem_iwm_drive_switch(iwm, drives, iwm->io_flags | CLEM_IWM_FLAG_DRIVE_35);
             }
         } else {
             if (old_io_flags & CLEM_IWM_FLAG_DRIVE_35) {
                 CLEM_DEBUG("IWM: setting 5.25 drive mode");
-                iwm->io_flags &= ~CLEM_IWM_FLAG_DRIVE_35;
+                _clem_iwm_drive_switch(iwm, drives, iwm->io_flags & ~CLEM_IWM_FLAG_DRIVE_35);
             }
         }
         if (value & 0x3f) {

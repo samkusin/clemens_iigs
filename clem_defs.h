@@ -471,16 +471,16 @@
 #define CLEM_ADB_KEY_BACKQUOTE  0x32
 #define CLEM_ADB_KEY_DELETE     0x33
 /* Skipped 0x34 */
-#define CLEM_ADB_KEY_ESCAPE        0x35
-#define CLEM_ADB_KEY_LCTRL         0x36
-#define CLEM_ADB_KEY_COMMAND_APPLE 0x37
-#define CLEM_ADB_KEY_LSHIFT        0x38
-#define CLEM_ADB_KEY_CAPSLOCK      0x39
-#define CLEM_ADB_KEY_OPTION        0x3A
-#define CLEM_ADB_KEY_LEFT          0x3B
-#define CLEM_ADB_KEY_RIGHT         0x3C
-#define CLEM_ADB_KEY_DOWN          0x3D
-#define CLEM_ADB_KEY_UP            0x3E
+#define CLEM_ADB_KEY_ESCAPE             0x35
+#define CLEM_ADB_KEY_LCTRL              0x36
+#define CLEM_ADB_KEY_COMMAND_OPEN_APPLE 0x37
+#define CLEM_ADB_KEY_LSHIFT             0x38
+#define CLEM_ADB_KEY_CAPSLOCK           0x39
+#define CLEM_ADB_KEY_OPTION             0x3A
+#define CLEM_ADB_KEY_LEFT               0x3B
+#define CLEM_ADB_KEY_RIGHT              0x3C
+#define CLEM_ADB_KEY_DOWN               0x3D
+#define CLEM_ADB_KEY_UP                 0x3E
 /* Skipped 0x3F */
 /* Skipped 0x40 */
 #define CLEM_ADB_KEY_PAD_DECIMAL 0x41

@@ -913,11 +913,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                 if (stepsRemaining.has_value()) {
                     stepsRemaining = *stepsRemaining - 1;
                 }
-
                 //  TODO: MMIO bypass
-
-                //  TODO: check breakpoints, etc
-
                 if (!breakpoints_.empty()) {
                     if ((hitBreakpoint = checkHitBreakpoint()).has_value()) {
                         stepsRemaining = 0;
@@ -961,6 +957,21 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                         diskDrive.imagePath.clear();
                         resetDisk(driveType);
                     }
+                }
+            }
+            for (auto diskDriveIt = smartPortDrives_.begin(); diskDriveIt != smartPortDrives_.end();
+                 ++diskDriveIt) {
+                auto &diskDrive = *diskDriveIt;
+                auto driveIndex = unsigned(diskDriveIt - smartPortDrives_.begin());
+                // auto *clemensUnit = clemens_smartport_unit_get(&mmio_, driveIndex);
+                //  TODO: detect SmartPort drive status - enable2 only detects if the
+                //        whole bus is active - which may be fine for now since we just support one
+                //        SmartPort drive!
+                diskDrive.isSpinning = mmio_.dev_iwm.enable2;
+                diskDrive.isWriteProtected = false;
+                diskDrive.saveFailed = false;
+                if (diskDrive.isEjecting) {
+                    //  TODO: SmartPort drive ejection
                 }
             }
             updateSeqNo = true;
@@ -1044,6 +1055,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                 publishedState.bpHitIndex = *hitBreakpoint;
             }
             publishedState.diskDrives = diskDrives_.data();
+            publishedState.smartDrives = smartPortDrives_.data();
             publishedState.commandFailed = std::move(commandFailed);
             publishedState.commandType = std::move(commandType);
             publishedState.message = std::move(debugMessage);

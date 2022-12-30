@@ -36,6 +36,8 @@ class ClemensFrontend {
     void frame(int width, int height, double deltaTime, FrameAppInterop &interop);
     //  application input from OS
     void input(ClemensInputEvent input);
+    //  application lost focus
+    void lostFocus();
 
   private:
     template <typename TBufferType> friend struct FormatView;
@@ -52,8 +54,11 @@ class ClemensFrontend {
     void doMachineDiskDisplay();
     void doMachineDiskSelection(ClemensDriveType driveType);
     void doMachineDiskStatus(ClemensDriveType driveType);
+    void doMachineSmartDriveSelection(unsigned driveIndex);
+    void doMachineSmartDriveStatus(unsigned driveIndex);
     void doMachineCPUInfoDisplay();
     void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU, float screenV);
+    void doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize);
     void doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize);
 
     void layoutTerminalLines();
@@ -143,12 +148,14 @@ class ClemensFrontend {
         uint8_t *memoryView = nullptr;
         uint8_t *ioPage = nullptr;
         uint8_t *docRAM = nullptr;
+        uint8_t *bram = nullptr;
         LogOutputNode *logNode = nullptr;
         ClemensBackendBreakpoint *breakpoints = nullptr;
         unsigned breakpointCount = 0;
         int logLevel;
 
         std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives;
+        std::array<ClemensBackendDiskDriveState, CLEM_SMARTPORT_DRIVE_LIMIT> smartDrives;
 
         float emulatorSpeedMhz;
         ClemensClock emulatorClock;
