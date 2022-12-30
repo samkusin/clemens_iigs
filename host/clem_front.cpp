@@ -1401,6 +1401,23 @@ void ClemensFrontend::doMachineSmartDriveSelection(unsigned driveIndex) {
         ImGui::Selectable(imageName);
         ImGui::EndCombo();
     }
+    ImGui::SameLine();
+    //  TODO: repeated code but fix when we ensure this works for SmartPort drives
+    const ImColor kRed(255, 0, 0, 255);
+    const ImColor kDark(64, 64, 64, 255);
+    ImGuiStyle &style = ImGui::GetStyle();
+    ImVec2 screenPos = ImGui::GetCursorScreenPos();
+    const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
+    const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
+    screenPos.x += style.ItemSpacing.x;
+    screenPos.y += lineHeight * 0.5f;
+    ImGui::Dummy(ImVec2(lineHeight, lineHeight));
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    if (drive.isSpinning) {
+        drawList->AddCircleFilled(screenPos, circleRadius, kRed);
+    } else {
+        drawList->AddCircleFilled(screenPos, circleRadius, kDark);
+    }
 }
 
 void ClemensFrontend::doMachineSmartDriveStatus(unsigned /*driveIndex */) {
@@ -2151,23 +2168,6 @@ void ClemensFrontend::doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize) {
         ImGui::Text("Move mouse into view for key input");
     }
 
-    /*
-
-    if (emulatorHasMouseFocus_ && emulatorHasKeyboardFocus_) {
-        ImGui::TextUnformatted("Input:ALL");
-    } else if (emulatorHasMouseFocus_) {
-        ImGui::TextUnformatted("Input:MOUSE");
-    } else if (emulatorHasKeyboardFocus_) {
-        ImGui::TextUnformatted("Input:KEYS");
-    } else {
-        ImGui::TextUnformatted("Input:NONE");
-    }
-
-
-    cursorPos.x = ImGui::GetCursorStartPos().x + rootSize.x * 0.5f;
-    ImGui::SameLine(cursorPos.x, 0.0f);
-    ImGui::TextUnformatted("BLAH");
-    */
     ImGui::End();
 }
 

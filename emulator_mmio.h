@@ -70,6 +70,15 @@ struct ClemensDrive *clemens_drive_get(ClemensMMIO *mmio, enum ClemensDriveType 
  *
  * @param mmio
  * @param drive_type
+ * @return struct ClemensDrive*
+ */
+struct ClemensSmartPortUnit *clemens_smartport_unit_get(ClemensMMIO *mmio, unsigned unit_index);
+
+/**
+ * @brief
+ *
+ * @param mmio
+ * @param drive_type
  * @param disk
  * @return true
  * @return false

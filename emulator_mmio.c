@@ -58,6 +58,12 @@ struct ClemensDrive *clemens_drive_get(ClemensMMIO *mmio, enum ClemensDriveType 
     return drive;
 }
 
+struct ClemensSmartPortUnit *clemens_smartport_unit_get(ClemensMMIO *mmio, unsigned unit_index) {
+    if (unit_index >= CLEM_SMARTPORT_DRIVE_LIMIT)
+        return NULL;
+    return &mmio->active_drives.smartport[unit_index];
+}
+
 bool clemens_assign_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
                          struct ClemensNibbleDisk *disk) {
     struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);

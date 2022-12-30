@@ -959,6 +959,21 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                     }
                 }
             }
+            for (auto diskDriveIt = smartPortDrives_.begin(); diskDriveIt != smartPortDrives_.end();
+                 ++diskDriveIt) {
+                auto &diskDrive = *diskDriveIt;
+                auto driveIndex = unsigned(diskDriveIt - smartPortDrives_.begin());
+                // auto *clemensUnit = clemens_smartport_unit_get(&mmio_, driveIndex);
+                //  TODO: detect SmartPort drive status - enable2 only detects if the
+                //        whole bus is active - which may be fine for now since we just support one
+                //        SmartPort drive!
+                diskDrive.isSpinning = mmio_.dev_iwm.enable2;
+                diskDrive.isWriteProtected = false;
+                diskDrive.saveFailed = false;
+                if (diskDrive.isEjecting) {
+                    //  TODO: SmartPort drive ejection
+                }
+            }
             updateSeqNo = true;
         }
 
