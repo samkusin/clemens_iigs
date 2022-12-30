@@ -15,15 +15,17 @@ extern "C" {
  * unit testing, and to allow emulation of other 65816 devices.
  *
  * @param clem
+ * @param mmio
  */
 void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio);
 
 /**
- * @brief
+ * @brief Returns the emulated system's clocks per second
  *
- * @param clem
- * @param is_slow_speed
- * @return uint64_t
+ * @param mmio The MMIO component
+ * @param is_slow_speed (Required) Points to a boolean indicating current system speed as read from
+ *                      the SPEED register (not BRAM)
+ * @return uint64_t The clocks per second
  */
 uint64_t clemens_clocks_per_second(ClemensMMIO *mmio, bool *is_slow_speed);
 

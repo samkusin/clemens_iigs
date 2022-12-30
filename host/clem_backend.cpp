@@ -913,11 +913,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                 if (stepsRemaining.has_value()) {
                     stepsRemaining = *stepsRemaining - 1;
                 }
-
                 //  TODO: MMIO bypass
-
-                //  TODO: check breakpoints, etc
-
                 if (!breakpoints_.empty()) {
                     if ((hitBreakpoint = checkHitBreakpoint()).has_value()) {
                         stepsRemaining = 0;

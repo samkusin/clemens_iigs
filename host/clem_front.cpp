@@ -768,6 +768,9 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     frameWriteState_.ioPage = (uint8_t *)frameWriteMemory_.allocate(256);
     memcpy(frameWriteState_.ioPage, state.ioPageValues, 256);
 
+    frameWriteState_.bram = (uint8_t *)frameWriteMemory_.allocate(CLEM_RTC_BRAM_SIZE);
+    memcpy(frameWriteState_.bram, state.mmio->dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
+
     frameWriteState_.memoryViewBank = state.debugMemoryPage;
     if (!state.isRunning) {
         frameWriteState_.memoryView = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
@@ -1080,18 +1083,24 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         }
     }
 
-    const int kLineSpacing = ImGui::GetTextLineHeightWithSpacing();
-    const int kTerminalViewHeight = std::max(kLineSpacing * 6, int(height * 0.33f));
-    const int kMachineStateViewWidth = std::max(int(width * 0.40f), 480);
-    const int kMonitorX = kMachineStateViewWidth;
-    const int kMonitorViewWidth = width - kMonitorX;
-    const int kMonitorViewHeight = height - kTerminalViewHeight;
+    const ImGuiStyle &kMainStyle = ImGui::GetStyle();
+    const ImVec2 kWindowBoundary(kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.x,
+                                 kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.y);
+    const float kLineSpacing = ImGui::GetTextLineHeightWithSpacing();
+    const float kMachineStateViewWidth = std::max(int(width * 0.40f), 480);
+    const float kMonitorX = kMachineStateViewWidth;
+    const float kMonitorViewWidth = width - kMonitorX;
+    const float kInfoBarHeight = kLineSpacing + kWindowBoundary.y * 2;
+    const float kTerminalViewHeight =
+        std::max(kLineSpacing * 6 + kWindowBoundary.y * 2, height * 0.33f) - kInfoBarHeight;
+    const float kMonitorViewHeight = height - kInfoBarHeight - kTerminalViewHeight;
     ImVec2 monitorSize(kMonitorViewWidth, kMonitorViewHeight);
 
     doMachineStateLayout(ImVec2(0, 0), ImVec2(kMachineStateViewWidth, height));
     doMachineViewLayout(ImVec2(kMonitorX, 0), monitorSize, screenUVs[0], screenUVs[1]);
-    doMachineTerminalLayout(ImVec2(kMonitorX, height - kTerminalViewHeight),
-                            ImVec2(width - kMonitorX, kTerminalViewHeight));
+    doMachineInfoBar(ImVec2(kMonitorX, monitorSize.y), ImVec2(kMonitorViewWidth, kInfoBarHeight));
+    doMachineTerminalLayout(ImVec2(kMonitorX, monitorSize.y + kInfoBarHeight),
+                            ImVec2(kMonitorViewWidth, kTerminalViewHeight));
     switch (guiMode_) {
     case GUIMode::ImportDiskModal:
     case GUIMode::BlankDiskModal:
@@ -1344,6 +1353,23 @@ void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType) {
         if (diskComboStateFlags_ & (1 << driveType)) {
             diskComboStateFlags_ &= ~(1 << driveType);
         }
+    }
+    ImGui::SameLine();
+
+    const ImColor kRed(255, 0, 0, 255);
+    const ImColor kDark(64, 64, 64, 255);
+    ImGuiStyle &style = ImGui::GetStyle();
+    ImVec2 screenPos = ImGui::GetCursorScreenPos();
+    const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
+    const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
+    screenPos.x += style.ItemSpacing.x;
+    screenPos.y += lineHeight * 0.5f;
+    ImGui::Dummy(ImVec2(lineHeight, lineHeight));
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    if (drive.isSpinning) {
+        drawList->AddCircleFilled(screenPos, circleRadius, kRed);
+    } else {
+        drawList->AddCircleFilled(screenPos, circleRadius, kDark);
     }
 }
 
@@ -2081,6 +2107,67 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
     emulatorHasKeyboardFocus_ = emulatorHasKeyboardFocus_ || ImGui::IsWindowHovered();
 
     ImGui::EndChild();
+    ImGui::End();
+}
+
+void ClemensFrontend::doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize) {
+    //  Display Power Status, Disk Drive Status, SmartPort Status, MouseLock,
+    //  Key Focus
+    const ImColor kGreen(0, 255, 0, 255);
+    const ImColor kDark(64, 64, 64, 255);
+    const uint8_t *ioPage = frameReadState_.ioPage;
+    const uint8_t *bram = frameReadState_.bram;
+
+    ImGui::SetNextWindowPos(rootAnchor);
+    ImGui::SetNextWindowSize(rootSize);
+    ImGui::Begin("InfoBar", nullptr,
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove);
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    ImVec2 screenPos;
+    ImVec2 cursorPos;
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const float kCellPaddingX = style.CellPadding.x;
+    float lineHeight = ImGui::GetTextLineHeightWithSpacing();
+    float circleHeight = ImGui::GetTextLineHeight() * 0.5f;
+    ImGui::TextUnformatted("1Mhz: ");
+    ImGui::SameLine(0.0f, 0.0f);
+    screenPos = ImGui::GetCursorScreenPos();
+    screenPos.y += lineHeight * 0.5f;
+    if (!bram || bram[CLEM_RTC_BRAM_SYSTEM_SPEED] != 0x00) {
+        drawList->AddCircleFilled(screenPos, circleHeight, kDark);
+    } else {
+        drawList->AddCircleFilled(screenPos, circleHeight, kGreen);
+    }
+    cursorPos.x = ImGui::GetCursorStartPos().x + rootSize.x * 0.20f;
+    cursorPos.y = ImGui::GetCursorPosY();
+    ImGui::SameLine(cursorPos.x, 0.0f);
+
+    if (emulatorHasMouseFocus_) {
+        ImGui::TextUnformatted("Press both ALT keys and CTRL to unlock mouse");
+    } else if (emulatorHasKeyboardFocus_) {
+        ImGui::Text("Click in View to lock mouse input");
+    } else {
+        ImGui::Text("Move mouse into view for key input");
+    }
+
+    /*
+
+    if (emulatorHasMouseFocus_ && emulatorHasKeyboardFocus_) {
+        ImGui::TextUnformatted("Input:ALL");
+    } else if (emulatorHasMouseFocus_) {
+        ImGui::TextUnformatted("Input:MOUSE");
+    } else if (emulatorHasKeyboardFocus_) {
+        ImGui::TextUnformatted("Input:KEYS");
+    } else {
+        ImGui::TextUnformatted("Input:NONE");
+    }
+
+
+    cursorPos.x = ImGui::GetCursorStartPos().x + rootSize.x * 0.5f;
+    ImGui::SameLine(cursorPos.x, 0.0f);
+    ImGui::TextUnformatted("BLAH");
+    */
     ImGui::End();
 }
 

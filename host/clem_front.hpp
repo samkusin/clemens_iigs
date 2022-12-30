@@ -58,6 +58,7 @@ class ClemensFrontend {
     void doMachineSmartDriveStatus(unsigned driveIndex);
     void doMachineCPUInfoDisplay();
     void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU, float screenV);
+    void doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize);
     void doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize);
 
     void layoutTerminalLines();
@@ -147,6 +148,7 @@ class ClemensFrontend {
         uint8_t *memoryView = nullptr;
         uint8_t *ioPage = nullptr;
         uint8_t *docRAM = nullptr;
+        uint8_t *bram = nullptr;
         LogOutputNode *logNode = nullptr;
         ClemensBackendBreakpoint *breakpoints = nullptr;
         unsigned breakpointCount = 0;

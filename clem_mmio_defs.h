@@ -1,3 +1,5 @@
+#ifndef CLEM_MMIO_DEFS_H
+#define CLEM_MMIO_DEFS_H
 
 //  These flags refer to bank 0 memory switches for address bit 17
 //  0 = Main Bank, 1 = Aux Bank ZP, Stack and Language Card
@@ -339,3 +341,8 @@
 #define CLEM_MMIO_EMULATOR_DETECT_IDLE    0
 #define CLEM_MMIO_EMULATOR_DETECT_START   1
 #define CLEM_MMIO_EMULATOR_DETECT_VERSION 2
+
+/** Definitions for the Battery RAM used to access values from the ClemensDeviceRTC component */
+#define CLEM_RTC_BRAM_SYSTEM_SPEED 0x20
+
+#endif
