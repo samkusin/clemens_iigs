@@ -41,7 +41,7 @@ ClemensTraceExecutedInstruction &
 ClemensTraceExecutedInstruction::fromInstruction(const ClemensInstruction &instruction,
                                                  const char *oper) {
     strncpy(opcode, instruction.desc->name, sizeof(opcode));
-    strncpy(operand, oper, sizeof(operand));
+    strncpy(operand, oper, sizeof(operand) - 1);
     cycles_spent = instruction.cycles_spent;
     pc = (uint32_t(instruction.pbr) << 16) | instruction.addr;
     size = kAddrModeSizes[instruction.desc->addr_mode];

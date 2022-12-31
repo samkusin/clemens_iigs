@@ -6,7 +6,7 @@
 #include <cstring>
 
 ClemensConfiguration::ClemensConfiguration(std::string iniPathname)
-    : iniPathname_(std::move(iniPathname)), majorVersion(0), minorVersion(0) {
+    : majorVersion(0), minorVersion(0), iniPathname_(std::move(iniPathname)) {
 
     if (ini_parse(iniPathname_.c_str(), &ClemensConfiguration::handler, this)) {
         return;

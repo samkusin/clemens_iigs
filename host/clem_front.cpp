@@ -2152,7 +2152,6 @@ void ClemensFrontend::doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize) {
     //  Key Focus
     const ImColor kGreen(0, 255, 0, 255);
     const ImColor kDark(64, 64, 64, 255);
-    const uint8_t *ioPage = frameReadState_.ioPage;
     const uint8_t *bram = frameReadState_.bram;
 
     ImGui::SetNextWindowPos(rootAnchor);
@@ -2164,7 +2163,6 @@ void ClemensFrontend::doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize) {
     ImVec2 screenPos;
     ImVec2 cursorPos;
     const ImGuiStyle &style = ImGui::GetStyle();
-    const float kCellPaddingX = style.CellPadding.x;
     float lineHeight = ImGui::GetTextLineHeightWithSpacing();
     float circleHeight = ImGui::GetTextLineHeight() * 0.5f;
     ImGui::TextUnformatted("1Mhz: ");
