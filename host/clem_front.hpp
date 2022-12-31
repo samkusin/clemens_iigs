@@ -184,6 +184,7 @@ class ClemensFrontend {
         bool mmioWasInitialized = false;
         bool isTracing = false;
         bool isIWMTracing = false;
+        bool isRunning = false;
     };
 
     //  This state sticks around until processed by the UI frame - a hacky solution
