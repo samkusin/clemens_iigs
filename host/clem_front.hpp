@@ -5,6 +5,7 @@
 #include "cinek/circular_buffer.hpp"
 #include "cinek/fixedstack.hpp"
 #include "clem_audio.hpp"
+#include "clem_configuration.hpp"
 #include "clem_disk_library.hpp"
 #include "clem_display.hpp"
 #include "clem_host_shared.hpp"
@@ -21,6 +22,7 @@
 struct ImFont;
 
 class ClemensBackend;
+class ClemensPreamble;
 
 class ClemensFrontend {
   public:
@@ -30,6 +32,7 @@ class ClemensFrontend {
 
     struct FrameAppInterop {
         bool mouseLock;
+        bool exitApp;
     };
 
     //  application rendering hook
@@ -87,6 +90,7 @@ class ClemensFrontend {
     void cmdADBMouse(std::string_view operand);
 
   private:
+    ClemensConfiguration config_;
     ClemensDisplayProvider displayProvider_;
 
     ClemensDisplay display_;
@@ -201,7 +205,7 @@ class ClemensFrontend {
         cinek::ByteBuffer audioBuffer;
     };
 
-    ClemensBackendConfig config_;
+    ClemensBackendConfig backendConfig_;
 
     cinek::FixedStack frameWriteMemory_;
     cinek::FixedStack frameReadMemory_;
@@ -262,6 +266,8 @@ class ClemensFrontend {
     void pollJoystickDevices();
 
   private:
+    std::unique_ptr<ClemensPreamble> preamble_;
+
     //  UI State Specific Flows
     void doModalOperations(int width, int height);
     void doImportDiskSetFlowStart(int width, int height);
@@ -271,6 +277,7 @@ class ClemensFrontend {
     void doNewBlankDisk(int width, int height);
 
     enum class GUIMode {
+        Preamble,
         Emulator,
         ImportDiskModal,
         BlankDiskModal,

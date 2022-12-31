@@ -272,8 +272,12 @@ static void onFrame() {
 
     ClemensFrontend::FrameAppInterop interop;
     interop.mouseLock = sapp_mouse_locked();
+    interop.exitApp = false;
     g_Host->frame(frameWidth, frameHeight, deltaTime, interop);
     sapp_lock_mouse(interop.mouseLock);
+    if (interop.exitApp) {
+        sapp_request_quit();
+    }
 
     sg_begin_default_pass(&g_sgPassAction, frameWidth, frameHeight);
     simgui_render();

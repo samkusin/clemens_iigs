@@ -6,6 +6,7 @@
 #include "clem_import_disk.hpp"
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
+#include "clem_preamble.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 #include "version.h"
@@ -560,8 +561,9 @@ const uint64_t ClemensFrontend::kFrameSeqNoInvalid = std::numeric_limits<uint64_
 
 ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
-    : displayProvider_(systemFontLoBuffer, systemFontHiBuffer), display_(displayProvider_),
-      audio_(), frameSeqNo_(kFrameSeqNoInvalid), frameLastSeqNo_(kFrameSeqNoInvalid),
+    : config_("config.ini"), displayProvider_(systemFontLoBuffer, systemFontHiBuffer),
+      display_(displayProvider_), audio_(), frameSeqNo_(kFrameSeqNoInvalid),
+      frameLastSeqNo_(kFrameSeqNoInvalid),
       frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameMemory_(kLogMemorySize, malloc(kLogMemorySize)), lastFrameCPUPins_{},
@@ -573,7 +575,7 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
               .string()},
       diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0),
       debugIOMode_(DebugIOMode::Core), validJoystickIds_{-1, -1, -1, -1},
-      guiMode_(GUIMode::Emulator) {
+      guiMode_(GUIMode::Preamble) {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -581,21 +583,21 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
     clem_joystick_open_devices(CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT);
 
     audio_.start();
-    config_.type = ClemensBackend::Config::Type::Apple2GS;
-    config_.audioSamplesPerSecond = audio_.getAudioFrequency();
+    backendConfig_.type = ClemensBackend::Config::Type::Apple2GS;
+    backendConfig_.audioSamplesPerSecond = audio_.getAudioFrequency();
 
-    auto audioBufferSize = config_.audioSamplesPerSecond * audio_.getBufferStride() / 2;
+    auto audioBufferSize = backendConfig_.audioSamplesPerSecond * audio_.getBufferStride() / 2;
     lastCommandState_.audioBuffer =
         cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
     thisFrameAudioBuffer_ = cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
 
-    config_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
+    backendConfig_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
 
-    config_.diskLibraryRootPath = diskLibraryRootPath_;
+    backendConfig_.diskLibraryRootPath = diskLibraryRootPath_;
     // TODO: This should be selectable like regular drives - this will require some
     //       UI to make it happen
-    config_.smartPortDriveStates[0].imagePath = std::filesystem::path("smartport.2mg").string();
-    backend_ = createBackend();
+    backendConfig_.smartPortDriveStates[0].imagePath =
+        std::filesystem::path("smartport.2mg").string();
 
     debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;
     debugMemoryEditor_.WriteFn = &ClemensFrontend::imguiMemoryEditorWrite;
@@ -641,12 +643,11 @@ void ClemensFrontend::lostFocus() {
 std::unique_ptr<ClemensBackend> ClemensFrontend::createBackend() {
     constexpr unsigned refreshFrequency_ = 60;
     auto backend = std::make_unique<ClemensBackend>(
-        "gs_rom_3.rom", config_,
+        "gs_rom_3.rom", backendConfig_,
         std::bind(&ClemensFrontend::backendStateDelegate, this, std::placeholders::_1));
     backend->setRefreshFrequency(refreshFrequency_);
     backend->reset();
     backend->run();
-    guiMode_ = GUIMode::Emulator;
     fmt::print("Creating new backend emulator refreshing @ {} Hz.\n", refreshFrequency_);
     return backend;
 }
@@ -869,7 +870,7 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     }
 
     if (state.message.has_value()) {
-        printf("debug message: %s\n", (*state.message).c_str());
+        fmt::print("debug message: {}\n", *state.message);
     }
 }
 
@@ -933,6 +934,8 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     //  send commands to emulator thread
     //  get results from emulator thread
     //    video, audio, machine state, etc
+    if (interop.exitApp)
+        return;
 
     pollJoystickDevices();
 
@@ -1006,9 +1009,9 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         breakpoints_.clear();
         for (unsigned bpIndex = 0; bpIndex < frameReadState_.breakpointCount; ++bpIndex) {
             breakpoints_.emplace_back(frameReadState_.breakpoints[bpIndex]);
-            config_.breakpoints.push_back(breakpoints_.back());
+            backendConfig_.breakpoints.push_back(breakpoints_.back());
         }
-        config_.breakpoints = breakpoints_;
+        backendConfig_.breakpoints = breakpoints_;
         if (lastCommandState_.commandFailed.has_value()) {
             if (*lastCommandState_.commandFailed) {
                 CLEM_TERM_COUT.format(TerminalLine::Error, "{} Failed.",
@@ -1037,7 +1040,7 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         }
 
         for (size_t driveIndex = 0; driveIndex < frameReadState_.diskDrives.size(); ++driveIndex) {
-            config_.diskDriveStates[driveIndex] = frameReadState_.diskDrives[driveIndex];
+            backendConfig_.diskDriveStates[driveIndex] = frameReadState_.diskDrives[driveIndex];
         }
 
         frameMemory_.reset();
@@ -1102,6 +1105,22 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     doMachineTerminalLayout(ImVec2(kMonitorX, monitorSize.y + kInfoBarHeight),
                             ImVec2(kMonitorViewWidth, kTerminalViewHeight));
     switch (guiMode_) {
+    case GUIMode::Preamble:
+        if (!preamble_) {
+            preamble_ = std::make_unique<ClemensPreamble>(config_);
+        }
+        if (preamble_) {
+            auto preambleResult = preamble_->frame(width, height);
+            if (preambleResult != ClemensPreamble::Result::Active) {
+                if (preambleResult == ClemensPreamble::Result::Ok) {
+                    preamble_ = nullptr;
+                    guiMode_ = GUIMode::RebootEmulator;
+                } else if (preambleResult == ClemensPreamble::Result::Exit) {
+                    interop.exitApp = true;
+                }
+            }
+        }
+        break;
     case GUIMode::ImportDiskModal:
     case GUIMode::BlankDiskModal:
         doModalOperations(width, height);
@@ -1123,16 +1142,17 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         doNewBlankDisk(width, height);
         break;
     case GUIMode::RebootEmulator:
-        if (isBackendTerminated) {
+        if (isBackendTerminated || !backend_) {
             backend_ = createBackend();
+            guiMode_ = GUIMode::Emulator;
         }
         break;
     default:
         break;
     }
-
-    backend_->publish();
-
+    if (backend_) {
+        backend_->publish();
+    }
     if (ImGui::IsKeyDown(ImGuiKey_LeftAlt) && ImGui::IsKeyDown(ImGuiKey_RightAlt)) {
         if (ImGui::IsKeyReleased(ImGuiKey_LeftCtrl) || ImGui::IsKeyReleased(ImGuiKey_RightCtrl)) {
             emulatorHasMouseFocus_ = false;
@@ -2423,23 +2443,17 @@ void ClemensFrontend::doImportDiskSetFlowStart(int /*width*/, int /*height*/) {
         //        waste cycles on figuring out this minor UI convenience for now.
         ImGui::SetItemDefaultFocus();
         bool doImport = false;
-        if (ImGui::InputText("##", collectionName, sizeof(collectionName),
-                             ImGuiInputTextFlags_EnterReturnsTrue)) {
+        if (ImGui::InputText("##", collectionName, sizeof(collectionName))) {
             importDiskSetName_ = collectionName;
-            doImport = true;
         }
-        if (ImGui::Button("Ok")) {
+        if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
             doImport = true;
         }
         if (doImport) {
             if (!importDiskSetName_.empty() && !std::filesystem::path(importDiskSetName_).empty()) {
                 importDiskSetPath_ =
                     (std::filesystem::path(diskLibraryRootPath_) / importDiskSetName_).string();
-                if (std::filesystem::exists(importDiskSetPath_)) {
-                    guiMode_ = GUIMode::ImportDiskSetReplaceOld;
-                } else {
-                    guiMode_ = GUIMode::ImportDiskSet;
-                }
+                guiMode_ = GUIMode::ImportDiskSet;
             } else {
                 guiMode_ = GUIMode::Emulator;
             }
@@ -2673,7 +2687,7 @@ std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath
             break;
         }
     }
-    if (!std::filesystem::create_directories(outputPath)) {
+    if (!std::filesystem::exists(outputPath) && !std::filesystem::create_directories(outputPath)) {
         return std::make_pair(fmt::format("Unable to create directory {}", outputPath), false);
     }
     if (!importer.build(outputPath)) {
