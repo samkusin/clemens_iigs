@@ -1,7 +1,7 @@
 #ifndef CLEM_HOST_AUDIO_H
 #define CLEM_HOST_AUDIO_H
 
-#include "clem_types.h"
+#include "clem_mmio_types.h"
 
 #include <mutex>
 #include <vector>

@@ -1,7 +1,7 @@
 #ifndef CLEM_HOST_SHARED_HPP
 #define CLEM_HOST_SHARED_HPP
 
-#include "clem_types.h"
+#include "clem_mmio_types.h"
 
 #include <array>
 #include <chrono>

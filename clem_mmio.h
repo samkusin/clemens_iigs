@@ -1,7 +1,7 @@
 #ifndef CLEM_MMIO_H
 #define CLEM_MMIO_H
 
-#include "clem_types.h"
+#include "clem_mmio_types.h"
 
 #ifdef __cplusplus
 extern "C" {
