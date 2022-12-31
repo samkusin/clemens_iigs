@@ -717,6 +717,16 @@ static int64_t calculateClocksPerTimeslice(ClemensMMIO *mmio, unsigned hz) {
     return int64_t(clemens_clocks_per_second(mmio, &is_machine_slow) / hz);
 }
 
+#if defined(__GNUC__)
+//  Despite guarding with std::optional<>::has_value(), annoying GCC warning
+//  that I may be accessing an uninitialized optional with a folloing value
+//  access (if has_value() returns true) - which is the accepted method
+//  or checking optionals if exception handling is turned off
+//  https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80635
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
 void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     int64_t clocksRemainingInTimeslice = 0;
     std::optional<int> stepsRemaining = 0;
@@ -756,8 +766,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         std::unique_lock<std::mutex> queuelock(commandQueueMutex_);
         if (!isRunning) {
             //  waiting for commands
-            commandQueueCondition_.wait(queuelock,
-                                        [this, &stepsRemaining] { return !commandQueue_.empty(); });
+            commandQueueCondition_.wait(queuelock, [this] { return !commandQueue_.empty(); });
         }
         //  TODO: we may just be able to use a vector for the command queue and
         //        create a local copy of the queue to minimize time spent executing
@@ -1095,6 +1104,10 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     fmt::print("Terminated backend refresh thread.\n");
 }
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 std::optional<unsigned> ClemensBackend::checkHitBreakpoint() {
     for (auto it = breakpoints_.begin(); it != breakpoints_.end(); ++it) {
         uint16_t b_adr = (uint16_t)(it->address & 0xffff);
@@ -1266,5 +1279,6 @@ void ClemensBackend::emulatorOpcodeCallback(struct ClemensInstruction *inst, con
     host->loggedInstructions_.emplace_back();
     auto &loggedInst = host->loggedInstructions_.back();
     loggedInst.data = *inst;
-    strncpy(loggedInst.operand, operand, sizeof(loggedInst.operand));
+    strncpy(loggedInst.operand, operand, sizeof(loggedInst.operand) - 1);
+    loggedInst.operand[sizeof(loggedInst.operand) - 1] = '\0';
 }

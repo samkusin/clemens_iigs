@@ -2162,7 +2162,6 @@ void ClemensFrontend::doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize) {
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     ImVec2 screenPos;
     ImVec2 cursorPos;
-    const ImGuiStyle &style = ImGui::GetStyle();
     float lineHeight = ImGui::GetTextLineHeightWithSpacing();
     float circleHeight = ImGui::GetTextLineHeight() * 0.5f;
     ImGui::TextUnformatted("1Mhz: ");
