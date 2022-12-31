@@ -253,6 +253,7 @@ class ClemensFrontend {
     void doMachineDebugDiskIODisplay();
     void doMachineDebugADBDisplay();
     void doMachineDebugSoundDisplay();
+    void doMachineDebugIORegister(uint8_t *ioregsold, uint8_t *ioregs, uint8_t reg);
 
     enum class DebugIOMode { Core };
     DebugIOMode debugIOMode_;
