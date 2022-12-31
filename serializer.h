@@ -2,6 +2,9 @@
 #define CLEM_SERIALIZER_H
 
 #include "clem_types.h"
+
+#include "clem_mmio_types.h"
+
 #include "external/mpack.h"
 
 #define CLEM_SERIALIZER_INVALID_RECORD (UINT_MAX)
@@ -42,11 +45,15 @@ struct ClemensSerializerRecord {
 };
 
 #define CLEM_SERIALIZER_RECORD(_struct_, _type_, _name_)                                           \
-    { #_name_, _type_, kClemensSerializerTypeEmpty, offsetof(_struct_, _name_), 0, 0, NULL }
+    {                                                                                              \
+#_name_, _type_, kClemensSerializerTypeEmpty, offsetof(_struct_, _name_), 0, 0, NULL       \
+    }
 
 #define CLEM_SERIALIZER_RECORD_PARAM(_struct_, _type_, _arr_type_, _name_, _size_, _param_,        \
                                      _records_)                                                    \
-    { #_name_, _type_, _arr_type_, offsetof(_struct_, _name_), _size_, _param_, _records_ }
+    {                                                                                              \
+#_name_, _type_, _arr_type_, offsetof(_struct_, _name_), _size_, _param_, _records_        \
+    }
 
 #define CLEM_SERIALIZER_RECORD_ARRAY(_struct_, _type_, _name_, _size_, _param_)                    \
     CLEM_SERIALIZER_RECORD_PARAM(_struct_, kClemensSerializerTypeArray, _type_, _name_, _size_,    \
