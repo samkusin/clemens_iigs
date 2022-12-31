@@ -619,7 +619,7 @@ void ClemensBackend::inputMachine(const std::string_view &inputParam) {
             if (commaPos != std::string_view::npos) {
                 std::string_view inputModifiers;
                 auto inputValueB = value.substr(commaPos + 1);
-                commaPos = inputValueB.find(',');
+                commaPos = !inputValueB.empty() ? inputValueB.find(',') : std::string_view::npos;
                 if (commaPos != std::string_view::npos) {
                     inputModifiers = inputValueB.substr(commaPos + 1);
                     inputValueB = inputValueB.substr(0, commaPos);
