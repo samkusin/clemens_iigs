@@ -4,6 +4,7 @@
 #include "clem_types.h"
 
 #include "clem_disk.h"
+#include "clem_mmio_defs.h"
 #include "clem_smartport.h"
 
 #ifdef __cplusplus

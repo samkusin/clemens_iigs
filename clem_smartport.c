@@ -1,6 +1,6 @@
 #include "clem_smartport.h"
 #include "clem_debug.h"
-#include "clem_defs.h"
+#include "clem_mmio_defs.h"
 
 #include <stdbool.h>
 #include <stdio.h>
