@@ -113,6 +113,7 @@ struct ClemensBackendState {
     uint64_t seqno;
     bool isRunning;
     bool isTracing;
+    bool isIWMTracing;
     bool mmio_was_initialized;
     std::optional<bool> terminated;
     std::optional<bool> commandFailed;

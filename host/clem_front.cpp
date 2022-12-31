@@ -6,6 +6,7 @@
 #include "clem_import_disk.hpp"
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
+#include "clem_preamble.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 #include "version.h"
@@ -560,8 +561,9 @@ const uint64_t ClemensFrontend::kFrameSeqNoInvalid = std::numeric_limits<uint64_
 
 ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
-    : displayProvider_(systemFontLoBuffer, systemFontHiBuffer), display_(displayProvider_),
-      audio_(), frameSeqNo_(kFrameSeqNoInvalid), frameLastSeqNo_(kFrameSeqNoInvalid),
+    : config_("config.ini"), displayProvider_(systemFontLoBuffer, systemFontHiBuffer),
+      display_(displayProvider_), audio_(), frameSeqNo_(kFrameSeqNoInvalid),
+      frameLastSeqNo_(kFrameSeqNoInvalid),
       frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameMemory_(kLogMemorySize, malloc(kLogMemorySize)), lastFrameCPUPins_{},
@@ -573,7 +575,7 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
               .string()},
       diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0),
       debugIOMode_(DebugIOMode::Core), validJoystickIds_{-1, -1, -1, -1},
-      guiMode_(GUIMode::Emulator) {
+      guiMode_(GUIMode::Preamble) {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -581,21 +583,21 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
     clem_joystick_open_devices(CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT);
 
     audio_.start();
-    config_.type = ClemensBackend::Config::Type::Apple2GS;
-    config_.audioSamplesPerSecond = audio_.getAudioFrequency();
+    backendConfig_.type = ClemensBackend::Config::Type::Apple2GS;
+    backendConfig_.audioSamplesPerSecond = audio_.getAudioFrequency();
 
-    auto audioBufferSize = config_.audioSamplesPerSecond * audio_.getBufferStride() / 2;
+    auto audioBufferSize = backendConfig_.audioSamplesPerSecond * audio_.getBufferStride() / 2;
     lastCommandState_.audioBuffer =
         cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
     thisFrameAudioBuffer_ = cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
 
-    config_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
+    backendConfig_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
 
-    config_.diskLibraryRootPath = diskLibraryRootPath_;
+    backendConfig_.diskLibraryRootPath = diskLibraryRootPath_;
     // TODO: This should be selectable like regular drives - this will require some
     //       UI to make it happen
-    config_.smartPortDriveStates[0].imagePath = std::filesystem::path("smartport.2mg").string();
-    backend_ = createBackend();
+    backendConfig_.smartPortDriveStates[0].imagePath =
+        std::filesystem::path("smartport.2mg").string();
 
     debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;
     debugMemoryEditor_.WriteFn = &ClemensFrontend::imguiMemoryEditorWrite;
@@ -641,12 +643,11 @@ void ClemensFrontend::lostFocus() {
 std::unique_ptr<ClemensBackend> ClemensFrontend::createBackend() {
     constexpr unsigned refreshFrequency_ = 60;
     auto backend = std::make_unique<ClemensBackend>(
-        "gs_rom_3.rom", config_,
+        "gs_rom_3.rom", backendConfig_,
         std::bind(&ClemensFrontend::backendStateDelegate, this, std::placeholders::_1));
     backend->setRefreshFrequency(refreshFrequency_);
     backend->reset();
     backend->run();
-    guiMode_ = GUIMode::Emulator;
     fmt::print("Creating new backend emulator refreshing @ {} Hz.\n", refreshFrequency_);
     return backend;
 }
@@ -687,6 +688,7 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     frameWriteState_.fps = state.fps;
     frameWriteState_.mmioWasInitialized = state.mmio_was_initialized;
     frameWriteState_.isTracing = state.isTracing;
+    frameWriteState_.isRunning = state.isRunning;
     frameWriteState_.emulatorSpeedMhz = state.emulatorSpeedMhz;
     frameWriteState_.emulatorClock.ts = state.machine->tspec.clocks_spent;
     frameWriteState_.emulatorClock.ref_step = CLEM_CLOCKS_MEGA2_CYCLE;
@@ -869,7 +871,7 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     }
 
     if (state.message.has_value()) {
-        printf("debug message: %s\n", (*state.message).c_str());
+        fmt::print("debug message: {}\n", *state.message);
     }
 }
 
@@ -933,6 +935,8 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     //  send commands to emulator thread
     //  get results from emulator thread
     //    video, audio, machine state, etc
+    if (interop.exitApp)
+        return;
 
     pollJoystickDevices();
 
@@ -1006,9 +1010,9 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         breakpoints_.clear();
         for (unsigned bpIndex = 0; bpIndex < frameReadState_.breakpointCount; ++bpIndex) {
             breakpoints_.emplace_back(frameReadState_.breakpoints[bpIndex]);
-            config_.breakpoints.push_back(breakpoints_.back());
+            backendConfig_.breakpoints.push_back(breakpoints_.back());
         }
-        config_.breakpoints = breakpoints_;
+        backendConfig_.breakpoints = breakpoints_;
         if (lastCommandState_.commandFailed.has_value()) {
             if (*lastCommandState_.commandFailed) {
                 CLEM_TERM_COUT.format(TerminalLine::Error, "{} Failed.",
@@ -1037,7 +1041,7 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         }
 
         for (size_t driveIndex = 0; driveIndex < frameReadState_.diskDrives.size(); ++driveIndex) {
-            config_.diskDriveStates[driveIndex] = frameReadState_.diskDrives[driveIndex];
+            backendConfig_.diskDriveStates[driveIndex] = frameReadState_.diskDrives[driveIndex];
         }
 
         frameMemory_.reset();
@@ -1102,6 +1106,22 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     doMachineTerminalLayout(ImVec2(kMonitorX, monitorSize.y + kInfoBarHeight),
                             ImVec2(kMonitorViewWidth, kTerminalViewHeight));
     switch (guiMode_) {
+    case GUIMode::Preamble:
+        if (!preamble_) {
+            preamble_ = std::make_unique<ClemensPreamble>(config_);
+        }
+        if (preamble_) {
+            auto preambleResult = preamble_->frame(width, height);
+            if (preambleResult != ClemensPreamble::Result::Active) {
+                if (preambleResult == ClemensPreamble::Result::Ok) {
+                    preamble_ = nullptr;
+                    guiMode_ = GUIMode::RebootEmulator;
+                } else if (preambleResult == ClemensPreamble::Result::Exit) {
+                    interop.exitApp = true;
+                }
+            }
+        }
+        break;
     case GUIMode::ImportDiskModal:
     case GUIMode::BlankDiskModal:
         doModalOperations(width, height);
@@ -1123,16 +1143,17 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         doNewBlankDisk(width, height);
         break;
     case GUIMode::RebootEmulator:
-        if (isBackendTerminated) {
+        if (isBackendTerminated || !backend_) {
             backend_ = createBackend();
+            guiMode_ = GUIMode::Emulator;
         }
         break;
     default:
         break;
     }
-
-    backend_->publish();
-
+    if (backend_) {
+        backend_->publish();
+    }
     if (ImGui::IsKeyDown(ImGuiKey_LeftAlt) && ImGui::IsKeyDown(ImGuiKey_RightAlt)) {
         if (ImGui::IsKeyReleased(ImGuiKey_LeftCtrl) || ImGui::IsKeyReleased(ImGuiKey_RightCtrl)) {
             emulatorHasMouseFocus_ = false;
@@ -1142,18 +1163,19 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     interop.mouseLock = emulatorHasMouseFocus_;
 }
 
-static ImColor getModifiedColor(bool hi) {
-    const ImColor kModifiedColor(255, 0, 255, hi ? 255 : 128);
-    return kModifiedColor;
-}
-
 static ImColor getDefaultColor(bool hi) {
     const ImColor kDefaultColor(255, 255, 255, hi ? 255 : 128);
     return kDefaultColor;
 }
+static ImColor getModifiedColor(bool hi, bool isRunning) {
+    if (isRunning)
+        return getDefaultColor(hi);
+    const ImColor kModifiedColor(255, 0, 255, hi ? 255 : 128);
+    return kModifiedColor;
+}
 
-template <typename T> static ImColor getStatusFieldColor(T a, T b, T statusMask) {
-    return (a & statusMask) != (b & statusMask) ? getModifiedColor(b & statusMask)
+template <typename T> static ImColor getStatusFieldColor(T a, T b, T statusMask, bool isRunning) {
+    return (a & statusMask) != (b & statusMask) ? getModifiedColor(b & statusMask, isRunning)
                                                 : getDefaultColor(b & statusMask);
 }
 
@@ -1427,17 +1449,18 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned /*driveIndex */) {
 
 #define CLEM_HOST_GUI_CPU_PINS_COLOR(_field_)                                                      \
     lastFrameCPUPins_._field_ != frameReadState_.cpu.pins._field_                                  \
-        ? getModifiedColor(frameReadState_.cpu.pins._field_)                                       \
+        ? getModifiedColor(frameReadState_.cpu.pins._field_, frameReadState_.isRunning)            \
         : getDefaultColor(frameReadState_.cpu.pins._field_)
 
 #define CLEM_HOST_GUI_CPU_PINS_INV_COLOR(_field_)                                                  \
     lastFrameCPUPins_._field_ != frameReadState_.cpu.pins._field_                                  \
-        ? getModifiedColor(!frameReadState_.cpu.pins._field_)                                      \
+        ? getModifiedColor(!frameReadState_.cpu.pins._field_, frameReadState_.isRunning)           \
         : getDefaultColor(!frameReadState_.cpu.pins._field_)
 
 #define CLEM_HOST_GUI_CPU_FIELD_COLOR(_field_)                                                     \
-    lastFrameCPURegs_._field_ != frameReadState_.cpu.regs._field_ ? getModifiedColor(true)         \
-                                                                  : getDefaultColor(true)
+    lastFrameCPURegs_._field_ != frameReadState_.cpu.regs._field_                                  \
+        ? getModifiedColor(true, frameReadState_.isRunning)                                        \
+        : getDefaultColor(true)
 
 void ClemensFrontend::doMachineCPUInfoDisplay() {
     ImGui::BeginTable("Machine", 3);
@@ -1469,35 +1492,43 @@ void ClemensFrontend::doMachineCPUInfoDisplay() {
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
     ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
-                                                    kClemensCPUStatus_Negative),
+                                                    kClemensCPUStatus_Negative,
+                                                    frameReadState_.isRunning),
                        "n");
     ImGui::SameLine(0.0f, 4.0f);
     ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
-                                                    kClemensCPUStatus_Overflow),
+                                                    kClemensCPUStatus_Overflow,
+                                                    frameReadState_.isRunning),
                        "v");
     ImGui::SameLine(0.0f, 4.0f);
     ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
-                                                    kClemensCPUStatus_MemoryAccumulator),
+                                                    kClemensCPUStatus_MemoryAccumulator,
+                                                    frameReadState_.isRunning),
                        frameReadState_.cpu.pins.emulation ? " " : "m");
     ImGui::SameLine(0.0f, 4.0f);
     ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
-                                                    kClemensCPUStatus_Index),
+                                                    kClemensCPUStatus_Index,
+                                                    frameReadState_.isRunning),
                        frameReadState_.cpu.pins.emulation ? " " : "x");
     ImGui::SameLine(0.0f, 4.0f);
     ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
-                                                    kClemensCPUStatus_Decimal),
+                                                    kClemensCPUStatus_Decimal,
+                                                    frameReadState_.isRunning),
                        "d");
     ImGui::SameLine(0.0f, 4.0f);
     ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
-                                                    kClemensCPUStatus_IRQDisable),
+                                                    kClemensCPUStatus_IRQDisable,
+                                                    frameReadState_.isRunning),
                        "i");
     ImGui::SameLine(0.0f, 4.0f);
     ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
-                                                    kClemensCPUStatus_Zero),
+                                                    kClemensCPUStatus_Zero,
+                                                    frameReadState_.isRunning),
                        "z");
     ImGui::SameLine(0.0f, 4.0f);
     ImGui::TextColored(getStatusFieldColor<uint8_t>(lastFrameCPURegs_.P, frameReadState_.cpu.regs.P,
-                                                    kClemensCPUStatus_Carry),
+                                                    kClemensCPUStatus_Carry,
+                                                    frameReadState_.isRunning),
                        "c");
     ImGui::EndTable();
 
@@ -1642,23 +1673,26 @@ void ClemensFrontend::imguiMemoryEditorWrite(ImU8 *mem_ptr, size_t off, ImU8 val
     self->backend_->debugMemoryWrite((uint16_t)(off & 0xffff), value);
 }
 
-static void doMachineDebugIORegister(uint8_t *ioregsold, uint8_t *ioregs, uint8_t reg) {
+void ClemensFrontend::doMachineDebugIORegister(uint8_t *ioregsold, uint8_t *ioregs, uint8_t reg) {
     auto &desc = sDebugIODescriptors[reg];
     bool changed = ioregsold[reg] != ioregs[reg];
     bool tooltip = false;
     ImGui::TableNextColumn();
     ImGui::PushStyleColor(ImGuiCol_Text,
-                          (ImU32)(changed ? getModifiedColor(true) : getDefaultColor(true)));
+                          (ImU32)(changed ? getModifiedColor(true, frameReadState_.isRunning)
+                                          : getDefaultColor(true)));
     ImGui::TextUnformatted(desc.readLabel);
     ImGui::PopStyleColor();
     tooltip = tooltip || ImGui::IsItemHovered();
     ImGui::TableNextColumn();
-    ImGui::TextColored(changed ? getModifiedColor(true) : getDefaultColor(true), "%04X",
-                       0xc000 + reg);
+    ImGui::TextColored(changed ? getModifiedColor(true, frameReadState_.isRunning)
+                               : getDefaultColor(true),
+                       "%04X", 0xc000 + reg);
     tooltip = tooltip || ImGui::IsItemHovered();
     ImGui::TableNextColumn();
-    ImGui::TextColored(changed ? getModifiedColor(true) : getDefaultColor(true), "%02X",
-                       ioregs[reg]);
+    ImGui::TextColored(changed ? getModifiedColor(true, frameReadState_.isRunning)
+                               : getDefaultColor(true),
+                       "%02X", ioregs[reg]);
     tooltip = tooltip || ImGui::IsItemHovered();
     if (tooltip) {
         ImGui::BeginTooltip();
@@ -1819,8 +1853,9 @@ void ClemensFrontend::doMachineDebugDiskIODisplay() {
     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);
     ImGui::TableHeadersRow();
     ImGui::TableNextColumn();
-    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDrive35) ? getModifiedColor(driveOn)
-                                                                     : getDefaultColor(driveOn);
+    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDrive35)
+                     ? getModifiedColor(driveOn, frameReadState_.isRunning)
+                     : getDefaultColor(driveOn);
     ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
     ImGui::TextUnformatted("Disk");
     ImGui::TableNextColumn();
@@ -1836,8 +1871,9 @@ void ClemensFrontend::doMachineDebugDiskIODisplay() {
     ImGui::PopStyleColor();
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
-    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDriveAlt) ? getModifiedColor(driveOn)
-                                                                      : getDefaultColor(driveOn);
+    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDriveAlt)
+                     ? getModifiedColor(driveOn, frameReadState_.isRunning)
+                     : getDefaultColor(driveOn);
     ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
     ImGui::TextUnformatted("Drive");
     ImGui::TableNextColumn();
@@ -1851,36 +1887,40 @@ void ClemensFrontend::doMachineDebugDiskIODisplay() {
     ImGui::PopStyleColor();
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
-    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusIWMQ6) ? getModifiedColor(true)
-                                                                   : getDefaultColor(true);
+    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusIWMQ6)
+                     ? getModifiedColor(true, frameReadState_.isRunning)
+                     : getDefaultColor(true);
     ImGui::TextColored(fieldColor, "Q6");
     ImGui::TableNextColumn();
     ImGui::TextColored(fieldColor, "%d", (iwmState.status & kIWMStatusIWMQ6) ? 1 : 0);
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
-    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusIWMQ7) ? getModifiedColor(true)
-                                                                   : getDefaultColor(true);
+    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusIWMQ7)
+                     ? getModifiedColor(true, frameReadState_.isRunning)
+                     : getDefaultColor(true);
     ImGui::TextColored(fieldColor, "Q7");
     ImGui::TableNextColumn();
     ImGui::TextColored(fieldColor, "%d", (iwmState.status & kIWMStatusIWMQ7) ? 1 : 0);
     ImGui::TableNextRow();
     fieldColor = lastFrameIORegs_[CLEM_MMIO_REG_IWM_Q6_LO] != ioregs[CLEM_MMIO_REG_IWM_Q6_LO]
-                     ? getModifiedColor(true)
+                     ? getModifiedColor(true, frameReadState_.isRunning)
                      : getDefaultColor(true);
     ImGui::TableNextColumn();
     ImGui::TextColored(fieldColor, "Read");
     ImGui::TableNextColumn();
     ImGui::TextColored(fieldColor, "%02X", ioregs[CLEM_MMIO_REG_IWM_Q6_LO]);
     ImGui::TableNextRow();
-    fieldColor =
-        lastFrameIWM_.data != iwmState.data ? getModifiedColor(driveOn) : getDefaultColor(driveOn);
+    fieldColor = lastFrameIWM_.data != iwmState.data
+                     ? getModifiedColor(driveOn, frameReadState_.isRunning)
+                     : getDefaultColor(driveOn);
     ImGui::TableNextColumn();
     ImGui::TextColored(fieldColor, "Data");
     ImGui::TableNextColumn();
     ImGui::TextColored(fieldColor, "%02X", iwmState.data);
     ImGui::TableNextRow();
-    fieldColor = lastFrameIWM_.latch != iwmState.latch ? getModifiedColor(driveOn)
-                                                       : getDefaultColor(driveOn);
+    fieldColor = lastFrameIWM_.latch != iwmState.latch
+                     ? getModifiedColor(driveOn, frameReadState_.isRunning)
+                     : getDefaultColor(driveOn);
     ImGui::TableNextColumn();
     ImGui::TextColored(fieldColor, "Latch");
     ImGui::TableNextColumn();
@@ -1902,15 +1942,17 @@ void ClemensFrontend::doMachineDebugDiskIODisplay() {
     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 16);
     ImGui::TableHeadersRow();
     ImGui::TableNextColumn();
-    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDriveSpin) ? getModifiedColor(driveOn)
-                                                                       : getDefaultColor(driveOn);
+    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDriveSpin)
+                     ? getModifiedColor(driveOn, frameReadState_.isRunning)
+                     : getDefaultColor(driveOn);
     ImGui::TextColored(fieldColor, "Motor");
     ImGui::TableNextColumn();
     ImGui::TextColored(fieldColor, "%s", (iwmState.status & kIWMStatusDriveSpin) ? "on" : "off");
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
-    fieldColor =
-        lastFrameIWM_.ph03 != iwmState.ph03 ? getModifiedColor(driveOn) : getDefaultColor(driveOn);
+    fieldColor = lastFrameIWM_.ph03 != iwmState.ph03
+                     ? getModifiedColor(driveOn, frameReadState_.isRunning)
+                     : getDefaultColor(driveOn);
     ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
     ImGui::TextUnformatted("Phase");
     ImGui::TableNextColumn();
@@ -1918,8 +1960,9 @@ void ClemensFrontend::doMachineDebugDiskIODisplay() {
                 (iwmState.ph03 & 4) ? 1 : 0, (iwmState.ph03 & 8) ? 1 : 0);
     ImGui::PopStyleColor();
     ImGui::TableNextRow();
-    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDriveSel) ? getModifiedColor(driveOn)
-                                                                      : getDefaultColor(driveOn);
+    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDriveSel)
+                     ? getModifiedColor(driveOn, frameReadState_.isRunning)
+                     : getDefaultColor(driveOn);
     ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
     ImGui::TableNextColumn();
     ImGui::TextUnformatted("HeadSel");
@@ -1927,8 +1970,9 @@ void ClemensFrontend::doMachineDebugDiskIODisplay() {
     ImGui::Text("%d", iwmState.status & kIWMStatusDriveSel ? 1 : 0);
     ImGui::PopStyleColor();
     ImGui::TableNextRow();
-    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDriveWP) ? getModifiedColor(driveOn)
-                                                                     : getDefaultColor(driveOn);
+    fieldColor = CLEM_HOST_GUI_IWM_STATUS_CHANGED(kIWMStatusDriveWP)
+                     ? getModifiedColor(driveOn, frameReadState_.isRunning)
+                     : getDefaultColor(driveOn);
     ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
     ImGui::TableNextColumn();
     ImGui::TextUnformatted("Sense");
@@ -1937,7 +1981,7 @@ void ClemensFrontend::doMachineDebugDiskIODisplay() {
     ImGui::PopStyleColor();
     ImGui::TableNextRow();
     fieldColor = lastFrameIWM_.qtr_track_index != iwmState.qtr_track_index
-                     ? getModifiedColor(driveOn)
+                     ? getModifiedColor(driveOn, frameReadState_.isRunning)
                      : getDefaultColor(driveOn);
     ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
     ImGui::TableNextColumn();
@@ -1967,7 +2011,7 @@ void ClemensFrontend::doMachineDebugDiskIODisplay() {
     ImGui::TableNextRow();
     fieldColor = ((lastFrameIWM_.track_byte_index != iwmState.track_byte_index) ||
                   (lastFrameIWM_.track_bit_shift != iwmState.track_bit_shift))
-                     ? getModifiedColor(driveOn)
+                     ? getModifiedColor(driveOn, frameReadState_.isRunning)
                      : getDefaultColor(driveOn);
     ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)fieldColor);
     ImGui::TableNextColumn();
@@ -2132,7 +2176,6 @@ void ClemensFrontend::doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize) {
     //  Key Focus
     const ImColor kGreen(0, 255, 0, 255);
     const ImColor kDark(64, 64, 64, 255);
-    const uint8_t *ioPage = frameReadState_.ioPage;
     const uint8_t *bram = frameReadState_.bram;
 
     ImGui::SetNextWindowPos(rootAnchor);
@@ -2143,8 +2186,6 @@ void ClemensFrontend::doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize) {
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     ImVec2 screenPos;
     ImVec2 cursorPos;
-    const ImGuiStyle &style = ImGui::GetStyle();
-    const float kCellPaddingX = style.CellPadding.x;
     float lineHeight = ImGui::GetTextLineHeightWithSpacing();
     float circleHeight = ImGui::GetTextLineHeight() * 0.5f;
     ImGui::TextUnformatted("1Mhz: ");
@@ -2423,23 +2464,17 @@ void ClemensFrontend::doImportDiskSetFlowStart(int /*width*/, int /*height*/) {
         //        waste cycles on figuring out this minor UI convenience for now.
         ImGui::SetItemDefaultFocus();
         bool doImport = false;
-        if (ImGui::InputText("##", collectionName, sizeof(collectionName),
-                             ImGuiInputTextFlags_EnterReturnsTrue)) {
+        if (ImGui::InputText("##", collectionName, sizeof(collectionName))) {
             importDiskSetName_ = collectionName;
-            doImport = true;
         }
-        if (ImGui::Button("Ok")) {
+        if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
             doImport = true;
         }
         if (doImport) {
             if (!importDiskSetName_.empty() && !std::filesystem::path(importDiskSetName_).empty()) {
                 importDiskSetPath_ =
                     (std::filesystem::path(diskLibraryRootPath_) / importDiskSetName_).string();
-                if (std::filesystem::exists(importDiskSetPath_)) {
-                    guiMode_ = GUIMode::ImportDiskSetReplaceOld;
-                } else {
-                    guiMode_ = GUIMode::ImportDiskSet;
-                }
+                guiMode_ = GUIMode::ImportDiskSet;
             } else {
                 guiMode_ = GUIMode::Emulator;
             }
@@ -2673,7 +2708,7 @@ std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath
             break;
         }
     }
-    if (!std::filesystem::create_directories(outputPath)) {
+    if (!std::filesystem::exists(outputPath) && !std::filesystem::create_directories(outputPath)) {
         return std::make_pair(fmt::format("Unable to create directory {}", outputPath), false);
     }
     if (!importer.build(outputPath)) {

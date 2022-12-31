@@ -26,6 +26,8 @@ set(FMT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/format.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/format.cc")
 
+set(EXT_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/ini.c")
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(PLATFORM_SOURCES
@@ -41,15 +43,18 @@ add_executable(clemens_iigs
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_display.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_backend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_configuration.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk_library.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_front.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_app.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_import_disk.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_preamble.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_program_trace.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_serializer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_smartport_disk.cpp"
+    ${EXT_SOURCES}
     ${FMT_SOURCES}
     ${SOKOL_SOURCES}
     ${IMGUI_SOURCES})

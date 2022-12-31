@@ -15,8 +15,6 @@ My eventual goal is to provide a solid Apple IIgs backend and debugger with a
 functional frontend.  At this writing I'd say the project is about 80% there
 with the following features **missing** (in rough priority of what's planned next):
 
-* Smartport Hard Drive
-* Gamepad/Joystick
 * ROM 01 Support
 * Serial (SCC)
 * Diagnostic Tests Pass
@@ -34,7 +32,9 @@ Please note this project is released with a Contributor Code of Conduct. By part
 * Ensoniq, Mockingboard C (without SSI voice) and A2 Speaker Audio
 * WOZ 2.0, 2IMG, PO, DO and DSK support
 * 5.25" and Apple 3.5" Drive Emulation
+* Smartport Hard Drive (IWM based on the disk port - not slot 7)
 * Mouse and Keyboard
+* Gamepad/Joystick
 * Runs on ROM 3
 * All Apple IIe graphics modes (hires is OK, could be better for some titles)
 
@@ -206,6 +206,7 @@ External libraries referenced below are used by the `host` project (the debuggin
 * [Sokol](https://github.com/floooh/sokol) A cross-platform minimal rendering backend
 * [fmt](https://github.com/fmtlib/fmt) A minimal std::format implementation
 * [doctest](https://github.com/doctest/doctest) A minimal C++ single-header testing framework
+* [inih](https://github.com/benhoyt/inih) A minimal C based INI file parser
 
 
 ## License

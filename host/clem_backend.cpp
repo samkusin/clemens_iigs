@@ -609,23 +609,28 @@ void ClemensBackend::inputMachine(const std::string_view &inputParam) {
     auto value = inputParam.substr(equalsTokenPos + 1);
     for (const char **keyName = &sInputKeys[0]; *keyName != NULL; ++keyName) {
         if (name == *keyName) {
-            ClemensInputEvent inputEvent;
+            ClemensInputEvent inputEvent{};
             inputEvent.type = (ClemensInputType)((int)(keyName - &sInputKeys[0]));
             //  oh why, oh why no straightforward C++ conversion from std::string_view
             //  to number
             auto commaPos = value.find(',');
             auto inputValueA = value.substr(0, commaPos);
-            auto inputValueB = value.substr(commaPos + 1);
-            commaPos = inputValueB.find(',');
-            auto inputModifiers = inputValueB.substr(commaPos + 1);
-            inputValueB = inputValueB.substr(0, commaPos);
             inputEvent.value_a = (int16_t)std::stol(std::string(inputValueA));
-            inputEvent.value_b = (int16_t)std::stol(std::string(inputValueB));
-            if (inputEvent.type == kClemensInputType_Paddle ||
-                inputEvent.type == kClemensInputType_PaddleDisconnected) {
-                inputEvent.gameport_button_mask = std::stoul(std::string(inputModifiers));
-            } else {
-                inputEvent.adb_key_toggle_mask = std::stoul(std::string(inputModifiers));
+            if (commaPos != std::string_view::npos) {
+                std::string_view inputModifiers;
+                auto inputValueB = value.substr(commaPos + 1);
+                commaPos = !inputValueB.empty() ? inputValueB.find(',') : std::string_view::npos;
+                if (commaPos != std::string_view::npos) {
+                    inputModifiers = inputValueB.substr(commaPos + 1);
+                    inputValueB = inputValueB.substr(0, commaPos);
+                }
+                inputEvent.value_b = (int16_t)std::stol(std::string(inputValueB));
+                if (inputEvent.type == kClemensInputType_Paddle ||
+                    inputEvent.type == kClemensInputType_PaddleDisconnected) {
+                    inputEvent.gameport_button_mask = std::stoul(std::string(inputModifiers));
+                } else {
+                    inputEvent.adb_key_toggle_mask = std::stoul(std::string(inputModifiers));
+                }
             }
             clemens_input(&mmio_, &inputEvent);
         }
@@ -717,6 +722,16 @@ static int64_t calculateClocksPerTimeslice(ClemensMMIO *mmio, unsigned hz) {
     return int64_t(clemens_clocks_per_second(mmio, &is_machine_slow) / hz);
 }
 
+#if defined(__GNUC__)
+//  Despite guarding with std::optional<>::has_value(), annoying GCC warning
+//  that I may be accessing an uninitialized optional with a folloing value
+//  access (if has_value() returns true) - which is the accepted method
+//  or checking optionals if exception handling is turned off
+//  https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80635
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
 void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     int64_t clocksRemainingInTimeslice = 0;
     std::optional<int> stepsRemaining = 0;
@@ -756,8 +771,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         std::unique_lock<std::mutex> queuelock(commandQueueMutex_);
         if (!isRunning) {
             //  waiting for commands
-            commandQueueCondition_.wait(queuelock,
-                                        [this, &stepsRemaining] { return !commandQueue_.empty(); });
+            commandQueueCondition_.wait(queuelock, [this] { return !commandQueue_.empty(); });
         }
         //  TODO: we may just be able to use a vector for the command queue and
         //        create a local copy of the queue to minimize time spent executing
@@ -962,11 +976,11 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             for (auto diskDriveIt = smartPortDrives_.begin(); diskDriveIt != smartPortDrives_.end();
                  ++diskDriveIt) {
                 auto &diskDrive = *diskDriveIt;
-                auto driveIndex = unsigned(diskDriveIt - smartPortDrives_.begin());
-                // auto *clemensUnit = clemens_smartport_unit_get(&mmio_, driveIndex);
-                //  TODO: detect SmartPort drive status - enable2 only detects if the
-                //        whole bus is active - which may be fine for now since we just support one
-                //        SmartPort drive!
+                // auto driveIndex = unsigned(diskDriveIt - smartPortDrives_.begin());
+                //  auto *clemensUnit = clemens_smartport_unit_get(&mmio_, driveIndex);
+                //   TODO: detect SmartPort drive status - enable2 only detects if the
+                //         whole bus is active - which may be fine for now since we just support
+                //         one SmartPort drive!
                 diskDrive.isSpinning = mmio_.dev_iwm.enable2;
                 diskDrive.isWriteProtected = false;
                 diskDrive.saveFailed = false;
@@ -1037,7 +1051,13 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                 }
             }
             publishedState.isRunning = isRunning;
-            publishedState.isTracing = programTrace_ != nullptr;
+            if (programTrace_ != nullptr) {
+                publishedState.isTracing = true;
+                publishedState.isIWMTracing = programTrace_->isIWMLoggingEnabled();
+            } else {
+                publishedState.isTracing = false;
+                publishedState.isIWMTracing = false;
+            }
             publishedState.machine = &machine_;
             publishedState.mmio = &mmio_;
             publishedState.seqno = publishSeqNo;
@@ -1094,6 +1114,10 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
     fmt::print("Terminated backend refresh thread.\n");
 }
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 std::optional<unsigned> ClemensBackend::checkHitBreakpoint() {
     for (auto it = breakpoints_.begin(); it != breakpoints_.end(); ++it) {
@@ -1266,5 +1290,6 @@ void ClemensBackend::emulatorOpcodeCallback(struct ClemensInstruction *inst, con
     host->loggedInstructions_.emplace_back();
     auto &loggedInst = host->loggedInstructions_.back();
     loggedInst.data = *inst;
-    strncpy(loggedInst.operand, operand, sizeof(loggedInst.operand));
+    strncpy(loggedInst.operand, operand, sizeof(loggedInst.operand) - 1);
+    loggedInst.operand[sizeof(loggedInst.operand) - 1] = '\0';
 }

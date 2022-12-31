@@ -9,20 +9,16 @@ with ROM1 if possible compatibility.)
 
 This is a running todo list.
 
-### Version 0.5 Wishlist
+### Version 0.6 Wishlist
 
 * Emulator detection of ROM version through introspection
 * Speed up disk access when reading/writing (fast mode for emulation)
-* Smartport Hard Drive Support
-* Joystick/Paddle Support
-* Refactor tests with new test backend
-* ADB fixes (control panel hotkey and some fixes regarding ADB keyboard status and interrupts)
-
-### Miscellaneous
-
 * ROM 01 and Introspect ROM version from binary
 * Introspect Mouse Position from memory in E1/E0 (may depend on ROM version) for
   emulation without mouselock
+
+### Miscellaneous
+
 * CYA vs MEGA2 I/O access speeds
   * Some CYA registers are still "slow" so resolve these so they run at the IIgs
     fast speed
@@ -44,6 +40,10 @@ This is a running todo list.
 
 Listed in order of completion
 
+* Smartport Hard Drive Support
+* Joystick/Paddle Support
+* Refactor tests with new test backend
+* ADB fixes (control panel hotkey and some fixes regarding ADB keyboard status and interrupts)
 * Flashing Characters
 * Double Lores Mode (should be simple given how clem_display.cpp is written)
 * Lores mode
