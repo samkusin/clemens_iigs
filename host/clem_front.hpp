@@ -88,6 +88,7 @@ class ClemensFrontend {
     void cmdLoad(std::string_view operand);
     void cmdGet(std::string_view operand);
     void cmdADBMouse(std::string_view operand);
+    void cmdScript(std::string_view command);
 
   private:
     ClemensConfiguration config_;
