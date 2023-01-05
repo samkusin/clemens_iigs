@@ -619,6 +619,14 @@ void ClemensBackend::inputEvent(const ClemensInputEvent &input) {
     queue(cmd);
 }
 
+#if defined(__GNUC__)
+//  NOTE GCC warning seems spurious for *some* std::string_view::find() cases
+//       have added plenty of guards around the line below to no avail.
+//            commaPos = !inputValueB.empty() ? inputValueB.find(',') : std::string_view::npos;
+//  ref: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=91397
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overread"
+#endif
 void ClemensBackend::inputMachine(const std::string_view &inputParam) {
     if (!clemens_is_initialized_simple(&machine_)) {
         return;
@@ -638,7 +646,7 @@ void ClemensBackend::inputMachine(const std::string_view &inputParam) {
             if (commaPos != std::string_view::npos) {
                 std::string_view inputModifiers;
                 auto inputValueB = value.substr(commaPos + 1);
-                commaPos = !inputValueB.empty() ? inputValueB.find(',', 0) : std::string_view::npos;
+                commaPos = !inputValueB.empty() ? inputValueB.find(',') : std::string_view::npos;
                 if (commaPos != std::string_view::npos) {
                     inputModifiers = inputValueB.substr(commaPos + 1);
                     inputValueB = inputValueB.substr(0, commaPos);
@@ -655,6 +663,9 @@ void ClemensBackend::inputMachine(const std::string_view &inputParam) {
         }
     }
 }
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 void ClemensBackend::breakExecution() { queue(Command{Command::Break}); }
 
