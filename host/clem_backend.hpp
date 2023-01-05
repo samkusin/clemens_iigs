@@ -2,6 +2,7 @@
 #define CLEM_HOST_BACKEND_HPP
 
 #include "clem_host_shared.hpp"
+#include "clem_interpreter.hpp"
 #include "clem_smartport_disk.hpp"
 
 #include "cinek/buffer.hpp"
@@ -83,6 +84,16 @@ class ClemensBackend {
     void saveMachine(std::string path);
     void loadMachine(std::string path);
 
+    void runScript(std::string command);
+
+    //  these methods do not queue instructions to execute on the runner
+    //  and must be executed instead on the runner thread.  They are made public
+    //  for access by ClemensInterpreter
+    using MachineProperty = ClemensBackendMachineProperty;
+    //  Properties can be 8/16 or 32-bit.   Registers are 8/16 bit.  The incoming
+    //  value is truncated by masking/downcast from 32-bit accordingly.
+    void assignPropertyToU32(MachineProperty property, uint32_t value);
+
   private:
     using Command = ClemensBackendCommand;
 
@@ -102,6 +113,7 @@ class ClemensBackend {
     bool programTrace(const std::string_view &inputParam);
     bool saveSnapshot(const std::string_view &inputParam);
     bool loadSnapshot(const std::string_view &inputParam);
+    bool runScriptCommand(const std::string_view &command);
 
     std::optional<unsigned> checkHitBreakpoint();
 
@@ -143,6 +155,8 @@ class ClemensBackend {
     cinek::ByteBuffer diskBuffer_;
     ClemensMachine machine_;
     ClemensMMIO mmio_;
+
+    ClemensInterpreter interpreter_;
 
     std::vector<ClemensBackendOutputText> logOutput_;
     std::vector<ClemensBackendBreakpoint> breakpoints_;

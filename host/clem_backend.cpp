@@ -20,6 +20,7 @@
 #include "fmt/format.h"
 
 static constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
+static constexpr unsigned kInterpreterMemorySize = 1 * 1024 * 1024;
 static constexpr unsigned kLogOutputLineLimit = 1024;
 
 struct ClemensRunSampler {
@@ -132,6 +133,7 @@ void ClemensBackend::localLog(int log_level, const char *msg, Args... args) {
 ClemensBackend::ClemensBackend(std::string romPathname, const Config &config,
                                PublishStateDelegate publishDelegate)
     : config_(config), slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
+      interpreter_(cinek::FixedStack(kInterpreterMemorySize, malloc(kInterpreterMemorySize))),
       breakpoints_(std::move(config_.breakpoints)), logLevel_(CLEM_DEBUG_LOG_INFO),
       debugMemoryPage_(0x00), areInstructionsLogged_(false) {
 
@@ -392,6 +394,23 @@ bool ClemensBackend::loadSnapshot(const std::string_view &inputParam) {
     return res;
 }
 
+void ClemensBackend::runScript(std::string command) {
+    queue(Command{Command::RunScript, std::move(command)});
+}
+
+bool ClemensBackend::runScriptCommand(const std::string_view &command) {
+    auto result = interpreter_.parse(command);
+    if (result.type == ClemensInterpreter::Result::Ok) {
+        interpreter_.execute(this);
+    } else if (result.type == ClemensInterpreter::Result::SyntaxError) {
+        // CLEM_TERM_COUT.print(TerminalLine::Error, "Syntax Error");
+        return false;
+    } else {
+        //        CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
+        return false;
+    }
+    return true;
+}
 //  TODO: Move into Clemens API clemens_mmio_find_card_name()
 static ClemensCard *findMockingboardCard(ClemensMMIO *mmio) {
     for (int cardIdx = 0; cardIdx < 7; ++cardIdx) {
@@ -600,6 +619,14 @@ void ClemensBackend::inputEvent(const ClemensInputEvent &input) {
     queue(cmd);
 }
 
+#if defined(__GNUC__)
+//  NOTE GCC warning seems spurious for *some* std::string_view::find() cases
+//       have added plenty of guards around the line below to no avail.
+//            commaPos = !inputValueB.empty() ? inputValueB.find(',') : std::string_view::npos;
+//  ref: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=91397
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overread"
+#endif
 void ClemensBackend::inputMachine(const std::string_view &inputParam) {
     if (!clemens_is_initialized_simple(&machine_)) {
         return;
@@ -636,6 +663,9 @@ void ClemensBackend::inputMachine(const std::string_view &inputParam) {
         }
     }
 }
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 void ClemensBackend::breakExecution() { queue(Command{Command::Break}); }
 
@@ -874,6 +904,11 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                     commandFailed = true;
                 }
                 break;
+            case Command::RunScript:
+                if (!runScriptCommand(command.operand)) {
+                    commandFailed = true;
+                }
+                break;
             case Command::Undefined:
                 break;
             }
@@ -1021,7 +1056,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             publishState = true;
             updateSeqNo = true;
         }
-
+        //  TODO: force update by publish() option
         updateSeqNo = updateSeqNo || commandFailed.has_value();
 
         if (updateSeqNo) {
@@ -1292,4 +1327,69 @@ void ClemensBackend::emulatorOpcodeCallback(struct ClemensInstruction *inst, con
     loggedInst.data = *inst;
     strncpy(loggedInst.operand, operand, sizeof(loggedInst.operand) - 1);
     loggedInst.operand[sizeof(loggedInst.operand) - 1] = '\0';
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ClemensBackend::assignPropertyToU32(MachineProperty property, uint32_t value) {
+    bool emulation = machine_.cpu.pins.emulation;
+    bool acc8 = emulation || (machine_.cpu.regs.P & kClemensCPUStatus_MemoryAccumulator) != 0;
+    bool idx8 = emulation || (machine_.cpu.regs.P & kClemensCPUStatus_Index) != 0;
+
+    switch (property) {
+    case MachineProperty::RegA:
+        if (acc8)
+            machine_.cpu.regs.A = (machine_.cpu.regs.A & 0xff00) | (uint16_t)(value & 0xff);
+        else
+            machine_.cpu.regs.A = (uint16_t)(value & 0xffff);
+        break;
+    case MachineProperty::RegB:
+        machine_.cpu.regs.A = (machine_.cpu.regs.A & 0xff) | (uint16_t)((value & 0xff) << 8);
+        break;
+    case MachineProperty::RegC:
+        machine_.cpu.regs.A = (uint16_t)(value & 0xffff);
+        break;
+    case MachineProperty::RegX:
+        if (emulation)
+            machine_.cpu.regs.X = (uint16_t)(value & 0xff);
+        else if (idx8)
+            machine_.cpu.regs.X = (machine_.cpu.regs.X & 0xff00) | (uint16_t)(value & 0xff);
+        else
+            machine_.cpu.regs.X = (uint16_t)(value & 0xffff);
+        break;
+    case MachineProperty::RegY:
+        if (emulation)
+            machine_.cpu.regs.Y = (uint16_t)(value & 0xff);
+        else if (idx8)
+            machine_.cpu.regs.Y = (machine_.cpu.regs.Y & 0xff00) | (uint16_t)(value & 0xff);
+        else
+            machine_.cpu.regs.Y = (uint16_t)(value & 0xffff);
+        break;
+    case MachineProperty::RegP:
+        if (emulation) {
+            machine_.cpu.regs.P = (value & 0x30); // do not affect MX flags
+        } else {
+            machine_.cpu.regs.P = (value & 0xff);
+        }
+        break;
+    case MachineProperty::RegD:
+        machine_.cpu.regs.D = (uint16_t)(value & 0xffff);
+        break;
+    case MachineProperty::RegSP:
+        if (emulation) {
+            machine_.cpu.regs.S = (machine_.cpu.regs.S & 0xff00) | (uint16_t)(value & 0xff);
+        } else {
+            machine_.cpu.regs.S = (uint16_t)(value & 0xffff);
+        }
+        break;
+    case MachineProperty::RegDBR:
+        machine_.cpu.regs.DBR = (uint8_t)(value & 0xff);
+        break;
+    case MachineProperty::RegPBR:
+        machine_.cpu.regs.PBR = (uint8_t)(value & 0xff);
+        break;
+    case MachineProperty::RegPC:
+        machine_.cpu.regs.PC = (uint16_t)(value & 0xff);
+        break;
+    };
 }

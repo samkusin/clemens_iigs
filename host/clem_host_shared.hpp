@@ -73,10 +73,25 @@ struct ClemensBackendCommand {
         DebugMessage,
         DebugProgramTrace,
         SaveMachine,
-        LoadMachine
+        LoadMachine,
+        RunScript
     };
     Type type = Undefined;
     std::string operand;
+};
+
+enum class ClemensBackendMachineProperty {
+    RegA,
+    RegB,
+    RegC,
+    RegX,
+    RegY,
+    RegP,
+    RegD,
+    RegSP,
+    RegDBR,
+    RegPBR,
+    RegPC
 };
 
 struct ClemensEmulatorStats {

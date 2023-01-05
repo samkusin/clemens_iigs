@@ -521,8 +521,8 @@ void initDebugIODescriptors() {
 #define CLEM_TERM_COUT                                                                             \
     FormatView<decltype(ClemensFrontend::terminalLines_)>(terminalLines_, terminalChanged_)
 
-static constexpr size_t kFrameMemorySize = 8 * 1024 * 1024;
-static constexpr size_t kLogMemorySize = 8 * 1024 * 1024;
+static constexpr size_t kFrameMemorySize = 4 * 1024 * 1024;
+static constexpr size_t kLogMemorySize = 4 * 1024 * 1024;
 
 static std::string getCommandTypeName(ClemensBackendCommand::Type type) {
     switch (type) {
@@ -2795,8 +2795,8 @@ void ClemensFrontend::executeCommand(std::string_view command) {
         cmdGet(operand);
     } else if (action == "adbmouse") {
         cmdADBMouse(operand);
-    } else if (!action.empty()) {
-        CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
+    } else {
+        cmdScript(command);
     }
 }
 
@@ -2852,6 +2852,14 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
     CLEM_TERM_COUT.print(
         TerminalLine::Info,
         "adbmouse {0|1}              - injects a mouse button event (1=up, 0=down)");
+    CLEM_TERM_COUT.print(
+        TerminalLine::Info,
+        ".{a|b|c|x|y|p|d|s|dbr|pbr|pc} = <value>      - sets a register value now\n"
+        "                              = a0           - hex\n"
+        "                              = #$a0         - hex alternate\n"
+        "                              = 0800         - 16-bit hex\n"
+        "                              = #128         - decimal\n"
+        "                              = #-10         - decimal negative\n");
     CLEM_TERM_COUT.newline();
 }
 
@@ -3350,4 +3358,8 @@ void ClemensFrontend::cmdADBMouse(std::string_view operand) {
     }
     backend_->inputEvent(input);
     CLEM_TERM_COUT.print(TerminalLine::Info, "Input sent.");
+}
+
+void ClemensFrontend::cmdScript(std::string_view command) {
+    backend_->runScript(std::string(command));
 }
