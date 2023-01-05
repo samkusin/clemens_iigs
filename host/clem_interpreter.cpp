@@ -28,22 +28,6 @@ std::string_view trimToken(const std::string_view &token, size_t off = 0,
     return tmp;
 }
 
-bool parseBool(const std::string_view &token, bool &result) {
-    if (token == "on" || token == "true") {
-        result = true;
-        return true;
-    } else if (token == "off" || token == "false") {
-        result = false;
-        return false;
-    }
-    int v = 0;
-    if (std::from_chars(token.data(), token.data() + token.size(), v).ec == std::errc{}) {
-        result = v != 0;
-        return true;
-    }
-    return false;
-}
-
 bool expect(std::string_view &result, std::string_view token) {
     auto tmp = trimLeft(result);
     if (tmp.compare(0, token.size(), token) != 0)
@@ -403,13 +387,14 @@ auto ClemensInterpreter::parseStatementList(std::string_view script) -> ParseRes
         return statement.revert(script);
     }
     //  optional extra statements
-    if (!expect(statement.script(), ";")) {
+    auto righthand = statement.script();
+    if (!expect(righthand, ";")) {
         auto remainder = trimLeft(statement.script());
         return !remainder.empty() ? statement.fail(remainder) : statement;
     }
-    auto statementList = parseStatementList(statement.script());
+    auto statementList = parseStatementList(righthand);
     if (!statementList.ok()) {
-        return statementList.revert(statement.script());
+        return statementList.revert(righthand);
     }
     statementList.node = addASTNodeToSibling(statementList.node, statement.node);
     return statementList;
@@ -480,6 +465,11 @@ bool ClemensInterpreter::execute(ASTNode *node, ClemensBackend *backend) {
                 return false;
             }
         }
+        break;
+    case ASTNodeType::Identifier:
+    case ASTNodeType::AnyIntegerValue:
+    case ASTNodeType::HexIntegerValue:
+    case ASTNodeType::IntegerValue:
         break;
     }
     return true;
