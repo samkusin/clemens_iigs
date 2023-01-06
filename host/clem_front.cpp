@@ -664,6 +664,7 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
 
     frameWriteMemory_.reset();
 
+    frameWriteState_.mark = 0xdeadbeef;
     frameWriteState_.cpu = state.machine->cpu;
     frameWriteState_.monitorFrame = state.monitor;
 
@@ -731,34 +732,41 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     frameWriteState_.iwm.latch = iwm.latch;
     frameWriteState_.iwm.ph03 = (uint8_t)(iwm.out_phase & 0xff);
 
+    constexpr auto diskBufferSize = sizeof(frameWriteState_.iwm.buffer);
+    memset(frameWriteState_.iwm.buffer, 0, diskBufferSize);
+
     const uint8_t *diskBits = iwmDrive->disk.bits_data;
     unsigned diskTrackIndex = frameWriteState_.iwm.qtr_track_index;
-    constexpr auto diskBufferSize = sizeof(frameWriteState_.iwm.buffer);
-    if (iwmDrive->disk.track_initialized[diskTrackIndex]) {
-        unsigned trackByteCount = iwmDrive->disk.track_byte_count[diskTrackIndex];
-        unsigned left, right;
-        if (iwmDrive->track_byte_index > 0) {
-            left = iwmDrive->track_byte_index - 1;
-        } else {
-            left = trackByteCount - 1;
-        }
-        right = iwmDrive->track_byte_index + diskBufferSize - 1;
-        if (right >= trackByteCount) {
-            right = right - trackByteCount;
-        }
-        diskBits += iwmDrive->disk.track_byte_offset[diskTrackIndex];
-        unsigned bufferIndex = 0;
-        if (left > right) {
-            for (; left < trackByteCount; ++left, ++bufferIndex) {
+
+    if (iwmDrive->disk.meta_track_map[diskTrackIndex] != 0xff) {
+        diskTrackIndex = iwmDrive->disk.meta_track_map[diskTrackIndex];
+
+        if (iwmDrive->disk.track_initialized[diskTrackIndex]) {
+            unsigned trackByteCount = iwmDrive->disk.track_byte_count[diskTrackIndex];
+            unsigned left, right;
+            if (iwmDrive->track_byte_index > 0) {
+                left = iwmDrive->track_byte_index - 1;
+            } else {
+                left = trackByteCount - 1;
+            }
+            right = left + diskBufferSize - 1;
+            if (right >= trackByteCount) {
+                right = right - trackByteCount;
+            }
+            diskBits += iwmDrive->disk.track_byte_offset[diskTrackIndex];
+            unsigned bufferIndex = 0;
+            if (left > right) {
+                for (; left < trackByteCount; ++left, ++bufferIndex) {
+                    assert(bufferIndex < 4);
+                    frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];
+                }
+                left = 0;
+            }
+            for (; left <= right; ++left, ++bufferIndex) {
+                assert(bufferIndex < 4);
                 frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];
             }
-            left = 0;
         }
-        for (; left <= right; ++left, ++bufferIndex) {
-            frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];
-        }
-    } else {
-        memset(frameWriteState_.iwm.buffer, 0, diskBufferSize);
     }
 
     //  copy over memory banks as needed

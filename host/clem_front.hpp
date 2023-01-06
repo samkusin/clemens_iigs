@@ -148,6 +148,7 @@ class ClemensFrontend {
     // its possible to "lose" state if the emulator runs faster than the UI.
     // This is OK in most cases as the UI will only present this data per frame
     struct FrameState {
+        unsigned mark = 0;
         uint8_t *bankE0 = nullptr;
         uint8_t *bankE1 = nullptr;
         uint8_t *memoryView = nullptr;
