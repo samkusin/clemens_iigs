@@ -1167,7 +1167,7 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         backend_->publish();
     }
     if (ImGui::IsKeyDown(ImGuiKey_LeftAlt) && ImGui::IsKeyDown(ImGuiKey_RightAlt)) {
-        if (ImGui::IsKeyReleased(ImGuiKey_LeftCtrl) || ImGui::IsKeyReleased(ImGuiKey_RightCtrl)) {
+        if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) {
             emulatorHasMouseFocus_ = false;
         }
     }
