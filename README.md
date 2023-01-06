@@ -1,11 +1,11 @@
 # Clemens IIGS
 
-![Boot Sequence Demo](https://samirsinha.com/images/dotc-title.gif)
-
 The Clemens IIgs emulator is an attempt at writing a modern emulator for
 the Apple IIgs machine.  Its design focuses on developers versus casual play,
 providing tools to debug IIgs applications at runtime. My eventual goal is to provide a 
 solid Apple IIgs backend and debugger with a functional frontend.
+
+![Boot Sequence Demo](https://samirsinha.com/images/dotc-title.gif)
 
 **NOTE** This software should be considered Alpha quality.  The emulator is generally 
 stable with some missing features which are listed in prioritized order below.  Of course, 
