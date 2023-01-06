@@ -71,7 +71,7 @@ static inline uint16_t _decode_u16(const uint8_t *data) {
     return ((uint16_t)data[1] << 8) | data[0];
 }
 
-static inline uint16_t _decode_u32(const uint8_t *data) {
+static inline uint32_t _decode_u32(const uint8_t *data) {
     return (((uint32_t)data[3] << 24) | ((uint32_t)data[2] << 16) | ((uint32_t)data[1] << 8) |
             data[0]);
 }
