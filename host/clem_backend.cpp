@@ -625,7 +625,7 @@ void ClemensBackend::inputEvent(const ClemensInputEvent &input) {
 //            commaPos = !inputValueB.empty() ? inputValueB.find(',') : std::string_view::npos;
 //  ref: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=91397
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstringop-overread"
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
 #endif
 void ClemensBackend::inputMachine(const std::string_view &inputParam) {
     if (!clemens_is_initialized_simple(&machine_)) {

@@ -2,14 +2,14 @@
 
 The Clemens IIgs emulator is an attempt at writing a modern emulator for
 the Apple IIgs machine.  Its design focuses on developers versus casual play,
-providing tools to debug IIgs applications at runtime. My eventual goal is to provide a 
+providing tools to debug IIgs applications at runtime. My eventual goal is to provide a
 solid Apple IIgs backend and debugger with a functional frontend.
 
 ![Boot Sequence Demo](https://samirsinha.com/images/dotc-title.gif)
 
-**NOTE** This software should be considered Alpha quality.  The emulator is generally 
-stable with some missing features which are listed in prioritized order below.  Of course, 
-help would be appreciated to take on a couple of these. 
+**NOTE** This software should be considered Alpha quality.  The emulator is generally
+stable with some missing features which are listed in prioritized order below.  Of course,
+help would be appreciated to take on a couple of these.
 
 * Fast disk emulation
 * ROM 01 support (only supports ROM 3
@@ -66,9 +66,9 @@ build is available as a binary on the releases page.
 
 ### Windows
 
-There is no installer and the application is contained in whole within a single exectuable.  
+There is no installer and the application is contained in whole within a single exectuable.
 Simply unzip the executable into a directory.  Because this executable is not code signed,
-you'll get a warning from the OS when running the binary.  Simply select 'More Info' and 
+you'll get a warning from the OS when running the binary.  Simply select 'More Info' and
 'Run Anyway' if your security policy (and personal comfort level) allows for running untrusted
 applications.
 
@@ -146,7 +146,7 @@ Inside the project directory execute the following.
 
 ```
 cmake -B build -DCMAKE_BUILD_TYPE=<Debug|RelWithDbgInfo|Release> -DBUILD_TESTING=OFF
-cmake --build build --config=<Debug|RelWithDbgInfo|Release>
+cmake --build build --config <Debug|RelWithDbgInfo|Release>
 cp build-run/clemens_iigs/clemens_iigs <your_selected_install_directory>
 ```
 
@@ -158,7 +158,7 @@ Inside the project directory execute the following.
 
 ```
 cmake -B build -DBUILD_TESTING=OFF
-cmake --build build --config=<Debug|RelWithDbgInfo|Release>
+cmake --build build --config <Debug|RelWithDbgInfo|Release>
 cp build-run/clemens_iigs/<Config>/clemens_iigs.exe <your_selected_install_directory>
 ```
 
@@ -187,7 +187,7 @@ I've attempted to document in source code original reference material for the va
 
 External libraries referenced below are used by the `host` project (the debugging front-end.)  The actual Clemens emulator backend does not have any dependencies beyond the C standard library and the two listed dependencies included in the project.
 
-All projects below have permissive enough licenses (MIT, BSD, Apache) to be distributed by this project.  
+All projects below have permissive enough licenses (MIT, BSD, Apache) to be distributed by this project.
 
 ### Clemens Emulator Library
 
