@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.5
+
+* SmartPort 32MB Hard Drive on the disk port, virtual slot 2, drive 1
+* Gamepad and Joystick support on Windows (DirectInput) and Linux
+* ADB fix allowing Ctrl-RightAlt-F1 to trigger the Control Panel
+* IWM properly report spindle status on each drive
+* Decouple Apple IIGS device types and APIs from the 65816 emulator library into its own library
+* Moved some graphics mode bitmap rendering into the library
+* Added register set commands in the debugger
+
 ## Version 0.4
 
 * New Debugger GUI and improved diagnostics display
