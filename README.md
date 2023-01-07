@@ -5,7 +5,8 @@ the Apple IIgs machine.  Its design focuses on developers versus casual play,
 providing tools to debug IIgs applications at runtime. My eventual goal is to provide a
 solid Apple IIgs backend and debugger with a functional frontend.
 
-![Boot Sequence Demo](https://samirsinha.com/images/dotc-title.gif)
+![Zany Golf](https://samirsinha.com/images/zany_small.gif)
+![Defender of the Crown](https://samirsinha.com/images/dotc-title.gif)
 
 **NOTE** This software should be considered Alpha quality.  The emulator is generally
 stable with some missing features which are listed in prioritized order below.  Of course,
@@ -57,7 +58,7 @@ This information will be moved to [the Wiki](https://github.com/samkusin/clemens
 
 ![Ultima V](https://samirsinha.com/images/u5a2_small.png)
 
-![GS/OS 5](https://samirsinha.com/images/gsos5_small.png)
+![GS/OS 5](https://samirsinha.com/images/gsos6_small.png)
 
 ## Installation
 

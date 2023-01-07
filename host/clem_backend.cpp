@@ -22,6 +22,7 @@
 static constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
 static constexpr unsigned kInterpreterMemorySize = 1 * 1024 * 1024;
 static constexpr unsigned kLogOutputLineLimit = 1024;
+static constexpr unsigned kSmartPortDiskBlockCount = 32 * 1024 * 2; // 32 MB blocks
 
 struct ClemensRunSampler {
     //  our method of keeping the simulation in sync with real time is to rely
@@ -581,8 +582,8 @@ void ClemensBackend::loadSmartPortDisk(unsigned driveIndex) {
         input.read((char *)buffer.data(), sz);
         smartPortDisks_[driveIndex] = ClemensSmartPortDisk(std::move(buffer));
     } else {
-        smartPortDisks_[driveIndex] =
-            ClemensSmartPortDisk(std::move(ClemensSmartPortDisk::createData(8192)));
+        smartPortDisks_[driveIndex] = ClemensSmartPortDisk(
+            std::move(ClemensSmartPortDisk::createData(kSmartPortDiskBlockCount)));
     }
     ClemensSmartPortDevice device;
     clemens_assign_smartport_disk(&mmio_, driveIndex,
