@@ -46,7 +46,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: clemens-${{github.ref_name}}-${{runner.os}}-${{runner.arch}}.zip
-        path: ${{github.workspace}}/build-run/clemens_iigs/Release/*
+        path: ${{github.workspace}}/build/host/Release/*
 
     # - name: Test
     #  working-directory: ${{github.workspace}}/build
