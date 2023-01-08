@@ -22,6 +22,7 @@
 static constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
 static constexpr unsigned kInterpreterMemorySize = 1 * 1024 * 1024;
 static constexpr unsigned kLogOutputLineLimit = 1024;
+static constexpr unsigned kSmartPortDiskBlockCount = 32 * 1024 * 2; // 32 MB blocks
 
 struct ClemensRunSampler {
     //  our method of keeping the simulation in sync with real time is to rely
@@ -581,8 +582,8 @@ void ClemensBackend::loadSmartPortDisk(unsigned driveIndex) {
         input.read((char *)buffer.data(), sz);
         smartPortDisks_[driveIndex] = ClemensSmartPortDisk(std::move(buffer));
     } else {
-        smartPortDisks_[driveIndex] =
-            ClemensSmartPortDisk(std::move(ClemensSmartPortDisk::createData(8192)));
+        smartPortDisks_[driveIndex] = ClemensSmartPortDisk(
+            std::move(ClemensSmartPortDisk::createData(kSmartPortDiskBlockCount)));
     }
     ClemensSmartPortDevice device;
     clemens_assign_smartport_disk(&mmio_, driveIndex,
@@ -625,7 +626,7 @@ void ClemensBackend::inputEvent(const ClemensInputEvent &input) {
 //            commaPos = !inputValueB.empty() ? inputValueB.find(',') : std::string_view::npos;
 //  ref: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=91397
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstringop-overread"
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
 #endif
 void ClemensBackend::inputMachine(const std::string_view &inputParam) {
     if (!clemens_is_initialized_simple(&machine_)) {

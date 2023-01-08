@@ -237,6 +237,8 @@ bool _clem_joystick_poll_one(ClemensHostJoystick *joystick,
                              struct ClemensHostJoystickInfo *device) {
     struct input_event event;
     int result;
+    unsigned short ev_code_base;
+
     if (device->connected) {
 
         while ((result = read(device->fd, &event, sizeof(event))) > 0) {
@@ -260,10 +262,15 @@ bool _clem_joystick_poll_one(ClemensHostJoystick *joystick,
                 break;
             case EV_KEY:
                 if (event.code >= BTN_JOYSTICK && event.code <= BTN_THUMBR) {
-                    if (event.value) {
-                        device->buttons |= (1 << (event.code - BTN_JOYSTICK));
+                    if (event.code >= BTN_GAMEPAD) {
+                        ev_code_base = BTN_GAMEPAD;
                     } else {
-                        device->buttons &= ~(1 << (event.code - BTN_JOYSTICK));
+                        ev_code_base = BTN_JOYSTICK;
+                    }
+                    if (event.value) {
+                        device->buttons |= (1 << (event.code - ev_code_base));
+                    } else {
+                        device->buttons &= ~(1 << (event.code - ev_code_base));
                     }
                 }
                 break;

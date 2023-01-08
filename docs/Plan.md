@@ -16,12 +16,13 @@ This is a running todo list.
 * ROM 01 and Introspect ROM version from binary
 * Introspect Mouse Position from memory in E1/E0 (may depend on ROM version) for
   emulation without mouselock
-
-### Miscellaneous
-
 * CYA vs MEGA2 I/O access speeds
   * Some CYA registers are still "slow" so resolve these so they run at the IIgs
     fast speed
+* More polish on the emulator GUI/host side
+
+### Miscellaneous
+
 * Verify Mega II Interrupts work
 * SCC Support
 * Apple IIgs Diagnostic Test

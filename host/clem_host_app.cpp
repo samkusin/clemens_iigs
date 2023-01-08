@@ -37,7 +37,7 @@ static ClemensFrontend *g_Host = nullptr;
 static sg_pass_action g_sgPassAction;
 static unsigned g_ADBKeyToggleMask = 0;
 
-#ifdef _WIN32
+#if defined(_WIN32)
 static bool g_escapeKeyDown = false;
 
 static sapp_keycode onKeyDown(const sapp_event *evt) {
@@ -65,6 +65,88 @@ static sapp_keycode onKeyUp(const sapp_event *evt) {
     }
     return evt->key_code;
 }
+#elif defined(__linux__)
+//  The Super/Tux key seems special-cased in Linux to bypass X Windows keyboard
+//  shortcuts involving CTRL and ALT.  To prevent accidental triggering of
+//  disruptive shortcut keys like ALT-Fx, the Super Key must be used in-tandem
+//  with CTRL or ALT key down events before passing the event to the emulator.
+//  As a side effect, ALT-Fx cannot be supported on X Windows -
+//
+//  SO: if Super Key is Down, Fx keys are remapped to 1 - 0, to avoid
+//      conflicts between CTRL+ALT+Fx key presses.
+//      delete key also maps to F12
+//
+static bool g_leftSuperKeyDown = false;
+static bool g_rightSuperKeyDown = false;
+static bool g_escapeKeyDown = false;
+static bool g_fnKeys[12];
+
+static int xlatToFnKey(const sapp_event *evt) {
+    int fnKey = -1;
+    if (evt->key_code >= SAPP_KEYCODE_0 && evt->key_code <= SAPP_KEYCODE_9) {
+        fnKey = evt->key_code - SAPP_KEYCODE_0;
+        if (fnKey == 0)
+            fnKey = 10;
+    } else if (evt->key_code == SAPP_KEYCODE_MINUS) {
+        fnKey = 11;
+    } else if (evt->key_code == SAPP_KEYCODE_EQUAL) {
+        fnKey = 12;
+    }
+    return fnKey;
+}
+
+static sapp_keycode onKeyDown(const sapp_event *evt) {
+    sapp_keycode outKeyCode = evt->key_code;
+
+    if (!g_leftSuperKeyDown && evt->key_code == SAPP_KEYCODE_LEFT_SUPER)
+        g_leftSuperKeyDown = true;
+    if (!g_rightSuperKeyDown && evt->key_code == SAPP_KEYCODE_RIGHT_SUPER)
+        g_rightSuperKeyDown = true;
+
+    int fnKey = xlatToFnKey(evt);
+    if (g_leftSuperKeyDown || g_rightSuperKeyDown) {
+        if (fnKey > 0) {
+            g_fnKeys[fnKey - 1] = true;
+            outKeyCode = static_cast<sapp_keycode>(static_cast<int>(SAPP_KEYCODE_F1) + (fnKey - 1));
+        }
+    }
+    if (evt->modifiers & (SAPP_MODIFIER_CTRL + SAPP_MODIFIER_ALT)) {
+        if (g_fnKeys[0] && !g_escapeKeyDown) {
+            g_escapeKeyDown = true;
+            outKeyCode = SAPP_KEYCODE_ESCAPE;
+        }
+    }
+    if (evt->key_code == SAPP_KEYCODE_ESCAPE) {
+        if (g_escapeKeyDown)
+            outKeyCode = SAPP_KEYCODE_INVALID;
+    }
+    return outKeyCode;
+}
+
+static sapp_keycode onKeyUp(const sapp_event *evt) {
+    sapp_keycode outKeyCode = evt->key_code;
+
+    if (g_leftSuperKeyDown && evt->key_code == SAPP_KEYCODE_LEFT_SUPER)
+        g_leftSuperKeyDown = false;
+    else if (g_rightSuperKeyDown && evt->key_code == SAPP_KEYCODE_RIGHT_SUPER)
+        g_leftSuperKeyDown = false;
+
+    int fnKey = xlatToFnKey(evt);
+    if (fnKey > 0) {
+        g_fnKeys[fnKey - 1] = false;
+        outKeyCode = static_cast<sapp_keycode>(static_cast<int>(SAPP_KEYCODE_F1) + (fnKey - 1));
+    }
+    if (g_escapeKeyDown) {
+        if (fnKey == 1) {
+            g_escapeKeyDown = false;
+            outKeyCode = SAPP_KEYCODE_ESCAPE;
+        } else if (evt->key_code == SAPP_KEYCODE_ESCAPE) {
+            outKeyCode = SAPP_KEYCODE_INVALID;
+        }
+    }
+    return outKeyCode;
+}
+
 #else
 static sapp_keycode onKeyDown(const sapp_event *evt) { return evt->key_code; }
 
