@@ -45,12 +45,29 @@ const char *kFirstTimeUse[] = {
     "- Enter the desired disk set name\n"
     "- A folder will be created in the library folder for the disk set containing the imported "
     "images\n"
-    "\n"
+    "\n"};
+
+#if defined(__linux__)
+const char *kGSKeyboardCommands[] = {
     "IIGS Keyboard Commands:\n"
     "\n"
-    "- Ctrl-Alt-F12 to reboot the system\n"
-    "- Ctrl-F12 for CTRL-RESET\n"
-    "- Ctrl-Left Alt-F1 to enter the Control Panel\n"};
+    "The Tux/Super key when used in combination with number keys will convert them "
+    " to Function Keys.\n"
+    "\n"
+    "- Tux - 1 = F1\n"
+    "- Tux - Minus = F11\n"
+    "- Tux - Equal = F12\n"
+    "\n"
+    "- Tux - Ctrl - Alt - Equal to reboot the system\n"
+    "- Tux - Ctrl - Equal for CTRL-RESET\n"
+    "- Tux - Ctrl - Left Alt - 1 to enter the Control Panel\n"};
+#else
+const char *kGSKeyboardCommands[] = {"IIGS Keyboard Commands:\n"
+                                     "\n"
+                                     "- Ctrl-Alt-F12 to reboot the system\n"
+                                     "- Ctrl-F12 for CTRL-RESET\n"
+                                     "- Ctrl-Left Alt-F1 to enter the Control Panel\n"};
+#endif
 } // namespace ClemensL10N
 
 //  TODO: pass the configuration object (ClemensConfiguration) into this
@@ -74,7 +91,7 @@ auto ClemensPreamble::frame(int width, int height) -> Result {
         break;
     case Mode::NewVersion:
         ImGui::SetNextWindowSize(
-            ImVec2(std::max(width * 0.75f, 512.0f), std::max(height * 0.6f, 384.0f)));
+            ImVec2(std::max(width * 0.75f, 512.0f), std::max(height * 0.66f, 400.0f)));
         if (ImGui::BeginPopupModal("Welcome", NULL, ImGuiWindowFlags_NoResize)) {
             auto contentSize = ImGui::GetContentRegionAvail();
             ImGui::BeginChild(ImGui::GetID("text"), ImVec2(-FLT_MIN, contentSize.y - 50));
@@ -98,11 +115,13 @@ auto ClemensPreamble::frame(int width, int height) -> Result {
         break;
     case Mode::FirstUse:
         ImGui::SetNextWindowSize(
-            ImVec2(std::max(width * 0.75f, 512.0f), std::max(height * 0.6f, 384.0f)));
+            ImVec2(std::max(width * 0.75f, 512.0f), std::max(height * 0.66f, 400.0f)));
         if (ImGui::BeginPopupModal("FirstUse", NULL, ImGuiWindowFlags_NoResize)) {
             auto contentSize = ImGui::GetContentRegionAvail();
             ImGui::BeginChild(ImGui::GetID("text"), ImVec2(-FLT_MIN, contentSize.y - 50));
             ImGui::TextWrapped(ClemensL10N::kFirstTimeUse[kLanguageDefault],
+                               CLEM_HOST_VERSION_MAJOR, CLEM_HOST_VERSION_MINOR);
+            ImGui::TextWrapped(ClemensL10N::kGSKeyboardCommands[kLanguageDefault],
                                CLEM_HOST_VERSION_MAJOR, CLEM_HOST_VERSION_MINOR);
             ImGui::EndChild();
             if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {

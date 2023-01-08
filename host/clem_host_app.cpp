@@ -87,9 +87,9 @@ static int xlatToFnKey(const sapp_event *evt) {
         fnKey = evt->key_code - SAPP_KEYCODE_0;
         if (fnKey == 0)
             fnKey = 10;
-    } else if (evt->key_code == SAPP_KEYCODE_INSERT) {
+    } else if (evt->key_code == SAPP_KEYCODE_MINUS) {
         fnKey = 11;
-    } else if (evt->key_code == SAPP_KEYCODE_DELETE) {
+    } else if (evt->key_code == SAPP_KEYCODE_EQUAL) {
         fnKey = 12;
     }
     return fnKey;
@@ -120,8 +120,6 @@ static sapp_keycode onKeyDown(const sapp_event *evt) {
         if (g_escapeKeyDown)
             outKeyCode = SAPP_KEYCODE_INVALID;
     }
-
-    printf("SKS: keydown: %d\n", outKeyCode);
     return outKeyCode;
 }
 
@@ -134,21 +132,18 @@ static sapp_keycode onKeyUp(const sapp_event *evt) {
         g_leftSuperKeyDown = false;
 
     int fnKey = xlatToFnKey(evt);
-
+    if (fnKey > 0) {
+        g_fnKeys[fnKey - 1] = false;
+        outKeyCode = static_cast<sapp_keycode>(static_cast<int>(SAPP_KEYCODE_F1) + (fnKey - 1));
+    }
     if (g_escapeKeyDown) {
-        if (g_fnKeys[0]) {
+        if (fnKey == 1) {
             g_escapeKeyDown = false;
             outKeyCode = SAPP_KEYCODE_ESCAPE;
         } else if (evt->key_code == SAPP_KEYCODE_ESCAPE) {
             outKeyCode = SAPP_KEYCODE_INVALID;
         }
     }
-    if (fnKey > 0) {
-        g_fnKeys[fnKey - 1] = false;
-        outKeyCode = static_cast<sapp_keycode>(static_cast<int>(SAPP_KEYCODE_F1) + (fnKey - 1));
-    }
-
-    printf("SKS: keyop: %d\n", outKeyCode);
     return outKeyCode;
 }
 
