@@ -82,7 +82,7 @@ packages for Debian and possibly other distributions.
 
 ## Getting Started
 
-1. Copy a ROM 3 file to the same directory as the executable
+1. Copy a ROM 3 file named `gs_rom_3.rom` to the same directory as the executable
 2. Run the executable
 3. Download disk images from https://archive.org/details/wozaday or https://mirrors.apple2.org.za/ftp.apple.asimov.net/
 4. Import the images using one of the four available drives from the UI on the upper left handed pane.
