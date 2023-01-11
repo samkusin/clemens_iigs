@@ -102,6 +102,13 @@ the emulator.
    * To reboot press `Ctrl`+`Alt`+`F12`
 * The F1 Key functions as an ESCAPE key if either `Ctrl` or `Alt` are pressed for OS compatibility reasons
    * To open the Desktop Manager/Control Panel, press `Ctrl`+`Right Alt`+`F1`
+* On Linux because of how the `Ctrl` and `Alt` + FN keys often map to other system functions:
+   * Use the Tux/Super key (usually to the left of your left ALT key) in combination with a number key to mock a FN key
+   * Tux - Minus = F11
+   * Tux - Equal = F12
+   * Tux - Ctrl - Alt - Equal to reboot the system
+   * Tux - Ctrl - Equal for CTRL-RESET
+   * Tux - Ctrl - Left Alt - 1 to enter the Control Panel
 
 ### Terminal Commands
 
