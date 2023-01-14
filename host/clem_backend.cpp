@@ -516,6 +516,10 @@ void ClemensBackend::resetDisk(ClemensDriveType driveType) {
             } else {
                 nib.meta_track_map[i] = 0xff;
             }
+            nib.track_initialized[i] = 0;
+            nib.track_byte_offset[i] = 0;
+            nib.track_byte_count[i] = 0;
+            nib.track_bits_count[i] = 0;
         }
         track_byte_offset = 0;
         for (unsigned region_index = 0; region_index < 5; ++region_index) {
@@ -532,10 +536,10 @@ void ClemensBackend::resetDisk(ClemensDriveType driveType) {
                 } else {
                     i += 1;
                 }
+                nib.track_initialized[track_index] = 1;
                 nib.track_byte_offset[track_index] = track_byte_offset;
                 nib.track_byte_count[track_index] = max_track_size_bytes;
                 nib.track_bits_count[track_index] = bits_cnt;
-                nib.track_initialized[track_index] = 0;
                 track_byte_offset += max_track_size_bytes;
             }
         }
@@ -553,13 +557,17 @@ void ClemensBackend::resetDisk(ClemensDriveType driveType) {
             } else {
                 nib.meta_track_map[i] = 0xff;
             }
+            nib.track_initialized[i] = 0;
+            nib.track_byte_offset[i] = 0;
+            nib.track_byte_count[i] = 0;
+            nib.track_bits_count[i] = 0;
         }
         track_byte_offset = 0;
         for (unsigned i = 0; i < nib.track_count; ++i) {
+            nib.track_initialized[i] = 1;
             nib.track_byte_offset[i] = track_byte_offset;
             nib.track_byte_count[i] = max_track_size_bytes;
             nib.track_bits_count[i] = CLEM_DISK_BLANK_TRACK_BIT_LENGTH_525;
-            nib.track_initialized[i] = 0;
             track_byte_offset += max_track_size_bytes;
         }
         break;
