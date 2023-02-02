@@ -22,7 +22,7 @@ jobs:
 
     - name: Prerequisites
       # Needed for X11 extensions and audio builds
-      run: /
+      run: |
         sudo apt-get update
         sudo apt-get install -y libxi-dev libxcursor-dev libasound2-dev mesa-common-dev
 
