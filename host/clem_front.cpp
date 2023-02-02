@@ -762,6 +762,7 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
                 }
                 left = 0;
             }
+            //  TODO: Buggy - seems that using a blank disk and then inserting a non blank disk causes a crash
             for (; left <= right; ++left, ++bufferIndex) {
                 assert(bufferIndex < 4);
                 frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];

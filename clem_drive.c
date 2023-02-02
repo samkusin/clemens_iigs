@@ -230,9 +230,14 @@ unsigned clem_drive_step(struct ClemensDrive *drive, unsigned *io_flags, int qtr
             *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
         }
     }
-    if (track_cur_pos >= drive->track_bit_length) {
-        /* wrap to beginning of track */
-        track_cur_pos -= drive->track_bit_length;
+    if (drive->track_bit_length > 0) {
+        if (track_cur_pos >= drive->track_bit_length) {
+            /* wrap to beginning of track */
+            track_cur_pos -= drive->track_bit_length;
+        }
+        CLEM_ASSERT(track_cur_pos < drive->track_bit_length);
+    } else {
+        track_cur_pos = 0;
     }
     drive->track_byte_index = track_cur_pos / 8;
     drive->track_bit_shift = 7 - (track_cur_pos % 8);
