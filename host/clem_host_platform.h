@@ -2,17 +2,21 @@
 #define CLEMENS_HOST_PLATFORM_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #if defined(_WIN32)
-#define CLEMENS_PLATFORM_WINDOWS 1
-#define CLEMENS_PLATFORM_LINUX   0
+
+#define CLEMENS_PLATFORM_WINDOWS
+//  A larger value to cover more edge cases but likely not all
+#define CLEMENS_PATH_MAX 1024
+
 #elif defined(__linux__)
-#define CLEMENS_PLATFORM_WINDOWS 0
-#define CLEMENS_PLATFORM_LINUX   1
-#else
-#define CLEMENS_PLATFORM_WINDOWS 0
-#define CLEMENS_PLATFORM_LINUX   0
+
+#define CLEMENS_PLATFORM_LINUX
+//  A larger value to cover PATH_MAX but perhaps not all usecases
+#define CLEMENS_PATH_MAX 4096
+
 #endif
 
 #define CLEM_HOST_JOYSTICK_LIMIT 4
@@ -25,8 +29,8 @@
 #define CLEM_HOST_JOYSTICK_AXIS_DELTA 1023
 
 #if defined(CLEMENS_PLATFORM_WINDOWS)
-#define CLEM_HOST_JOYSTICK_PROVIDER_DINPUT "dinput"
-#define CLEM_HOST_JOYSTICK_PROVIDER_XINPUT "xinput"
+#define CLEM_HOST_JOYSTICK_PROVIDER_DINPUT  "dinput"
+#define CLEM_HOST_JOYSTICK_PROVIDER_XINPUT  "xinput"
 #define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT CLEM_HOST_JOYSTICK_PROVIDER_DINPUT
 #elif defined(CLEMENS_PLATFORM_LINUX)
 #define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT ""
@@ -71,11 +75,32 @@ unsigned clem_host_get_processor_number();
 void clem_host_uuid_gen(ClemensHostUUID *uuid);
 
 /**
+ * @brief Get the process executable full path name
+ *
+ * @param outpath C string buffer
+ * @param outpath_size  Size of the *whole* outpath buffer (including null term)
+ * @return char* NULL if the pathname length is greater than outpath_size
+ */
+char *get_process_executable_path(char *outpath, size_t outpath_size);
+
+/**
+ * @brief Get the local user data directory qualified with identifiers
+ *
+ * @param outpath
+ * @param outpath_size
+ * @param company_name
+ * @param app_name
+ * @return char*
+ */
+char *get_local_user_data_directory(char *outpath, size_t outpath_size, const char *company_name,
+                                    const char *app_name);
+
+/**
  * @brief Initializes the joystick system
  *
  * @param provider OS specific (Windows: "xinput", "dinput"; Linux: "{evdev root dir}")
  */
-void clem_joystick_open_devices(const char* provider);
+void clem_joystick_open_devices(const char *provider);
 
 /**
  * @brief Return joystick data for up to 4 devices

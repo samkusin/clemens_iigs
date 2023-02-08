@@ -559,9 +559,10 @@ void ClemensFrontend::DOCStatus::copyFrom(const ClemensDeviceEnsoniq &doc) {
 
 const uint64_t ClemensFrontend::kFrameSeqNoInvalid = std::numeric_limits<uint64_t>::max();
 
-ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
+ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
+                                 const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
-    : config_("config.ini"), displayProvider_(systemFontLoBuffer, systemFontHiBuffer),
+    : config_(config), displayProvider_(systemFontLoBuffer, systemFontHiBuffer),
       display_(displayProvider_), audio_(), frameSeqNo_(kFrameSeqNoInvalid),
       frameLastSeqNo_(kFrameSeqNoInvalid),
       frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
@@ -571,11 +572,12 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
       emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false), terminalChanged_(false),
       consoleChanged_(false), terminalMode_(TerminalMode::Command),
       diskLibraryRootPath_{
-          (std::filesystem::current_path() / std::filesystem::path(CLEM_HOST_LIBRARY_DIR))
-              .string()},
+          (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_LIBRARY_DIR).string()},
+      diskTracesRootPath_{
+          (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_TRACES_DIR).string()},
       diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0),
       debugIOMode_(DebugIOMode::Core), validJoystickIds_{-1, -1, -1, -1},
-      guiMode_(GUIMode::Preamble) {
+      guiMode_(GUIMode::RebootEmulator) {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -594,6 +596,10 @@ ClemensFrontend::ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
     backendConfig_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
 
     backendConfig_.diskLibraryRootPath = diskLibraryRootPath_;
+    backendConfig_.diskTraceRootPath = diskTracesRootPath_;
+    backendConfig_.diskSnapshotRootPath =
+        (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_SNAPSHOT_DIR).string();
+
     // TODO: This should be selectable like regular drives - this will require some
     //       UI to make it happen
     backendConfig_.smartPortDriveStates[0].imagePath =
@@ -642,8 +648,9 @@ void ClemensFrontend::lostFocus() {
 
 std::unique_ptr<ClemensBackend> ClemensFrontend::createBackend() {
     constexpr unsigned refreshFrequency_ = 60;
+    auto romDir = std::filesystem::path(config_.dataDirectory) / "gs_rom_3.rom";
     auto backend = std::make_unique<ClemensBackend>(
-        "gs_rom_3.rom", backendConfig_,
+        romDir.string(), backendConfig_,
         std::bind(&ClemensFrontend::backendStateDelegate, this, std::placeholders::_1));
     backend->setRefreshFrequency(refreshFrequency_);
     backend->reset();
@@ -762,7 +769,8 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
                 }
                 left = 0;
             }
-            //  TODO: Buggy - seems that using a blank disk and then inserting a non blank disk causes a crash
+            //  TODO: Buggy - seems that using a blank disk and then inserting a non blank disk
+            //  causes a crash
             for (; left <= right; ++left, ++bufferIndex) {
                 assert(bufferIndex < 4);
                 frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];
@@ -944,12 +952,13 @@ void ClemensFrontend::pollJoystickDevices() {
     backend_->inputEvent(inputs[1]);
 }
 
-void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInterop &interop) {
+auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInterop &interop)
+    -> ViewType {
     //  send commands to emulator thread
     //  get results from emulator thread
     //    video, audio, machine state, etc
     if (interop.exitApp)
-        return;
+        return getViewType();
 
     pollJoystickDevices();
 
@@ -1119,22 +1128,6 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     doMachineTerminalLayout(ImVec2(kMonitorX, monitorSize.y + kInfoBarHeight),
                             ImVec2(kMonitorViewWidth, kTerminalViewHeight));
     switch (guiMode_) {
-    case GUIMode::Preamble:
-        if (!preamble_) {
-            preamble_ = std::make_unique<ClemensPreamble>(config_);
-        }
-        if (preamble_) {
-            auto preambleResult = preamble_->frame(width, height);
-            if (preambleResult != ClemensPreamble::Result::Active) {
-                if (preambleResult == ClemensPreamble::Result::Ok) {
-                    preamble_ = nullptr;
-                    guiMode_ = GUIMode::RebootEmulator;
-                } else if (preambleResult == ClemensPreamble::Result::Exit) {
-                    interop.exitApp = true;
-                }
-            }
-        }
-        break;
     case GUIMode::ImportDiskModal:
     case GUIMode::BlankDiskModal:
         doModalOperations(width, height);
@@ -1174,6 +1167,8 @@ void ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     }
 
     interop.mouseLock = emulatorHasMouseFocus_;
+
+    return getViewType();
 }
 
 static ImColor getDefaultColor(bool hi) {
@@ -3261,7 +3256,7 @@ bool ClemensFrontend::cmdMessageLocal(std::string_view message) {
         return false;
     } else if (cmd == "dump") {
         bool isOk = true;
-        auto outPath = std::filesystem::path(CLEM_HOST_TRACES_DIR) / params[0];
+        auto outPath = std::filesystem::path(diskTracesRootPath_) / params[0];
         std::ios_base::openmode flags = std::ios_base::out | std::ios_base::binary;
         std::ofstream outstream(outPath, flags);
         if (outstream.is_open()) {

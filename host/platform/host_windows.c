@@ -1,16 +1,18 @@
 #include "clem_host_platform.h"
 
+#include <stdlib.h>
+
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 #include <Dbt.h>
+#include <ShlObj_core.h>
 #include <Xinput.h>
+#include <combaseapi.h>
 
 #define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
 #include <dinputd.h>
-
-#include <combaseapi.h>
 
 #ifdef _MSC_VER
 #pragma comment(lib, "dxguid")
@@ -40,6 +42,63 @@ void clem_host_uuid_gen(ClemensHostUUID *uuid) {
     uuid->data[13] = guid.Data4[5];
     uuid->data[14] = guid.Data4[6];
     uuid->data[15] = guid.Data4[7];
+}
+
+char *get_process_executable_path(char *outpath, size_t outpath_size) {
+    DWORD path_size = (DWORD)outpath_size - 1;
+    DWORD actual_path_size = GetModuleFileName(NULL, outpath, path_size);
+    if (actual_path_size == 0) {
+        DWORD last_error = GetLastError();
+        printf("GetModuleFileName failed with error %u\n", last_error);
+        return NULL;
+    }
+    outpath[actual_path_size] = '\0';
+    if (actual_path_size == path_size) {
+        if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+            printf("GetModuleFileName truncated path %s\n", outpath);
+            return NULL;
+        }
+    }
+    return outpath;
+}
+
+char *get_local_user_data_directory(char *outpath, size_t outpath_size, const char *company_name,
+                                    const char *app_name) {
+    char *current_path = outpath;
+    char *tail_path = outpath + outpath_size - 1;
+    int state = 0;
+    PWSTR directoryString;
+    HRESULT hr = SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, NULL, &directoryString);
+    if (SUCCEEDED(hr)) {
+        int cnt = WideCharToMultiByte(CP_UTF8, 0, directoryString, wcslen(directoryString), outpath,
+                                      outpath_size, NULL, NULL);
+        if (cnt <= 0) {
+            return NULL;
+        }
+        current_path += cnt;
+    }
+    //  according to docs for SHGetKnownFolderPath, there will be no trailing '\'
+    while (current_path < tail_path && state < 4) {
+        if (!(state & 1)) {
+            *current_path = '\\';
+            ++current_path;
+        } else if (state == 1) {
+            strncpy(current_path, company_name, tail_path - current_path);
+            current_path += strnlen(current_path, tail_path - current_path);
+        } else if (state == 3) {
+            strncpy(current_path, app_name, tail_path - current_path);
+            current_path += strnlen(current_path, tail_path - current_path);
+        }
+        ++state;
+    }
+    CoTaskMemFree(directoryString);
+    *current_path = '\0';
+
+    //  did we finish our path construction
+    if (state != 4)
+        return NULL;
+
+    return outpath;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

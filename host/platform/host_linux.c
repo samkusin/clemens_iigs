@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/input.h>
+#include <pwd.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +38,48 @@ unsigned clem_host_get_processor_number() { return local_getcpu(); }
 void clem_host_uuid_gen(ClemensHostUUID *uuid) {
     assert(sizeof(uuid_t) <= sizeof(uuid->data));
     uuid_generate(uuid->data);
+}
+
+char *get_process_executable_path(char *outpath, size_t outpath_size) {
+    //   TODO: /proc/self/exe
+    struct stat file_stat;
+    ssize_t bufsz;
+
+    bufsz = readlink("/proc/self/exe", outpath, outpath_size - 1);
+    if (bufsz < 0)
+        return NULL;
+    outpath[bufsz] = '\0';
+
+    printf("get_process_exectuable_path = %s\n", outpath);
+
+    //  verify that the result is actually a file (to ensure that our output path
+    //  is a complete link vs clipped by the buffer size)
+    if (stat(outpath, &file_stat) < 0) {
+        return NULL;
+    }
+    if (!S_ISREG(file_stat.st_mode)) {
+        return NULL;
+    }
+    while (--bufsz >= 0) {
+        if (outpath[bufsz] == '/') {
+            outpath[bufsz] = '\0';
+            break;
+        }
+    }
+    return outpath;
+}
+
+char *get_local_user_data_directory(char *outpath, size_t outpath_size, const char *company_name,
+                                    const char *app_name) {
+    //  generate ~/.var/com.<company_name>.<app_name>/data
+    const char *user_home_dir = getenv("HOME");
+    if (user_home_dir == NULL) {
+        user_home_dir = getpwuid(getuid())->pw_dir;
+    }
+    snprintf(outpath, outpath_size - 1, "%s/.var/com.%s.%s/data", user_home_dir, company_name,
+             app_name);
+    outpath[outpath_size - 1] = '\0';
+    return outpath;
 }
 
 //  evdev implementation

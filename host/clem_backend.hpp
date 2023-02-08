@@ -120,7 +120,6 @@ class ClemensBackend {
     void initEmulatedDiskLocalStorage();
     bool loadDisk(ClemensDriveType driveType, bool allowBlank);
     bool saveDisk(ClemensDriveType driveType);
-    void resetDisk(ClemensDriveType driveType);
 
     void loadSmartPortDisk(unsigned driveIndex);
     bool saveSmartPortDisk(unsigned driveIndex);
