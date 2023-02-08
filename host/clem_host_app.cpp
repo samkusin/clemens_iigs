@@ -409,7 +409,7 @@ static void onFrame(void *userdata) {
     }
 }
 
-static void onEvent(const sapp_event *evt, void *userdata) {
+static void onEvent(const sapp_event *evt, void *) {
     struct ClemensInputEvent clemInput {};
 
     simgui_handle_event(evt);

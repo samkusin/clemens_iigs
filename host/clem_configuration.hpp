@@ -21,13 +21,18 @@ struct ClemensConfiguration {
 
     ClemensConfiguration();
     ClemensConfiguration(std::string pathname, std::string datadir);
-    ClemensConfiguration(const ClemensConfiguration &other);
+    ClemensConfiguration(const ClemensConfiguration &other) { copyFrom(other); }
+    ClemensConfiguration &operator=(const ClemensConfiguration &other) {
+        copyFrom(other);
+        return *this;
+    }
 
     bool isNewInstall() const { return majorVersion == 0 && minorVersion == 0; }
 
     bool save();
 
   private:
+    void copyFrom(const ClemensConfiguration &other);
     static int handler(void *user, const char *section, const char *name, const char *value);
 };
 

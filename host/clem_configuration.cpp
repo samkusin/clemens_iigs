@@ -17,7 +17,7 @@ ClemensConfiguration::ClemensConfiguration(std::string pathname, std::string dat
     }
 }
 
-ClemensConfiguration::ClemensConfiguration(const ClemensConfiguration &other) {
+void ClemensConfiguration::copyFrom(const ClemensConfiguration &other) {
     iniPathname = other.iniPathname;
     dataDirectory = other.dataDirectory;
     majorVersion = other.majorVersion;

@@ -88,8 +88,8 @@ ClemensConfiguration findConfiguration(const std::string &rootDirectoryOverride)
 ClemensStartupView::ClemensStartupView(std::string rootDirectoryOverride)
     : mode_(Mode::Initial), config_(findConfiguration(rootDirectoryOverride)) {}
 
-auto ClemensStartupView::frame(int width, int height, double deltaTime, FrameAppInterop &interop)
-    -> ViewType {
+auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
+                               FrameAppInterop &interop) -> ViewType {
     auto nextView = ViewType::Startup;
 
     switch (mode_) {
