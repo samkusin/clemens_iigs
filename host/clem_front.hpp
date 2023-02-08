@@ -1,6 +1,8 @@
 #ifndef CLEM_HOST_FRONT_HPP
 #define CLEM_HOST_FRONT_HPP
 
+#include "clem_host_view.hpp"
+
 #include "cinek/buffer.hpp"
 #include "cinek/circular_buffer.hpp"
 #include "cinek/fixedstack.hpp"
@@ -22,25 +24,17 @@
 struct ImFont;
 
 class ClemensBackend;
-class ClemensPreamble;
 
-class ClemensFrontend {
+class ClemensFrontend : public ClemensHostView {
   public:
-    ClemensFrontend(const cinek::ByteBuffer &systemFontLoBuffer,
+    ClemensFrontend(ClemensConfiguration config, const cinek::ByteBuffer &systemFontLoBuffer,
                     const cinek::ByteBuffer &systemFontHiBuffer);
     ~ClemensFrontend();
 
-    struct FrameAppInterop {
-        bool mouseLock;
-        bool exitApp;
-    };
-
-    //  application rendering hook
-    void frame(int width, int height, double deltaTime, FrameAppInterop &interop);
-    //  application input from OS
-    void input(ClemensInputEvent input);
-    //  application lost focus
-    void lostFocus();
+    ViewType getViewType() const final { return ViewType::Main; }
+    ViewType frame(int width, int height, double deltaTime, FrameAppInterop &interop) final;
+    void input(ClemensInputEvent input) final;
+    void lostFocus() final;
 
   private:
     template <typename TBufferType> friend struct FormatView;
@@ -243,6 +237,7 @@ class ClemensFrontend {
     std::vector<ClemensBackendBreakpoint> breakpoints_;
 
     std::string diskLibraryRootPath_;
+    std::string diskTracesRootPath_;
     ClemensDiskLibrary diskLibrary_;
 
     unsigned diskComboStateFlags_; // if opened, flag == 1 else 0
@@ -270,8 +265,6 @@ class ClemensFrontend {
     void pollJoystickDevices();
 
   private:
-    std::unique_ptr<ClemensPreamble> preamble_;
-
     //  UI State Specific Flows
     void doModalOperations(int width, int height);
     void doImportDiskSetFlowStart(int width, int height);

@@ -344,7 +344,7 @@ bool ClemensBackend::programTrace(const std::string_view &inputParam) {
     bool ok = true;
     if (programTrace_ != nullptr && !path.empty()) {
         //  save if a path was supplied
-        auto exportPath = std::filesystem::path(CLEM_HOST_TRACES_DIR) / path;
+        auto exportPath = std::filesystem::path(config_.diskTraceRootPath) / path;
         ok = programTrace_->exportTrace(exportPath.string().c_str());
         if (ok) {
             programTrace_->reset();
@@ -374,7 +374,7 @@ void ClemensBackend::saveMachine(std::string path) {
 }
 
 bool ClemensBackend::saveSnapshot(const std::string_view &inputParam) {
-    auto outputPath = std::filesystem::path(CLEM_HOST_SNAPSHOT_DIR) / inputParam;
+    auto outputPath = std::filesystem::path(config_.diskSnapshotRootPath) / inputParam;
     return ClemensSerializer::save(outputPath.string(), &machine_, &mmio_, diskContainers_.size(),
                                    diskContainers_.data(), diskDrives_.data(),
                                    CLEM_SMARTPORT_DRIVE_LIMIT, smartPortDisks_.data(),
@@ -386,7 +386,7 @@ void ClemensBackend::loadMachine(std::string path) {
 }
 
 bool ClemensBackend::loadSnapshot(const std::string_view &inputParam) {
-    auto outputPath = std::filesystem::path(CLEM_HOST_SNAPSHOT_DIR) / inputParam;
+    auto outputPath = std::filesystem::path(config_.diskSnapshotRootPath) / inputParam;
     bool res = ClemensSerializer::load(
         outputPath.string(), &machine_, &mmio_, diskContainers_.size(), diskContainers_.data(),
         diskDrives_.data(), CLEM_SMARTPORT_DRIVE_LIMIT, smartPortDisks_.data(),

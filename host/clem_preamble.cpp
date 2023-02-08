@@ -132,8 +132,10 @@ auto ClemensPreamble::frame(int width, int height) -> Result {
         }
         break;
     case Mode::Continue:
+        //  create data directory
         config_.majorVersion = CLEM_HOST_VERSION_MAJOR;
         config_.minorVersion = CLEM_HOST_VERSION_MINOR;
+        //  TODO: build data directory
         config_.save();
         return Result::Ok;
     case Mode::Exit:

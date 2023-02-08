@@ -19,6 +19,7 @@
 #include <filesystem>
 
 #include "clem_front.hpp"
+#include "clem_startup_view.hpp"
 
 #define SOKOL_IMPL
 #include "sokol/sokol_app.h"
@@ -32,10 +33,23 @@
 #include "fonts/font_printchar21.h"
 #include "fonts/font_prnumber3.h"
 
+struct SharedAppData {
+    SharedAppData(int argc, char *argv[]) {
+        if (argc > 1) {
+            rootPathOverride = argv[1];
+        }
+    }
+
+    std::string rootPathOverride;
+};
+
 static uint64_t g_lastTime = 0;
-static ClemensFrontend *g_Host = nullptr;
+static ClemensHostView *g_Host = nullptr;
 static sg_pass_action g_sgPassAction;
 static unsigned g_ADBKeyToggleMask = 0;
+
+static cinek::ByteBuffer g_systemFontLoBuffer;
+static cinek::ByteBuffer g_systemFontHiBuffer;
 
 #if defined(_WIN32)
 static bool g_escapeKeyDown = false;
@@ -202,17 +216,12 @@ static void imguiFontSetup(const cinek::ByteBuffer &systemFontLoBuffer,
     }
 }
 
-static void initDirectories() {
-    std::filesystem::create_directory(CLEM_HOST_LIBRARY_DIR);
-    std::filesystem::create_directory(CLEM_HOST_SNAPSHOT_DIR);
-    std::filesystem::create_directory(CLEM_HOST_TRACES_DIR);
-}
+static void onInit(void *userdata) {
+    auto *appdata = reinterpret_cast<SharedAppData *>(userdata);
 
-static void onInit() {
     stm_setup();
-    initDirectories();
 
-#if CLEMENS_PLATFORM_WINDOWS
+#if defined(CLEMENS_PLATFORM_WINDOWS)
     CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #endif
 
@@ -331,18 +340,20 @@ static void onInit() {
     g_sokolToADBKey[SAPP_KEYCODE_RIGHT_CONTROL] = CLEM_ADB_KEY_RCTRL;
     g_sokolToADBKey[SAPP_KEYCODE_RIGHT_ALT] = CLEM_ADB_KEY_COMMAND_OPEN_APPLE;
 
-    auto systemFontLoBuffer = loadFont("fonts/PrintChar21.ttf");
-    auto systemFontHiBuffer = loadFont("fonts/PRNumber3.ttf");
-    imguiFontSetup(systemFontLoBuffer, systemFontHiBuffer);
-    g_Host = new ClemensFrontend(systemFontLoBuffer, systemFontHiBuffer);
+    g_systemFontLoBuffer = loadFont("fonts/PrintChar21.ttf");
+    g_systemFontHiBuffer = loadFont("fonts/PRNumber3.ttf");
+    imguiFontSetup(g_systemFontLoBuffer, g_systemFontHiBuffer);
+    g_Host = new ClemensStartupView(appdata->rootPathOverride);
 }
 
-static void onFrame() {
+static void onFrame(void *userdata) {
+    auto *appdata = reinterpret_cast<SharedAppData *>(userdata);
     const int frameWidth = sapp_width();
     const int frameHeight = sapp_height();
 
     uint64_t deltaTicks = stm_laptime(&g_lastTime);
     double deltaTime = stm_sec(deltaTicks);
+    bool exitApp = false;
 
     simgui_frame_desc_t imguiFrameDesc = {};
     imguiFrameDesc.delta_time = deltaTime;
@@ -351,23 +362,52 @@ static void onFrame() {
     imguiFrameDesc.height = frameHeight;
 
     simgui_new_frame(imguiFrameDesc);
+    if (g_Host) {
+        ClemensHostView::FrameAppInterop interop;
+        interop.mouseLock = sapp_mouse_locked();
+        interop.exitApp = exitApp;
 
-    ClemensFrontend::FrameAppInterop interop;
-    interop.mouseLock = sapp_mouse_locked();
-    interop.exitApp = false;
-    g_Host->frame(frameWidth, frameHeight, deltaTime, interop);
-    sapp_lock_mouse(interop.mouseLock);
-    if (interop.exitApp) {
-        sapp_request_quit();
+        auto nextViewType = g_Host->frame(frameWidth, frameHeight, deltaTime, interop);
+        sapp_lock_mouse(interop.mouseLock);
+        exitApp = interop.exitApp;
+
+        if (nextViewType != g_Host->getViewType()) {
+            auto *oldHost = g_Host;
+            switch (nextViewType) {
+            case ClemensHostView::ViewType::Startup:
+                g_Host = new ClemensStartupView(appdata->rootPathOverride);
+                break;
+            case ClemensHostView::ViewType::Main: {
+                ClemensConfiguration config;
+                if (oldHost->getViewType() == ClemensHostView::ViewType::Startup) {
+                    config = static_cast<ClemensStartupView *>(oldHost)->getConfiguration();
+                }
+                g_Host = new ClemensFrontend(config, g_systemFontLoBuffer, g_systemFontHiBuffer);
+                break;
+            }
+            default:
+                g_Host = nullptr;
+                CK_ASSERT(false);
+                exitApp = true;
+                break;
+            }
+
+            if (oldHost) {
+                delete oldHost;
+            }
+        }
     }
-
     sg_begin_default_pass(&g_sgPassAction, frameWidth, frameHeight);
     simgui_render();
     sg_end_pass();
     sg_commit();
+
+    if (exitApp) {
+        sapp_request_quit();
+    }
 }
 
-static void onEvent(const sapp_event *evt) {
+static void onEvent(const sapp_event *evt, void *userdata) {
     struct ClemensInputEvent clemInput {};
 
     simgui_handle_event(evt);
@@ -376,7 +416,8 @@ static void onEvent(const sapp_event *evt) {
 
     switch (evt->type) {
     case SAPP_EVENTTYPE_UNFOCUSED:
-        g_Host->lostFocus();
+        if (g_Host)
+            g_Host->lostFocus();
         break;
     case SAPP_EVENTTYPE_KEY_DOWN:
         keycode = onKeyDown(evt);
@@ -422,34 +463,38 @@ static void onEvent(const sapp_event *evt) {
             g_ADBKeyToggleMask &= ~CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;
         }
         clemInput.adb_key_toggle_mask = g_ADBKeyToggleMask;
-        g_Host->input(clemInput);
+        if (g_Host)
+            g_Host->input(clemInput);
     }
 }
 
-static void onCleanup() {
-    delete g_Host;
-
-    g_Host = nullptr;
-
-#if CLEMENS_PLATFORM_WINDOWS
+static void onCleanup(void *userdata) {
+    auto *appdata = reinterpret_cast<SharedAppData *>(userdata);
+    if (g_Host) {
+        delete g_Host;
+        g_Host = nullptr;
+    }
+#if defined(CLEMENS_PLATFORM_WINDOWS)
     CoUninitialize();
 #endif
+    delete appdata;
     simgui_shutdown();
     sg_shutdown();
 }
 
-static void onFail(const char *msg) { printf("app failure: %s", msg); }
+static void onFail(const char *msg, void *) { printf("app failure: %s", msg); }
 
-sapp_desc sokol_main(int /*argc*/, char *[] /*argv[]*/) {
+sapp_desc sokol_main(int argc, char *argv[]) {
     sapp_desc sapp = {};
 
+    sapp.user_data = new SharedAppData(argc, argv);
     sapp.width = 1440;
     sapp.height = 900;
-    sapp.init_cb = &onInit;
-    sapp.frame_cb = &onFrame;
-    sapp.cleanup_cb = &onCleanup;
-    sapp.event_cb = &onEvent;
-    sapp.fail_cb = &onFail;
+    sapp.init_userdata_cb = &onInit;
+    sapp.frame_userdata_cb = &onFrame;
+    sapp.cleanup_userdata_cb = &onCleanup;
+    sapp.event_userdata_cb = &onEvent;
+    sapp.fail_userdata_cb = &onFail;
     sapp.window_title = "Clemens IIgs Developer";
     sapp.win32_console_create = true;
     sapp.win32_console_attach = true;
