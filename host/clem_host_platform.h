@@ -8,13 +8,11 @@
 #if defined(_WIN32)
 
 #define CLEMENS_PLATFORM_WINDOWS
-#define CLEMENS_PLATFORM_LINUX
 //  A larger value to cover more edge cases but likely not all
 #define CLEMENS_PATH_MAX 1024
 
 #elif defined(__linux__)
 
-#define CLEMENS_PLATFORM_WINDOWS
 #define CLEMENS_PLATFORM_LINUX
 //  A larger value to cover PATH_MAX but perhaps not all usecases
 #define CLEMENS_PATH_MAX 4096

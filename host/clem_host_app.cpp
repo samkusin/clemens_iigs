@@ -18,6 +18,8 @@
 #include <cstdio>
 #include <filesystem>
 
+#include "clem_host_platform.h"
+
 #include "clem_front.hpp"
 #include "clem_startup_view.hpp"
 
