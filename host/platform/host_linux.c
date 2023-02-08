@@ -39,6 +39,17 @@ void clem_host_uuid_gen(ClemensHostUUID *uuid) {
     uuid_generate(uuid->data);
 }
 
+char *get_process_executable_path(char *outpath, size_t outpath_size) {
+    //   TODO: /proc/self/exe
+    return outpath;
+}
+
+char *get_local_user_data_directory(char *outpath, size_t outpath_size, const char *company_name,
+                                    const char *app_name) {
+    //  generate ~/.var/com.<company_name>.<app_name>/data
+    return outpath;
+}
+
 //  evdev implementation
 //  using https://fossies.org/linux/stella/src/tools/evdev-joystick/evdev-joystick.c
 //  as an education of evdev and joystick input.
