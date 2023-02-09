@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+    <id>com.cinekine.Clemens</id>
+
+    <name>Clemens</name>
+    <summary>An Apple IIgs Emulator and Debugger written in C/C++ for Windows and Linux.</summary>
+    <developer_name>Samir Sinha</developer_name>
+    <update_contact>samir@cinekine.com</update_contact>
+
+    <metadata_license>MIT</metadata_license>
+    <project_license>MIT</project_license>
+
+    <url type="homepage">https://github.com/samkusin/clemens_iigs</url>
+    <url type="faq">https://github.com/samkusin/clemens_iigs/wiki</url>
+
+    <description>
+        <p>
+		The Clemens IIgs emulator is an attempt at writing a modern emulator
+		for the Apple IIgs machine. Its design focuses on developers versus
+		casual play, providing tools to debug IIgs applications at runtime.
+		My eventual goal is to provide a solid Apple IIgs backend and debugger
+		with a functional frontend.
+        </p>
+    </description>
+
+    <launchable type="desktop-id">com.cinekine.Clemens.desktop</launchable>
+
+    <screenshots>
+        <screenshot type="default">
+            <image>https://camo.githubusercontent.com/643069cb14ad6cbdc3d5523f3fb4139dd43d9cd6b75812c13131093f5491a95a/68747470733a2f2f73616d697273696e68612e636f6d2f696d616765732f7a616e795f736d616c6c2e676966</image>
+            <!-- caption>The options dialog</caption -->
+        </screenshot>
+        <screenshot><image>https://camo.githubusercontent.com/6c586093f5b6a3fdca70cec494c96f559c05ca9a583d3b76133d9357b53d7d4a/68747470733a2f2f73616d697273696e68612e636f6d2f696d616765732f646f74632d7469746c652e676966</image></screenshot>
+    </screenshots>
+
+    <releases>
+        <!-- Date is YYYY-MM-DD -->
+        <release version="0.6" date="2023-02-08">
+            <description>
+                <p>Initial Flatpak for testing.</p>
+            </description>
+        </release>
+    </releases>
+
+</component>

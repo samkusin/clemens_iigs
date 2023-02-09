@@ -1,0 +1,33 @@
+app-id: com.cinekine.Clemens
+
+runtime: org.freedesktop.Platform
+runtime-version: '22.08'
+sdk: org.freedesktop.Sdk
+
+command: clemens_iigs
+
+modules:
+  - name: clemens
+
+    buildsystem: simple
+    build-commands:
+      - cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -G Ninja -S . -B .
+      - ninja
+      - install -D host/clemens_iigs /app/bin/clemens_iigs
+      - install -D clemens_mpack_format /app/bin/clemens_mpack_format
+      - install -Dm755 flatpak/com.cinekine.Clemens.desktop -t /app/share/applications
+      - install -Dm644 flatpak/com.cinekine.Clemens.png /app/share/icons/hicolor/128x128/apps/com.cinekine.Clemens.png
+      - install -Dm644 flatpak/com.cinekine.Clemens.appdata.xml -t /app/share/metainfo
+
+    sources:
+      - type: dir
+        path: ..
+        dest: .
+
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --filesystem=host
+  - --share=network
+  - --device=dri
