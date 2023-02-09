@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.15)
 
 project(clements_iigs LANGUAGES C CXX)
 
+if(APPLE)
+    enable_language(OBJC)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 
 # build header-only source
@@ -35,6 +39,9 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(PLATFORM_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_linux.c")
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(PLATFORM_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_macos.m")
 endif()
 
 add_executable(clemens_iigs

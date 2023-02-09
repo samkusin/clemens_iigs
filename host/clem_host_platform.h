@@ -17,6 +17,12 @@
 //  A larger value to cover PATH_MAX but perhaps not all usecases
 #define CLEMENS_PATH_MAX 4096
 
+#elif defined(__APPLE__)
+
+#define CLEMENS_PLATFORM_MACOS
+//  A larger value to cover PATH_MAX but perhaps not all usecases
+#define CLEMENS_PATH_MAX 4096
+
 #endif
 
 #define CLEM_HOST_JOYSTICK_LIMIT 4
