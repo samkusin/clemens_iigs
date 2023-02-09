@@ -763,8 +763,7 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
             diskBits += iwmDrive->disk.track_byte_offset[diskTrackIndex];
             unsigned bufferIndex = 0;
             if (left > right) {
-                for (; left < trackByteCount; ++left, ++bufferIndex) {
-                    assert(bufferIndex < 4);
+                for (; left < trackByteCount && bufferIndex < 4; ++left, ++bufferIndex) {
                     frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];
                 }
                 left = 0;

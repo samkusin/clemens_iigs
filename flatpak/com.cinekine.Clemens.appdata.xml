@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-    <id>com.samirsinha.Clemens</id>
+    <id>com.cinekine.Clemens</id>
 
     <name>Clemens</name>
     <summary>An Apple IIgs Emulator and Debugger written in C/C++ for Windows and Linux.</summary>
     <developer_name>Samir Sinha</developer_name>
-    <update_contact>unknown_AT_samirsinha.com</update_contact>
+    <update_contact>samir@cinekine.com</update_contact>
 
     <metadata_license>MIT</metadata_license>
     <project_license>MIT</project_license>
@@ -17,13 +17,13 @@
         <p>
 		The Clemens IIgs emulator is an attempt at writing a modern emulator
 		for the Apple IIgs machine. Its design focuses on developers versus
-		casual play, providing tools to debug IIgs applications at runtime. 
-		My eventual goal is to provide a solid Apple IIgs backend and debugger 
+		casual play, providing tools to debug IIgs applications at runtime.
+		My eventual goal is to provide a solid Apple IIgs backend and debugger
 		with a functional frontend.
         </p>
     </description>
 
-    <launchable type="desktop-id">com.samirsinha.Clemens.desktop</launchable>
+    <launchable type="desktop-id">com.cinekine.Clemens.desktop</launchable>
 
     <screenshots>
         <screenshot type="default">
@@ -35,7 +35,7 @@
 
     <releases>
         <!-- Date is YYYY-MM-DD -->
-        <release version="1.0" date="2023-01-12">
+        <release version="0.6" date="2023-02-08">
             <description>
                 <p>Initial Flatpak for testing.</p>
             </description>

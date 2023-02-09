@@ -6,6 +6,6 @@ Name=Clemens
 Comment=An Apple IIgs Emulator and Debugger written in C/C++ for Windows and Linux.
 Categories=Development;
 
-Icon=com.samirsinha.Clemens.png
-Exec=clemens_65816_emulator
+Icon=com.cinekine.Clemens.png
+Exec=clemens_iigs
 Terminal=true

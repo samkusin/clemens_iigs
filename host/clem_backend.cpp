@@ -83,8 +83,9 @@ struct ClemensRunSampler {
 
         if (frameTimeBuffer.isFull()) {
             decltype(frameTimeBuffer)::ValueType lruFrametime;
-            frameTimeBuffer.pop(lruFrametime);
-            sampledFrameTime -= lruFrametime;
+            if (frameTimeBuffer.pop(lruFrametime)) {
+                sampledFrameTime -= lruFrametime;
+            }
         }
         frameTimeBuffer.push(actualFrameInterval);
         sampledFrameTime += actualFrameInterval;
