@@ -450,7 +450,7 @@ static unsigned _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit,
             unit->packet.dest_unit_id = data_start[0] & 0x7f;
             if (data_start[2] == 0x80) {
                 unit->packet.type = kClemensSmartPortPacketType_Command;
-            } else if (data_start[2] = 0x81) {
+            } else if (data_start[2] == 0x81) {
                 unit->packet.type = kClemensSmartPortPacketType_Status;
             } else if (data_start[2] == 0x82) {
                 unit->packet.type = kClemensSmartPortPacketType_Data;

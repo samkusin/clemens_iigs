@@ -214,7 +214,7 @@ bool clem_2img_parse_header(struct Clemens2IMGDisk *disk, uint8_t *data, uint8_t
         case 9: // points to the start of the comment chunk
             data_size = _increment_data_ptr(data, 4, data_end);
             if (data_size == 4) {
-                disk->comment = disk->image_buffer + _decode_u32(data);
+                disk->comment = (char *)disk->image_buffer + _decode_u32(data);
                 ++state;
             } else {
                 return false;
@@ -234,7 +234,7 @@ bool clem_2img_parse_header(struct Clemens2IMGDisk *disk, uint8_t *data, uint8_t
         case 11: // points to the start of the creator chunk
             data_size = _increment_data_ptr(data, 4, data_end);
             if (data_size == 4) {
-                disk->creator_data = disk->image_buffer + _decode_u32(data);
+                disk->creator_data = (char *)disk->image_buffer + _decode_u32(data);
                 ++state;
             } else {
                 return false;
@@ -302,8 +302,8 @@ bool clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uint8_t
         return false;
     }
 
-    _encode_mem(&image_cur, "2IMG", 4, overlapped);
-    _encode_mem(&image_cur, "CLEM", 4, overlapped);
+    _encode_mem(&image_cur, (uint8_t*)"2IMG", 4, overlapped);
+    _encode_mem(&image_cur, (uint8_t*)"CLEM", 4, overlapped);
     _encode_u16(&image_cur, CLEM_2IMG_HEADER_BYTE_SIZE);
     _encode_u16(&image_cur, disk->version);
     _encode_u32(&image_cur, disk->format);
@@ -343,8 +343,8 @@ bool clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uint8_t
         return false;
 
     _encode_mem(&image_cur, disk->data, source_size, overlapped);
-    _encode_mem(&image_cur, disk->creator_data, creator_size, overlapped);
-    _encode_mem(&image_cur, disk->comment, comment_size, overlapped);
+    _encode_mem(&image_cur, (uint8_t*)disk->creator_data, creator_size, overlapped);
+    _encode_mem(&image_cur, (uint8_t*)disk->comment, comment_size, overlapped);
 
     return true;
 }

@@ -220,7 +220,7 @@ const uint8_t *clem_woz_parse_info_chunk(struct ClemensWOZDisk *disk,
             disk->nib->is_write_protected = true;
         }
     }
-    _clem_woz_read_bytes(&woz_iter, disk->creator, sizeof(disk->creator));
+    _clem_woz_read_bytes(&woz_iter, (uint8_t*)disk->creator, sizeof(disk->creator));
     if (disk->version > 1) {
         if (_clem_woz_read_u8(&woz_iter) == 2) {
             disk->flags |= CLEM_WOZ_IMAGE_DOUBLE_SIDED;
@@ -500,7 +500,7 @@ const uint8_t *clem_woz_serialize(struct ClemensWOZDisk *disk, uint8_t *out, siz
     _clem_woz_write_u8(&iter, (disk->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) ? 1 : 0);
     _clem_woz_write_u8(&iter, (disk->flags & CLEM_WOZ_IMAGE_SYNCHRONIZED) ? 1 : 0);
     _clem_woz_write_u8(&iter, (disk->flags & CLEM_WOZ_IMAGE_CLEANED) ? 1 : 0);
-    _clem_woz_write_bytes(&iter, disk->creator, sizeof(disk->creator));
+    _clem_woz_write_bytes(&iter, (uint8_t*)disk->creator, sizeof(disk->creator));
     _clem_woz_write_u8(&iter, (disk->flags & CLEM_WOZ_IMAGE_DOUBLE_SIDED) ? 2 : 1);
     _clem_woz_write_u8(&iter, (uint8_t)(disk->boot_type));
     _clem_woz_write_u8(&iter, (uint8_t)(disk->nib->bit_timing_ns / 125));
