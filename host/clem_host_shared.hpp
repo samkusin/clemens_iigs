@@ -41,9 +41,10 @@ struct ClemensBackendDiskDriveState {
 
 struct ClemensBackendConfig {
     enum class Type { Apple2GS };
+    std::string dataRootPath;
     std::string diskLibraryRootPath;
-    std::string diskSnapshotRootPath;
-    std::string diskTraceRootPath;
+    std::string snapshotRootPath;
+    std::string traceRootPath;
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDriveStates;
     std::array<ClemensBackendDiskDriveState, 1> smartPortDriveStates;
     std::array<std::string, 7> cardNames;

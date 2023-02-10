@@ -18,8 +18,12 @@
 #define CLEMENS_PATH_MAX 4096
 
 #elif defined(__APPLE__)
+#include <TargetConditionals.h>
 
+#if TARGET_OS_MAC
 #define CLEMENS_PLATFORM_MACOS
+#endif
+
 //  A larger value to cover PATH_MAX but perhaps not all usecases
 #define CLEMENS_PATH_MAX 4096
 

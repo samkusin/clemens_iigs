@@ -38,11 +38,9 @@ class ClemensDisplayProvider {
     sg_image systemFontImageHi_;
     sg_image blankImage_;
     sg_shader textShader_;
-    sg_shader backShader_;
     sg_shader hiresShader_;
     sg_shader superHiresShader_; // TODO: consolidate with the hires one
     sg_pipeline textPipeline_;
-    sg_pipeline backPipeline_;
     sg_pipeline hiresPipeline_;
     sg_pipeline superHiresPipeline_;
 };

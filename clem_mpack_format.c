@@ -56,6 +56,8 @@ void print_message(mpack_reader_t* reader, int level) {
     unsigned index;
 
     switch (mpack_tag.type) {
+        case mpack_type_missing:
+            break;
         case mpack_type_nil:
         case mpack_type_bool:
             if (mpack_tag.v.b) {

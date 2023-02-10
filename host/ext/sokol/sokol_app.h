@@ -3375,6 +3375,9 @@ _SOKOL_PRIVATE uint32_t _sapp_macos_mods(NSEvent* ev) {
     if (f & NSEventModifierFlagCommand) {
         m |= SAPP_MODIFIER_SUPER;
     }
+    if (f & NSEventModifierFlagCapsLock) {
+        m |= SAPP_MODIFIER_CAPS;
+    }
     if (0 != (b & (1<<0))) {
         m |= SAPP_MODIFIER_LMB;
     }

@@ -4,11 +4,13 @@
 #include "clem_host_platform.h"
 #include "clem_host_utils.hpp"
 #include "clem_import_disk.hpp"
+#include "clem_l10n.hpp"
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
 #include "clem_preamble.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
+#include "imgui.h"
 #include "version.h"
 
 #include "cinek/encode.h"
@@ -594,10 +596,10 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
     thisFrameAudioBuffer_ = cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
 
     backendConfig_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
-
+    backendConfig_.dataRootPath = config_.dataDirectory;
     backendConfig_.diskLibraryRootPath = diskLibraryRootPath_;
-    backendConfig_.diskTraceRootPath = diskTracesRootPath_;
-    backendConfig_.diskSnapshotRootPath =
+    backendConfig_.traceRootPath = diskTracesRootPath_;
+    backendConfig_.snapshotRootPath =
         (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_SNAPSHOT_DIR).string();
 
     // TODO: This should be selectable like regular drives - this will require some
@@ -1159,7 +1161,8 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     if (backend_) {
         backend_->publish();
     }
-    if (ImGui::IsKeyDown(ImGuiKey_LeftAlt) && ImGui::IsKeyDown(ImGuiKey_RightAlt)) {
+    if (ImGui::IsKeyDown(ImGuiKey_LeftAlt) && 
+        (ImGui::IsKeyDown(ImGuiKey_RightAlt) || ImGui::IsKeyDown(ImGuiKey_LeftSuper))) {
         if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) {
             emulatorHasMouseFocus_ = false;
         }
@@ -2209,7 +2212,7 @@ void ClemensFrontend::doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize) {
     ImGui::SameLine(cursorPos.x, 0.0f);
 
     if (emulatorHasMouseFocus_) {
-        ImGui::TextUnformatted("Press both ALT keys and CTRL to unlock mouse");
+        ImGui::TextUnformatted(ClemensL10N::kMouseUnlock[ClemensL10N::kLanguageDefault]);
     } else if (emulatorHasKeyboardFocus_) {
         ImGui::Text("Click in View to lock mouse input");
     } else {

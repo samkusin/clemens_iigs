@@ -61,6 +61,7 @@ add_executable(clemens_iigs
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_import_disk.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_interpreter.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_l10n.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_preamble.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_program_trace.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_serializer.cpp"

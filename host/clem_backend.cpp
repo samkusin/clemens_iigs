@@ -345,7 +345,7 @@ bool ClemensBackend::programTrace(const std::string_view &inputParam) {
     bool ok = true;
     if (programTrace_ != nullptr && !path.empty()) {
         //  save if a path was supplied
-        auto exportPath = std::filesystem::path(config_.diskTraceRootPath) / path;
+        auto exportPath = std::filesystem::path(config_.traceRootPath) / path;
         ok = programTrace_->exportTrace(exportPath.string().c_str());
         if (ok) {
             programTrace_->reset();
@@ -375,7 +375,7 @@ void ClemensBackend::saveMachine(std::string path) {
 }
 
 bool ClemensBackend::saveSnapshot(const std::string_view &inputParam) {
-    auto outputPath = std::filesystem::path(config_.diskSnapshotRootPath) / inputParam;
+    auto outputPath = std::filesystem::path(config_.snapshotRootPath) / inputParam;
     return ClemensSerializer::save(outputPath.string(), &machine_, &mmio_, diskContainers_.size(),
                                    diskContainers_.data(), diskDrives_.data(),
                                    CLEM_SMARTPORT_DRIVE_LIMIT, smartPortDisks_.data(),
@@ -387,7 +387,7 @@ void ClemensBackend::loadMachine(std::string path) {
 }
 
 bool ClemensBackend::loadSnapshot(const std::string_view &inputParam) {
-    auto outputPath = std::filesystem::path(config_.diskSnapshotRootPath) / inputParam;
+    auto outputPath = std::filesystem::path(config_.snapshotRootPath) / inputParam;
     bool res = ClemensSerializer::load(
         outputPath.string(), &machine_, &mmio_, diskContainers_.size(), diskContainers_.data(),
         diskDrives_.data(), CLEM_SMARTPORT_DRIVE_LIMIT, smartPortDisks_.data(),
@@ -1215,8 +1215,8 @@ void ClemensBackend::saveBRAM() {
     const uint8_t *bram = clemens_rtc_get_bram(&mmio_, &isDirty);
     if (!isDirty)
         return;
-
-    std::ofstream bramFile("clem.bram", std::ios::binary);
+    auto bramPath = std::filesystem::path(config_.dataRootPath) / "clem.bram"; 
+    std::ofstream bramFile(bramPath, std::ios::binary);
     if (bramFile.is_open()) {
         bramFile.write((char *)bram, CLEM_RTC_BRAM_SIZE);
     } else {
@@ -1225,7 +1225,8 @@ void ClemensBackend::saveBRAM() {
 }
 
 void ClemensBackend::loadBRAM() {
-    std::ifstream bramFile("clem.bram", std::ios::binary);
+    auto bramPath = std::filesystem::path(config_.dataRootPath) / "clem.bram"; 
+    std::ifstream bramFile(bramPath, std::ios::binary);
     if (bramFile.is_open()) {
         bramFile.read((char *)mmio_.dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
     } else {
