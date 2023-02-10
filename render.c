@@ -419,8 +419,7 @@ void clemens_render_graphics(const ClemensVideo *video, const uint8_t *memory, c
         _render_hires(video, memory, texture, width, height, stride);
         break;
     case kClemensVideoFormat_Lores:
-        //  This is currently handled as drawing characters in the host implementation
-        break;
+    case kClemensVideoFormat_Double_Lores:
     case kClemensVideoFormat_Text:
         //  This is currently handled as drawing characters in the host implementation
         break;

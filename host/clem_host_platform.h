@@ -40,6 +40,8 @@
 #define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT CLEM_HOST_JOYSTICK_PROVIDER_DINPUT
 #elif defined(CLEMENS_PLATFORM_LINUX)
 #define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT ""
+#elif defined(CLEMENS_PLATFORM_MACOS)
+#define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT ""
 #endif
 
 #ifdef __cplusplus
@@ -85,9 +87,10 @@ void clem_host_uuid_gen(ClemensHostUUID *uuid);
  *
  * @param outpath C string buffer
  * @param outpath_size  Size of the *whole* outpath buffer (including null term)
+ *                      If the value is not large enough then a value will be returned here
  * @return char* NULL if the pathname length is greater than outpath_size
  */
-char *get_process_executable_path(char *outpath, size_t outpath_size);
+char *get_process_executable_path(char *outpath, size_t *outpath_size);
 
 /**
  * @brief Get the local user data directory qualified with identifiers

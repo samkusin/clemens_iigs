@@ -35,13 +35,16 @@ set(EXT_SOURCES
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(PLATFORM_SOURCES
-        "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_windows.c")
+        "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_windows.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.cpp")
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(PLATFORM_SOURCES
-        "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_linux.c")
+        "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_linux.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.cpp")
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(PLATFORM_SOURCES
-        "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_macos.m")
+        "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_macos.m"
+        "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.mm")
 endif()
 
 add_executable(clemens_iigs

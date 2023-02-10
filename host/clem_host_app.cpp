@@ -1,12 +1,6 @@
 
 #include <cinttypes>
 
-#if defined(CK3D_BACKEND_D3D11)
-#define SOKOL_D3D11
-#elif defined(CK3D_BACKEND_GL)
-#define SOKOL_GLCORE33
-#endif
-
 #ifdef _WIN32
 #include <combaseapi.h>
 #endif
@@ -23,7 +17,6 @@
 #include "clem_front.hpp"
 #include "clem_startup_view.hpp"
 
-#define SOKOL_IMPL
 #include "sokol/sokol_app.h"
 #include "sokol/sokol_audio.h"
 #include "sokol/sokol_gfx.h"
@@ -49,6 +42,7 @@ static uint64_t g_lastTime = 0;
 static ClemensHostView *g_Host = nullptr;
 static sg_pass_action g_sgPassAction;
 static unsigned g_ADBKeyToggleMask = 0;
+static sg_image g_imgui_font_img;
 
 static cinek::ByteBuffer g_systemFontLoBuffer;
 static cinek::ByteBuffer g_systemFontHiBuffer;
@@ -213,8 +207,8 @@ static void imguiFontSetup(const cinek::ByteBuffer &systemFontLoBuffer,
         img_desc.data.subimage[0][0].ptr = font_pixels;
         img_desc.data.subimage[0][0].size = (size_t)(font_width * font_height) * sizeof(uint32_t);
         img_desc.label = "sokol-imgui-font";
-        _simgui.img = sg_make_image(&img_desc);
-        io.Fonts->TexID = (ImTextureID)(uintptr_t)_simgui.img.id;
+        g_imgui_font_img = sg_make_image(&img_desc);
+        io.Fonts->TexID = (ImTextureID)(uintptr_t)g_imgui_font_img.id;
     }
 }
 

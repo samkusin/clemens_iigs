@@ -40,12 +40,12 @@ void clem_host_uuid_gen(ClemensHostUUID *uuid) {
     uuid_generate(uuid->data);
 }
 
-char *get_process_executable_path(char *outpath, size_t outpath_size) {
+char *get_process_executable_path(char *outpath, size_t* outpath_size) {
     //   TODO: /proc/self/exe
     struct stat file_stat;
     ssize_t bufsz;
 
-    bufsz = readlink("/proc/self/exe", outpath, outpath_size - 1);
+    bufsz = readlink("/proc/self/exe", outpath, *outpath_size - 1);
     if (bufsz < 0)
         return NULL;
     outpath[bufsz] = '\0';
