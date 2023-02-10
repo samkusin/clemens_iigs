@@ -1,7 +1,0 @@
-#ifndef CLEM_HOST_VERSION_H
-#define CLEM_HOST_VERSION_H
-
-#define CLEM_HOST_VERSION_MAJOR 0
-#define CLEM_HOST_VERSION_MINOR 6
-
-#endif

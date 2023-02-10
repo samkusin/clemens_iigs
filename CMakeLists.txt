@@ -4,6 +4,8 @@ project(clemens_65816 LANGUAGES C)
 
 set (CMAKE_C_STANDARD 11)
 
+set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 add_library(clemens_65816 STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_debug.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_mem.c"

@@ -2,6 +2,13 @@ cmake_minimum_required(VERSION 3.15)
 
 project(clements_iigs LANGUAGES C CXX)
 
+set(CLEM_HOST_VERSION_MAJOR 0)
+set(CLEM_HOST_VERSION_MINOR 6)
+set(CLEM_HOST_VERSION_PATCH 0)
+string(TIMESTAMP CLEM_HOST_COPYRIGHT_YEAR "%Y")
+
+configure_file(version.h.in version.h)
+
 if(APPLE)
     enable_language(OBJC)
 endif()
@@ -47,9 +54,13 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.mm")
 endif()
 
-add_executable(clemens_iigs
+set(PROJECT_SOURCES 
     ${PLATFORM_SOURCES}
     ${CINEK_SOURCES}
+    ${EXT_SOURCES}
+    ${FMT_SOURCES}
+    ${SOKOL_SOURCES}
+    ${IMGUI_SOURCES}
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_display.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_backend.cpp"
@@ -66,14 +77,12 @@ add_executable(clemens_iigs
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_program_trace.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_serializer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_startup_view.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/clem_smartport_disk.cpp"
-    ${EXT_SOURCES}
-    ${FMT_SOURCES}
-    ${SOKOL_SOURCES}
-    ${IMGUI_SOURCES})
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_smartport_disk.cpp")
 
+add_executable(clemens_iigs ${PROJECT_SOURCES})
 target_include_directories(clemens_iigs
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+    PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}
             ${CMAKE_CURRENT_SOURCE_DIR}/ext)
 target_link_libraries(clemens_iigs
     PRIVATE
@@ -105,6 +114,13 @@ else()
                                                ${AUDIO_TOOLBOX_LIB}
                                                ${CORE_GRAPHICS_LIB}
                                                ${OPENGL_LIB})
+    set_target_properties(clemens_iigs PROPERTIES 
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_BUNDLE_NAME "Clemens IIGS"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${CLEM_HOST_VERSION_MAJOR}.${CLEM_HOST_VERSION_MINOR}.${CLEM_HOST_VERSION_PATCH}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${CLEM_HOST_VERSION_MAJOR}.${CLEM_HOST_VERSION_MINOR}.${CLEM_HOST_VERSION_PATCH}"
+        MACOSX_BUNDLE_COPYRIGHT "Copyright %Y Samir Sinha DBA Cinekine"
+        )
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
