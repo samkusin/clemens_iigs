@@ -91,7 +91,19 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_GL)
     target_link_libraries(clemens_iigs PRIVATE asound X11 Xi Xcursor GL dl pthread uuid)
 else()
+    find_library(FOUNDATION_LIB Foundation)
+    find_library(APPKIT_LIB AppKit)
+    find_library(CORE_AUDIO_LIB CoreAudio)
+    find_library(AUDIO_TOOLBOX_LIB AudioToolbox)
+    find_library(CORE_GRAPHICS_LIB CoreGraphics)
+    find_library(OPENGL_LIB OpenGL)
     target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_GL)
+    target_link_libraries(clemens_iigs PRIVATE ${FOUNDATION_LIB} 
+                                               ${APPKIT_LIB}
+                                               ${CORE_AUDIO_LIB}
+                                               ${AUDIO_TOOLBOX_LIB}
+                                               ${CORE_GRAPHICS_LIB}
+                                               ${OPENGL_LIB})
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
