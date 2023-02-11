@@ -1950,6 +1950,8 @@ void clem_adb_device_input(struct ClemensDeviceADB *adb, const struct ClemensInp
     //
     int16_t key_index = input->value_a & 0x7f;
     switch (input->type) {
+    case kClemensInputType_None:
+        break;
     case kClemensInputType_KeyDown:
         if (input->value_a == key_index) { /* filter unsupported keys */
             // CLEM_LOG("Key Dn: %02X", key_index);

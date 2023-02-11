@@ -27,7 +27,8 @@ ClemensConfiguration findConfiguration(const std::string &rootDirectoryOverride)
 
     //  local directory configuration check
     char localpath[CLEMENS_PATH_MAX];
-    if (get_process_executable_path(localpath, sizeof(localpath))) {
+    size_t localpathSize = sizeof(localpath);
+    if (get_process_executable_path(localpath, &localpathSize)) {
         if (strnlen(localpath, CLEMENS_PATH_MAX - 1) >= sizeof(localpath) - 1) {
             //  If this is a problem, later code will determine whether the path
             //  was actually truncated
@@ -39,6 +40,7 @@ ClemensConfiguration findConfiguration(const std::string &rootDirectoryOverride)
             return createConfiguration(dataDirectory);
         }
     } else {
+        //  TODO: handle systems that support dynamic path sizes (i.e. localpathSize != sizeof(localpath))
         printf("Warning: unable to obtain our local executable path. Falling back to user data "
                "paths.\n");
     }

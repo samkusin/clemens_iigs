@@ -20,6 +20,10 @@
 #pragma comment(lib, "xinput")
 #endif
 
+void clem_host_platform_init() {}
+
+void clem_host_platform_terminate() {}
+
 unsigned clem_host_get_processor_number() { return (unsigned)GetCurrentProcessorNumber(); }
 
 void clem_host_uuid_gen(ClemensHostUUID *uuid) {
@@ -44,8 +48,8 @@ void clem_host_uuid_gen(ClemensHostUUID *uuid) {
     uuid->data[15] = guid.Data4[7];
 }
 
-char *get_process_executable_path(char *outpath, size_t outpath_size) {
-    DWORD path_size = (DWORD)outpath_size - 1;
+char *get_process_executable_path(char *outpath, size_t* outpath_size) {
+    DWORD path_size = (DWORD)(*outpath_size) - 1;
     DWORD actual_path_size = GetModuleFileName(NULL, outpath, path_size);
     if (actual_path_size == 0) {
         DWORD last_error = GetLastError();

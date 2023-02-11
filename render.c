@@ -407,6 +407,8 @@ void clemens_render_graphics(const ClemensVideo *video, const uint8_t *memory, c
                              uint8_t *texture, unsigned width, unsigned height, unsigned stride) {
 
     switch (video->format) {
+    case kClemensVideoFormat_None:
+        break;
     case kClemensVideoFormat_Super_Hires:
         _render_super_hires(video, memory, texture, width, height, stride);
         break;
@@ -415,6 +417,11 @@ void clemens_render_graphics(const ClemensVideo *video, const uint8_t *memory, c
         break;
     case kClemensVideoFormat_Hires:
         _render_hires(video, memory, texture, width, height, stride);
+        break;
+    case kClemensVideoFormat_Lores:
+    case kClemensVideoFormat_Double_Lores:
+    case kClemensVideoFormat_Text:
+        //  This is currently handled as drawing characters in the host implementation
         break;
     }
 }

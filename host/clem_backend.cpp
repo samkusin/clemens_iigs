@@ -345,7 +345,7 @@ bool ClemensBackend::programTrace(const std::string_view &inputParam) {
     bool ok = true;
     if (programTrace_ != nullptr && !path.empty()) {
         //  save if a path was supplied
-        auto exportPath = std::filesystem::path(config_.diskTraceRootPath) / path;
+        auto exportPath = std::filesystem::path(config_.traceRootPath) / path;
         ok = programTrace_->exportTrace(exportPath.string().c_str());
         if (ok) {
             programTrace_->reset();
@@ -375,7 +375,7 @@ void ClemensBackend::saveMachine(std::string path) {
 }
 
 bool ClemensBackend::saveSnapshot(const std::string_view &inputParam) {
-    auto outputPath = std::filesystem::path(config_.diskSnapshotRootPath) / inputParam;
+    auto outputPath = std::filesystem::path(config_.snapshotRootPath) / inputParam;
     return ClemensSerializer::save(outputPath.string(), &machine_, &mmio_, diskContainers_.size(),
                                    diskContainers_.data(), diskDrives_.data(),
                                    CLEM_SMARTPORT_DRIVE_LIMIT, smartPortDisks_.data(),
@@ -387,7 +387,7 @@ void ClemensBackend::loadMachine(std::string path) {
 }
 
 bool ClemensBackend::loadSnapshot(const std::string_view &inputParam) {
-    auto outputPath = std::filesystem::path(config_.diskSnapshotRootPath) / inputParam;
+    auto outputPath = std::filesystem::path(config_.snapshotRootPath) / inputParam;
     bool res = ClemensSerializer::load(
         outputPath.string(), &machine_, &mmio_, diskContainers_.size(), diskContainers_.data(),
         diskDrives_.data(), CLEM_SMARTPORT_DRIVE_LIMIT, smartPortDisks_.data(),
@@ -505,8 +505,8 @@ void ClemensBackend::loadSmartPortDisk(unsigned driveIndex) {
         input.read((char *)buffer.data(), sz);
         smartPortDisks_[driveIndex] = ClemensSmartPortDisk(std::move(buffer));
     } else {
-        smartPortDisks_[driveIndex] = ClemensSmartPortDisk(
-            std::move(ClemensSmartPortDisk::createData(kSmartPortDiskBlockCount)));
+        auto diskData = ClemensSmartPortDisk::createData(kSmartPortDiskBlockCount);
+        smartPortDisks_[driveIndex] = ClemensSmartPortDisk(std::move(diskData));
     }
     ClemensSmartPortDevice device;
     clemens_assign_smartport_disk(&mmio_, driveIndex,
@@ -544,12 +544,14 @@ void ClemensBackend::inputEvent(const ClemensInputEvent &input) {
 }
 
 #if defined(__GNUC__)
+#if !defined(__clang__)
 //  NOTE GCC warning seems spurious for *some* std::string_view::find() cases
 //       have added plenty of guards around the line below to no avail.
 //            commaPos = !inputValueB.empty() ? inputValueB.find(',') : std::string_view::npos;
 //  ref: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=91397
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
 #endif
 void ClemensBackend::inputMachine(const std::string_view &inputParam) {
     if (!clemens_is_initialized_simple(&machine_)) {
@@ -588,7 +590,9 @@ void ClemensBackend::inputMachine(const std::string_view &inputParam) {
     }
 }
 #if defined(__GNUC__)
+#if !defined(__clang__)
 #pragma GCC diagnostic pop
+#endif
 #endif
 
 void ClemensBackend::breakExecution() { queue(Command{Command::Break}); }
@@ -677,6 +681,7 @@ static int64_t calculateClocksPerTimeslice(ClemensMMIO *mmio, unsigned hz) {
 }
 
 #if defined(__GNUC__)
+#if !defined(__clang__)
 //  Despite guarding with std::optional<>::has_value(), annoying GCC warning
 //  that I may be accessing an uninitialized optional with a folloing value
 //  access (if has_value() returns true) - which is the accepted method
@@ -684,6 +689,7 @@ static int64_t calculateClocksPerTimeslice(ClemensMMIO *mmio, unsigned hz) {
 //  https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80635
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 #endif
 
 void ClemensBackend::main(PublishStateDelegate publishDelegate) {
@@ -1075,7 +1081,9 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 }
 
 #if defined(__GNUC__)
+#if !defined(__clang__)
 #pragma GCC diagnostic pop
+#endif
 #endif
 
 std::optional<unsigned> ClemensBackend::checkHitBreakpoint() {
@@ -1207,8 +1215,8 @@ void ClemensBackend::saveBRAM() {
     const uint8_t *bram = clemens_rtc_get_bram(&mmio_, &isDirty);
     if (!isDirty)
         return;
-
-    std::ofstream bramFile("clem.bram", std::ios::binary);
+    auto bramPath = std::filesystem::path(config_.dataRootPath) / "clem.bram"; 
+    std::ofstream bramFile(bramPath, std::ios::binary);
     if (bramFile.is_open()) {
         bramFile.write((char *)bram, CLEM_RTC_BRAM_SIZE);
     } else {
@@ -1217,7 +1225,8 @@ void ClemensBackend::saveBRAM() {
 }
 
 void ClemensBackend::loadBRAM() {
-    std::ifstream bramFile("clem.bram", std::ios::binary);
+    auto bramPath = std::filesystem::path(config_.dataRootPath) / "clem.bram"; 
+    std::ifstream bramFile(bramPath, std::ios::binary);
     if (bramFile.is_open()) {
         bramFile.read((char *)mmio_.dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
     } else {

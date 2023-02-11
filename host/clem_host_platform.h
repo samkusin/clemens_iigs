@@ -17,6 +17,16 @@
 //  A larger value to cover PATH_MAX but perhaps not all usecases
 #define CLEMENS_PATH_MAX 4096
 
+#elif defined(__APPLE__)
+#include <TargetConditionals.h>
+
+#if TARGET_OS_MAC
+#define CLEMENS_PLATFORM_MACOS
+#endif
+
+//  A larger value to cover PATH_MAX but perhaps not all usecases
+#define CLEMENS_PATH_MAX 4096
+
 #endif
 
 #define CLEM_HOST_JOYSTICK_LIMIT 4
@@ -34,6 +44,10 @@
 #define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT CLEM_HOST_JOYSTICK_PROVIDER_DINPUT
 #elif defined(CLEMENS_PLATFORM_LINUX)
 #define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT ""
+#elif defined(CLEMENS_PLATFORM_MACOS)
+#define CLEM_HOST_JOYSTICK_PROVIDER_GAMECONTROLLER  "gamecontroller"
+#define CLEM_HOST_JOYSTICK_PROVIDER_HIDIOKIT  "hid-iokit"
+#define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT CLEM_HOST_JOYSTICK_PROVIDER_GAMECONTROLLER
 #endif
 
 #ifdef __cplusplus
@@ -54,6 +68,21 @@ typedef struct {
     int16_t y[2];
     bool isConnected;
 } ClemensHostJoystick;
+
+/**
+ * @brief Starts any platform specific systems
+ *
+ * This may equate to a no-op on some platforms, but gives our application
+ * a change to perform any platform specific initialization not handled by
+ * the cross-platform application framework used.
+ */
+void clem_host_platform_init();
+
+/**
+ * @brief Reverses clem_host_platform_init()
+ * 
+ */
+void clem_host_platform_terminate();
 
 /**
  * @brief Returns the current processor the local thread is running on
@@ -79,9 +108,10 @@ void clem_host_uuid_gen(ClemensHostUUID *uuid);
  *
  * @param outpath C string buffer
  * @param outpath_size  Size of the *whole* outpath buffer (including null term)
+ *                      If the value is not large enough then a value will be returned here
  * @return char* NULL if the pathname length is greater than outpath_size
  */
-char *get_process_executable_path(char *outpath, size_t outpath_size);
+char *get_process_executable_path(char *outpath, size_t *outpath_size);
 
 /**
  * @brief Get the local user data directory qualified with identifiers
@@ -98,7 +128,7 @@ char *get_local_user_data_directory(char *outpath, size_t outpath_size, const ch
 /**
  * @brief Initializes the joystick system
  *
- * @param provider OS specific (Windows: "xinput", "dinput"; Linux: "{evdev root dir}")
+ * @param provider OS specific (see CLEM_HOST_JOYSTICK_PROVIDER_xxx IDs)
  */
 void clem_joystick_open_devices(const char *provider);
 

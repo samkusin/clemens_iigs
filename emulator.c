@@ -210,6 +210,9 @@ static void _opcode_print(ClemensMachine *clem, struct ClemensInstruction *inst)
     operand[0] = '\0';
 
     switch (inst->desc->addr_mode) {
+    case kClemensCPUAddrMode_None:
+    case kClemensCPUAddrMode_Count:
+        break;
     case kClemensCPUAddrMode_Immediate:
         if (inst->opc_8) {
             snprintf(operand, sizeof(operand), "#$%02X", (uint8_t)inst->value);

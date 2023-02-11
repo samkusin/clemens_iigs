@@ -393,6 +393,10 @@ unsigned clemens_serialize_record(mpack_writer_t *writer, uintptr_t data_adr,
     union ClemensSerializerVariant variant;
     unsigned sz = 0;
     switch (record->type) {
+    case kClemensSerializerTypeEmpty:
+        break;
+    case kClemensSerializerTypeRoot:
+        break;
     case kClemensSerializerTypeBool:
         variant.b = *(bool *)(data_adr + record->offset);
         mpack_write_bool(writer, variant.b);
@@ -604,6 +608,9 @@ unsigned clemens_unserialize_record(mpack_reader_t *reader, uintptr_t data_adr,
     char key[64];
 
     switch (record->type) {
+    case kClemensSerializerTypeEmpty:
+    case kClemensSerializerTypeRoot:
+        break;
     case kClemensSerializerTypeBool:
         variant.b = mpack_expect_bool(reader);
         *(bool *)(data_adr + record->offset) = variant.b;

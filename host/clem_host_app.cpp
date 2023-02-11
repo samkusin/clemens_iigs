@@ -1,15 +1,10 @@
 
 #include <cinttypes>
 
-#if defined(CK3D_BACKEND_D3D11)
-#define SOKOL_D3D11
-#elif defined(CK3D_BACKEND_GL)
-#define SOKOL_GLCORE33
-#endif
-
 #ifdef _WIN32
 #include <combaseapi.h>
 #endif
+
 
 #include "imgui.h"
 
@@ -23,7 +18,6 @@
 #include "clem_front.hpp"
 #include "clem_startup_view.hpp"
 
-#define SOKOL_IMPL
 #include "sokol/sokol_app.h"
 #include "sokol/sokol_audio.h"
 #include "sokol/sokol_gfx.h"
@@ -49,11 +43,44 @@ static uint64_t g_lastTime = 0;
 static ClemensHostView *g_Host = nullptr;
 static sg_pass_action g_sgPassAction;
 static unsigned g_ADBKeyToggleMask = 0;
+static sg_image g_imgui_font_img;
 
 static cinek::ByteBuffer g_systemFontLoBuffer;
 static cinek::ByteBuffer g_systemFontHiBuffer;
 
-#if defined(_WIN32)
+//  Keyboard customization
+//  Typically the OS specific "super" key is used to augment key combinations that
+//  may otherwise be intercepted by the OS.  This usage really depends on the target
+//  platform.  See each platform's implementation below for exceptional cases.
+
+#if defined(CLEMENS_PLATFORM_LINUX)
+//  utility for platforms that require special mapping of function keys 
+static int xlatToFnKey(const sapp_event *evt) {
+    int fnKey = -1;
+    if (evt->key_code >= SAPP_KEYCODE_0 && evt->key_code <= SAPP_KEYCODE_9) {
+        fnKey = evt->key_code - SAPP_KEYCODE_0;
+        if (fnKey == 0)
+            fnKey = 10;
+    } else if (evt->key_code == SAPP_KEYCODE_MINUS) {
+        fnKey = 11;
+    } else if (evt->key_code == SAPP_KEYCODE_EQUAL) {
+        fnKey = 12;
+    }
+    return fnKey;
+}
+#endif
+
+#if defined(CLEMENS_PLATFORM_WINDOWS)
+// The SUPER key maps to the Windows Key, which is pretty much off limits
+// for key-mapping.  Windows also traps the CTRL+ESC key combination.
+
+// The logic below ensures that the ESC key can be used in the emulated
+// machine in combination with either CTRL or ALT.
+//
+//  CTRL + F1   = CTRL-ESC
+//  ALT + F1    = APPLE or OPTION - ESC
+//
+
 static bool g_escapeKeyDown = false;
 
 static sapp_keycode onKeyDown(const sapp_event *evt) {
@@ -70,7 +97,7 @@ static sapp_keycode onKeyDown(const sapp_event *evt) {
     return evt->key_code;
 }
 
-static sapp_keycode onKeyUp(const sapp_event *evt) {
+static sapp_keycode onKeyUp(const sapp_event *evt, bool* doDownEvent) {
     if (g_escapeKeyDown) {
         if (evt->key_code == SAPP_KEYCODE_F1) {
             g_escapeKeyDown = false;
@@ -79,9 +106,10 @@ static sapp_keycode onKeyUp(const sapp_event *evt) {
             return SAPP_KEYCODE_INVALID;
         }
     }
+    *doDownEvent = false;
     return evt->key_code;
 }
-#elif defined(__linux__)
+#elif defined(CLEMENS_PLATFORM_LINUX)
 //  The Super/Tux key seems special-cased in Linux to bypass X Windows keyboard
 //  shortcuts involving CTRL and ALT.  To prevent accidental triggering of
 //  disruptive shortcut keys like ALT-Fx, the Super Key must be used in-tandem
@@ -96,20 +124,6 @@ static bool g_leftSuperKeyDown = false;
 static bool g_rightSuperKeyDown = false;
 static bool g_escapeKeyDown = false;
 static bool g_fnKeys[12];
-
-static int xlatToFnKey(const sapp_event *evt) {
-    int fnKey = -1;
-    if (evt->key_code >= SAPP_KEYCODE_0 && evt->key_code <= SAPP_KEYCODE_9) {
-        fnKey = evt->key_code - SAPP_KEYCODE_0;
-        if (fnKey == 0)
-            fnKey = 10;
-    } else if (evt->key_code == SAPP_KEYCODE_MINUS) {
-        fnKey = 11;
-    } else if (evt->key_code == SAPP_KEYCODE_EQUAL) {
-        fnKey = 12;
-    }
-    return fnKey;
-}
 
 static sapp_keycode onKeyDown(const sapp_event *evt) {
     sapp_keycode outKeyCode = evt->key_code;
@@ -139,7 +153,7 @@ static sapp_keycode onKeyDown(const sapp_event *evt) {
     return outKeyCode;
 }
 
-static sapp_keycode onKeyUp(const sapp_event *evt) {
+static sapp_keycode onKeyUp(const sapp_event *evt, bool* doDownEvent) {
     sapp_keycode outKeyCode = evt->key_code;
 
     if (g_leftSuperKeyDown && evt->key_code == SAPP_KEYCODE_LEFT_SUPER)
@@ -160,13 +174,63 @@ static sapp_keycode onKeyUp(const sapp_event *evt) {
             outKeyCode = SAPP_KEYCODE_INVALID;
         }
     }
+    *doDownEvent = false;
     return outKeyCode;
 }
 
+#elif defined(CLEMENS_PLATFORM_MACOS)
+//  Option -> Alt (Option/Closed apple)
+//  Command -> Super (Open Apple)
+//  Both Option and Command do not have a 'right' equivalent exposed by NSEvent
+//  Function keys often require pressing the Fn key on macOS (unless this feature
+//      was turned off by the user via macOS preferences.)
+
+//  edge case where CTRL + ESC does not report the ESCAPE down event
+static bool g_escape_down = false;
+static sapp_keycode onKeyDown(const sapp_event *evt) { 
+    sapp_keycode outKeyCode = evt->key_code;
+    if (evt->key_code == SAPP_KEYCODE_LEFT_SUPER) {
+         outKeyCode = SAPP_KEYCODE_RIGHT_ALT;
+    }
+    if (evt->modifiers & (SAPP_MODIFIER_CTRL + SAPP_MODIFIER_ALT)) {
+        if (evt->key_code == SAPP_KEYCODE_F1 && !g_escape_down) {
+            g_escape_down = true;
+            return SAPP_KEYCODE_ESCAPE;
+        }
+    }
+    if (evt->key_code == SAPP_KEYCODE_ESCAPE) {
+        if (g_escape_down)
+            return SAPP_KEYCODE_INVALID;
+        g_escape_down = true;
+    }
+    return outKeyCode;
+}
+
+static sapp_keycode onKeyUp(const sapp_event *evt, bool* doDownEvent) {
+    sapp_keycode outKeyCode = evt->key_code;
+    *doDownEvent = false;
+    if (evt->key_code == SAPP_KEYCODE_LEFT_SUPER) {
+        outKeyCode = SAPP_KEYCODE_RIGHT_ALT;
+    }
+    if (evt->key_code == SAPP_KEYCODE_ESCAPE) {
+        if (!g_escape_down) *doDownEvent = true;
+        g_escape_down = false;
+    } else if (g_escape_down) {
+        if (evt->key_code == SAPP_KEYCODE_F1 || evt->key_code == SAPP_KEYCODE_ESCAPE) {
+            g_escape_down = false;
+            outKeyCode =  SAPP_KEYCODE_ESCAPE;
+        }
+    }
+    
+    return outKeyCode;
+}
 #else
 static sapp_keycode onKeyDown(const sapp_event *evt) { return evt->key_code; }
 
-static sapp_keycode onKeyUp(const sapp_event *evt) { return evt->key_code; }
+static sapp_keycode onKeyUp(const sapp_event *evt, bool* doDownEvent) {
+    *doDownEvent = false;
+    return evt->key_code;
+}
 #endif
 
 std::array<int16_t, 512> g_sokolToADBKey;
@@ -213,16 +277,17 @@ static void imguiFontSetup(const cinek::ByteBuffer &systemFontLoBuffer,
         img_desc.data.subimage[0][0].ptr = font_pixels;
         img_desc.data.subimage[0][0].size = (size_t)(font_width * font_height) * sizeof(uint32_t);
         img_desc.label = "sokol-imgui-font";
-        _simgui.img = sg_make_image(&img_desc);
-        io.Fonts->TexID = (ImTextureID)(uintptr_t)_simgui.img.id;
+        g_imgui_font_img = sg_make_image(&img_desc);
+        io.Fonts->TexID = (ImTextureID)(uintptr_t)g_imgui_font_img.id;
     }
 }
 
 static void onInit(void *userdata) {
     auto *appdata = reinterpret_cast<SharedAppData *>(userdata);
 
+    clem_host_platform_init();
     stm_setup();
-
+    
 #if defined(CLEMENS_PLATFORM_WINDOWS)
     CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #endif
@@ -409,12 +474,26 @@ static void onFrame(void *userdata) {
     }
 }
 
+static void doHostInputEvent(struct ClemensInputEvent& clemInput, uint32_t modifiers) {
+    if (clemInput.type == kClemensInputType_None) return;
+    if (modifiers & SAPP_MODIFIER_CAPS) {
+        g_ADBKeyToggleMask |= CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;
+    } else {
+        g_ADBKeyToggleMask &= ~CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;
+    }
+    clemInput.adb_key_toggle_mask = g_ADBKeyToggleMask;
+    if (g_Host)
+        g_Host->input(clemInput);
+}
+
+
 static void onEvent(const sapp_event *evt, void *) {
     struct ClemensInputEvent clemInput {};
 
     simgui_handle_event(evt);
 
     sapp_keycode keycode;
+    bool doDownEventOnKeyUp = false;
 
     switch (evt->type) {
     case SAPP_EVENTTYPE_UNFOCUSED:
@@ -429,9 +508,19 @@ static void onEvent(const sapp_event *evt, void *) {
         }
         break;
     case SAPP_EVENTTYPE_KEY_UP:
-        keycode = onKeyUp(evt);
+        keycode = onKeyUp(evt, &doDownEventOnKeyUp);
         if (keycode != SAPP_KEYCODE_INVALID) {
             clemInput.value_a = g_sokolToADBKey[keycode];
+        }
+        if (doDownEventOnKeyUp) {
+            printf("Do ESCAPE DOWN\n");
+            //  on lost key down events, emulate a key tap.
+            if (keycode != SAPP_KEYCODE_INVALID) {
+                clemInput.type = kClemensInputType_KeyDown;
+            }
+            doHostInputEvent(clemInput, evt->modifiers);
+        }
+        if (keycode != SAPP_KEYCODE_INVALID) {
             clemInput.type = kClemensInputType_KeyUp;
         }
         break;
@@ -458,16 +547,7 @@ static void onEvent(const sapp_event *evt, void *) {
         clemInput.type = kClemensInputType_None;
         break;
     }
-    if (clemInput.type != kClemensInputType_None) {
-        if (evt->modifiers & SAPP_MODIFIER_CAPS) {
-            g_ADBKeyToggleMask |= CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;
-        } else {
-            g_ADBKeyToggleMask &= ~CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;
-        }
-        clemInput.adb_key_toggle_mask = g_ADBKeyToggleMask;
-        if (g_Host)
-            g_Host->input(clemInput);
-    }
+    doHostInputEvent(clemInput, evt->modifiers);
 }
 
 static void onCleanup(void *userdata) {
@@ -482,6 +562,7 @@ static void onCleanup(void *userdata) {
     delete appdata;
     simgui_shutdown();
     sg_shutdown();
+    clem_host_platform_terminate();
 }
 
 static void onFail(const char *msg, void *) { printf("app failure: %s", msg); }
