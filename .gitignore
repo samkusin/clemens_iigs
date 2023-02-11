@@ -1,3 +1,4 @@
+.DS_Store
 .cache/
 .vscode/
 .vs/
@@ -6,3 +7,4 @@ build/
 dist/
 data/*.rom
 data/*.bin
+

@@ -33,6 +33,10 @@ static inline unsigned local_getcpu() {
 #endif
 }
 
+void clem_host_platform_init() {}
+
+void clem_host_platform_terminate() {}
+
 unsigned clem_host_get_processor_number() { return local_getcpu(); }
 
 void clem_host_uuid_gen(ClemensHostUUID *uuid) {

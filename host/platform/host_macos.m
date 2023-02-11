@@ -5,6 +5,8 @@
 #include <uuid/uuid.h>
 
 #import <Foundation/Foundation.h>
+#import <GameController/GameController.h>
+
 
 //  Objective-C note - These functions are called from the sokol application framework
 //                     and otherwise are wrapped already in an autoreleasepool there.
@@ -46,8 +48,33 @@ char *get_local_user_data_directory(char *outpath, size_t outpath_size, const ch
     return outpath;
 }
 
-void clem_joystick_open_devices(const char *provider) {
 
+///////////////////////////////////////////////////////////////////////////////
+
+void clem_host_platform_init() {}
+
+void clem_host_platform_terminate() {}
+
+static NSArray<GCController*> *controllers_ = nil;
+
+static void _open_gamecontrollers() {
+    //NSNotifcationCenter* notificationCenter = [NSNotificationCenter defaultCenter];
+
+    controllers_ = [GCController controllers];
+    unsigned controllerIndex;
+    printf("%u count\n", controllers_.count);
+    for (controllerIndex = 0; controllerIndex < controllers_.count; ++controllerIndex) {
+        GCPhysicalInputProfile *profile = controllers_[controllerIndex].physicalInputProfile;
+        if (profile != nil) {
+            NSLog(@"Elements = %u", (unsigned)profile.allElements.count);
+        }
+    }
+}
+
+void clem_joystick_open_devices(const char *provider) {
+    if (strncmp(provider, CLEM_HOST_JOYSTICK_PROVIDER_GAMECONTROLLER, 32) == 0) {
+        _open_gamecontrollers();
+    }
 }
 
 unsigned clem_joystick_poll(ClemensHostJoystick *joysticks) {
@@ -55,5 +82,5 @@ unsigned clem_joystick_poll(ClemensHostJoystick *joysticks) {
 }
 
 void clem_joystick_close_devices() {
-
+    controllers_ = nil;
 }

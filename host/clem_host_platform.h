@@ -45,7 +45,9 @@
 #elif defined(CLEMENS_PLATFORM_LINUX)
 #define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT ""
 #elif defined(CLEMENS_PLATFORM_MACOS)
-#define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT ""
+#define CLEM_HOST_JOYSTICK_PROVIDER_GAMECONTROLLER  "gamecontroller"
+#define CLEM_HOST_JOYSTICK_PROVIDER_HIDIOKIT  "hid-iokit"
+#define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT CLEM_HOST_JOYSTICK_PROVIDER_GAMECONTROLLER
 #endif
 
 #ifdef __cplusplus
@@ -66,6 +68,21 @@ typedef struct {
     int16_t y[2];
     bool isConnected;
 } ClemensHostJoystick;
+
+/**
+ * @brief Starts any platform specific systems
+ *
+ * This may equate to a no-op on some platforms, but gives our application
+ * a change to perform any platform specific initialization not handled by
+ * the cross-platform application framework used.
+ */
+void clem_host_platform_init();
+
+/**
+ * @brief Reverses clem_host_platform_init()
+ * 
+ */
+void clem_host_platform_terminate();
 
 /**
  * @brief Returns the current processor the local thread is running on
@@ -111,7 +128,7 @@ char *get_local_user_data_directory(char *outpath, size_t outpath_size, const ch
 /**
  * @brief Initializes the joystick system
  *
- * @param provider OS specific (Windows: "xinput", "dinput"; Linux: "{evdev root dir}")
+ * @param provider OS specific (see CLEM_HOST_JOYSTICK_PROVIDER_xxx IDs)
  */
 void clem_joystick_open_devices(const char *provider);
 

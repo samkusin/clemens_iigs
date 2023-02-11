@@ -107,20 +107,24 @@ else()
     find_library(AUDIO_TOOLBOX_LIB AudioToolbox)
     find_library(CORE_GRAPHICS_LIB CoreGraphics)
     find_library(OPENGL_LIB OpenGL)
+    find_library(GAME_CONTROLLER_LIB GameController)
     target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_GL)
     target_link_libraries(clemens_iigs PRIVATE ${FOUNDATION_LIB} 
                                                ${APPKIT_LIB}
                                                ${CORE_AUDIO_LIB}
                                                ${AUDIO_TOOLBOX_LIB}
                                                ${CORE_GRAPHICS_LIB}
-                                               ${OPENGL_LIB})
+                                               ${OPENGL_LIB}
+                                               ${GAME_CONTROLLER_LIB})
     set_target_properties(clemens_iigs PROPERTIES 
+        OUTPUT_NAME "Clemens IIGS"
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "Clemens IIGS"
         MACOSX_BUNDLE_BUNDLE_VERSION "${CLEM_HOST_VERSION_MAJOR}.${CLEM_HOST_VERSION_MINOR}.${CLEM_HOST_VERSION_PATCH}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${CLEM_HOST_VERSION_MAJOR}.${CLEM_HOST_VERSION_MINOR}.${CLEM_HOST_VERSION_PATCH}"
-        MACOSX_BUNDLE_COPYRIGHT "Copyright %Y Samir Sinha DBA Cinekine"
-        )
+        MACOSX_BUNDLE_COPYRIGHT "Copyright ${CLEM_HOST_COPYRIGHT_YEAR} Samir Sinha DBA Cinekine"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/macos_bundle_info_plist.in"
+        XCODE_ATTRIBUTE_EXECUTABLE_NAME "Clemens IIGS")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

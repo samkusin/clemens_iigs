@@ -285,8 +285,9 @@ static void imguiFontSetup(const cinek::ByteBuffer &systemFontLoBuffer,
 static void onInit(void *userdata) {
     auto *appdata = reinterpret_cast<SharedAppData *>(userdata);
 
+    clem_host_platform_init();
     stm_setup();
-
+    
 #if defined(CLEMENS_PLATFORM_WINDOWS)
     CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #endif
@@ -561,6 +562,7 @@ static void onCleanup(void *userdata) {
     delete appdata;
     simgui_shutdown();
     sg_shutdown();
+    clem_host_platform_terminate();
 }
 
 static void onFail(const char *msg, void *) { printf("app failure: %s", msg); }
