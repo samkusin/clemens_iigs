@@ -18,6 +18,7 @@ struct ClemensConfiguration {
     std::string dataDirectory;
     unsigned majorVersion;
     unsigned minorVersion;
+    bool hybridInterfaceEnabled;
 
     ClemensConfiguration();
     ClemensConfiguration(std::string pathname, std::string datadir);

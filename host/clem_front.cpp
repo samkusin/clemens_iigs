@@ -3,6 +3,7 @@
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
 #include "clem_host_utils.hpp"
+#include "clem_imgui.hpp"
 #include "clem_import_disk.hpp"
 #include "clem_l10n.hpp"
 #include "clem_mem.h"
@@ -11,15 +12,30 @@
 #include "emulator.h"
 #include "emulator_mmio.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "version.h"
 
 #include "cinek/encode.h"
 #include "fmt/format.h"
 #include "imgui_filedialog/ImGuiFileDialog.h"
 
+#include <cfloat>
 #include <charconv>
 #include <filesystem>
 #include <tuple>
+
+//  Style
+#define CLEM_HOST_OPEN_APPLE_UTF8 "\xee\x80\x90"
+namespace ClemensHostStyle {
+// monochromatic "platinum" classic CACAC8
+//                          middle  969695
+// monochromatic "platinum" dark    4A4A33
+static ImU32 kDarkFrameColor = IM_COL32(0x4a, 0x4a, 0x33, 0xff);
+static ImU32 kDarkInsetColor = IM_COL32(0x3a, 0x3a, 0x22, 0xff);
+
+ImU32 getFrameColor(const ClemensFrontend &) { return kDarkFrameColor; }
+ImU32 getInsetColor(const ClemensFrontend &) { return kDarkInsetColor; }
+} // namespace ClemensHostStyle
 
 //  TODO: Platform specific user data directory (ROM, disk images, traces, etc)
 //  TODO: Insert card to slot (non-gui)
@@ -747,6 +763,8 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     const uint8_t *diskBits = iwmDrive->disk.bits_data;
     unsigned diskTrackIndex = frameWriteState_.iwm.qtr_track_index;
 
+    frameWriteState_.adb.mod_states = clemens_get_adb_key_modifier_states(state.mmio);
+
     if (iwmDrive->disk.meta_track_map[diskTrackIndex] != 0xff) {
         diskTrackIndex = iwmDrive->disk.meta_track_map[diskTrackIndex];
 
@@ -1080,8 +1098,9 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     //  render video
     constexpr int kClemensScreenWidth = 720;
     constexpr int kClemensScreenHeight = 480;
+    //  video is rendered to a texture and the UVs of the display on the virtual
+    //  monitor are stored in screenUVs
     float screenUVs[2]{0.0f, 0.0f};
-
     if (frameReadState_.mmioWasInitialized && guiMode_ != GUIMode::RebootEmulator) {
         const uint8_t *e0mem = frameReadState_.bankE0;
         const uint8_t *e1mem = frameReadState_.bankE1;
@@ -1112,24 +1131,12 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         }
     }
 
-    const ImGuiStyle &kMainStyle = ImGui::GetStyle();
-    const ImVec2 kWindowBoundary(kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.x,
-                                 kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.y);
-    const float kLineSpacing = ImGui::GetTextLineHeightWithSpacing();
-    const float kMachineStateViewWidth = std::max(int(width * 0.40f), 480);
-    const float kMonitorX = kMachineStateViewWidth;
-    const float kMonitorViewWidth = width - kMonitorX;
-    const float kInfoBarHeight = kLineSpacing + kWindowBoundary.y * 2;
-    const float kTerminalViewHeight =
-        std::max(kLineSpacing * 6 + kWindowBoundary.y * 2, height * 0.33f) - kInfoBarHeight;
-    const float kMonitorViewHeight = height - kInfoBarHeight - kTerminalViewHeight;
-    ImVec2 monitorSize(kMonitorViewWidth, kMonitorViewHeight);
+    if (config_.hybridInterfaceEnabled) {
+        doDebuggerInterface(ImVec2(width, height), ImVec2(screenUVs[0], screenUVs[1]), deltaTime);
+    } else {
+        doEmulatorInterface(ImVec2(width, height), ImVec2(screenUVs[0], screenUVs[1]), deltaTime);
+    }
 
-    doMachineStateLayout(ImVec2(0, 0), ImVec2(kMachineStateViewWidth, height));
-    doMachineViewLayout(ImVec2(kMonitorX, 0), monitorSize, screenUVs[0], screenUVs[1]);
-    doMachineInfoBar(ImVec2(kMonitorX, monitorSize.y), ImVec2(kMonitorViewWidth, kInfoBarHeight));
-    doMachineTerminalLayout(ImVec2(kMonitorX, monitorSize.y + kInfoBarHeight),
-                            ImVec2(kMonitorViewWidth, kTerminalViewHeight));
     switch (guiMode_) {
     case GUIMode::ImportDiskModal:
     case GUIMode::BlankDiskModal:
@@ -1163,7 +1170,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     if (backend_) {
         backend_->publish();
     }
-    if (ImGui::IsKeyDown(ImGuiKey_LeftAlt) && 
+    if (ImGui::IsKeyDown(ImGuiKey_LeftAlt) &&
         (ImGui::IsKeyDown(ImGuiKey_RightAlt) || ImGui::IsKeyDown(ImGuiKey_LeftSuper))) {
         if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) {
             emulatorHasMouseFocus_ = false;
@@ -1173,6 +1180,149 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     interop.mouseLock = emulatorHasMouseFocus_;
 
     return getViewType();
+}
+
+void ClemensFrontend::doDebuggerInterface(ImVec2 dimensions, ImVec2 screenUVs,
+                                          double /*deltaTime*/) {
+    const ImGuiStyle &kMainStyle = ImGui::GetStyle();
+    const ImVec2 kWindowBoundary(kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.x,
+                                 kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.y);
+    const float kLineSpacing = ImGui::GetTextLineHeightWithSpacing();
+    const float kMachineStateViewWidth = std::max(int(dimensions.x * 0.40f), 480);
+    const float kMonitorX = kMachineStateViewWidth;
+    const float kMonitorViewWidth = dimensions.x - kMonitorX;
+    const float kInfoBarHeight = kLineSpacing + kWindowBoundary.y * 2;
+    const float kTerminalViewHeight =
+        std::max(kLineSpacing * 6 + kWindowBoundary.y * 2, dimensions.y * 0.33f) - kInfoBarHeight;
+    const float kMonitorViewHeight = dimensions.y - kInfoBarHeight - kTerminalViewHeight;
+    ImVec2 monitorSize(kMonitorViewWidth, kMonitorViewHeight);
+
+    doMachineStateLayout(ImVec2(0, 0), ImVec2(kMachineStateViewWidth, dimensions.y));
+    doMachineViewLayout(ImVec2(kMonitorX, 0), monitorSize, screenUVs[0], screenUVs[1]);
+    doMachineInfoBar(ImVec2(kMonitorX, monitorSize.y), ImVec2(kMonitorViewWidth, kInfoBarHeight));
+    doMachineTerminalLayout(ImVec2(kMonitorX, monitorSize.y + kInfoBarHeight),
+                            ImVec2(kMonitorViewWidth, kTerminalViewHeight));
+}
+
+void ClemensFrontend::doEmulatorInterface(ImVec2 dimensions, ImVec2 screenUVs,
+                                          double /*deltaTime*/) {
+    const ImGuiStyle &kMainStyle = ImGui::GetStyle();
+    const ImVec2 kWindowBoundary(kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.x,
+                                 kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.y);
+    const float kLineSpacing = ImGui::GetTextLineHeight() + ImGui::GetFontSize() / 2;
+    const float kMonitorViewAspect = 1.33333f;
+
+    //  The monitor view should be the largest possible given the input viewport
+    //  Bottom Info Bar
+    ImVec2 kMonitorViewSize(dimensions.x, dimensions.y);
+    ImVec2 kInfoStatusSize(dimensions.x, kLineSpacing + kWindowBoundary.y * 2);
+
+    kMonitorViewSize.y -= kInfoStatusSize.y;
+    kMonitorViewSize.x = std::min(dimensions.x, kMonitorViewSize.y * kMonitorViewAspect);
+
+    ImVec2 kSideBarSize(std::max(96.0f, dimensions.x - kMonitorViewSize.x),
+                        dimensions.y - kInfoStatusSize.y);
+
+    ImVec2 kSideBarAnchor(0.0f, 0.0f);
+    ImVec2 kMonitorViewAnchor(kSideBarSize.x, 0.0f);
+    ImVec2 kInfoSizeAnchor(0.0f, kSideBarSize.y);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ClemensHostStyle::getFrameColor(*this));
+    doSidePanelLayout(kSideBarAnchor, kSideBarSize);
+    doMachineViewLayout(kMonitorViewAnchor, kMonitorViewSize, screenUVs[0], screenUVs[1]);
+    doInfoStatusLayout(kInfoSizeAnchor, kInfoStatusSize, kMonitorViewAnchor.x);
+    ImGui::PopStyleColor();
+}
+
+void ClemensFrontend::doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions) {
+    //  Display Power Status
+    //  Display S5,D1
+    //  Display S5,D2
+    //  Display S6,D1
+    //  Display S5,D1
+    //  Display SmartPort HDD
+    //  Separator
+    //  Display Joystick 1 and 2 status
+    //  Display OS specific instructions
+    ImGui::SetNextWindowPos(anchor);
+    ImGui::SetNextWindowSize(dimensions);
+    ImGui::Begin("SidePanel", nullptr,
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                     ImGuiWindowFlags_NoMove);
+    ImGui::End();
+}
+
+void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float dividerXPos) {
+    //  Display 1Mhz vs Fast
+    //  Display Mouse Lock/Focus
+    //  Display Key Focus
+    //  Display Option, Open Apple, Ctrl, Reset, Escape, Caps lock in abbrev/icons
+
+    ImGui::SetNextWindowPos(anchor);
+    ImGui::SetNextWindowSize(dimensions);
+    ImGui::Begin("InfoStatus", nullptr,
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar);
+
+    float statusItemHeight =
+        dimensions.y - (ImGui::GetStyle().WindowBorderSize + ImGui::GetStyle().WindowPadding.y) * 2;
+    float statusItemPaddingHeight =
+        statusItemHeight - ImGui::GetTextLineHeight() - (ImGui::GetStyle().FrameBorderSize * 2);
+
+    ImVec2 framePadding(6.0f, statusItemPaddingHeight / 2);
+    ImGui::PushStyleColor(ImGuiCol_Border, ClemensHostStyle::getInsetColor(*this));
+    ImGui::PushStyleColor(ImGuiCol_TableRowBg, ClemensHostStyle::getInsetColor(*this));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, framePadding);
+
+    const uint8_t *bram = frameReadState_.bram;
+    bool is1MhzMode = (bram && bram[CLEM_RTC_BRAM_SYSTEM_SPEED] == 0x00);
+    bool isEscapeDown = (frameReadState_.adb.mod_states & CLEM_ADB_KEY_MOD_STATE_ESCAPE) != 0;
+    bool isCtrlDown = (frameReadState_.adb.mod_states & CLEM_ADB_KEY_MOD_STATE_CTRL) != 0;
+    bool isOptionDown = (frameReadState_.adb.mod_states & CLEM_ADB_KEY_MOD_STATE_OPTION) != 0;
+    bool isOpenAppleDown = (frameReadState_.adb.mod_states & CLEM_ADB_KEY_MOD_STATE_APPLE) != 0;
+    bool isResetDown = (frameReadState_.adb.mod_states & CLEM_ADB_KEY_MOD_STATE_RESET) != 0;
+
+    ClemensHostImGui::StatusBarField(is1MhzMode ? ClemensHostImGui::StatusBarFlags_Active
+                                                : ClemensHostImGui::StatusBarFlags_Inactive,
+                                     "1 Mhz");
+
+    ImGui::SameLine(dividerXPos);
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+    ClemensHostImGui::StatusBarField(isCtrlDown ? ClemensHostImGui::StatusBarFlags_Active
+                                                : ClemensHostImGui::StatusBarFlags_Inactive,
+                                     "CTRL");
+    ImGui::SameLine();
+    ClemensHostImGui::StatusBarField(isEscapeDown ? ClemensHostImGui::StatusBarFlags_Active
+                                                  : ClemensHostImGui::StatusBarFlags_Inactive,
+                                     "ESC");
+    ImGui::SameLine();
+    ClemensHostImGui::StatusBarField(isOptionDown ? ClemensHostImGui::StatusBarFlags_Active
+                                                  : ClemensHostImGui::StatusBarFlags_Inactive,
+                                     "OPT");
+    ImGui::SameLine();
+    ClemensHostImGui::StatusBarField(isOpenAppleDown ? ClemensHostImGui::StatusBarFlags_Active
+                                                     : ClemensHostImGui::StatusBarFlags_Inactive,
+                                     " " CLEM_HOST_OPEN_APPLE_UTF8 " ");
+    ImGui::SameLine(0.0f, ImGui::GetFont()->GetCharAdvance('A') * 2);
+
+    float rightSideWidth =
+        (ImGui::GetStyle().FrameBorderSize + ImGui::GetStyle().FramePadding.x) * 2 +
+        ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0.0f, "RESET0").x;
+
+    ImVec2 inputInstructionSize = ImVec2(dimensions.x - ImGui::GetCursorPos().x - rightSideWidth,
+                                         ImGui::GetTextLineHeight() + statusItemPaddingHeight);
+    doViewInputInstructions(inputInstructionSize);
+
+    ImGui::SameLine(anchor.x + dimensions.x - rightSideWidth);
+    ClemensHostImGui::StatusBarField(isResetDown ? ClemensHostImGui::StatusBarFlags_Active
+                                                 : ClemensHostImGui::StatusBarFlags_Inactive,
+                                     "RESET");
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor(2);
+
+    ImGui::End();
 }
 
 static ImColor getDefaultColor(bool hi) {
@@ -2143,11 +2293,12 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
         ImGui::SetNextWindowFocus();
         emulatorHasKeyboardFocus_ = false;
     }
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::Begin("Display", nullptr,
-                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus |
                      ImGuiWindowFlags_NoMove);
     ImGui::BeginChild("DisplayView");
+
     ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // No tint
     ImTextureID texId{(void *)((uintptr_t)display_.getScreenTarget().id)};
     ImVec2 p = ImGui::GetCursorScreenPos();
@@ -2181,6 +2332,7 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
 
     ImGui::EndChild();
     ImGui::End();
+    ImGui::PopStyleVar();
 }
 
 void ClemensFrontend::doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize) {
@@ -2192,9 +2344,7 @@ void ClemensFrontend::doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize) {
 
     ImGui::SetNextWindowPos(rootAnchor);
     ImGui::SetNextWindowSize(rootSize);
-    ImGui::Begin("InfoBar", nullptr,
-                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove);
+    ImGui::Begin("InfoBar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     ImVec2 screenPos;
     ImVec2 cursorPos;
@@ -2213,15 +2363,28 @@ void ClemensFrontend::doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize) {
     cursorPos.y = ImGui::GetCursorPosY();
     ImGui::SameLine(cursorPos.x, 0.0f);
 
-    if (emulatorHasMouseFocus_) {
-        ImGui::TextUnformatted(ClemensL10N::kMouseUnlock[ClemensL10N::kLanguageDefault]);
-    } else if (emulatorHasKeyboardFocus_) {
-        ImGui::Text("Click in View to lock mouse input");
-    } else {
-        ImGui::Text("Move mouse into view for key input");
-    }
+    doViewInputInstructions(ImVec2(ImGui::GetWindowContentRegionWidth() - cursorPos.x, rootSize.y));
 
     ImGui::End();
+}
+
+void ClemensFrontend::doViewInputInstructions(ImVec2 dimensions) {
+    const char *infoText = nullptr;
+    if (emulatorHasMouseFocus_) {
+        infoText = ClemensL10N::kMouseUnlock[ClemensL10N::kLanguageDefault];
+    } else if (emulatorHasKeyboardFocus_) {
+        infoText = ClemensL10N::kMouseLock[ClemensL10N::kLanguageDefault];
+    } else {
+        infoText = ClemensL10N::kViewInput[ClemensL10N::kLanguageDefault];
+    }
+
+    ImVec2 anchor = ImGui::GetCursorScreenPos();
+    ImColor color = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+    ImGui::Dummy(dimensions);
+    ImVec2 size = ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0.0f, infoText);
+    // anchor.x += std::max(0.0f, (dimensions.x - size.x) * 0.5f);
+    anchor.y += std::max(0.0f, (dimensions.y - size.y) * 0.5f);
+    ImGui::GetWindowDrawList()->AddText(anchor, (ImU32)color, infoText);
 }
 
 void ClemensFrontend::doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize) {

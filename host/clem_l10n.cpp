@@ -41,6 +41,9 @@ const char *kFirstTimeUse[] = {
     "images\n"
     "\n"};
 
+const char *kMouseLock[] = {"Click in View to lock mouse input"};
+const char *kViewInput[] = {"Move mouse into view for key input"};
+
 #if defined(__linux__)
 const char *kGSKeyboardCommands[] = {
     "IIGS Keyboard Commands:\n"
@@ -56,28 +59,21 @@ const char *kGSKeyboardCommands[] = {
     "- Tux - Ctrl - Equal for CTRL-RESET\n"
     "- Tux - Ctrl - Left Alt - 1 to enter the Control Panel\n"};
 
-const char *kMouseUnlock[] = {
-    "Press both ALT keys and CTRL to unlock mouse"
-};
+const char *kMouseUnlock[] = {"Press both ALT keys and CTRL to unlock mouse"};
 #elif defined(__APPLE__)
 const char *kGSKeyboardCommands[] = {"IIGS Keyboard Commands:\n"
                                      "\n"
                                      "- Ctrl-Command-F12 to reboot the system\n"
                                      "- Ctrl-F12 for CTRL-RESET\n"
                                      "- Ctrl-Option-F1 to enter the Control Panel\n"};
-const char *kMouseUnlock[] = {
-    "Press Option + Command + and CTRL to unlock mouse:"
-};
+const char *kMouseUnlock[] = {"Press Option + Command + and CTRL to unlock mouse:"};
 #else
 const char *kGSKeyboardCommands[] = {"IIGS Keyboard Commands:\n"
                                      "\n"
                                      "- Ctrl-Right ALT-F12 to reboot the system\n"
                                      "- Ctrl-F12 for CTRL-RESET\n"
                                      "- Ctrl-Left ALT-F1 to enter the Control Panel\n"};
-                                     
-const char *kMouseUnlock[] = {
-    "Press both ALT keys and CTRL to unlock mouse"
-};
+
+const char *kMouseUnlock[] = {"Press both ALT keys and CTRL to unlock mouse"};
 #endif
 } // namespace ClemensL10N
-

@@ -46,6 +46,12 @@ class ClemensFrontend : public ClemensHostView {
     void backendStateDelegate(const ClemensBackendState &state);
     void copyState(const ClemensBackendState &state);
 
+    void doEmulatorInterface(ImVec2 dimensions, ImVec2 screenUVs, double deltaTime);
+    void doDebuggerInterface(ImVec2 dimensions, ImVec2 screenUVs, double deltaTime);
+
+    void doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions);
+    void doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float dividerXPos);
+    void doViewInputInstructions(ImVec2 dimensions);
     void doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize);
     void doMachineDiagnosticsDisplay();
     void doMachineDiskDisplay();
@@ -138,6 +144,10 @@ class ClemensFrontend : public ClemensHostView {
         void copyFrom(const ClemensDeviceEnsoniq &doc);
     };
 
+    struct ADBStatus {
+        unsigned mod_states;
+    };
+
     // This state comes in for any update to the emulator per frame.  As such
     // its possible to "lose" state if the emulator runs faster than the UI.
     // This is OK in most cases as the UI will only present this data per frame
@@ -168,6 +178,7 @@ class ClemensFrontend : public ClemensHostView {
 
         IWMStatus iwm;
         DOCStatus doc;
+        ADBStatus adb;
 
         uint32_t vgcModeFlags;
 

@@ -70,6 +70,7 @@ set(PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_front.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_app.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_utils.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_imgui.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_import_disk.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_interpreter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_l10n.cpp"
