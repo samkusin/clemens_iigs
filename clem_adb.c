@@ -101,25 +101,6 @@
 #define CLEM_ADB_DEVICE_KEYBOARD 0x02
 #define CLEM_ADB_DEVICE_MOUSE    0x03
 
-/* GLU register flags */
-#define CLEM_ADB_GLU_REG0_MOUSE_BTN         0x8000
-#define CLEM_ADB_GLU_REG0_MOUSE_Y_DELTA     0x7f00
-#define CLEM_ADB_GLU_REG0_MOUSE_ALWAYS_1    0x0080 /* Table 6-11 HWRef */
-#define CLEM_ADB_GLU_REG0_MOUSE_X_DELTA     0x007f
-#define CLEM_ADB_GLU_REG2_KEY_CAPS_TOGGLE   0x0002
-#define CLEM_ADB_GLU_REG2_KEY_CLEAR_NUMLOCK 0x0080
-#define CLEM_ADB_GLU_REG2_KEY_APPLE         0x0100
-#define CLEM_ADB_GLU_REG2_KEY_OPTION        0x0200
-#define CLEM_ADB_GLU_REG2_KEY_SHIFT         0x0400
-#define CLEM_ADB_GLU_REG2_KEY_CTRL          0x0800
-#define CLEM_ADB_GLU_REG2_KEY_RESET         0x1000
-#define CLEM_ADB_GLU_REG2_KEY_CAPS          0x2000
-/* no scroll lock and LEDs counted - see 'ADB - The Untold Story' refe */
-#define CLEM_ADB_GLU_REG2_MODKEY_MASK 0x7f80
-
-#define CLEM_ADB_GLU_REG3_MASK_SRQ    0x2000
-#define CLEM_ADB_GLU_REG3_DEVICE_MASK 0x0F00
-
 /* ADB Mode Flags */
 #define CLEM_ADB_MODE_AUTOPOLL_KEYB  0x00000001
 #define CLEM_ADB_MODE_AUTOPOLL_MOUSE 0x00000002
@@ -1443,14 +1424,18 @@ static void _clem_adb_glu_keyb_talk(struct ClemensDeviceADB *adb) {
 
     /* The reset key is special - it takes up the whole register, and so
        for the first unqueue, only allow one read from the key queue
+       See https://developer.apple.com/library/archive/technotes/hw/hw_01.html
+       for the behavior behind the reset key
     */
     if ((key_event & 0x7f) == CLEM_ADB_KEY_RESET) {
         if (key_event & 0x80) {
             adb->keyb_reg[0] = 0x7f7f;
+            adb->keyb_reg[2] &= ~CLEM_ADB_GLU_REG2_KEY_RESET;
             if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_CTRL) {
                 adb->keyb.reset_key = true;
             }
         } else {
+            adb->keyb_reg[2] |= CLEM_ADB_GLU_REG2_KEY_RESET;
             adb->keyb_reg[0] = 0xffff;
         }
     } else {

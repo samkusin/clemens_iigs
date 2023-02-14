@@ -300,6 +300,14 @@ void clemens_input_key_toggle(ClemensMMIO *mmio, unsigned enabled) {
     clem_adb_device_key_toggle(&mmio->dev_adb, enabled);
 }
 
+unsigned clemens_get_adb_key_modifier_states(ClemensMMIO *mmio) {
+    unsigned key_mod_state = mmio->dev_adb.keyb_reg[2];
+    if (mmio->dev_adb.keyb.states[CLEM_ADB_KEY_ESCAPE]) {
+        key_mod_state |= CLEM_ADB_KEY_MOD_STATE_ESCAPE;
+    }
+    return key_mod_state;
+}
+
 const uint8_t *clemens_get_ascii_from_a2code(unsigned input) {
     return clem_adb_ascii_from_a2code(input);
 }

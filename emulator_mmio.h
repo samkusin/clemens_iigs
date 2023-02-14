@@ -159,6 +159,14 @@ void clemens_input(ClemensMMIO *mmio, const struct ClemensInputEvent *input);
 void clemens_input_key_toggle(ClemensMMIO *mmio, unsigned enabled);
 
 /**
+ * @brief Retrieve the current state of ADB related modifier keys
+ *
+ * @param mmio
+ * @return See CLEM_ADB_GLU_REG2_xxx
+ */
+unsigned clemens_get_adb_key_modifier_states(ClemensMMIO *mmio);
+
+/**
  * @brief
  *
  * @param input
