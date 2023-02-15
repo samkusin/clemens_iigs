@@ -54,11 +54,9 @@ class ClemensFrontend : public ClemensHostView {
     void doViewInputInstructions(ImVec2 dimensions);
     void doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize);
     void doMachineDiagnosticsDisplay();
-    void doMachineDiskDisplay();
-    void doMachineDiskSelection(ClemensDriveType driveType);
-    void doMachineDiskStatus(ClemensDriveType driveType);
-    void doMachineSmartDriveSelection(unsigned driveIndex);
-    void doMachineSmartDriveStatus(unsigned driveIndex);
+    void doMachineDiskDisplay(float width);
+    void doMachineDiskStatus(ClemensDriveType driveType, float width);
+    void doMachineSmartDriveStatus(unsigned driveIndex, float width);
     void doMachineCPUInfoDisplay();
     void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU, float screenV);
     void doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize);

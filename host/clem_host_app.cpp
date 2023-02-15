@@ -581,8 +581,8 @@ sapp_desc sokol_main(int argc, char *argv[]) {
     sapp_desc sapp = {};
 
     sapp.user_data = new SharedAppData(argc, argv);
-    sapp.width = 1300;
     sapp.height = 900;
+    sapp.width = 1440;
     sapp.init_userdata_cb = &onInit;
     sapp.frame_userdata_cb = &onFrame;
     sapp.cleanup_userdata_cb = &onCleanup;
