@@ -61,7 +61,6 @@ set(PROJECT_SOURCES
     ${EXT_SOURCES}
     ${FMT_SOURCES}
     ${SOKOL_SOURCES}
-    ${IMGUI_SOURCES}
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_assets.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_display.cpp"
