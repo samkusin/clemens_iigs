@@ -49,4 +49,26 @@ void StatusBarField(StatusBarFlags flags, const char *fmt, ...) {
     drawList->AddText(ltanchor, (ImU32)textColor, tempCharBuffer);
 }
 
+bool IconButton(const char *strId, ImTextureID texId, const ImVec2 &size) {
+    bool result = false;
+    const ImGuiStyle &style = ImGui::GetStyle();
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+    ImVec2 rbanchorPos = cursorPos;
+    rbanchorPos.x += size.x;
+    rbanchorPos.y += size.y;
+    result = ImGui::InvisibleButton(strId, size);
+    ImVec4 imageColor;
+    if (ImGui::IsItemActive()) {
+        imageColor = style.Colors[ImGuiCol_ButtonActive];
+    } else if (ImGui::IsItemHovered()) {
+        imageColor = style.Colors[ImGuiCol_ButtonHovered];
+    } else {
+        imageColor = style.Colors[ImGuiCol_Button];
+    }
+    drawList->AddImage(texId, cursorPos, rbanchorPos, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                       (ImU32)ImColor(imageColor));
+    return result;
+}
+
 } // namespace ClemensHostImGui

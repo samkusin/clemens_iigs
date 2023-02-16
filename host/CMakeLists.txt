@@ -38,7 +38,8 @@ set(FMT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/format.cc")
 
 set(EXT_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/ext/ini.c")
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/ini.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/stb.c")
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(PLATFORM_SOURCES
@@ -61,6 +62,7 @@ set(PROJECT_SOURCES
     ${FMT_SOURCES}
     ${SOKOL_SOURCES}
     ${IMGUI_SOURCES}
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_assets.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_display.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_backend.cpp"

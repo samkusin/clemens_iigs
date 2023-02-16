@@ -54,6 +54,7 @@ class ClemensFrontend : public ClemensHostView {
     void doViewInputInstructions(ImVec2 dimensions);
     void doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize);
     void doMachineDiagnosticsDisplay();
+    void doPowerDisplay(float width);
     void doMachineDiskDisplay(float width);
     void doMachineDiskStatus(ClemensDriveType driveType, float width);
     void doMachineSmartDriveStatus(unsigned driveIndex, float width);
@@ -74,6 +75,7 @@ class ClemensFrontend : public ClemensHostView {
     void cmdBreak(std::string_view operand);
     void cmdRun(std::string_view operand);
     void cmdReboot(std::string_view operand);
+    void cmdPower(std::string_view operand);
     void cmdReset(std::string_view operand);
     void cmdDisk(std::string_view operand);
     void cmdStep(std::string_view operand);
@@ -87,6 +89,8 @@ class ClemensFrontend : public ClemensHostView {
     void cmdGet(std::string_view operand);
     void cmdADBMouse(std::string_view operand);
     void cmdScript(std::string_view command);
+
+    void rebootInternal();
 
   private:
     ClemensConfiguration config_;
@@ -282,6 +286,9 @@ class ClemensFrontend : public ClemensHostView {
     void doNewBlankDiskFlow(int width, int height);
     void doNewBlankDisk(int width, int height);
 
+    bool isEmulatorStarting() const;
+    bool isEmulatorActive() const;
+
     enum class GUIMode {
         Preamble,
         Emulator,
@@ -293,7 +300,9 @@ class ClemensFrontend : public ClemensHostView {
         NewBlankDiskFlow,
         NewBlankDiskReplaceOld,
         NewBlankDisk,
-        RebootEmulator
+        RebootEmulator,
+        StartingEmulator,
+        NoEmulator
     };
     GUIMode guiMode_;
     ClemensDriveType importDriveType_;
@@ -301,6 +310,7 @@ class ClemensFrontend : public ClemensHostView {
     std::string importDiskSetPath_;
     std::vector<std::string> importDiskFiles_;
     std::string messageModalString_;
+    std::optional<float> delayRebootTimer_;
 };
 
 #endif

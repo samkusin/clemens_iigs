@@ -14,6 +14,7 @@
 
 #include "clem_host_platform.h"
 
+#include "clem_assets.hpp"
 #include "clem_front.hpp"
 #include "clem_startup_view.hpp"
 
@@ -420,6 +421,9 @@ static void onInit(void *userdata) {
     g_systemFontLoBuffer = loadFont("fonts/PrintChar21.ttf");
     g_systemFontHiBuffer = loadFont("fonts/PRNumber3.ttf");
     imguiFontSetup(appdata, g_systemFontLoBuffer, g_systemFontHiBuffer);
+
+    ClemensHostAssets::initialize();
+
     g_Host = new ClemensStartupView(appdata->rootPathOverride);
 }
 
@@ -570,6 +574,9 @@ static void onCleanup(void *userdata) {
     CoUninitialize();
 #endif
     delete appdata;
+
+    ClemensHostAssets::terminate();
+
     simgui_shutdown();
     sg_shutdown();
     clem_host_platform_terminate();

@@ -1,4 +1,5 @@
 #include "clem_front.hpp"
+#include "clem_assets.hpp"
 #include "clem_backend.hpp"
 #include "clem_disk.h"
 #include "clem_disk_utils.hpp"
@@ -1105,7 +1106,9 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     //  video is rendered to a texture and the UVs of the display on the virtual
     //  monitor are stored in screenUVs
     float screenUVs[2]{0.0f, 0.0f};
-    if (frameReadState_.mmioWasInitialized && guiMode_ != GUIMode::RebootEmulator) {
+    if (frameReadState_.mmioWasInitialized && isEmulatorActive()) {
+        fprintf(stdout, "[%d] FRAME EMULATOR\n", static_cast<int>(guiMode_));
+        fflush(stdout);
         const uint8_t *e0mem = frameReadState_.bankE0;
         const uint8_t *e1mem = frameReadState_.bankE1;
         bool altCharSet = frameReadState_.vgcModeFlags & CLEM_VGC_ALTCHARSET;
@@ -1121,24 +1124,34 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
             display_.renderSuperHiresGraphics(frameReadState_.graphicsFrame, e1mem);
         }
         display_.finish(screenUVs);
+    } else {
+        fprintf(stdout, "[%d] EMULATOR = %u,%u\n", static_cast<int>(guiMode_),
+                frameReadState_.mmioWasInitialized, isEmulatorActive());
+        fflush(stdout);
+    }
 
-        // render audio
-        if (isNewFrame && thisFrameAudioBuffer_.getSize() > 0) {
-            ClemensAudio audioFrame;
-            audioFrame.data = thisFrameAudioBuffer_.getHead();
-            audioFrame.frame_stride = frameReadState_.audioFrame.frame_stride;
-            audioFrame.frame_start = 0;
-            audioFrame.frame_count = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
-            audioFrame.frame_total = thisFrameAudioBuffer_.getCapacity() / audioFrame.frame_stride;
-            audio_.queue(audioFrame, deltaTime);
-            thisFrameAudioBuffer_.reset();
-        }
+    // render audio
+    if (isNewFrame && thisFrameAudioBuffer_.getSize() > 0) {
+        ClemensAudio audioFrame;
+        audioFrame.data = thisFrameAudioBuffer_.getHead();
+        audioFrame.frame_stride = frameReadState_.audioFrame.frame_stride;
+        audioFrame.frame_start = 0;
+        audioFrame.frame_count = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
+        audioFrame.frame_total = thisFrameAudioBuffer_.getCapacity() / audioFrame.frame_stride;
+        audio_.queue(audioFrame, deltaTime);
+        thisFrameAudioBuffer_.reset();
     }
 
     if (config_.hybridInterfaceEnabled) {
         doDebuggerInterface(ImVec2(width, height), ImVec2(screenUVs[0], screenUVs[1]), deltaTime);
     } else {
         doEmulatorInterface(ImVec2(width, height), ImVec2(screenUVs[0], screenUVs[1]), deltaTime);
+    }
+
+    if (isBackendTerminated) {
+        fprintf(stdout, "TERMINATED (GUIMode = %d)\n", static_cast<int>(guiMode_));
+        fflush(stdout);
+        backend_ = nullptr;
     }
 
     switch (guiMode_) {
@@ -1163,14 +1176,33 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         doNewBlankDisk(width, height);
         break;
     case GUIMode::RebootEmulator:
-        if (isBackendTerminated || !backend_) {
+        if (!backend_) {
+            fprintf(stdout, "REBOOT EMULATOR\n");
+            fflush(stdout);
             backend_ = createBackend();
+            guiMode_ = GUIMode::StartingEmulator;
+        }
+        break;
+    case GUIMode::StartingEmulator:
+        if (isNewFrame) {
+            fprintf(stdout, "STARTING EMULATOR\n");
+            fflush(stdout);
             guiMode_ = GUIMode::Emulator;
         }
+        break;
+    case GUIMode::NoEmulator:
         break;
     default:
         break;
     }
+
+    if (delayRebootTimer_.has_value()) {
+        delayRebootTimer_ = *delayRebootTimer_ + (float)deltaTime;
+        if (*delayRebootTimer_ > 1.0f) {
+            delayRebootTimer_.reset();
+        }
+    }
+
     if (backend_) {
         backend_->publish();
     }
@@ -1253,6 +1285,7 @@ void ClemensFrontend::doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions) {
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
                      ImGuiWindowFlags_NoMove);
+    doPowerDisplay(dimensions.x);
     doMachineDiskDisplay(dimensions.x);
     ImGui::End();
 }
@@ -1445,6 +1478,57 @@ void ClemensFrontend::doMachineDiagnosticsDisplay() {
     ImGui::EndTable();
 }
 
+void ClemensFrontend::doPowerDisplay(float width) {
+    ImGui::Spacing();
+    if (backend_) {
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(64, 64, 64, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 128, 128, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
+    }
+    if (ClemensHostImGui::IconButton(
+            "PowerButton",
+            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kPowerButton)
+                                         .id),
+            ImVec2(32.0f, 32.0f))) {
+        if (backend_) {
+            cmdPower("off");
+        } else {
+            cmdPower("on");
+        }
+    }
+    ImGui::PopStyleColor(3);
+
+    ImGui::SameLine();
+    if (backend_ && !delayRebootTimer_.has_value()) {
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(64, 64, 64, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(64, 64, 64, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(64, 64, 64, 255));
+    }
+    if (ClemensHostImGui::IconButton(
+            "CycleButton",
+            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kPowerCycle)
+                                         .id),
+            ImVec2(32.0f, 32.0f))) {
+        if (backend_ && !isEmulatorStarting()) {
+            if (!delayRebootTimer_.has_value()) {
+                cmdReboot("");
+            }
+        }
+    }
+
+    ImGui::PopStyleColor(3);
+    ImGui::Spacing();
+    ImGui::Separator();
+}
+
 static const char *sDriveName[] = {"S5,D1", "S5,D2", "S6,D1", "S6,D2"};
 static const char *sDriveDescriptionShort[] = {"3.5\" disk", "3.5\" disk", "5.25\" disk",
                                                "5.25\" disk"};
@@ -1452,22 +1536,29 @@ static const char *sDriveDescription[] = {"3.5 inch 800K", "3.5 inch 800K", "5.2
                                           "5.25 inch 140K"};
 
 void ClemensFrontend::doMachineDiskDisplay(float width) {
+    ImGui::Spacing();
     doMachineDiskStatus(kClemensDrive_3_5_D1, width);
     ImGui::Separator();
+    ImGui::Spacing();
     doMachineDiskStatus(kClemensDrive_3_5_D2, width);
     ImGui::Separator();
+    ImGui::Spacing();
     doMachineDiskStatus(kClemensDrive_5_25_D1, width);
     ImGui::Separator();
+    ImGui::Spacing();
     doMachineDiskStatus(kClemensDrive_5_25_D2, width);
     ImGui::Separator();
+    ImGui::Spacing();
     doMachineSmartDriveStatus(0, width);
     ImGui::Separator();
+    ImGui::Spacing();
 }
 
 void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float width) {
     const ClemensBackendDiskDriveState &drive = frameReadState_.diskDrives[driveType];
     bool isDiskInDrive = !drive.imagePath.empty();
 
+    ImGui::PushID(sDriveName[driveType]);
     ImGui::BeginGroup();
     {
         ImColor styleActive = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
@@ -1491,9 +1582,11 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
             ImGui::PushStyleColor(ImGuiCol_Button, styleInactive.Value);
         }
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, styleHovered.Value);
-        if (ImGui::Button("WP") && isDiskInDrive) {
-            wp = !wp;
-            backend_->writeProtectDisk(driveType, wp);
+        if (ImGui::Button("WP")) {
+            if (isDiskInDrive) {
+                wp = !wp;
+                backend_->writeProtectDisk(driveType, wp);
+            }
         }
         ImGui::PopStyleColor(3);
 
@@ -1521,17 +1614,19 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
         //  2 states: empty, has disk
         //    options if empty: <blank disk>, <import image>, image 0, image 1, ...
         //    options if full: <eject>
-        const char *imageName;
+        char tempPath[CLEMENS_PATH_MAX];
         if (drive.isEjecting) {
-            imageName = "Ejecting...";
+            strncpy(tempPath, "Ejecting...", sizeof(tempPath) - 1);
         } else if (drive.imagePath.empty()) {
-            imageName = "- Empty";
+            strncpy(tempPath, "* No Disk *", sizeof(tempPath) - 1);
         } else {
-            imageName = std::filesystem::path(drive.imagePath).stem().c_str();
+            strncpy(tempPath, std::filesystem::path(drive.imagePath).stem().c_str(),
+                    sizeof(tempPath) - 1);
         }
+        tempPath[sizeof(tempPath) - 1] = '\0';
         char label[32];
         snprintf(label, sizeof(label) - 1, "##%s", sDriveName[driveType]);
-        if (ImGui::BeginCombo(label, imageName, ImGuiComboFlags_NoArrowButton)) {
+        if (ImGui::BeginCombo(label, tempPath, ImGuiComboFlags_NoArrowButton)) {
             if (!(diskComboStateFlags_ & (1 << driveType))) {
                 if (driveType == kClemensDrive_3_5_D1 || driveType == kClemensDrive_3_5_D2) {
                     diskLibrary_.reset(diskLibraryRootPath_, CLEM_DISK_TYPE_3_5);
@@ -1580,6 +1675,7 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
         }
     }
     ImGui::EndGroup();
+    ImGui::PopID();
     if (ImGui::IsItemHovered()) {
         if (isDiskInDrive) {
             ImGui::SetTooltip("%s (%s)", sDriveDescriptionShort[driveType],
@@ -1593,18 +1689,20 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
 void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width) {
     const ClemensBackendDiskDriveState &drive = frameReadState_.smartDrives[driveIndex];
 
+    ImGui::PushID("SmartPort");
     ImGui::BeginGroup();
     {
         ImGui::Text("Smartport D%u", driveIndex + 1);
-        ImGui::SameLine();
+
+        ImGuiStyle &style = ImGui::GetStyle();
+        const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
+        ImGui::SameLine(width - (circleRadius + style.ItemSpacing.x) * 2);
 
         //  TODO: repeated code but fix when we ensure this works for SmartPort drives
         const ImColor kRed(255, 0, 0, 255);
         const ImColor kDark(64, 64, 64, 255);
-        ImGuiStyle &style = ImGui::GetStyle();
         ImVec2 screenPos = ImGui::GetCursorScreenPos();
         const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
-        const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
         screenPos.x += style.ItemSpacing.x;
         screenPos.y += lineHeight * 0.5f;
         ImGui::Dummy(ImVec2(lineHeight, lineHeight));
@@ -1631,6 +1729,7 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
         }
     }
     ImGui::EndGroup();
+    ImGui::PopID();
     if (ImGui::IsItemHovered()) {
         if (!drive.imagePath.empty()) {
             ImGui::SetTooltip("Smartport (%s)", drive.imagePath.c_str());
@@ -2330,7 +2429,6 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
                      ImGuiWindowFlags_NoMove);
     ImGui::BeginChild("DisplayView");
 
-    ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // No tint
     ImTextureID texId{(void *)((uintptr_t)display_.getScreenTarget().id)};
     ImVec2 p = ImGui::GetCursorScreenPos();
     ImVec2 contentSize = ImGui::GetContentRegionAvail();
@@ -2347,24 +2445,36 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
     screenV0 = 1.0f;
     screenV1 = 1.0f - screenV1;
 #endif
-    ImGui::GetWindowDrawList()->AddImage(
-        texId, ImVec2(monitorAnchor.x, monitorAnchor.y),
-        ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y),
-        ImVec2(0, screenV0), ImVec2(screenU, screenV1), ImGui::GetColorU32(tint_col));
+    if (guiMode_ == GUIMode::NoEmulator) {
+        ImVec4 tint_col = ImVec4(0.1f, 0.1f, 0.1f, 0.5f);
+        emulatorHasKeyboardFocus_ = false;
+        emulatorHasMouseFocus_ = false;
+        ImGui::GetWindowDrawList()->AddRectFilled(
+            ImVec2(monitorAnchor.x, monitorAnchor.y),
+            ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y),
+            ImGui::GetColorU32(tint_col));
 
-    //  This logic is rather convoluted - we have two focus types and this logic is
-    //  an attempt to determine the user's intent regarding where keyboard and mouse
-    //  input goes (to the emulator vs GUI.)  Basically if the mouse pointer is in
-    //  the emulator view, all keyboard input goes to the view.  If the user mouse-clicks
-    //  inside the emulator view, all input goes to the view.
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !emulatorHasMouseFocus_) {
-        emulatorHasMouseFocus_ = ImGui::IsWindowHovered();
+    } else {
+        ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // No tint
+        ImGui::GetWindowDrawList()->AddImage(
+            texId, ImVec2(monitorAnchor.x, monitorAnchor.y),
+            ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y),
+            ImVec2(0, screenV0), ImVec2(screenU, screenV1), ImGui::GetColorU32(tint_col));
+
+        //  This logic is rather convoluted - we have two focus types and this logic is
+        //  an attempt to determine the user's intent regarding where keyboard and mouse
+        //  input goes (to the emulator vs GUI.)  Basically if the mouse pointer is in
+        //  the emulator view, all keyboard input goes to the view.  If the user mouse-clicks
+        //  inside the emulator view, all input goes to the view.
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !emulatorHasMouseFocus_) {
+            emulatorHasMouseFocus_ = ImGui::IsWindowHovered();
+        }
+        emulatorHasKeyboardFocus_ = emulatorHasMouseFocus_;
+        if (ImGui::IsWindowFocused()) {
+            emulatorHasKeyboardFocus_ = true;
+        }
+        emulatorHasKeyboardFocus_ = emulatorHasKeyboardFocus_ || ImGui::IsWindowHovered();
     }
-    emulatorHasKeyboardFocus_ = emulatorHasMouseFocus_;
-    if (ImGui::IsWindowFocused()) {
-        emulatorHasKeyboardFocus_ = true;
-    }
-    emulatorHasKeyboardFocus_ = emulatorHasKeyboardFocus_ || ImGui::IsWindowHovered();
 
     ImGui::EndChild();
     ImGui::End();
@@ -2932,6 +3042,14 @@ std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath
     return std::make_pair(outputPath, true);
 }
 
+bool ClemensFrontend::isEmulatorStarting() const {
+    return guiMode_ == GUIMode::RebootEmulator || guiMode_ == GUIMode::StartingEmulator;
+}
+
+bool ClemensFrontend::isEmulatorActive() const {
+    return guiMode_ != GUIMode::NoEmulator && !isEmulatorStarting();
+}
+
 static std::string_view trimToken(const std::string_view &token, size_t off = 0,
                                   size_t length = std::string_view::npos) {
     auto tmp = token.substr(off, length);
@@ -2986,6 +3104,8 @@ void ClemensFrontend::executeCommand(std::string_view command) {
         cmdBreak(operand);
     } else if (action == "reboot") {
         cmdReboot(operand);
+    } else if (action == "power") {
+        cmdPower(operand);
     } else if (action == "reset") {
         cmdReset(operand);
     } else if (action == "disk") {
@@ -3015,6 +3135,7 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
     if (!operand.empty()) {
         CLEM_TERM_COUT.print(TerminalLine::Warn, "Command specific help not yet supported.");
     }
+    CLEM_TERM_COUT.print(TerminalLine::Info, "power {on|off}              - power the machine");
     CLEM_TERM_COUT.print(TerminalLine::Info,
                          "reset                       - soft reset of the machine");
     CLEM_TERM_COUT.print(TerminalLine::Info,
@@ -3190,10 +3311,37 @@ void ClemensFrontend::cmdStep(std::string_view operand) {
     backend_->step(count);
 }
 
-void ClemensFrontend::cmdReboot(std::string_view /*operand*/) {
+void ClemensFrontend::rebootInternal() {
     guiMode_ = GUIMode::RebootEmulator;
+    //  NOTE: this delay isn't necessary but is kept here to reduce the load of spamming
+    //        the restart sequence.  stress testing the reboot sequence seems to yield no
+    //        errors.
+    delayRebootTimer_ = 0.0f;
+}
+
+void ClemensFrontend::cmdReboot(std::string_view /*operand*/) {
+    rebootInternal();
     backend_->terminate();
     CLEM_TERM_COUT.print(TerminalLine::Info, "Rebooting machine...");
+}
+
+void ClemensFrontend::cmdPower(std::string_view operand) {
+    if (operand == "off") {
+        if (backend_) {
+            backend_->terminate();
+            guiMode_ = GUIMode::NoEmulator;
+            CLEM_TERM_COUT.print(TerminalLine::Info, "Shutting down machine...");
+        } else {
+            CLEM_TERM_COUT.print(TerminalLine::Error, "Not powered on.");
+        }
+    } else if (operand == "on") {
+        if (!backend_) {
+            rebootInternal();
+            CLEM_TERM_COUT.print(TerminalLine::Info, "Powering machine...");
+        } else {
+            CLEM_TERM_COUT.print(TerminalLine::Error, "Already on.");
+        }
+    }
 }
 
 void ClemensFrontend::cmdReset(std::string_view /*operand*/) { backend_->reset(); }
