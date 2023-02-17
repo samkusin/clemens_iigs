@@ -1,6 +1,7 @@
 #ifndef CLEM_HOST_FRONT_HPP
 #define CLEM_HOST_FRONT_HPP
 
+#include "clem_host_platform.h"
 #include "clem_host_view.hpp"
 
 #include "cinek/buffer.hpp"
@@ -50,11 +51,13 @@ class ClemensFrontend : public ClemensHostView {
     void doDebuggerInterface(ImVec2 dimensions, ImVec2 screenUVs, double deltaTime);
 
     void doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions);
+    void doUserMenuDisplay(float width);
+    void doMachinePeripheralDisplay(float width);
     void doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float dividerXPos);
+
     void doViewInputInstructions(ImVec2 dimensions);
     void doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize);
     void doMachineDiagnosticsDisplay();
-    void doPowerDisplay(float width);
     void doMachineDiskDisplay(float width);
     void doMachineDiskStatus(ClemensDriveType driveType, float width);
     void doMachineDiskMotorStatus(float circleRadius, bool isSpinning);
@@ -169,6 +172,7 @@ class ClemensFrontend : public ClemensHostView {
 
         std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives;
         std::array<ClemensBackendDiskDriveState, CLEM_SMARTPORT_DRIVE_LIMIT> smartDrives;
+        std::array<std::string, CLEM_CARD_SLOT_COUNT> cards;
 
         float emulatorSpeedMhz;
         ClemensClock emulatorClock;
@@ -274,7 +278,8 @@ class ClemensFrontend : public ClemensHostView {
     static ImU8 imguiMemoryEditorRead(const ImU8 *mem_ptr, size_t off);
     static void imguiMemoryEditorWrite(ImU8 *mem_ptr, size_t off, ImU8 value);
 
-    std::array<int, 4> validJoystickIds_;
+    std::array<ClemensHostJoystick, CLEM_HOST_JOYSTICK_LIMIT> joysticks_;
+    unsigned joystickSlotCount_;
 
     void pollJoystickDevices();
 

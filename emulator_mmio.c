@@ -375,7 +375,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
         clem_iwm_speed_disk_gate(mmio, &clem->tspec);
         clock.ts = clem->tspec.clocks_spent;
         clock.ref_step = clem->tspec.clocks_step_mega2;
-        for (i = 0; i < 7; ++i) {
+        for (i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
             if (mmio->card_slot[i]) {
                 mmio->card_slot[i]->io_reset(&clock, mmio->card_slot[i]->context);
             }
@@ -414,7 +414,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
 
     card_nmis = 0;
     card_irqs = 0;
-    for (i = 0; i < 7; ++i) {
+    for (i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
         if (!mmio->card_slot[i])
             continue;
         card_result = (*mmio->card_slot[i]->io_sync)(&clock, mmio->card_slot[i]->context);

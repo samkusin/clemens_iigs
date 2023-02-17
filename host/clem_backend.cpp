@@ -415,7 +415,7 @@ bool ClemensBackend::runScriptCommand(const std::string_view &command) {
 }
 //  TODO: Move into Clemens API clemens_mmio_find_card_name()
 static ClemensCard *findMockingboardCard(ClemensMMIO *mmio) {
-    for (int cardIdx = 0; cardIdx < 7; ++cardIdx) {
+    for (int cardIdx = 0; cardIdx < CLEM_CARD_SLOT_COUNT; ++cardIdx) {
         if (mmio->card_slot[cardIdx]) {
             const char *cardName =
                 mmio->card_slot[cardIdx]->io_name(mmio->card_slot[cardIdx]->context);
@@ -1072,7 +1072,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
     //  TODO: clemens_mmio_card_eject() will clear the slot but it still needs
     //        to be destroyed by the app
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
         destroyCard(mmio_.card_slot[i]);
         mmio_.card_slot[i] = NULL;
     }
@@ -1215,7 +1215,7 @@ void ClemensBackend::saveBRAM() {
     const uint8_t *bram = clemens_rtc_get_bram(&mmio_, &isDirty);
     if (!isDirty)
         return;
-    auto bramPath = std::filesystem::path(config_.dataRootPath) / "clem.bram"; 
+    auto bramPath = std::filesystem::path(config_.dataRootPath) / "clem.bram";
     std::ofstream bramFile(bramPath, std::ios::binary);
     if (bramFile.is_open()) {
         bramFile.write((char *)bram, CLEM_RTC_BRAM_SIZE);
@@ -1225,7 +1225,7 @@ void ClemensBackend::saveBRAM() {
 }
 
 void ClemensBackend::loadBRAM() {
-    auto bramPath = std::filesystem::path(config_.dataRootPath) / "clem.bram"; 
+    auto bramPath = std::filesystem::path(config_.dataRootPath) / "clem.bram";
     std::ifstream bramFile(bramPath, std::ios::binary);
     if (bramFile.is_open()) {
         bramFile.read((char *)mmio_.dev_rtc.bram, CLEM_RTC_BRAM_SIZE);

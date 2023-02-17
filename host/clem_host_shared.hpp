@@ -47,7 +47,7 @@ struct ClemensBackendConfig {
     std::string traceRootPath;
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDriveStates;
     std::array<ClemensBackendDiskDriveState, 1> smartPortDriveStates;
-    std::array<std::string, 7> cardNames;
+    std::array<std::string, CLEM_CARD_SLOT_COUNT> cardNames;
     std::vector<ClemensBackendBreakpoint> breakpoints;
     unsigned audioSamplesPerSecond;
     Type type;

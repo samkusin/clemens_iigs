@@ -4,6 +4,7 @@
 
 namespace ClemensHostAssets {
 
+#include "images/card_png.h"
 #include "images/joystick_png.h"
 #include "images/load_png.h"
 #include "images/power_png.h"
@@ -37,6 +38,7 @@ void initialize() {
     g_allImages[kJoystick] = loadImageFromPNG(joystick_png, joystick_png_len);
     g_allImages[kLoad] = loadImageFromPNG(load_png, load_png_len);
     g_allImages[kSave] = loadImageFromPNG(save_png, save_png_len);
+    g_allImages[kCard] = loadImageFromPNG(card_icon_png, card_icon_png_len);
 }
 
 sg_image getImage(ImageId imageId) { return g_allImages[imageId]; }

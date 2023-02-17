@@ -40,6 +40,8 @@
 /** NMI line masks for card slot triggers */
 #define CLEM_NMI_CARD_MASK (0x000000ff)
 
+#define CLEM_CARD_SLOT_COUNT 7
+
 //  These flags refer to bank 0 memory switches for address bit 17
 //  0 = Main Bank, 1 = Aux Bank ZP, Stack and Language Card
 #define CLEM_MEM_IO_MMAP_ALTZPLC 0x00000001

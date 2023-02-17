@@ -608,8 +608,7 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       diskTracesRootPath_{
           (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_TRACES_DIR).string()},
       diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0),
-      debugIOMode_(DebugIOMode::Core), validJoystickIds_{-1, -1, -1, -1},
-      guiMode_(GUIMode::RebootEmulator) {
+      debugIOMode_(DebugIOMode::Core), joystickSlotCount_(0), guiMode_(GUIMode::RebootEmulator) {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -855,6 +854,15 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
         smartDrive = *driveState;
         ++driveState;
     }
+    for (unsigned slotIndex = 0; slotIndex < CLEM_CARD_SLOT_COUNT; ++slotIndex) {
+        if (state.mmio->card_slot[slotIndex]) {
+            const char *cardName = state.mmio->card_slot[slotIndex]->io_name(
+                state.mmio->card_slot[slotIndex]->context);
+            frameWriteState_.cards[slotIndex] = cardName;
+        } else {
+            frameWriteState_.cards[slotIndex].clear();
+        }
+    }
 
     frameWriteState_.breakpoints = frameWriteMemory_.allocateArray<ClemensBackendBreakpoint>(
         state.bpBufferEnd - state.bpBufferStart);
@@ -926,23 +934,23 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
 }
 
 void ClemensFrontend::pollJoystickDevices() {
-    ClemensHostJoystick joysticks[CLEM_HOST_JOYSTICK_LIMIT];
-    unsigned deviceCount = clem_joystick_poll(joysticks);
+    std::array<ClemensHostJoystick, CLEM_HOST_JOYSTICK_LIMIT> joysticks;
+    unsigned deviceCount = clem_joystick_poll(joysticks.data());
     unsigned joystickCount = 0;
     ClemensInputEvent inputs[2];
     constexpr int32_t kGameportAxisMagnitude = CLEM_GAMEPORT_PADDLE_AXIS_VALUE_MAX;
     constexpr int32_t kHostAxisMagnitude = CLEM_HOST_JOYSTICK_AXIS_DELTA * 2;
     unsigned index;
 
-    if (!backend_)
+    if (!backend_) {
         return;
+    }
 
-    for (index = 0; index < (unsigned)validJoystickIds_.size(); ++index) {
+    for (index = 0; index < (unsigned)joysticks.size(); ++index) {
         if (index >= deviceCount || joystickCount >= 2)
             break;
         auto &input = inputs[joystickCount];
         if (joysticks[index].isConnected) {
-            validJoystickIds_[index] = index;
             //  TODO: select (x,y)[0] or (x,y)[1] based on user preference for
             //        console style controllers (left or right stick, left always for now)
             input.type = kClemensInputType_Paddle;
@@ -965,12 +973,13 @@ void ClemensFrontend::pollJoystickDevices() {
                     joysticks[index].y[0], joysticks[index].x[1], joysticks[index].y[1],
                     joysticks[index].buttons);
             */
+            joysticks_[index] = joysticks[index];
             joystickCount++;
-        } else if (validJoystickIds_[index] != -1) {
+        } else if (joysticks_[index].isConnected) {
             input.type = kClemensInputType_PaddleDisconnected;
             input.gameport_button_mask = 0;
+            joysticks_[index].isConnected = false;
             joystickCount++;
-            validJoystickIds_[index] = -1;
         }
         if (joystickCount == 1) {
             input.gameport_button_mask |= CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_0;
@@ -979,6 +988,7 @@ void ClemensFrontend::pollJoystickDevices() {
             input.gameport_button_mask |= CLEM_GAMEPORT_BUTTON_MASK_JOYSTICK_1;
         }
     }
+    joystickSlotCount_ = std::max(joystickSlotCount_, joystickCount);
     if (joystickCount < 1)
         return;
     backend_->inputEvent(inputs[0]);
@@ -1281,9 +1291,127 @@ void ClemensFrontend::doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions) {
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
                      ImGuiWindowFlags_NoMove);
-    doPowerDisplay(dimensions.x);
+    doUserMenuDisplay(dimensions.x);
     doMachineDiskDisplay(dimensions.x);
+    doMachinePeripheralDisplay(dimensions.x);
     ImGui::End();
+}
+
+void ClemensFrontend::doUserMenuDisplay(float width) {
+    ImGui::Spacing();
+    if (backend_) {
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(255, 0, 0, 192));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 128, 128, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
+    }
+    if (ClemensHostImGui::IconButton(
+            "PowerButton",
+            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kPowerButton)
+                                         .id),
+            ImVec2(32.0f, 32.0f))) {
+        if (backend_) {
+            cmdPower("off");
+        } else {
+            cmdPower("on");
+        }
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        ImGui::SetTooltip("Power");
+    }
+    ImGui::PopStyleColor(3);
+
+    if (backend_ && !delayRebootTimer_.has_value()) {
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(64, 64, 64, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(64, 64, 64, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(64, 64, 64, 255));
+    }
+    ImGui::SameLine();
+    if (ClemensHostImGui::IconButton(
+            "CycleButton",
+            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kPowerCycle)
+                                         .id),
+            ImVec2(32.0f, 32.0f))) {
+        if (backend_ && !isEmulatorStarting()) {
+            if (!delayRebootTimer_.has_value()) {
+                cmdReboot("");
+            }
+        }
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        ImGui::SetTooltip("Reboot (Cycle Power)");
+    }
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+    if (ClemensHostImGui::IconButton(
+            "LoadSnapshot",
+            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kLoad).id),
+            ImVec2(32.0f, 32.0f))) {
+        if (backend_ && !isEmulatorStarting()) {
+        }
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        ImGui::SetTooltip("Load Snapshot");
+    }
+    ImGui::SameLine();
+    if (ClemensHostImGui::IconButton(
+            "SaveSnapshot",
+            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kSave).id),
+            ImVec2(32.0f, 32.0f))) {
+        if (backend_ && !isEmulatorStarting()) {
+        }
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        ImGui::SetTooltip("Save Snapshot");
+    }
+    ImGui::PopStyleColor(3);
+    ImGui::Spacing();
+    ImGui::Separator();
+}
+
+void ClemensFrontend::doMachinePeripheralDisplay(float) {
+    ImGui::BeginChild("PeripheralsAndCards");
+    if (ImGui::CollapsingHeader("Peripherals", ImGuiTreeNodeFlags_DefaultOpen)) {
+        for (unsigned slot = 0; slot < joystickSlotCount_; ++slot) {
+            ImColor color = joysticks_[slot].isConnected ? ImColor(255, 255, 255, 255)
+                                                         : ImColor(128, 128, 128, 255);
+            ImGui::Spacing();
+            ImGui::Image(
+                (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kJoystick)
+                                             .id),
+                ImVec2(32.0f, 32.0f), ImVec2(0, 0), ImVec2(1, 1), color.Value);
+            ImGui::SameLine();
+            ImGui::BeginGroup();
+            ImGui::TextColored(color, "Joystick %u", slot);
+            ImGui::EndGroup();
+            ImGui::Separator();
+        }
+    }
+    if (ImGui::CollapsingHeader("Cards", ImGuiTreeNodeFlags_DefaultOpen)) {
+        for (unsigned slot = 0; slot < CLEM_CARD_SLOT_COUNT; ++slot) {
+            if (frameWriteState_.cards[slot].empty())
+                continue;
+            ImGui::Spacing();
+            ImGui::Image(
+                (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kCard).id),
+                ImVec2(32.0f, 32.0f));
+            ImGui::SameLine();
+            ImGui::BeginGroup();
+            ImGui::Text("Slot %u", slot + 1);
+            ImGui::TextUnformatted(frameWriteState_.cards[slot].c_str());
+            ImGui::EndGroup();
+            ImGui::Separator();
+        }
+    }
+    ImGui::EndChild();
 }
 
 void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float dividerXPos) {
@@ -1472,86 +1600,6 @@ void ClemensFrontend::doMachineDiagnosticsDisplay() {
     unsigned milliseconds = ((emulatorTime % 3600000) % 60000) % 1000;
     ImGui::Text("%02u:%02u:%02u.%03u", hours, minutes, seconds, milliseconds);
     ImGui::EndTable();
-}
-
-void ClemensFrontend::doPowerDisplay(float width) {
-    ImGui::Spacing();
-    if (backend_) {
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
-    } else {
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(255, 0, 0, 192));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 128, 128, 255));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
-    }
-    if (ClemensHostImGui::IconButton(
-            "PowerButton",
-            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kPowerButton)
-                                         .id),
-            ImVec2(32.0f, 32.0f))) {
-        if (backend_) {
-            cmdPower("off");
-        } else {
-            cmdPower("on");
-        }
-    }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-        ImGui::SetTooltip("Power");
-    }
-    ImGui::PopStyleColor(3);
-
-    if (backend_ && !delayRebootTimer_.has_value()) {
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
-    } else {
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(64, 64, 64, 255));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(64, 64, 64, 255));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(64, 64, 64, 255));
-    }
-    ImGui::SameLine();
-    if (ClemensHostImGui::IconButton(
-            "CycleButton",
-            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kPowerCycle)
-                                         .id),
-            ImVec2(32.0f, 32.0f))) {
-        if (backend_ && !isEmulatorStarting()) {
-            if (!delayRebootTimer_.has_value()) {
-                cmdReboot("");
-            }
-        }
-    }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-        ImGui::SetTooltip("Reboot (Cycle Power)");
-    }
-    ImGui::SameLine();
-    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-    ImGui::SameLine();
-    if (ClemensHostImGui::IconButton(
-            "LoadSnapshot",
-            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kLoad).id),
-            ImVec2(32.0f, 32.0f))) {
-        if (backend_ && !isEmulatorStarting()) {
-        }
-    }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-        ImGui::SetTooltip("Load Snapshot");
-    }
-    ImGui::SameLine();
-    if (ClemensHostImGui::IconButton(
-            "SaveSnapshot",
-            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kSave).id),
-            ImVec2(32.0f, 32.0f))) {
-        if (backend_ && !isEmulatorStarting()) {
-        }
-    }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-        ImGui::SetTooltip("Save Snapshot");
-    }
-    ImGui::PopStyleColor(3);
-    ImGui::Spacing();
-    ImGui::Separator();
 }
 
 static const char *sDriveName[] = {"S5,D1", "S5,D2", "S6,D1", "S6,D2"};

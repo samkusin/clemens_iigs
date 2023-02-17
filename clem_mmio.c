@@ -1664,7 +1664,7 @@ void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
     mmio->fpi_ram_bank_count = fpi_ram_bank_count;
     mmio->card_expansion_rom_index = -1;
 
-    for (idx = 0; idx < 7; ++idx) {
+    for (idx = 0; idx < CLEM_CARD_SLOT_COUNT; ++idx) {
         mmio->card_slot[idx] = NULL;
         mmio->card_slot_expansion_memory[idx] = (((uint8_t *)slot_expansion_rom) + (idx * 2048));
     }
