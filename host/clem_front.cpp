@@ -1379,6 +1379,9 @@ void ClemensFrontend::doUserMenuDisplay(float width) {
 
 void ClemensFrontend::doMachinePeripheralDisplay(float) {
     ImGui::BeginChild("PeripheralsAndCards");
+    const ImGuiStyle &drawStyle = ImGui::GetStyle();
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+
     if (ImGui::CollapsingHeader("Peripherals", ImGuiTreeNodeFlags_DefaultOpen)) {
         for (unsigned slot = 0; slot < joystickSlotCount_; ++slot) {
             ImColor color = joysticks_[slot].isConnected ? ImColor(255, 255, 255, 255)
@@ -1390,8 +1393,71 @@ void ClemensFrontend::doMachinePeripheralDisplay(float) {
                 ImVec2(32.0f, 32.0f), ImVec2(0, 0), ImVec2(1, 1), color.Value);
             ImGui::SameLine();
             ImGui::BeginGroup();
-            ImGui::TextColored(color, "Joystick %u", slot);
+            {
+                constexpr auto kButtonOffColor = IM_COL32(128, 128, 128, 255);
+                constexpr auto kButtonOffText = IM_COL32(0, 0, 0, 255);
+                constexpr auto kButtonOnColor = IM_COL32(192, 0, 0, 255);
+                constexpr auto kButtonOnText = IM_COL32(255, 255, 255, 255);
+                constexpr ImU32 kAxisOnColor = IM_COL32(128, 128, 128, 255);
+                constexpr ImU32 kAxisOffColor = IM_COL32(64, 64, 64, 255);
+                const ImU32 dotColor = IM_COL32(0, 192, 0, 255);
+                ImGui::TextColored(color, "Joystick %u", slot);
+                ImGui::Spacing();
+                ImVec2 buttonSize(ImGui::GetFont()->GetCharAdvance('X') +
+                                      2 * (drawStyle.FrameBorderSize + drawStyle.FramePadding.x),
+                                  ImGui::GetTextLineHeight() +
+                                      2 * (drawStyle.FrameBorderSize + drawStyle.FramePadding.y));
+                ImVec2 anchorLT = ImGui::GetCursorScreenPos();
+                ImVec2 anchorRB(anchorLT.x + buttonSize.x, anchorLT.y + buttonSize.y);
+
+                drawList->AddRectFilled(anchorLT, anchorRB, kAxisOffColor, 4.0f);
+                drawList->AddRectFilled(ImVec2(anchorLT.x + 4.0f, anchorLT.y + 4.0f),
+                                        ImVec2(anchorRB.x - 4.0f, anchorRB.y - 4.0f), kAxisOnColor,
+                                        4.0f);
+
+                if (joysticks_[slot].isConnected) {
+                    float xMid = buttonSize.x * 0.5f;
+                    float yMid = buttonSize.y * 0.5f;
+                    float xAxis = ((float)joysticks_[0].x[0] / CLEM_HOST_JOYSTICK_AXIS_DELTA) *
+                                  (buttonSize.x - 4.0f) * 0.5f;
+                    float yAxis = ((float)joysticks_[0].y[0] / CLEM_HOST_JOYSTICK_AXIS_DELTA) *
+                                  (buttonSize.y - 4.0f) * 0.5f;
+
+                    drawList->AddCircleFilled(
+                        ImVec2(anchorLT.x + xMid + xAxis, anchorLT.y + yMid + yAxis), 4.0f,
+                        dotColor);
+                }
+
+                ImGui::Dummy(buttonSize);
+                ImGui::SameLine();
+
+                char buttonText[2];
+                buttonText[1] = '\0';
+                for (unsigned buttonIndex = 0; buttonIndex < 2; ++buttonIndex) {
+                    if (buttonIndex > 0) {
+                        ImGui::SameLine();
+                    }
+                    anchorLT = ImGui::GetCursorScreenPos();
+                    anchorRB = ImVec2(anchorLT.x + buttonSize.x, anchorLT.y + buttonSize.y);
+                    buttonText[0] = '1' + buttonIndex;
+                    ImU32 backColor;
+                    ImU32 textColor;
+                    if (joysticks_[slot].buttons & (1 << buttonIndex)) {
+                        backColor = kButtonOnColor;
+                        textColor = kButtonOnText;
+                    } else {
+                        backColor = kButtonOffColor;
+                        textColor = kButtonOffText;
+                    }
+                    drawList->AddRectFilled(anchorLT, anchorRB, backColor, 4.0f);
+                    anchorLT.x += drawStyle.FramePadding.x;
+                    anchorLT.y += drawStyle.FramePadding.y;
+                    drawList->AddText(anchorLT, textColor, buttonText);
+                    ImGui::Dummy(buttonSize);
+                }
+            }
             ImGui::EndGroup();
+            ImGui::Spacing();
             ImGui::Separator();
         }
     }
@@ -1406,6 +1472,7 @@ void ClemensFrontend::doMachinePeripheralDisplay(float) {
             ImGui::SameLine();
             ImGui::BeginGroup();
             ImGui::Text("Slot %u", slot + 1);
+            ImGui::Spacing();
             ImGui::TextUnformatted(frameWriteState_.cards[slot].c_str());
             ImGui::EndGroup();
             ImGui::Separator();
