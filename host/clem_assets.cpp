@@ -5,8 +5,10 @@
 namespace ClemensHostAssets {
 
 #include "images/joystick_png.h"
+#include "images/load_png.h"
 #include "images/power_png.h"
 #include "images/reboot_png.h"
+#include "images/save_png.h"
 
 static sg_image g_allImages[kImageCount];
 
@@ -33,6 +35,8 @@ void initialize() {
     g_allImages[kPowerButton] = loadImageFromPNG(power_png, power_png_len);
     g_allImages[kPowerCycle] = loadImageFromPNG(reboot_png, reboot_png_len);
     g_allImages[kJoystick] = loadImageFromPNG(joystick_png, joystick_png_len);
+    g_allImages[kLoad] = loadImageFromPNG(load_png, load_png_len);
+    g_allImages[kSave] = loadImageFromPNG(save_png, save_png_len);
 }
 
 sg_image getImage(ImageId imageId) { return g_allImages[imageId]; }
