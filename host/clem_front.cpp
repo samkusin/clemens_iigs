@@ -39,7 +39,6 @@ ImU32 getFrameColor(const ClemensFrontend &) { return kDarkFrameColor; }
 ImU32 getInsetColor(const ClemensFrontend &) { return kDarkInsetColor; }
 } // namespace ClemensHostStyle
 
-//  TODO: Platform specific user data directory (ROM, disk images, traces, etc)
 //  TODO: Insert card to slot (non-gui)
 //  TODO: Mouse x,y scaling based on display view size vs desktop size
 //  TODO: blank disk gui selection for disk set (selecting combo create will
@@ -47,6 +46,7 @@ ImU32 getInsetColor(const ClemensFrontend &) { return kDarkInsetColor; }
 //  TODO: preroll audio for some buffer on to handle sound clipping on lower end
 //        systems
 
+//  DONE: Platform specific user data directory (ROM, disk images, traces, etc)
 //  DONE: Diagnose GL offsets issue with emulated display
 //  DONE: Diagnose Linux caps lock issue
 //  DONE: Break on IRQ
@@ -117,6 +117,13 @@ namespace {
 constexpr int kClemensScreenWidth = 720;
 constexpr int kClemensScreenHeight = 480;
 constexpr float kClemensAspectRatio = float(kClemensScreenWidth) / kClemensScreenHeight;
+
+//  Delay user-initiated reboot after reset by this amount in seconds
+//  This was done in response to a bug related to frequent reboots that appears fixed
+//  with the addition of GUIMode::StartingEmulator and delaying the switch to GUIMode::Emulator
+//  until the first machine frame runs.
+//  Kept this value here since I think it's better UX
+constexpr float kClemensRebootDelayDuration = 1.0f;
 
 constexpr uint8_t kIWMStatusDriveSpin = 0x01;
 constexpr uint8_t kIWMStatusDrive35 = 0x02;
@@ -1107,8 +1114,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     //  monitor are stored in screenUVs
     float screenUVs[2]{0.0f, 0.0f};
     if (frameReadState_.mmioWasInitialized && isEmulatorActive()) {
-        fprintf(stdout, "[%d] FRAME EMULATOR\n", static_cast<int>(guiMode_));
-        fflush(stdout);
         const uint8_t *e0mem = frameReadState_.bankE0;
         const uint8_t *e1mem = frameReadState_.bankE1;
         bool altCharSet = frameReadState_.vgcModeFlags & CLEM_VGC_ALTCHARSET;
@@ -1124,10 +1129,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
             display_.renderSuperHiresGraphics(frameReadState_.graphicsFrame, e1mem);
         }
         display_.finish(screenUVs);
-    } else {
-        fprintf(stdout, "[%d] EMULATOR = %u,%u\n", static_cast<int>(guiMode_),
-                frameReadState_.mmioWasInitialized, isEmulatorActive());
-        fflush(stdout);
     }
 
     // render audio
@@ -1149,7 +1150,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     }
 
     if (isBackendTerminated) {
-        fprintf(stdout, "TERMINATED (GUIMode = %d)\n", static_cast<int>(guiMode_));
         fflush(stdout);
         backend_ = nullptr;
     }
@@ -1177,16 +1177,12 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         break;
     case GUIMode::RebootEmulator:
         if (!backend_) {
-            fprintf(stdout, "REBOOT EMULATOR\n");
-            fflush(stdout);
             backend_ = createBackend();
             guiMode_ = GUIMode::StartingEmulator;
         }
         break;
     case GUIMode::StartingEmulator:
         if (isNewFrame) {
-            fprintf(stdout, "STARTING EMULATOR\n");
-            fflush(stdout);
             guiMode_ = GUIMode::Emulator;
         }
         break;
@@ -1198,7 +1194,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
 
     if (delayRebootTimer_.has_value()) {
         delayRebootTimer_ = *delayRebootTimer_ + (float)deltaTime;
-        if (*delayRebootTimer_ > 1.0f) {
+        if (*delayRebootTimer_ > kClemensRebootDelayDuration) {
             delayRebootTimer_.reset();
         }
     }
@@ -1481,12 +1477,12 @@ void ClemensFrontend::doMachineDiagnosticsDisplay() {
 void ClemensFrontend::doPowerDisplay(float width) {
     ImGui::Spacing();
     if (backend_) {
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 255));
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
     } else {
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(64, 64, 64, 255));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 128, 128, 255));
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(255, 0, 0, 192));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 128, 128, 255));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
     }
     if (ClemensHostImGui::IconButton(
@@ -1500,11 +1496,13 @@ void ClemensFrontend::doPowerDisplay(float width) {
             cmdPower("on");
         }
     }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        ImGui::SetTooltip("Power");
+    }
     ImGui::PopStyleColor(3);
 
-    ImGui::SameLine();
     if (backend_ && !delayRebootTimer_.has_value()) {
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 255));
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
     } else {
@@ -1512,6 +1510,7 @@ void ClemensFrontend::doPowerDisplay(float width) {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(64, 64, 64, 255));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(64, 64, 64, 255));
     }
+    ImGui::SameLine();
     if (ClemensHostImGui::IconButton(
             "CycleButton",
             (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kPowerCycle)
@@ -1523,7 +1522,33 @@ void ClemensFrontend::doPowerDisplay(float width) {
             }
         }
     }
-
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        ImGui::SetTooltip("Reboot (Cycle Power)");
+    }
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+    if (ClemensHostImGui::IconButton(
+            "LoadSnapshot",
+            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kLoad).id),
+            ImVec2(32.0f, 32.0f))) {
+        if (backend_ && !isEmulatorStarting()) {
+        }
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        ImGui::SetTooltip("Load Snapshot");
+    }
+    ImGui::SameLine();
+    if (ClemensHostImGui::IconButton(
+            "SaveSnapshot",
+            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kSave).id),
+            ImVec2(32.0f, 32.0f))) {
+        if (backend_ && !isEmulatorStarting()) {
+        }
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        ImGui::SetTooltip("Save Snapshot");
+    }
     ImGui::PopStyleColor(3);
     ImGui::Spacing();
     ImGui::Separator();
@@ -1597,19 +1622,7 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
         const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
         ImGui::SameLine(width - (circleRadius + style.ItemSpacing.x) * 2);
 
-        const ImColor kRed(255, 0, 0, 255);
-        const ImColor kDark(64, 64, 64, 255);
-        ImVec2 screenPos = ImGui::GetCursorScreenPos();
-        const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
-        screenPos.x += style.ItemSpacing.x;
-        screenPos.y += lineHeight * 0.5f;
-        ImGui::Dummy(ImVec2(lineHeight, lineHeight));
-        ImDrawList *drawList = ImGui::GetWindowDrawList();
-        if (drive.isSpinning) {
-            drawList->AddCircleFilled(screenPos, circleRadius, kRed);
-        } else {
-            drawList->AddCircleFilled(screenPos, circleRadius, kDark);
-        }
+        doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
 
         //  2 states: empty, has disk
         //    options if empty: <blank disk>, <import image>, image 0, image 1, ...
@@ -1626,7 +1639,8 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
         tempPath[sizeof(tempPath) - 1] = '\0';
         char label[32];
         snprintf(label, sizeof(label) - 1, "##%s", sDriveName[driveType]);
-        if (ImGui::BeginCombo(label, tempPath, ImGuiComboFlags_NoArrowButton)) {
+        if (ImGui::BeginCombo(label, tempPath,
+                              ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightLarge)) {
             if (!(diskComboStateFlags_ & (1 << driveType))) {
                 if (driveType == kClemensDrive_3_5_D1 || driveType == kClemensDrive_3_5_D2) {
                     diskLibrary_.reset(diskLibraryRootPath_, CLEM_DISK_TYPE_3_5);
@@ -1676,7 +1690,7 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
     }
     ImGui::EndGroup();
     ImGui::PopID();
-    if (ImGui::IsItemHovered()) {
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
         if (isDiskInDrive) {
             ImGui::SetTooltip("%s (%s)", sDriveDescriptionShort[driveType],
                               drive.imagePath.c_str());
@@ -1698,20 +1712,8 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
         const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
         ImGui::SameLine(width - (circleRadius + style.ItemSpacing.x) * 2);
 
-        //  TODO: repeated code but fix when we ensure this works for SmartPort drives
-        const ImColor kRed(255, 0, 0, 255);
-        const ImColor kDark(64, 64, 64, 255);
-        ImVec2 screenPos = ImGui::GetCursorScreenPos();
-        const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
-        screenPos.x += style.ItemSpacing.x;
-        screenPos.y += lineHeight * 0.5f;
-        ImGui::Dummy(ImVec2(lineHeight, lineHeight));
-        ImDrawList *drawList = ImGui::GetWindowDrawList();
-        if (drive.isSpinning) {
-            drawList->AddCircleFilled(screenPos, circleRadius, kRed);
-        } else {
-            drawList->AddCircleFilled(screenPos, circleRadius, kDark);
-        }
+        doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
+
         //  smartport disk drive image
         const char *imageName;
         if (drive.isEjecting) {
@@ -1730,12 +1732,29 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
     }
     ImGui::EndGroup();
     ImGui::PopID();
-    if (ImGui::IsItemHovered()) {
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
         if (!drive.imagePath.empty()) {
             ImGui::SetTooltip("Smartport (%s)", drive.imagePath.c_str());
         } else {
             ImGui::SetTooltip("Smartport");
         }
+    }
+}
+
+void ClemensFrontend::doMachineDiskMotorStatus(float circleRadius, bool isSpinning) {
+    ImGuiStyle &style = ImGui::GetStyle();
+    const ImColor kRed(255, 0, 0, 255);
+    const ImColor kDark(64, 64, 64, 255);
+    ImVec2 screenPos = ImGui::GetCursorScreenPos();
+    const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
+    screenPos.x += style.ItemSpacing.x;
+    screenPos.y += lineHeight * 0.5f;
+    ImGui::Dummy(ImVec2(lineHeight, lineHeight));
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    if (isSpinning) {
+        drawList->AddCircleFilled(screenPos, circleRadius, kRed);
+    } else {
+        drawList->AddCircleFilled(screenPos, circleRadius, kDark);
     }
 }
 
@@ -3313,9 +3332,6 @@ void ClemensFrontend::cmdStep(std::string_view operand) {
 
 void ClemensFrontend::rebootInternal() {
     guiMode_ = GUIMode::RebootEmulator;
-    //  NOTE: this delay isn't necessary but is kept here to reduce the load of spamming
-    //        the restart sequence.  stress testing the reboot sequence seems to yield no
-    //        errors.
     delayRebootTimer_ = 0.0f;
 }
 
@@ -3330,6 +3346,7 @@ void ClemensFrontend::cmdPower(std::string_view operand) {
         if (backend_) {
             backend_->terminate();
             guiMode_ = GUIMode::NoEmulator;
+            audio_.stop();
             CLEM_TERM_COUT.print(TerminalLine::Info, "Shutting down machine...");
         } else {
             CLEM_TERM_COUT.print(TerminalLine::Error, "Not powered on.");
@@ -3337,6 +3354,7 @@ void ClemensFrontend::cmdPower(std::string_view operand) {
     } else if (operand == "on") {
         if (!backend_) {
             rebootInternal();
+            audio_.start();
             CLEM_TERM_COUT.print(TerminalLine::Info, "Powering machine...");
         } else {
             CLEM_TERM_COUT.print(TerminalLine::Error, "Already on.");
