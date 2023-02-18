@@ -5,9 +5,6 @@
 #include "imgui.h"
 #include "version.h"
 
-
-
-
 //  TODO: pass the configuration object (ClemensConfiguration) into this
 //        class from ClemensFrontend (created there, it loads the INI file and
 //        defines some configuration values.)

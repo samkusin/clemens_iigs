@@ -6,7 +6,8 @@
 #include <cstring>
 #include <filesystem>
 
-ClemensConfiguration::ClemensConfiguration() : majorVersion(0), minorVersion(0), hybridInterfaceEnabled(false) {}
+ClemensConfiguration::ClemensConfiguration()
+    : majorVersion(0), minorVersion(0), hybridInterfaceEnabled(false) {}
 
 ClemensConfiguration::ClemensConfiguration(std::string pathname, std::string datadir)
     : ClemensConfiguration() {
@@ -20,6 +21,7 @@ ClemensConfiguration::ClemensConfiguration(std::string pathname, std::string dat
 void ClemensConfiguration::copyFrom(const ClemensConfiguration &other) {
     iniPathname = other.iniPathname;
     dataDirectory = other.dataDirectory;
+    romFilename = other.romFilename;
     majorVersion = other.majorVersion;
     minorVersion = other.minorVersion;
     hybridInterfaceEnabled = other.hybridInterfaceEnabled;
@@ -36,6 +38,9 @@ bool ClemensConfiguration::save() {
     fprintf(fp, "minor=%u\n", minorVersion);
     fprintf(fp, "data=%s\n", dataDirectory.c_str());
     fprintf(fp, "hybrid=%u\n", hybridInterfaceEnabled ? 1 : 0);
+    fprintf(fp, "\n");
+    fprintf(fp, "[emulator]\n");
+    fprintf(fp, "romfile=%s\n", romFilename.c_str());
     fprintf(fp, "\n");
 
     fclose(fp);
@@ -54,6 +59,10 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
             config->dataDirectory = value;
         } else if (strncmp(name, "hybrid", 16) == 0) {
             config->hybridInterfaceEnabled = atoi(value) > 0 ? true : false;
+        }
+    } else if (strncmp(section, "emulator", 16) == 0) {
+        if (strncmp(name, "romfile", 16) == 0) {
+            config->romFilename = value;
         }
     }
     return 1;

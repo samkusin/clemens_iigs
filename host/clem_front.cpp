@@ -679,9 +679,9 @@ void ClemensFrontend::lostFocus() {
 
 std::unique_ptr<ClemensBackend> ClemensFrontend::createBackend() {
     constexpr unsigned refreshFrequency_ = 60;
-    auto romDir = std::filesystem::path(config_.dataDirectory) / "gs_rom_3.rom";
+    auto romPath = std::filesystem::path(config_.dataDirectory) / config_.romFilename;
     auto backend = std::make_unique<ClemensBackend>(
-        romDir.string(), backendConfig_,
+        romPath.string(), backendConfig_,
         std::bind(&ClemensFrontend::backendStateDelegate, this, std::placeholders::_1));
     backend->setRefreshFrequency(refreshFrequency_);
     backend->reset();
