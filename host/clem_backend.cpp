@@ -722,7 +722,8 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
     std::optional<bool> commandFailed;
     std::optional<Command::Type> commandType;
     std::optional<std::string> debugMessage;
-
+    ClemensBackendState publishedState{};
+    publishedState.results.reserve(8);
     while (!isTerminated) {
         bool isRunning = !stepsRemaining.has_value() || *stepsRemaining > 0;
         bool publishState = false;
@@ -998,9 +999,21 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         //        assumption that once the callback returns, we can alter the state
         //        again as needed next timeslice.
         if (publishState) {
-            ClemensBackendState publishedState{};
-            publishedState.mmio_was_initialized = clemens_is_initialized_simple(&machine_);
-            if (publishedState.mmio_was_initialized) {
+            publishedState.machine = &machine_;
+            publishedState.mmio = &mmio_;
+            publishedState.fps = runSampler.sampledFramesPerSecond;
+            publishedState.seqno = publishSeqNo;
+            publishedState.isTerminated = isTerminated;
+            publishedState.isRunning = isRunning;
+            if (programTrace_ != nullptr) {
+                publishedState.isTracing = true;
+                publishedState.isIWMTracing = programTrace_->isIWMLoggingEnabled();
+            } else {
+                publishedState.isTracing = false;
+                publishedState.isIWMTracing = false;
+            }
+            publishedState.mmioWasInitialized = clemens_is_initialized_simple(&machine_);
+            if (publishedState.mmioWasInitialized) {
                 clemens_get_monitor(&publishedState.monitor, &mmio_);
                 clemens_get_text_video(&publishedState.text, &mmio_);
                 clemens_get_graphics_video(&publishedState.graphics, &machine_, &mmio_);
@@ -1015,38 +1028,26 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                     }
                 }
             }
-            publishedState.isRunning = isRunning;
-            if (programTrace_ != nullptr) {
-                publishedState.isTracing = true;
-                publishedState.isIWMTracing = programTrace_->isIWMLoggingEnabled();
-            } else {
-                publishedState.isTracing = false;
-                publishedState.isIWMTracing = false;
-            }
-            publishedState.machine = &machine_;
-            publishedState.mmio = &mmio_;
-            publishedState.seqno = publishSeqNo;
-            publishedState.fps = runSampler.sampledFramesPerSecond;
+            publishedState.commandFailed = std::move(commandFailed);
+            publishedState.commandType = std::move(commandType);
+            publishedState.message = std::move(debugMessage);
+
             publishedState.hostCPUID = clem_host_get_processor_number();
             publishedState.logLevel = logLevel_;
             publishedState.logBufferStart = logOutput_.data();
             publishedState.logBufferEnd = logOutput_.data() + logOutput_.size();
-            publishedState.logInstructionStart = loggedInstructions_.data();
-            publishedState.logInstructionEnd =
-                loggedInstructions_.data() + loggedInstructions_.size();
             publishedState.bpBufferStart = breakpoints_.data();
             publishedState.bpBufferEnd = breakpoints_.data() + breakpoints_.size();
             if (hitBreakpoint.has_value()) {
                 publishedState.bpHitIndex = *hitBreakpoint;
             }
+
             publishedState.diskDrives = diskDrives_.data();
             publishedState.smartDrives = smartPortDrives_.data();
-            publishedState.commandFailed = std::move(commandFailed);
-            publishedState.commandType = std::move(commandType);
-            publishedState.message = std::move(debugMessage);
-            if (isTerminated) {
-                publishedState.terminated = isTerminated;
-            }
+            publishedState.logInstructionStart = loggedInstructions_.data();
+            publishedState.logInstructionEnd =
+                loggedInstructions_.data() + loggedInstructions_.size();
+
             //  read IO memory from bank 0xe0 which ignores memory shadow settings
             for (uint16_t ioAddr = 0xc000; ioAddr < 0xc0ff; ++ioAddr) {
                 clem_read(&machine_, &publishedState.ioPageValues[ioAddr - 0xc000], ioAddr, 0xe0,
@@ -1056,7 +1057,8 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             publishedState.emulatorSpeedMhz = runSampler.sampledEmulatorSpeedMhz;
 
             publishDelegate(publishedState);
-            if (publishedState.mmio_was_initialized) {
+
+            if (publishedState.mmioWasInitialized) {
                 clemens_audio_next_frame(&mmio_, publishedState.audio.frame_count);
             }
             logOutput_.clear();

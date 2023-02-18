@@ -729,7 +729,7 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     frameWriteState_.audioFrame = state.audio;
     frameWriteState_.backendCPUID = state.hostCPUID;
     frameWriteState_.fps = state.fps;
-    frameWriteState_.mmioWasInitialized = state.mmio_was_initialized;
+    frameWriteState_.mmioWasInitialized = state.mmioWasInitialized;
     frameWriteState_.isTracing = state.isTracing;
     frameWriteState_.isRunning = state.isRunning;
     frameWriteState_.emulatorSpeedMhz = state.emulatorSpeedMhz;
@@ -890,7 +890,7 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
         lastCommandState_.commandType = state.commandType;
     }
     if (!lastCommandState_.terminated.has_value()) {
-        lastCommandState_.terminated = state.terminated;
+        lastCommandState_.terminated = state.isTerminated;
     }
 
     auto audioBufferSize = int32_t(state.audio.frame_count * state.audio.frame_stride);

@@ -123,31 +123,37 @@ template <typename Stats> struct ClemensEmulatorDiagnostics {
         return std::make_pair(0.0, false);
     }
 };
+struct ClemensBackendResult {
+    ClemensBackendCommand cmd;
+    enum Type { Success, Failed };
+    Type type;
+};
 
 struct ClemensBackendState {
+    std::vector<ClemensBackendResult> results;
     ClemensMachine *machine;
     ClemensMMIO *mmio;
     double fps;
     uint64_t seqno;
+    bool isTerminated;
     bool isRunning;
     bool isTracing;
     bool isIWMTracing;
-    bool mmio_was_initialized;
-    std::optional<bool> terminated;
-    std::optional<bool> commandFailed;
-    // valid if commandFailed
-    std::optional<ClemensBackendCommand::Type> commandType;
-    // valid if a debugMessage() command was issued from the frontend
-    std::optional<std::string> message;
+    bool mmioWasInitialized;
 
     ClemensMonitor monitor;
     ClemensVideo text;
     ClemensVideo graphics;
     ClemensAudio audio;
 
+    std::optional<bool> commandFailed;
+    // valid if commandFailed
+    std::optional<ClemensBackendCommand::Type> commandType;
+    // valid if a debugMessage() command was issued from the frontend
+    std::optional<std::string> message;
+
     unsigned hostCPUID;
     int logLevel;
-
     const ClemensBackendOutputText *logBufferStart;
     const ClemensBackendOutputText *logBufferEnd;
     const ClemensBackendBreakpoint *bpBufferStart;
