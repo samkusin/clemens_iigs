@@ -4,13 +4,13 @@
 #include "clem_disk.h"
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
+#include "clem_host_shared.hpp"
 #include "clem_host_utils.hpp"
 #include "clem_imgui.hpp"
 #include "clem_import_disk.hpp"
 #include "clem_l10n.hpp"
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
-#include "clem_preamble.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 #include "imgui.h"
@@ -24,6 +24,7 @@
 #include <cfloat>
 #include <charconv>
 #include <filesystem>
+#include <memory>
 #include <tuple>
 
 //  Style
@@ -1013,6 +1014,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
 
     bool isNewFrame = false;
     bool isBackendTerminated = false;
+    std::optional<ClemensBackendCommand::Type> lastFailedCommandType;
     std::unique_lock<std::mutex> frameLock(frameMutex_);
     framePublished_.wait_for(frameLock, std::chrono::milliseconds::zero(),
                              [this]() { return frameSeqNo_ != frameLastSeqNo_; });
@@ -1091,6 +1093,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
             } else {
                 CLEM_TERM_COUT.print(TerminalLine::Info, "Ok.");
             }
+            lastFailedCommandType = *lastCommandState_.commandType;
             lastCommandState_.commandFailed = std::nullopt;
             lastCommandState_.commandType = std::nullopt;
         }
@@ -1190,7 +1193,12 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         doNewBlankDisk(width, height);
         break;
     case GUIMode::SaveSnapshot:
-        doSaveSnapshot(width, height);
+        if (!saveSnapshotMode_.isStarted()) {
+            saveSnapshotMode_.start(backend_.get(), frameReadState_.isRunning);
+        }
+        if (saveSnapshotMode_.frame(width, height, backend_.get())) {
+            saveSnapshotMode_.stop(backend_.get());
+        }
         break;
     case GUIMode::LoadSnapshot:
         doLoadSnapshot(width, height);
@@ -1353,7 +1361,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
             ImVec2(32.0f, 32.0f))) {
         if (backend_ && !isEmulatorStarting()) {
             if (!delayRebootTimer_.has_value()) {
-                cmdReboot("");
+                rebootInternal();
             }
         }
     }
@@ -2877,8 +2885,8 @@ void ClemensFrontend::doModalOperations(int width, int height) {
         ImVec2(std::max(720.0f, width * 0.33f), 7 * ImGui::GetTextLineHeightWithSpacing()));
     if (ImGui::BeginPopupModal("Enter Disk Set Name", NULL, 0)) {
         ImGui::Spacing();
-        char collectionName[64]{};
-        char imageName[64]{};
+        static char collectionName[64]{};
+        static char imageName[64]{};
 
         //  TODO: seems the user has to enter text and press enter always to confirm
         //        adding an OK button seems that the right thing to do, but there's
@@ -2935,7 +2943,7 @@ void ClemensFrontend::doImportDiskSetFlowStart(int /*width*/, int /*height*/) {
     if (ImGui::BeginPopupModal("Import Master Disk Set", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Spacing();
         ImGui::Text("Enter the name of the imported disk set collection.");
-        char collectionName[64] = "";
+        static char collectionName[64] = "";
         ImGui::SetNextItemWidth(ImGui::GetWindowContentRegionWidth() -
                                 ImGui::GetStyle().WindowPadding.x);
         //  TODO: seems the user has to enter text and press enter always to confirm
@@ -3203,8 +3211,6 @@ std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath
 }
 
 void ClemensFrontend::doLoadSnapshot(int width, int height) {}
-
-void ClemensFrontend::doSaveSnapshot(int width, int height) {}
 
 bool ClemensFrontend::isEmulatorStarting() const {
     return guiMode_ == GUIMode::RebootEmulator || guiMode_ == GUIMode::StartingEmulator;
@@ -3478,13 +3484,15 @@ void ClemensFrontend::cmdStep(std::string_view operand) {
 void ClemensFrontend::rebootInternal() {
     guiMode_ = GUIMode::RebootEmulator;
     delayRebootTimer_ = 0.0f;
+    if (backend_) {
+        backend_->terminate();
+        CLEM_TERM_COUT.print(TerminalLine::Info, "Rebooting machine...");
+    } else {
+        CLEM_TERM_COUT.print(TerminalLine::Info, "Powering machine...");
+    }
 }
 
-void ClemensFrontend::cmdReboot(std::string_view /*operand*/) {
-    rebootInternal();
-    backend_->terminate();
-    CLEM_TERM_COUT.print(TerminalLine::Info, "Rebooting machine...");
-}
+void ClemensFrontend::cmdReboot(std::string_view /*operand*/) { rebootInternal(); }
 
 void ClemensFrontend::cmdPower(std::string_view operand) {
     if (operand == "off") {
@@ -3500,7 +3508,6 @@ void ClemensFrontend::cmdPower(std::string_view operand) {
         if (!backend_) {
             rebootInternal();
             audio_.start();
-            CLEM_TERM_COUT.print(TerminalLine::Info, "Powering machine...");
         } else {
             CLEM_TERM_COUT.print(TerminalLine::Error, "Already on.");
         }

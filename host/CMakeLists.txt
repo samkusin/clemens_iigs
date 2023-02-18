@@ -39,6 +39,7 @@ set(FMT_SOURCES
 
 set(EXT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/ini.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/miniz.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/stb.c")
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
@@ -77,6 +78,7 @@ set(PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_l10n.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_preamble.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_program_trace.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_save_snapshot_ui.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_serializer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_startup_view.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_smartport_disk.cpp")

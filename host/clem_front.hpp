@@ -12,6 +12,7 @@
 #include "clem_disk_library.hpp"
 #include "clem_display.hpp"
 #include "clem_host_shared.hpp"
+#include "clem_save_snapshot_ui.hpp"
 #include "imgui.h"
 #include "imgui_memory_editor.h"
 
@@ -293,7 +294,6 @@ class ClemensFrontend : public ClemensHostView {
     void doNewBlankDiskFlow(int width, int height);
     void doNewBlankDisk(int width, int height);
     void doLoadSnapshot(int width, int height);
-    void doSaveSnapshot(int width, int height);
 
     bool isEmulatorStarting() const;
     bool isEmulatorActive() const;
@@ -321,6 +321,9 @@ class ClemensFrontend : public ClemensHostView {
     std::string importDiskSetPath_;
     std::vector<std::string> importDiskFiles_;
     std::string messageModalString_;
+
+    ClemensSaveSnapshotUI saveSnapshotMode_;
+
     std::optional<float> delayRebootTimer_;
 };
 
