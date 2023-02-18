@@ -292,6 +292,8 @@ class ClemensFrontend : public ClemensHostView {
     void doImportDiskSet(int width, int height);
     void doNewBlankDiskFlow(int width, int height);
     void doNewBlankDisk(int width, int height);
+    void doLoadSnapshot(int width, int height);
+    void doSaveSnapshot(int width, int height);
 
     bool isEmulatorStarting() const;
     bool isEmulatorActive() const;
@@ -307,6 +309,8 @@ class ClemensFrontend : public ClemensHostView {
         NewBlankDiskFlow,
         NewBlankDiskReplaceOld,
         NewBlankDisk,
+        LoadSnapshot,
+        SaveSnapshot,
         RebootEmulator,
         StartingEmulator,
         NoEmulator

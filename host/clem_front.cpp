@@ -1189,6 +1189,12 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     case GUIMode::NewBlankDisk:
         doNewBlankDisk(width, height);
         break;
+    case GUIMode::SaveSnapshot:
+        doSaveSnapshot(width, height);
+        break;
+    case GUIMode::LoadSnapshot:
+        doLoadSnapshot(width, height);
+        break;
     case GUIMode::RebootEmulator:
         if (!backend_) {
             backend_ = createBackend();
@@ -1362,6 +1368,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
             (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kLoad).id),
             ImVec2(32.0f, 32.0f))) {
         if (backend_ && !isEmulatorStarting()) {
+            guiMode_ = GUIMode::LoadSnapshot;
         }
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
@@ -1373,6 +1380,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
             (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kSave).id),
             ImVec2(32.0f, 32.0f))) {
         if (backend_ && !isEmulatorStarting()) {
+            guiMode_ = GUIMode::SaveSnapshot;
         }
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
@@ -3193,6 +3201,10 @@ std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath
 
     return std::make_pair(outputPath, true);
 }
+
+void ClemensFrontend::doLoadSnapshot(int width, int height) {}
+
+void ClemensFrontend::doSaveSnapshot(int width, int height) {}
 
 bool ClemensFrontend::isEmulatorStarting() const {
     return guiMode_ == GUIMode::RebootEmulator || guiMode_ == GUIMode::StartingEmulator;
