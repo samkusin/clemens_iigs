@@ -29,6 +29,10 @@
 //  Style
 #define CLEM_HOST_OPEN_APPLE_UTF8 "\xee\x80\x90"
 namespace ClemensHostStyle {
+
+static constexpr float kSideBarMinWidth = 160.0f;
+static constexpr float kMachineStateViewMinWidth = 480.0f;
+
 // monochromatic "platinum" classic CACAC8
 //                          middle  969695
 // monochromatic "platinum" dark    4A4A33
@@ -1230,7 +1234,8 @@ void ClemensFrontend::doDebuggerInterface(ImVec2 dimensions, ImVec2 screenUVs,
     const ImVec2 kWindowBoundary(kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.x,
                                  kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.y);
     const float kLineSpacing = ImGui::GetTextLineHeightWithSpacing();
-    const float kMachineStateViewWidth = std::max(int(dimensions.x * 0.40f), 480);
+    const float kMachineStateViewWidth =
+        std::max(dimensions.x * 0.40f, ClemensHostStyle::kMachineStateViewMinWidth);
     const float kMonitorX = kMachineStateViewWidth;
     const float kMonitorViewWidth = dimensions.x - kMonitorX;
     const float kInfoBarHeight = kLineSpacing + kWindowBoundary.y * 2;
@@ -1261,8 +1266,9 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 dimensions, ImVec2 screenUVs,
     kMonitorViewSize.y -= kInfoStatusSize.y;
     kMonitorViewSize.x = std::min(dimensions.x, kMonitorViewSize.y * kClemensAspectRatio);
 
-    ImVec2 kSideBarSize(std::max(160.0f, dimensions.x - kMonitorViewSize.x),
-                        dimensions.y - kInfoStatusSize.y);
+    ImVec2 kSideBarSize(
+        std::max(ClemensHostStyle::kSideBarMinWidth, dimensions.x - kMonitorViewSize.x),
+        dimensions.y - kInfoStatusSize.y);
     kMonitorViewSize.x = dimensions.x - kSideBarSize.x;
 
     ImVec2 kSideBarAnchor(0.0f, 0.0f);
@@ -1297,7 +1303,7 @@ void ClemensFrontend::doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::End();
 }
 
-void ClemensFrontend::doUserMenuDisplay(float width) {
+void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     ImGui::Spacing();
     if (backend_) {
         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
@@ -1731,76 +1737,23 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
         ImGui::PopStyleColor(3);
 
         ImGui::SameLine();
-        ImGui::TextUnformatted(sDriveName[driveType]);
+        if (width < ClemensHostStyle::kMachineStateViewMinWidth) {
+            ImGui::TextUnformatted(sDriveName[driveType]);
 
-        ImGuiStyle &style = ImGui::GetStyle();
-        const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
-        ImGui::SameLine(width - (circleRadius + style.ItemSpacing.x) * 2);
+            ImGuiStyle &style = ImGui::GetStyle();
+            const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
+            ImGui::SameLine(width - (circleRadius + style.ItemSpacing.x) * 2);
 
-        doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
+            doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
 
-        //  2 states: empty, has disk
-        //    options if empty: <blank disk>, <import image>, image 0, image 1, ...
-        //    options if full: <eject>
-        char tempPath[CLEMENS_PATH_MAX];
-        if (drive.isEjecting) {
-            strncpy(tempPath, "Ejecting...", sizeof(tempPath) - 1);
-        } else if (drive.imagePath.empty()) {
-            strncpy(tempPath, "* No Disk *", sizeof(tempPath) - 1);
+            doMachineDiskSelection(driveType, false);
         } else {
-            strncpy(tempPath, std::filesystem::path(drive.imagePath).stem().c_str(),
-                    sizeof(tempPath) - 1);
-        }
-        tempPath[sizeof(tempPath) - 1] = '\0';
-        char label[32];
-        snprintf(label, sizeof(label) - 1, "##%s", sDriveName[driveType]);
-        if (ImGui::BeginCombo(label, tempPath,
-                              ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightLarge)) {
-            if (!(diskComboStateFlags_ & (1 << driveType))) {
-                if (driveType == kClemensDrive_3_5_D1 || driveType == kClemensDrive_3_5_D2) {
-                    diskLibrary_.reset(diskLibraryRootPath_, CLEM_DISK_TYPE_3_5);
-                } else if (driveType == kClemensDrive_5_25_D1 ||
-                           driveType == kClemensDrive_5_25_D2) {
-                    diskLibrary_.reset(diskLibraryRootPath_, CLEM_DISK_TYPE_5_25);
-                } else {
-                    diskLibrary_.reset(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE);
-                }
-                diskComboStateFlags_ |= (1 << driveType);
-            } else {
-                diskLibrary_.update();
-            }
-            if (!drive.imagePath.empty() && !drive.isEjecting && ImGui::Selectable("<eject>")) {
-                backend_->ejectDisk(driveType);
-            }
-            if (drive.imagePath.empty()) {
-                if (ImGui::Selectable("<insert blank disk>")) {
-                    guiMode_ = GUIMode::BlankDiskModal;
-                    importDriveType_ = driveType;
-                }
-                if (ImGui::Selectable("<import master>")) {
-                    guiMode_ = GUIMode::ImportDiskModal;
-                    importDriveType_ = driveType;
-                }
-                ImGui::Separator();
-                std::filesystem::path selectedPath;
-                diskLibrary_.iterate([&selectedPath](const ClemensDiskLibrary::DiskEntry &entry) {
-                    auto relativePath =
-                        entry.location.parent_path().filename() / entry.location.stem();
-                    if (ImGui::Selectable(relativePath.string().c_str())) {
-                        selectedPath =
-                            entry.location.parent_path().filename() / entry.location.filename();
-                    }
-                });
-                if (!selectedPath.empty()) {
-                    backend_->insertDisk(driveType, selectedPath.string());
-                }
-                ImGui::Separator();
-            }
-            ImGui::EndCombo();
-        } else {
-            if (diskComboStateFlags_ & (1 << driveType)) {
-                diskComboStateFlags_ &= ~(1 << driveType);
-            }
+            doMachineDiskSelection(driveType, true);
+            ImGuiStyle &style = ImGui::GetStyle();
+            const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
+            ImGui::SameLine(width - (circleRadius + style.ItemSpacing.x) * 2);
+
+            doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
         }
     }
     ImGui::EndGroup();
@@ -1811,6 +1764,71 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
                               drive.imagePath.c_str());
         } else {
             ImGui::SetTooltip("%s", sDriveDescription[driveType]);
+        }
+    }
+}
+
+void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType, bool showLabel) {
+    const ClemensBackendDiskDriveState &drive = frameReadState_.diskDrives[driveType];
+    //  2 states: empty, has disk
+    //    options if empty: <blank disk>, <import image>, image 0, image 1, ...
+    //    options if full: <eject>
+    char tempPath[CLEMENS_PATH_MAX];
+    if (drive.isEjecting) {
+        strncpy(tempPath, "Ejecting...", sizeof(tempPath) - 1);
+    } else if (drive.imagePath.empty()) {
+        strncpy(tempPath, "* No Disk *", sizeof(tempPath) - 1);
+    } else {
+        strncpy(tempPath, std::filesystem::path(drive.imagePath).stem().c_str(),
+                sizeof(tempPath) - 1);
+    }
+    tempPath[sizeof(tempPath) - 1] = '\0';
+    char label[32];
+    snprintf(label, sizeof(label) - 1, "%s%s", !showLabel ? "##" : "", sDriveName[driveType]);
+    if (ImGui::BeginCombo(label, tempPath,
+                          ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightLarge)) {
+        if (!(diskComboStateFlags_ & (1 << driveType))) {
+            if (driveType == kClemensDrive_3_5_D1 || driveType == kClemensDrive_3_5_D2) {
+                diskLibrary_.reset(diskLibraryRootPath_, CLEM_DISK_TYPE_3_5);
+            } else if (driveType == kClemensDrive_5_25_D1 || driveType == kClemensDrive_5_25_D2) {
+                diskLibrary_.reset(diskLibraryRootPath_, CLEM_DISK_TYPE_5_25);
+            } else {
+                diskLibrary_.reset(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE);
+            }
+            diskComboStateFlags_ |= (1 << driveType);
+        } else {
+            diskLibrary_.update();
+        }
+        if (!drive.imagePath.empty() && !drive.isEjecting && ImGui::Selectable("<eject>")) {
+            backend_->ejectDisk(driveType);
+        }
+        if (drive.imagePath.empty()) {
+            if (ImGui::Selectable("<insert blank disk>")) {
+                guiMode_ = GUIMode::BlankDiskModal;
+                importDriveType_ = driveType;
+            }
+            if (ImGui::Selectable("<import master>")) {
+                guiMode_ = GUIMode::ImportDiskModal;
+                importDriveType_ = driveType;
+            }
+            ImGui::Separator();
+            std::filesystem::path selectedPath;
+            diskLibrary_.iterate([&selectedPath](const ClemensDiskLibrary::DiskEntry &entry) {
+                auto relativePath = entry.location.parent_path().filename() / entry.location.stem();
+                if (ImGui::Selectable(relativePath.string().c_str())) {
+                    selectedPath =
+                        entry.location.parent_path().filename() / entry.location.filename();
+                }
+            });
+            if (!selectedPath.empty()) {
+                backend_->insertDisk(driveType, selectedPath.string());
+            }
+            ImGui::Separator();
+        }
+        ImGui::EndCombo();
+    } else {
+        if (diskComboStateFlags_ & (1 << driveType)) {
+            diskComboStateFlags_ &= ~(1 << driveType);
         }
     }
 }

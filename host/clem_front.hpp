@@ -60,6 +60,7 @@ class ClemensFrontend : public ClemensHostView {
     void doMachineDiagnosticsDisplay();
     void doMachineDiskDisplay(float width);
     void doMachineDiskStatus(ClemensDriveType driveType, float width);
+    void doMachineDiskSelection(ClemensDriveType driveType, bool showLabel);
     void doMachineDiskMotorStatus(float circleRadius, bool isSpinning);
     void doMachineSmartDriveStatus(unsigned driveIndex, float width);
     void doMachineCPUInfoDisplay();
