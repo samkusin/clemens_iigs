@@ -43,9 +43,15 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensBackend *bac
             if (ImGui::BeginListBox("##SnapshotList", listSize)) {
                 for (auto const &entry : std::filesystem::directory_iterator(snapshotDir_)) {
                     auto filename = entry.path().filename().string();
-                    if (ImGui::Selectable(filename.c_str())) {
+                    bool isSelected = ImGui::Selectable(filename.c_str(), filename == snapshotName_,
+                                                        ImGuiSelectableFlags_AllowDoubleClick);
+                    if (!isOk && isSelected) {
                         auto cnt = filename.copy(snapshotName_, sizeof(snapshotName_) - 1);
                         snapshotName_[cnt] = '\0';
+                        if (ImGui::IsItemHovered() &&
+                            ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                            isOk = true;
+                        }
                     }
                     ImGui::Separator();
                 }

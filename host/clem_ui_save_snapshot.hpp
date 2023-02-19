@@ -17,7 +17,7 @@ class ClemensSaveSnapshotUI {
 
     Mode mode_ = Mode::None;
     bool interruptedExecution_ = false;
-    char snapshotName_[64];
+    char snapshotName_[128];
 };
 
 #endif

@@ -20,7 +20,7 @@ class ClemensLoadSnapshotUI {
     Mode mode_ = Mode::None;
     std::string snapshotDir_;
     bool interruptedExecution_ = false;
-    char snapshotName_[64];
+    char snapshotName_[128];
 };
 
 #endif
