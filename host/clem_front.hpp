@@ -63,7 +63,7 @@ class ClemensFrontend : public ClemensHostView {
     void doMachineDiagnosticsDisplay();
     void doMachineDiskDisplay(float width);
     void doMachineDiskStatus(ClemensDriveType driveType, float width);
-    void doMachineDiskSelection(ClemensDriveType driveType, bool showLabel);
+    void doMachineDiskSelection(ClemensDriveType driveType, float width, bool showLabel);
     void doMachineDiskMotorStatus(float circleRadius, bool isSpinning);
     void doMachineSmartDriveStatus(unsigned driveIndex, float width);
     void doMachineCPUInfoDisplay();
@@ -96,6 +96,7 @@ class ClemensFrontend : public ClemensHostView {
     void cmdLoad(std::string_view operand);
     void cmdGet(std::string_view operand);
     void cmdADBMouse(std::string_view operand);
+    void cmdMinimode(std::string_view operand);
     void cmdScript(std::string_view command);
 
     void rebootInternal();
@@ -294,7 +295,6 @@ class ClemensFrontend : public ClemensHostView {
     void doImportDiskSet(int width, int height);
     void doNewBlankDiskFlow(int width, int height);
     void doNewBlankDisk(int width, int height);
-    void doLoadSnapshot(int width, int height);
 
     bool isEmulatorStarting() const;
     bool isEmulatorActive() const;

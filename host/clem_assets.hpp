@@ -5,7 +5,19 @@
 
 namespace ClemensHostAssets {
 
-enum ImageId { kPowerButton, kPowerCycle, kJoystick, kLoad, kSave, kCard, kImageCount };
+enum ImageId {
+    kPowerButton,
+    kPowerCycle,
+    kSettings,
+    kDebugger,
+    kLoad,
+    kSave,
+    kRunMachine,
+    kStopMachine,
+    kJoystick,
+    kCard,
+    kImageCount
+};
 
 void initialize();
 sg_image getImage(ImageId imageId);

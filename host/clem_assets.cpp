@@ -5,11 +5,15 @@
 namespace ClemensHostAssets {
 
 #include "images/card_png.h"
+#include "images/debugger_png.h"
 #include "images/joystick_png.h"
 #include "images/load_png.h"
+#include "images/play_run_png.h"
 #include "images/power_png.h"
 #include "images/reboot_png.h"
 #include "images/save_png.h"
+#include "images/settings_png.h"
+#include "images/stop_run_png.h"
 
 static sg_image g_allImages[kImageCount];
 
@@ -38,6 +42,10 @@ void initialize() {
     g_allImages[kJoystick] = loadImageFromPNG(joystick_png, joystick_png_len);
     g_allImages[kLoad] = loadImageFromPNG(load_png, load_png_len);
     g_allImages[kSave] = loadImageFromPNG(save_png, save_png_len);
+    g_allImages[kRunMachine] = loadImageFromPNG(play_run_png, play_run_png_len);
+    g_allImages[kStopMachine] = loadImageFromPNG(stop_run_png, stop_run_png_len);
+    g_allImages[kDebugger] = loadImageFromPNG(debugger_png, debugger_png_len);
+    g_allImages[kSettings] = loadImageFromPNG(settings_png, settings_png_len);
     g_allImages[kCard] = loadImageFromPNG(card_icon_png, card_icon_png_len);
 }
 

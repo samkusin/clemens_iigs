@@ -31,8 +31,9 @@
 #define CLEM_HOST_OPEN_APPLE_UTF8 "\xee\x80\x90"
 namespace ClemensHostStyle {
 
-static constexpr float kSideBarMinWidth = 160.0f;
+static constexpr float kSideBarMinWidth = 200.0f;
 static constexpr float kMachineStateViewMinWidth = 480.0f;
+static constexpr float kDiskStatusLongMinWidth = 430.0f;
 
 // monochromatic "platinum" classic CACAC8
 //                          middle  969695
@@ -42,6 +43,10 @@ static ImU32 kDarkInsetColor = IM_COL32(0x3a, 0x3a, 0x22, 0xff);
 
 ImU32 getFrameColor(const ClemensFrontend &) { return kDarkFrameColor; }
 ImU32 getInsetColor(const ClemensFrontend &) { return kDarkInsetColor; }
+
+ImTextureID getImTextureOfAsset(ClemensHostAssets::ImageId id) {
+    return (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(id).id);
+}
 } // namespace ClemensHostStyle
 
 //  TODO: Insert card to slot (non-gui)
@@ -1237,10 +1242,14 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     if (backend_) {
         backend_->publish();
     }
-    if (ImGui::IsKeyDown(ImGuiKey_LeftAlt) &&
-        (ImGui::IsKeyDown(ImGuiKey_RightAlt) || ImGui::IsKeyDown(ImGuiKey_LeftSuper))) {
+    if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
         if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) {
-            emulatorHasMouseFocus_ = false;
+            if (ImGui::IsKeyDown(ImGuiKey_RightAlt) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) {
+                emulatorHasMouseFocus_ = false;
+            } else if (ImGui::IsKeyPressed(ImGuiKey_F11)) {
+                config_.hybridInterfaceEnabled = !config_.hybridInterfaceEnabled;
+                config_.save();
+            }
         }
     }
 
@@ -1366,7 +1375,11 @@ void ClemensFrontend::doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions) {
 }
 
 void ClemensFrontend::doUserMenuDisplay(float /* width */) {
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const ImVec2 kIconSize(24.0f, 24.0f);
     ImGui::Spacing();
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+                        ImVec2(style.ItemSpacing.x * 1.5f, style.ItemSpacing.y));
     if (backend_) {
         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
@@ -1376,11 +1389,10 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 128, 128, 255));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
     }
+    //  Button Group 1
     if (ClemensHostImGui::IconButton(
-            "PowerButton",
-            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kPowerButton)
-                                         .id),
-            ImVec2(32.0f, 32.0f))) {
+            "Power", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kPowerButton),
+            kIconSize)) {
         if (backend_) {
             cmdPower("off");
         } else {
@@ -1403,10 +1415,8 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     }
     ImGui::SameLine();
     if (ClemensHostImGui::IconButton(
-            "CycleButton",
-            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kPowerCycle)
-                                         .id),
-            ImVec2(32.0f, 32.0f))) {
+            "Settings", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kSettings),
+            kIconSize)) {
         if (backend_ && !isEmulatorStarting()) {
             if (!delayRebootTimer_.has_value()) {
                 rebootInternal();
@@ -1414,15 +1424,15 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
         }
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-        ImGui::SetTooltip("Reboot (Cycle Power)");
+        ImGui::SetTooltip("Settings");
     }
     ImGui::SameLine();
+    //  Button Group 2
     ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
     ImGui::SameLine();
     if (ClemensHostImGui::IconButton(
-            "LoadSnapshot",
-            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kLoad).id),
-            ImVec2(32.0f, 32.0f))) {
+            "Load Snapshot", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kLoad),
+            kIconSize)) {
         if (backend_ && !isEmulatorStarting()) {
             setGUIMode(GUIMode::LoadSnapshot);
         }
@@ -1432,9 +1442,8 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     }
     ImGui::SameLine();
     if (ClemensHostImGui::IconButton(
-            "SaveSnapshot",
-            (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kSave).id),
-            ImVec2(32.0f, 32.0f))) {
+            "Save Snapshot", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kSave),
+            kIconSize)) {
         if (backend_ && !isEmulatorStarting()) {
             setGUIMode(GUIMode::SaveSnapshot);
         }
@@ -1443,6 +1452,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
         ImGui::SetTooltip("Save Snapshot");
     }
     ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar();
     ImGui::Spacing();
     ImGui::Separator();
 }
@@ -1556,7 +1566,7 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
     //  Display Mouse Lock/Focus
     //  Display Key Focus
     //  Display Option, Open Apple, Ctrl, Reset, Escape, Caps lock in abbrev/icons
-
+    const ImVec2 kIconSize(24.0f, 24.0f);
     ImGui::SetNextWindowPos(anchor);
     ImGui::SetNextWindowSize(dimensions);
     ImGui::Begin("InfoStatus", nullptr,
@@ -1584,6 +1594,60 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
     ClemensHostImGui::StatusBarField(is1MhzMode ? ClemensHostImGui::StatusBarFlags_Active
                                                 : ClemensHostImGui::StatusBarFlags_Inactive,
                                      "1 Mhz");
+
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    if (backend_) {
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
+        ImGui::SameLine();
+        if (ClemensHostImGui::IconButton(
+                "CycleButton",
+                ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kPowerCycle), kIconSize)) {
+            if (!isEmulatorStarting()) {
+                if (!delayRebootTimer_.has_value()) {
+                    rebootInternal();
+                }
+            }
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+            ImGui::SetTooltip("Reboot (cycle power)");
+        }
+        ImGui::SameLine();
+        if (frameReadState_.isRunning) {
+            if (ClemensHostImGui::IconButton(
+                    "Continue",
+                    ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kStopMachine),
+                    kIconSize)) {
+                backend_->breakExecution();
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+                ImGui::SetTooltip("Stop execution");
+            }
+        } else {
+            if (ClemensHostImGui::IconButton(
+                    "Continue",
+                    ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kRunMachine),
+                    kIconSize)) {
+                backend_->run();
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+                ImGui::SetTooltip("Continue execution");
+            }
+        }
+        ImGui::SameLine();
+        if (ClemensHostImGui::IconButton(
+                "Debugger", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kDebugger),
+                kIconSize)) {
+            config_.hybridInterfaceEnabled = true;
+            config_.save();
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+            ImGui::SetTooltip("Enter debugger mode");
+        }
+        ImGui::PopStyleColor(3);
+    }
 
     ImGui::SameLine(dividerXPos);
     ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
@@ -1801,21 +1865,20 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
         ImGui::PopStyleColor(3);
 
         ImGui::SameLine();
-        if (width < ClemensHostStyle::kMachineStateViewMinWidth) {
+
+        ImGuiStyle &style = ImGui::GetStyle();
+        const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
+        const float motorStatusWidth = (circleRadius + style.ItemSpacing.x) * 2;
+        ImVec2 columnPos = ImGui::GetCursorPos();
+        if (width < ClemensHostStyle::kDiskStatusLongMinWidth) {
             ImGui::TextUnformatted(sDriveName[driveType]);
-
-            ImGuiStyle &style = ImGui::GetStyle();
-            const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
-            ImGui::SameLine(width - (circleRadius + style.ItemSpacing.x) * 2);
-
+            ImGui::SameLine(width - motorStatusWidth);
             doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
-
-            doMachineDiskSelection(driveType, false);
+            // next line
+            doMachineDiskSelection(driveType, width, false);
         } else {
-            doMachineDiskSelection(driveType, true);
-            ImGuiStyle &style = ImGui::GetStyle();
-            const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
-            ImGui::SameLine(width - (circleRadius + style.ItemSpacing.x) * 2);
+            doMachineDiskSelection(driveType, width - columnPos.x - motorStatusWidth, true);
+            ImGui::SameLine(width - motorStatusWidth);
 
             doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
         }
@@ -1832,7 +1895,8 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
     }
 }
 
-void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType, bool showLabel) {
+void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType, float width,
+                                             bool showLabel) {
     const ClemensBackendDiskDriveState &drive = frameReadState_.diskDrives[driveType];
     //  2 states: empty, has disk
     //    options if empty: <blank disk>, <import image>, image 0, image 1, ...
@@ -1847,8 +1911,13 @@ void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType, bool sh
                 sizeof(tempPath) - 1);
     }
     tempPath[sizeof(tempPath) - 1] = '\0';
+
     char label[32];
     snprintf(label, sizeof(label) - 1, "%s%s", !showLabel ? "##" : "", sDriveName[driveType]);
+    if (!showLabel) {
+        //  enlarge the combo-box to account for the blank label space.
+        ImGui::PushItemWidth(width);
+    }
     if (ImGui::BeginCombo(label, tempPath,
                           ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightLarge)) {
         if (!(diskComboStateFlags_ & (1 << driveType))) {
@@ -3258,8 +3327,6 @@ std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath
     return std::make_pair(outputPath, true);
 }
 
-void ClemensFrontend::doLoadSnapshot(int width, int height) {}
-
 bool ClemensFrontend::isEmulatorStarting() const {
     return guiMode_ == GUIMode::RebootEmulator || guiMode_ == GUIMode::StartingEmulator;
 }
@@ -3344,6 +3411,8 @@ void ClemensFrontend::executeCommand(std::string_view command) {
         cmdGet(operand);
     } else if (action == "adbmouse") {
         cmdADBMouse(operand);
+    } else if (action == "minimode") {
+        cmdMinimode(operand);
     } else {
         cmdScript(command);
     }
@@ -3354,6 +3423,8 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
         CLEM_TERM_COUT.print(TerminalLine::Warn, "Command specific help not yet supported.");
     }
     CLEM_TERM_COUT.print(TerminalLine::Info, "power {on|off}              - power the machine");
+    CLEM_TERM_COUT.print(TerminalLine::Info,
+                         "minimode                    - returns to user display mode");
     CLEM_TERM_COUT.print(TerminalLine::Info,
                          "reset                       - soft reset of the machine");
     CLEM_TERM_COUT.print(TerminalLine::Info,
@@ -3941,6 +4012,16 @@ void ClemensFrontend::cmdADBMouse(std::string_view operand) {
     }
     backend_->inputEvent(input);
     CLEM_TERM_COUT.print(TerminalLine::Info, "Input sent.");
+}
+
+void ClemensFrontend::cmdMinimode(std::string_view operand) {
+    auto [params, cmd, paramCount] = gatherMessageParams(operand);
+    if (paramCount != 0) {
+        CLEM_TERM_COUT.print(TerminalLine::Error, "Minimode innvalid parameters.");
+        return;
+    }
+    config_.hybridInterfaceEnabled = false;
+    config_.save();
 }
 
 void ClemensFrontend::cmdScript(std::string_view command) {
