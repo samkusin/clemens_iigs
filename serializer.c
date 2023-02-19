@@ -399,12 +399,12 @@ unsigned clemens_serialize_record(mpack_writer_t *writer, uintptr_t data_adr,
         break;
     case kClemensSerializerTypeBool:
         variant.b = *(bool *)(data_adr + record->offset);
-        mpack_write_bool(writer, variant.b);
+        mpack_write_bool(writer, variant.u8);
         sz = sizeof(bool);
         break;
     case kClemensSerializerTypeUInt8:
         variant.u8 = *(uint8_t *)(data_adr + record->offset);
-        mpack_write_u8(writer, variant.b);
+        mpack_write_u8(writer, variant.u8);
         sz = sizeof(uint8_t);
         break;
     case kClemensSerializerTypeUInt16:
