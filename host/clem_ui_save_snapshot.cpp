@@ -1,8 +1,9 @@
-#include "clem_save_snapshot_ui.hpp"
+#include "clem_ui_save_snapshot.hpp"
 
 #include "clem_backend.hpp"
 #include "clem_imgui.hpp"
 #include "fmt/format.h"
+#include "imgui.h"
 
 #include <filesystem>
 
@@ -15,7 +16,7 @@ void ClemensSaveSnapshotUI::start(ClemensBackend *backend, bool isEmulatorRunnin
     backend->breakExecution();
 }
 
-bool ClemensSaveSnapshotUI::frame(float width, float height, ClemensBackend *backend) {
+bool ClemensSaveSnapshotUI::frame(float width, float /* height */, ClemensBackend *backend) {
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     switch (mode_) {
     case Mode::None:
@@ -27,7 +28,7 @@ bool ClemensSaveSnapshotUI::frame(float width, float height, ClemensBackend *bac
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::SetNextWindowSize(
             ImVec2(std::max(720.0f, width * 0.33f), 7 * ImGui::GetTextLineHeightWithSpacing()));
-        if (ImGui::BeginPopupModal("Save Snapshot", NULL, 0)) {
+        if (ImGui::BeginPopupModal("Save Snapshot", NULL, ImGuiWindowFlags_Modal)) {
             bool isOk = false;
             ImGui::Spacing();
             ImGui::Text("Enter the name of this snapshot.");
@@ -47,7 +48,7 @@ bool ClemensSaveSnapshotUI::frame(float width, float height, ClemensBackend *bac
                 ImGui::CloseCurrentPopup();
                 mode_ = Mode::Cancelled;
             }
-            if (isOk) {
+            if (isOk && snapshotName_[0] != '\0') {
                 ImGui::CloseCurrentPopup();
                 auto selectedPath = std::filesystem::path(snapshotName_);
                 if (!selectedPath.has_extension()) {
@@ -62,13 +63,40 @@ bool ClemensSaveSnapshotUI::frame(float width, float height, ClemensBackend *bac
     } break;
     case Mode::WaitForResponse:
         break;
-    case Mode::Succeeded:
-        fmt::print("SaveSnapshotMode: ok.\n");
-        return true;
-        break;
-    case Mode::Failed:
-        fmt::print("SaveSnapshotMode: failed!\n");
-        return true;
+    case Mode::Succeeded: {
+        bool done = false;
+        if (!ImGui::IsPopupOpen("Save Completed")) {
+            ImGui::OpenPopup("Save Completed");
+        }
+        if (ImGui::BeginPopupModal("Save Completed", NULL, ImGuiWindowFlags_Modal)) {
+            ImGui::Spacing();
+            ImGui::Text("Snapshot '%s' finished.", snapshotName_);
+            ImGui::Separator();
+            if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+                ImGui::CloseCurrentPopup();
+                done = true;
+            }
+            ImGui::EndPopup();
+        }
+        return done;
+    } break;
+    case Mode::Failed: {
+        bool done = false;
+        if (!ImGui::IsPopupOpen("Save Failed")) {
+            ImGui::OpenPopup("Save Failed");
+        }
+        if (ImGui::BeginPopupModal("Save Failed", NULL, ImGuiWindowFlags_Modal)) {
+            ImGui::Spacing();
+            ImGui::Text("Snapshot '%s' failed to save.", snapshotName_);
+            ImGui::Separator();
+            if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+                ImGui::CloseCurrentPopup();
+                done = true;
+            }
+            ImGui::EndPopup();
+        }
+        return done;
+    } break;
     case Mode::Cancelled:
         return true;
     }
@@ -85,59 +113,3 @@ void ClemensSaveSnapshotUI::stop(ClemensBackend *backend) {
 void ClemensSaveSnapshotUI::fail() { mode_ = Mode::Failed; }
 
 void ClemensSaveSnapshotUI::succeeded() { mode_ = Mode::Succeeded; }
-
-// backend_->saveMachine(name);
-
-/*
-void ClemensFrontend::doSaveSnapshot(int width, int height) {
-    if (!ImGui::IsPopupOpen("Save Snapshot")) {
-        ImGui::OpenPopup("Save Snapshot");
-    }
-    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(
-        ImVec2(std::max(720.0f, width * 0.33f), 7 * ImGui::GetTextLineHeightWithSpacing()));
-    if (ImGui::BeginPopupModal("Save Snapshot", NULL, 0)) {
-        static char snapshotName[64] = "";
-        bool isOk = false;
-        ImGui::Spacing();
-        ImGui::Text("Enter the name of this snapshot.");
-        ImGui::SetNextItemWidth(ImGui::GetWindowContentRegionWidth() -
-                                ImGui::GetStyle().WindowPadding.x);
-        ImGui::SetItemDefaultFocus();
-        if (ImGui::InputText("##", snapshotName, sizeof(snapshotName),
-                             ImGuiInputTextFlags_EnterReturnsTrue)) {
-            isOk = true;
-        }
-        ImGui::Separator();
-        if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-            isOk = true;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel") && !isOk) {
-            ImGui::CloseCurrentPopup();
-            backend_->run();
-            guiMode_ = GUIMode::Emulator;
-        }
-        if (isOk) {
-            ImGui::CloseCurrentPopup();
-            auto selectedPath = std::filesystem::path(snapshotName);
-            if (!selectedPath.has_extension()) {
-                selectedPath.replace_extension(".clemens-sav");
-            }
-            backend_->saveMachine(selectedPath.string());
-            guiMode_ = GUIMode::SaveSnapshotDone;
-        }
-        ImGui::EndPopup();
-    }
-}
-
-if (!ImGui::IsPopupOpen("Save Snapshot Failed") && !ImGui::IsPopupOpen("Save Snapshot Completed")) {
-    if (lastFailedCommandType.has_value() &&
-        *lastFailedCommandType == ClemensBackendCommand::Type::SaveMachine) {
-        ImGui::OpenPopup("Save Snapshot Failed");
-    } else {
-        ImGui::OpenPopup("Save Snapshot Completed");
-    }
-}
-*/

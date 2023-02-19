@@ -125,7 +125,7 @@ template <typename Stats> struct ClemensEmulatorDiagnostics {
 };
 struct ClemensBackendResult {
     ClemensBackendCommand cmd;
-    enum Type { Success, Failed };
+    enum Type { Succeeded, Failed };
     Type type;
 };
 
@@ -146,12 +146,6 @@ struct ClemensBackendState {
     ClemensVideo graphics;
     ClemensAudio audio;
 
-    std::optional<bool> commandFailed;
-    // valid if commandFailed
-    std::optional<ClemensBackendCommand::Type> commandType;
-    // valid if a debugMessage() command was issued from the frontend
-    std::optional<std::string> message;
-
     unsigned hostCPUID;
     int logLevel;
     const ClemensBackendOutputText *logBufferStart;
@@ -168,6 +162,9 @@ struct ClemensBackendState {
     uint8_t debugMemoryPage;
 
     float emulatorSpeedMhz;
+
+    // valid if a debugMessage() command was issued from the frontend
+    std::optional<std::string> message;
 };
 
 #endif

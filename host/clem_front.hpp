@@ -12,7 +12,8 @@
 #include "clem_disk_library.hpp"
 #include "clem_display.hpp"
 #include "clem_host_shared.hpp"
-#include "clem_save_snapshot_ui.hpp"
+#include "clem_ui_load_snapshot.hpp"
+#include "clem_ui_save_snapshot.hpp"
 #include "imgui.h"
 #include "imgui_memory_editor.h"
 
@@ -47,6 +48,7 @@ class ClemensFrontend : public ClemensHostView {
     //  when a frame has been published
     void backendStateDelegate(const ClemensBackendState &state);
     void copyState(const ClemensBackendState &state);
+    void processBackendResult(const ClemensBackendResult &result);
 
     void doEmulatorInterface(ImVec2 dimensions, ImVec2 screenUVs, double deltaTime);
     void doDebuggerInterface(ImVec2 dimensions, ImVec2 screenUVs, double deltaTime);
@@ -207,9 +209,8 @@ class ClemensFrontend : public ClemensHostView {
     //  to the problem mentioned with FrameState.  In some cases we want to know
     //  when an event happened (command failed, termination, breakpoint hit, etc)
     struct LastCommandState {
+        std::vector<ClemensBackendResult> results;
         std::optional<bool> terminated;
-        std::optional<bool> commandFailed;
-        std::optional<ClemensBackendCommand::Type> commandType;
         std::optional<unsigned> hitBreakpoint;
         std::optional<std::string> message;
         LogOutputNode *logNode = nullptr;
@@ -299,6 +300,7 @@ class ClemensFrontend : public ClemensHostView {
     bool isEmulatorActive() const;
 
     enum class GUIMode {
+        Empty,
         Preamble,
         Emulator,
         ImportDiskModal,
@@ -315,13 +317,18 @@ class ClemensFrontend : public ClemensHostView {
         StartingEmulator,
         NoEmulator
     };
+    void setGUIMode(GUIMode guiMode);
+
     GUIMode guiMode_;
+    GUIMode guiPrevMode_;
+
     ClemensDriveType importDriveType_;
     std::string importDiskSetName_;
     std::string importDiskSetPath_;
     std::vector<std::string> importDiskFiles_;
     std::string messageModalString_;
 
+    ClemensLoadSnapshotUI loadSnapshotMode_;
     ClemensSaveSnapshotUI saveSnapshotMode_;
 
     std::optional<float> delayRebootTimer_;

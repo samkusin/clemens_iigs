@@ -613,7 +613,8 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       diskTracesRootPath_{
           (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_TRACES_DIR).string()},
       diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0),
-      debugIOMode_(DebugIOMode::Core), joystickSlotCount_(0), guiMode_(GUIMode::RebootEmulator) {
+      debugIOMode_(DebugIOMode::Core), joystickSlotCount_(0), guiMode_(GUIMode::RebootEmulator),
+      guiPrevMode_(GUIMode::NoEmulator) {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -881,14 +882,12 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
             }
         }
     }
+
+    //  prevent reallocation of the results vector
+    std::copy(state.results.begin(), state.results.end(),
+              std::back_inserter(lastCommandState_.results));
     if (!lastCommandState_.message.has_value() && state.message.has_value()) {
         lastCommandState_.message = cmdMessageFromBackend(*state.message, state.machine);
-    }
-    if (!lastCommandState_.commandFailed.has_value()) {
-        lastCommandState_.commandFailed = state.commandFailed;
-    }
-    if (!lastCommandState_.commandType.has_value()) {
-        lastCommandState_.commandType = state.commandType;
     }
     if (!lastCommandState_.terminated.has_value()) {
         lastCommandState_.terminated = state.isTerminated;
@@ -1014,7 +1013,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
 
     bool isNewFrame = false;
     bool isBackendTerminated = false;
-    std::optional<ClemensBackendCommand::Type> lastFailedCommandType;
+
     std::unique_lock<std::mutex> frameLock(frameMutex_);
     framePublished_.wait_for(frameLock, std::chrono::milliseconds::zero(),
                              [this]() { return frameSeqNo_ != frameLastSeqNo_; });
@@ -1086,16 +1085,12 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
             backendConfig_.breakpoints.push_back(breakpoints_.back());
         }
         backendConfig_.breakpoints = breakpoints_;
-        if (lastCommandState_.commandFailed.has_value()) {
-            if (*lastCommandState_.commandFailed) {
-                CLEM_TERM_COUT.format(TerminalLine::Error, "{} Failed.",
-                                      getCommandTypeName(*lastCommandState_.commandType));
-            } else {
-                CLEM_TERM_COUT.print(TerminalLine::Info, "Ok.");
+
+        if (!lastCommandState_.results.empty()) {
+            for (auto &result : lastCommandState_.results) {
+                processBackendResult(result);
             }
-            lastFailedCommandType = *lastCommandState_.commandType;
-            lastCommandState_.commandFailed = std::nullopt;
-            lastCommandState_.commandType = std::nullopt;
+            lastCommandState_.results.clear();
         }
         if (lastCommandState_.hitBreakpoint.has_value()) {
             unsigned bpIndex = *lastCommandState_.hitBreakpoint;
@@ -1172,6 +1167,8 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     }
 
     switch (guiMode_) {
+    case GUIMode::Empty:
+        break;
     case GUIMode::ImportDiskModal:
     case GUIMode::BlankDiskModal:
         doModalOperations(width, height);
@@ -1198,20 +1195,28 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         }
         if (saveSnapshotMode_.frame(width, height, backend_.get())) {
             saveSnapshotMode_.stop(backend_.get());
+            guiMode_ = GUIMode::Emulator;
         }
         break;
     case GUIMode::LoadSnapshot:
-        doLoadSnapshot(width, height);
+        if (!loadSnapshotMode_.isStarted()) {
+            loadSnapshotMode_.start(backend_.get(), backendConfig_.snapshotRootPath,
+                                    frameReadState_.isRunning);
+        }
+        if (loadSnapshotMode_.frame(width, height, backend_.get())) {
+            loadSnapshotMode_.stop(backend_.get());
+            guiMode_ = GUIMode::Emulator;
+        }
         break;
     case GUIMode::RebootEmulator:
         if (!backend_) {
             backend_ = createBackend();
-            guiMode_ = GUIMode::StartingEmulator;
+            setGUIMode(GUIMode::StartingEmulator);
         }
         break;
     case GUIMode::StartingEmulator:
         if (isNewFrame) {
-            guiMode_ = GUIMode::Emulator;
+            setGUIMode(GUIMode::Emulator);
         }
         break;
     case GUIMode::NoEmulator:
@@ -1219,6 +1224,8 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     default:
         break;
     }
+
+    guiPrevMode_ = guiMode_;
 
     if (delayRebootTimer_.has_value()) {
         delayRebootTimer_ = *delayRebootTimer_ + (float)deltaTime;
@@ -1240,6 +1247,47 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     interop.mouseLock = emulatorHasMouseFocus_;
 
     return getViewType();
+}
+
+void ClemensFrontend::setGUIMode(GUIMode guiMode) { guiMode_ = guiMode; }
+
+void ClemensFrontend::processBackendResult(const ClemensBackendResult &result) {
+    bool succeeded = false;
+    switch (result.type) {
+    case ClemensBackendResult::Failed:
+        CLEM_TERM_COUT.format(TerminalLine::Error, "{} Failed.",
+                              getCommandTypeName(result.cmd.type));
+        break;
+    case ClemensBackendResult::Succeeded:
+        CLEM_TERM_COUT.print(TerminalLine::Info, "Ok.");
+        succeeded = true;
+        break;
+    default:
+        CK_ASSERT(succeeded);
+        break;
+    }
+
+    //  let GUI modes handle command results
+    switch (guiMode_) {
+    case GUIMode::SaveSnapshot:
+        if (result.cmd.type == ClemensBackendCommand::Type::SaveMachine) {
+            if (succeeded)
+                saveSnapshotMode_.succeeded();
+            else
+                saveSnapshotMode_.fail();
+        }
+        break;
+    case GUIMode::LoadSnapshot:
+        if (result.cmd.type == ClemensBackendCommand::Type::LoadMachine) {
+            if (succeeded)
+                loadSnapshotMode_.succeeded();
+            else
+                loadSnapshotMode_.fail();
+        }
+        break;
+    default:
+        break;
+    }
 }
 
 void ClemensFrontend::doDebuggerInterface(ImVec2 dimensions, ImVec2 screenUVs,
@@ -1376,7 +1424,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
             (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kLoad).id),
             ImVec2(32.0f, 32.0f))) {
         if (backend_ && !isEmulatorStarting()) {
-            guiMode_ = GUIMode::LoadSnapshot;
+            setGUIMode(GUIMode::LoadSnapshot);
         }
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
@@ -1388,7 +1436,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
             (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kSave).id),
             ImVec2(32.0f, 32.0f))) {
         if (backend_ && !isEmulatorStarting()) {
-            guiMode_ = GUIMode::SaveSnapshot;
+            setGUIMode(GUIMode::SaveSnapshot);
         }
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
@@ -1820,11 +1868,11 @@ void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType, bool sh
         }
         if (drive.imagePath.empty()) {
             if (ImGui::Selectable("<insert blank disk>")) {
-                guiMode_ = GUIMode::BlankDiskModal;
+                setGUIMode(GUIMode::BlankDiskModal);
                 importDriveType_ = driveType;
             }
             if (ImGui::Selectable("<import master>")) {
-                guiMode_ = GUIMode::ImportDiskModal;
+                setGUIMode(GUIMode::ImportDiskModal);
                 importDriveType_ = driveType;
             }
             ImGui::Separator();
@@ -2860,11 +2908,11 @@ void ClemensFrontend::doModalOperations(int width, int height) {
             for (auto &e : selection) {
                 importDiskFiles_.emplace_back(e.second);
             }
-            guiMode_ = GUIMode::ImportDiskSetFlow;
+            setGUIMode(GUIMode::ImportDiskSetFlow);
             ImGui::OpenPopup("Import Master Disk Set");
             newOperation = true;
         } else {
-            guiMode_ = GUIMode::Emulator;
+            setGUIMode(GUIMode::Emulator);
         }
 
         ImGuiFileDialog::Instance()->Close();
@@ -2920,15 +2968,15 @@ void ClemensFrontend::doModalOperations(int width, int height) {
                 !importDiskSetName_.empty()) {
                 importDiskSetPath_ =
                     (std::filesystem::path(diskLibraryRootPath_) / importDiskSetPath_).string();
-                guiMode_ = GUIMode::NewBlankDiskFlow;
+                setGUIMode(GUIMode::NewBlankDiskFlow);
             } else {
-                guiMode_ = GUIMode::Emulator;
+                setGUIMode(GUIMode::Emulator);
             }
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
-            guiMode_ = GUIMode::Emulator;
+            setGUIMode(GUIMode::Emulator);
             ImGui::CloseCurrentPopup();
         }
         ImGui::Spacing();
@@ -2963,15 +3011,15 @@ void ClemensFrontend::doImportDiskSetFlowStart(int /*width*/, int /*height*/) {
             if (!importDiskSetName_.empty() && !std::filesystem::path(importDiskSetName_).empty()) {
                 importDiskSetPath_ =
                     (std::filesystem::path(diskLibraryRootPath_) / importDiskSetName_).string();
-                guiMode_ = GUIMode::ImportDiskSet;
+                setGUIMode(GUIMode::ImportDiskSet);
             } else {
-                guiMode_ = GUIMode::Emulator;
+                setGUIMode(GUIMode::Emulator);
             }
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
-            guiMode_ = GUIMode::Emulator;
+            setGUIMode(GUIMode::Emulator);
             ImGui::CloseCurrentPopup();
         }
         ImGui::Spacing();
@@ -3021,9 +3069,9 @@ void ClemensFrontend::doImportDiskSetReplaceOld(int width, int height) {
             std::error_code errorCode;
             ImGui::CloseCurrentPopup();
             if (guiMode_ == GUIMode::ImportDiskSetReplaceOld) {
-                guiMode_ = GUIMode::ImportDiskSet;
+                setGUIMode(GUIMode::ImportDiskSet);
             } else if (guiMode_ == GUIMode::NewBlankDiskReplaceOld) {
-                guiMode_ = GUIMode::NewBlankDisk;
+                setGUIMode(GUIMode::NewBlankDisk);
             }
             if (std::filesystem::remove_all(importDiskSetPath_, errorCode) == std::uintmax_t(-1)) {
                 failure = true;
@@ -3032,7 +3080,7 @@ void ClemensFrontend::doImportDiskSetReplaceOld(int width, int height) {
         ImGui::SameLine();
         if (ImGui::Button("No")) {
             ImGui::CloseCurrentPopup();
-            guiMode_ = GUIMode::Emulator;
+            setGUIMode(GUIMode::Emulator);
         }
         ImGui::EndPopup();
     }
@@ -3078,7 +3126,7 @@ void ClemensFrontend::doImportDiskSet(int width, int height) {
                              (ImGui::GetStyle().FramePadding.y * 2 + ImGui::GetTextLineHeight())));
         if (ImGui::Button("Ok")) {
             ImGui::CloseCurrentPopup();
-            guiMode_ = GUIMode::Emulator;
+            setGUIMode(GUIMode::Emulator);
         }
         ImGui::EndPopup();
     }
@@ -3100,7 +3148,7 @@ void ClemensFrontend::doImportDiskSet(int width, int height) {
                              (ImGui::GetStyle().FramePadding.y * 2 + ImGui::GetTextLineHeight())));
         if (ImGui::Button("Ok")) {
             ImGui::CloseCurrentPopup();
-            guiMode_ = GUIMode::Emulator;
+            setGUIMode(GUIMode::Emulator);
         }
         ImGui::EndPopup();
     }
@@ -3121,10 +3169,10 @@ void ClemensFrontend::doNewBlankDiskFlow(int /*width */, int /*height*/) {
     auto diskPath = diskDirectory / importDiskSetName_;
 
     if (std::filesystem::exists(diskPath)) {
-        guiMode_ = GUIMode::NewBlankDiskReplaceOld;
+        setGUIMode(GUIMode::NewBlankDiskReplaceOld);
         ImGui::OpenPopup("Replace Disk Set");
     } else {
-        guiMode_ = GUIMode::NewBlankDisk;
+        setGUIMode(GUIMode::NewBlankDisk);
     }
 }
 
@@ -3145,14 +3193,14 @@ void ClemensFrontend::doNewBlankDisk(int /*width */, int /*height*/) {
             messageModalString_ =
                 fmt::format("Unable to create directory {}", diskDirectory.string());
             ImGui::OpenPopup("Import Disk Set Error");
-            guiMode_ = GUIMode::ImportDiskSetFlow;
+            setGUIMode(GUIMode::ImportDiskSetFlow);
             return;
         }
     }
     auto diskPath = diskDirectory / importDiskSetName_;
     diskPath.replace_extension("woz");
     backend_->insertBlankDisk(importDriveType_, diskPath.string());
-    guiMode_ = GUIMode::Emulator;
+    setGUIMode(GUIMode::Emulator);
 }
 
 std::pair<std::string, bool> ClemensFrontend::importDisks(std::string outputPath,
@@ -3482,7 +3530,7 @@ void ClemensFrontend::cmdStep(std::string_view operand) {
 }
 
 void ClemensFrontend::rebootInternal() {
-    guiMode_ = GUIMode::RebootEmulator;
+    setGUIMode(GUIMode::RebootEmulator);
     delayRebootTimer_ = 0.0f;
     if (backend_) {
         backend_->terminate();
@@ -3498,7 +3546,7 @@ void ClemensFrontend::cmdPower(std::string_view operand) {
     if (operand == "off") {
         if (backend_) {
             backend_->terminate();
-            guiMode_ = GUIMode::NoEmulator;
+            setGUIMode(GUIMode::NoEmulator);
             audio_.stop();
             CLEM_TERM_COUT.print(TerminalLine::Info, "Shutting down machine...");
         } else {

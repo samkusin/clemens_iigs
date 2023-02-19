@@ -1,6 +1,7 @@
 #include "clem_backend.hpp"
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
+#include "clem_host_shared.hpp"
 #include "clem_mem.h"
 #include "clem_program_trace.hpp"
 #include "clem_serializer.hpp"
@@ -15,6 +16,7 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <vector>
 
 #include "cinek/circular_buffer.hpp"
 #include "fmt/format.h"
@@ -719,11 +721,12 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         std::chrono::microseconds((long)std::floor(1e6 / emulatorRefreshFrequency));
     auto lastFrameTimePoint = std::chrono::high_resolution_clock::now();
     std::optional<unsigned> hitBreakpoint;
-    std::optional<bool> commandFailed;
-    std::optional<Command::Type> commandType;
     std::optional<std::string> debugMessage;
+    std::vector<ClemensBackendResult> commandResults;
+
     ClemensBackendState publishedState{};
     publishedState.results.reserve(8);
+
     while (!isTerminated) {
         bool isRunning = !stepsRemaining.has_value() || *stepsRemaining > 0;
         bool publishState = false;
@@ -734,6 +737,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             //  waiting for commands
             commandQueueCondition_.wait(queuelock, [this] { return !commandQueue_.empty(); });
         }
+
         //  TODO: we may just be able to use a vector for the command queue and
         //        create a local copy of the queue to minimize time spent executing
         //        commands.   the mutex seems to be used just for adds to the
@@ -741,11 +745,8 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         while (!commandQueue_.empty() && !isTerminated) {
             auto command = commandQueue_.front();
             commandQueue_.pop_front();
-            if (command.type != Command::Publish && command.type != Command::Input) {
-                if (!commandFailed.has_value()) {
-                    commandFailed = false;
-                }
-            }
+            bool commandFailed = false;
+
             switch (command.type) {
             case Command::Terminate:
                 isTerminated = true;
@@ -843,8 +844,14 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             case Command::Undefined:
                 break;
             }
-            if (commandFailed.has_value() && *commandFailed == true && !commandType.has_value()) {
-                commandType = command.type;
+
+            if (command.type != Command::Publish && command.type != Command::Input) {
+                //   queue command result
+                ClemensBackendResult commandResult;
+                commandResult.cmd = std::move(command);
+                commandResult.type =
+                    commandFailed ? ClemensBackendResult::Failed : ClemensBackendResult::Succeeded;
+                commandResults.emplace_back(commandResult);
             }
         }
         queuelock.unlock();
@@ -987,8 +994,8 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             publishState = true;
             updateSeqNo = true;
         }
-        //  TODO: force update by publish() option
-        updateSeqNo = updateSeqNo || commandFailed.has_value();
+
+        updateSeqNo = updateSeqNo || !commandResults.empty();
 
         if (updateSeqNo) {
             publishSeqNo++;
@@ -999,6 +1006,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         //        assumption that once the callback returns, we can alter the state
         //        again as needed next timeslice.
         if (publishState) {
+            std::swap(publishedState.results, commandResults);
             publishedState.machine = &machine_;
             publishedState.mmio = &mmio_;
             publishedState.fps = runSampler.sampledFramesPerSecond;
@@ -1028,10 +1036,6 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                     }
                 }
             }
-            publishedState.commandFailed = std::move(commandFailed);
-            publishedState.commandType = std::move(commandType);
-            publishedState.message = std::move(debugMessage);
-
             publishedState.hostCPUID = clem_host_get_processor_number();
             publishedState.logLevel = logLevel_;
             publishedState.logBufferStart = logOutput_.data();
@@ -1055,7 +1059,9 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             }
             publishedState.debugMemoryPage = debugMemoryPage_;
             publishedState.emulatorSpeedMhz = runSampler.sampledEmulatorSpeedMhz;
+            publishedState.message = std::move(debugMessage);
 
+            // send the published state to our listener
             publishDelegate(publishedState);
 
             if (publishedState.mmioWasInitialized) {
@@ -1063,9 +1069,8 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             }
             logOutput_.clear();
             loggedInstructions_.clear();
+            commandResults.clear();
             hitBreakpoint = std::nullopt;
-            commandFailed = std::nullopt;
-            commandType = std::nullopt;
             debugMessage = std::nullopt;
         }
     } // !isTerminated
