@@ -1907,7 +1907,7 @@ void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType, float w
     } else if (drive.imagePath.empty()) {
         strncpy(tempPath, "* No Disk *", sizeof(tempPath) - 1);
     } else {
-        strncpy(tempPath, std::filesystem::path(drive.imagePath).stem().c_str(),
+        strncpy(tempPath, std::filesystem::path(drive.imagePath).stem().string().c_str(),
                 sizeof(tempPath) - 1);
     }
     tempPath[sizeof(tempPath) - 1] = '\0';
