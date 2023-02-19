@@ -38,7 +38,9 @@ set(FMT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/format.cc")
 
 set(EXT_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/ext/ini.c")
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/ini.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/miniz.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/stb.c")
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(PLATFORM_SOURCES
@@ -60,7 +62,7 @@ set(PROJECT_SOURCES
     ${EXT_SOURCES}
     ${FMT_SOURCES}
     ${SOKOL_SOURCES}
-    ${IMGUI_SOURCES}
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_assets.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_display.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_backend.cpp"
@@ -70,11 +72,14 @@ set(PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_front.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_app.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_utils.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_imgui.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_import_disk.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_interpreter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_l10n.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_preamble.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_program_trace.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_load_snapshot.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_save_snapshot.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_serializer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_startup_view.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_smartport_disk.cpp")

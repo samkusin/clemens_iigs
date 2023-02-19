@@ -9,12 +9,12 @@
 #pragma GCC diagnostic ignored "-Wunused-function"
 #endif
 
-#define STBTT_STATIC
-#define STB_TRUETYPE_IMPLEMENTATION
-#include "misc/stb_truetype.h"
+#include "stb_truetype.h"
 
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 #if defined(CK3D_BACKEND_D3D11)
 #include "shaders/d3d11.inl"

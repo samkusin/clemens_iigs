@@ -1,6 +1,7 @@
 #include "clem_backend.hpp"
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
+#include "clem_host_shared.hpp"
 #include "clem_mem.h"
 #include "clem_program_trace.hpp"
 #include "clem_serializer.hpp"
@@ -15,6 +16,7 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <vector>
 
 #include "cinek/circular_buffer.hpp"
 #include "fmt/format.h"
@@ -415,7 +417,7 @@ bool ClemensBackend::runScriptCommand(const std::string_view &command) {
 }
 //  TODO: Move into Clemens API clemens_mmio_find_card_name()
 static ClemensCard *findMockingboardCard(ClemensMMIO *mmio) {
-    for (int cardIdx = 0; cardIdx < 7; ++cardIdx) {
+    for (int cardIdx = 0; cardIdx < CLEM_CARD_SLOT_COUNT; ++cardIdx) {
         if (mmio->card_slot[cardIdx]) {
             const char *cardName =
                 mmio->card_slot[cardIdx]->io_name(mmio->card_slot[cardIdx]->context);
@@ -719,9 +721,11 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         std::chrono::microseconds((long)std::floor(1e6 / emulatorRefreshFrequency));
     auto lastFrameTimePoint = std::chrono::high_resolution_clock::now();
     std::optional<unsigned> hitBreakpoint;
-    std::optional<bool> commandFailed;
-    std::optional<Command::Type> commandType;
     std::optional<std::string> debugMessage;
+    std::vector<ClemensBackendResult> commandResults;
+
+    ClemensBackendState publishedState{};
+    publishedState.results.reserve(8);
 
     while (!isTerminated) {
         bool isRunning = !stepsRemaining.has_value() || *stepsRemaining > 0;
@@ -733,6 +737,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             //  waiting for commands
             commandQueueCondition_.wait(queuelock, [this] { return !commandQueue_.empty(); });
         }
+
         //  TODO: we may just be able to use a vector for the command queue and
         //        create a local copy of the queue to minimize time spent executing
         //        commands.   the mutex seems to be used just for adds to the
@@ -740,11 +745,8 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         while (!commandQueue_.empty() && !isTerminated) {
             auto command = commandQueue_.front();
             commandQueue_.pop_front();
-            if (command.type != Command::Publish && command.type != Command::Input) {
-                if (!commandFailed.has_value()) {
-                    commandFailed = false;
-                }
-            }
+            bool commandFailed = false;
+
             switch (command.type) {
             case Command::Terminate:
                 isTerminated = true;
@@ -842,8 +844,14 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             case Command::Undefined:
                 break;
             }
-            if (commandFailed.has_value() && *commandFailed == true && !commandType.has_value()) {
-                commandType = command.type;
+
+            if (command.type != Command::Publish && command.type != Command::Input) {
+                //   queue command result
+                ClemensBackendResult commandResult;
+                commandResult.cmd = std::move(command);
+                commandResult.type =
+                    commandFailed ? ClemensBackendResult::Failed : ClemensBackendResult::Succeeded;
+                commandResults.emplace_back(commandResult);
             }
         }
         queuelock.unlock();
@@ -986,8 +994,8 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             publishState = true;
             updateSeqNo = true;
         }
-        //  TODO: force update by publish() option
-        updateSeqNo = updateSeqNo || commandFailed.has_value();
+
+        updateSeqNo = updateSeqNo || !commandResults.empty();
 
         if (updateSeqNo) {
             publishSeqNo++;
@@ -998,9 +1006,22 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
         //        assumption that once the callback returns, we can alter the state
         //        again as needed next timeslice.
         if (publishState) {
-            ClemensBackendState publishedState{};
-            publishedState.mmio_was_initialized = clemens_is_initialized_simple(&machine_);
-            if (publishedState.mmio_was_initialized) {
+            std::swap(publishedState.results, commandResults);
+            publishedState.machine = &machine_;
+            publishedState.mmio = &mmio_;
+            publishedState.fps = runSampler.sampledFramesPerSecond;
+            publishedState.seqno = publishSeqNo;
+            publishedState.isTerminated = isTerminated;
+            publishedState.isRunning = isRunning;
+            if (programTrace_ != nullptr) {
+                publishedState.isTracing = true;
+                publishedState.isIWMTracing = programTrace_->isIWMLoggingEnabled();
+            } else {
+                publishedState.isTracing = false;
+                publishedState.isIWMTracing = false;
+            }
+            publishedState.mmioWasInitialized = clemens_is_initialized_simple(&machine_);
+            if (publishedState.mmioWasInitialized) {
                 clemens_get_monitor(&publishedState.monitor, &mmio_);
                 clemens_get_text_video(&publishedState.text, &mmio_);
                 clemens_get_graphics_video(&publishedState.graphics, &machine_, &mmio_);
@@ -1015,38 +1036,22 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                     }
                 }
             }
-            publishedState.isRunning = isRunning;
-            if (programTrace_ != nullptr) {
-                publishedState.isTracing = true;
-                publishedState.isIWMTracing = programTrace_->isIWMLoggingEnabled();
-            } else {
-                publishedState.isTracing = false;
-                publishedState.isIWMTracing = false;
-            }
-            publishedState.machine = &machine_;
-            publishedState.mmio = &mmio_;
-            publishedState.seqno = publishSeqNo;
-            publishedState.fps = runSampler.sampledFramesPerSecond;
             publishedState.hostCPUID = clem_host_get_processor_number();
             publishedState.logLevel = logLevel_;
             publishedState.logBufferStart = logOutput_.data();
             publishedState.logBufferEnd = logOutput_.data() + logOutput_.size();
-            publishedState.logInstructionStart = loggedInstructions_.data();
-            publishedState.logInstructionEnd =
-                loggedInstructions_.data() + loggedInstructions_.size();
             publishedState.bpBufferStart = breakpoints_.data();
             publishedState.bpBufferEnd = breakpoints_.data() + breakpoints_.size();
             if (hitBreakpoint.has_value()) {
                 publishedState.bpHitIndex = *hitBreakpoint;
             }
+
             publishedState.diskDrives = diskDrives_.data();
             publishedState.smartDrives = smartPortDrives_.data();
-            publishedState.commandFailed = std::move(commandFailed);
-            publishedState.commandType = std::move(commandType);
-            publishedState.message = std::move(debugMessage);
-            if (isTerminated) {
-                publishedState.terminated = isTerminated;
-            }
+            publishedState.logInstructionStart = loggedInstructions_.data();
+            publishedState.logInstructionEnd =
+                loggedInstructions_.data() + loggedInstructions_.size();
+
             //  read IO memory from bank 0xe0 which ignores memory shadow settings
             for (uint16_t ioAddr = 0xc000; ioAddr < 0xc0ff; ++ioAddr) {
                 clem_read(&machine_, &publishedState.ioPageValues[ioAddr - 0xc000], ioAddr, 0xe0,
@@ -1054,16 +1059,18 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             }
             publishedState.debugMemoryPage = debugMemoryPage_;
             publishedState.emulatorSpeedMhz = runSampler.sampledEmulatorSpeedMhz;
+            publishedState.message = std::move(debugMessage);
 
+            // send the published state to our listener
             publishDelegate(publishedState);
-            if (publishedState.mmio_was_initialized) {
+
+            if (publishedState.mmioWasInitialized) {
                 clemens_audio_next_frame(&mmio_, publishedState.audio.frame_count);
             }
             logOutput_.clear();
             loggedInstructions_.clear();
+            commandResults.clear();
             hitBreakpoint = std::nullopt;
-            commandFailed = std::nullopt;
-            commandType = std::nullopt;
             debugMessage = std::nullopt;
         }
     } // !isTerminated
@@ -1072,7 +1079,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
     //  TODO: clemens_mmio_card_eject() will clear the slot but it still needs
     //        to be destroyed by the app
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
         destroyCard(mmio_.card_slot[i]);
         mmio_.card_slot[i] = NULL;
     }
@@ -1215,7 +1222,7 @@ void ClemensBackend::saveBRAM() {
     const uint8_t *bram = clemens_rtc_get_bram(&mmio_, &isDirty);
     if (!isDirty)
         return;
-    auto bramPath = std::filesystem::path(config_.dataRootPath) / "clem.bram"; 
+    auto bramPath = std::filesystem::path(config_.dataRootPath) / "clem.bram";
     std::ofstream bramFile(bramPath, std::ios::binary);
     if (bramFile.is_open()) {
         bramFile.write((char *)bram, CLEM_RTC_BRAM_SIZE);
@@ -1225,7 +1232,7 @@ void ClemensBackend::saveBRAM() {
 }
 
 void ClemensBackend::loadBRAM() {
-    auto bramPath = std::filesystem::path(config_.dataRootPath) / "clem.bram"; 
+    auto bramPath = std::filesystem::path(config_.dataRootPath) / "clem.bram";
     std::ifstream bramFile(bramPath, std::ios::binary);
     if (bramFile.is_open()) {
         bramFile.read((char *)mmio_.dev_rtc.bram, CLEM_RTC_BRAM_SIZE);

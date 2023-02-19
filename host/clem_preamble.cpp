@@ -5,9 +5,6 @@
 #include "imgui.h"
 #include "version.h"
 
-
-
-
 //  TODO: pass the configuration object (ClemensConfiguration) into this
 //        class from ClemensFrontend (created there, it loads the INI file and
 //        defines some configuration values.)
@@ -57,10 +54,9 @@ auto ClemensPreamble::frame(int width, int height) -> Result {
         if (ImGui::BeginPopupModal("FirstUse", NULL, ImGuiWindowFlags_NoResize)) {
             auto contentSize = ImGui::GetContentRegionAvail();
             ImGui::BeginChild(ImGui::GetID("text"), ImVec2(-FLT_MIN, contentSize.y - 50));
-            ImGui::TextWrapped(ClemensL10N::kFirstTimeUse[kLanguageDefault],
-                               CLEM_HOST_VERSION_MAJOR, CLEM_HOST_VERSION_MINOR);
-            ImGui::TextWrapped(ClemensL10N::kGSKeyboardCommands[kLanguageDefault],
-                               CLEM_HOST_VERSION_MAJOR, CLEM_HOST_VERSION_MINOR);
+            ImGui::TextWrapped("%s\n\n", ClemensL10N::kGSKeyboardCommands[kLanguageDefault]);
+            ImGui::TextWrapped("%s", ClemensL10N::kFirstTimeUse[kLanguageDefault]);
+
             ImGui::EndChild();
             if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
                 ImGui::CloseCurrentPopup();

@@ -2,12 +2,10 @@ namespace ClemensL10N {
 const char *kWelcomeText[] = {"Clemens IIGS Emulator v%d.%d\n"
                               "\n\n"
                               "This release contains the following changes:\n\n"
-                              "- SmartPort hard drive emulation\n"
-                              "- Joystick/Paddles support\n"
-                              "- Ctrl-Apple-Escape trigger for the Desktop Manager\n"
-                              "- Minor fixes on the IWM\n"
-                              "- Separation of 65816 and I/O emulator libraries\n"
-                              "- UI improvements\n"
+                              "- User-minimal interface mode (by default)\n"
+                              "- macOS Intel and Apple Silicon support\n"
+                              "- Snapshot save/load fixes in some cases\n"
+                              "- Improved Keyboard shortcut support\n"
                               "\n\n"
                               "The following IIGS features are not yet supported:\n"
                               "\n"
@@ -17,7 +15,7 @@ const char *kWelcomeText[] = {"Clemens IIGS Emulator v%d.%d\n"
                               "- Emulator Localization (PAL, Monochrome)"};
 
 const char *kFirstTimeUse[] = {
-    "Usage instructions for the Emulator:\n"
+    "Usage instructions for the Emulator in Debugger Mode:\n"
     "\n"
     "At the terminal prompt (lower-right side of the view), enter 'help' to display instructions "
     "for supported commands.\n"
@@ -25,6 +23,7 @@ const char *kFirstTimeUse[] = {
     "Useful Terminal Commands:\n"
     "- reboot                       : reboots the system\n"
     "- help                         : displays all supported commands\n"
+    "- minimode                     : returns to the user frontend\n"
     "- break                        : breaks into the debugger\n"
     "- save <snapshot_name>         : saves a snapshot of the current system\n"
     "- load <snapshot_name>         : loads a saved snapshot\n"
@@ -41,6 +40,9 @@ const char *kFirstTimeUse[] = {
     "images\n"
     "\n"};
 
+const char *kMouseLock[] = {"Click in View to lock mouse input"};
+const char *kViewInput[] = {"Move mouse into view for key input"};
+
 #if defined(__linux__)
 const char *kGSKeyboardCommands[] = {
     "IIGS Keyboard Commands:\n"
@@ -56,28 +58,21 @@ const char *kGSKeyboardCommands[] = {
     "- Tux - Ctrl - Equal for CTRL-RESET\n"
     "- Tux - Ctrl - Left Alt - 1 to enter the Control Panel\n"};
 
-const char *kMouseUnlock[] = {
-    "Press both ALT keys and CTRL to unlock mouse"
-};
+const char *kMouseUnlock[] = {"Press both ALT keys and CTRL to unlock mouse"};
 #elif defined(__APPLE__)
 const char *kGSKeyboardCommands[] = {"IIGS Keyboard Commands:\n"
                                      "\n"
                                      "- Ctrl-Command-F12 to reboot the system\n"
                                      "- Ctrl-F12 for CTRL-RESET\n"
                                      "- Ctrl-Option-F1 to enter the Control Panel\n"};
-const char *kMouseUnlock[] = {
-    "Press Option + Command + and CTRL to unlock mouse:"
-};
+const char *kMouseUnlock[] = {"Press Option + CTRL + Command to unlock mouse:"};
 #else
 const char *kGSKeyboardCommands[] = {"IIGS Keyboard Commands:\n"
                                      "\n"
                                      "- Ctrl-Right ALT-F12 to reboot the system\n"
                                      "- Ctrl-F12 for CTRL-RESET\n"
                                      "- Ctrl-Left ALT-F1 to enter the Control Panel\n"};
-                                     
-const char *kMouseUnlock[] = {
-    "Press both ALT keys and CTRL to unlock mouse"
-};
+
+const char *kMouseUnlock[] = {"Press both ALT keys and CTRL to unlock mouse"};
 #endif
 } // namespace ClemensL10N
-

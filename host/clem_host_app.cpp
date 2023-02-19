@@ -5,7 +5,6 @@
 #include <combaseapi.h>
 #endif
 
-
 #include "imgui.h"
 
 #include <array>
@@ -15,6 +14,7 @@
 
 #include "clem_host_platform.h"
 
+#include "clem_assets.hpp"
 #include "clem_front.hpp"
 #include "clem_startup_view.hpp"
 
@@ -37,6 +37,7 @@ struct SharedAppData {
     }
 
     std::string rootPathOverride;
+    ImVector<ImWchar> imguiUnicodeRanges;
 };
 
 static uint64_t g_lastTime = 0;
@@ -54,7 +55,7 @@ static cinek::ByteBuffer g_systemFontHiBuffer;
 //  platform.  See each platform's implementation below for exceptional cases.
 
 #if defined(CLEMENS_PLATFORM_LINUX)
-//  utility for platforms that require special mapping of function keys 
+//  utility for platforms that require special mapping of function keys
 static int xlatToFnKey(const sapp_event *evt) {
     int fnKey = -1;
     if (evt->key_code >= SAPP_KEYCODE_0 && evt->key_code <= SAPP_KEYCODE_9) {
@@ -97,7 +98,7 @@ static sapp_keycode onKeyDown(const sapp_event *evt) {
     return evt->key_code;
 }
 
-static sapp_keycode onKeyUp(const sapp_event *evt, bool* doDownEvent) {
+static sapp_keycode onKeyUp(const sapp_event *evt, bool *doDownEvent) {
     if (g_escapeKeyDown) {
         if (evt->key_code == SAPP_KEYCODE_F1) {
             g_escapeKeyDown = false;
@@ -153,7 +154,7 @@ static sapp_keycode onKeyDown(const sapp_event *evt) {
     return outKeyCode;
 }
 
-static sapp_keycode onKeyUp(const sapp_event *evt, bool* doDownEvent) {
+static sapp_keycode onKeyUp(const sapp_event *evt, bool *doDownEvent) {
     sapp_keycode outKeyCode = evt->key_code;
 
     if (g_leftSuperKeyDown && evt->key_code == SAPP_KEYCODE_LEFT_SUPER)
@@ -187,10 +188,10 @@ static sapp_keycode onKeyUp(const sapp_event *evt, bool* doDownEvent) {
 
 //  edge case where CTRL + ESC does not report the ESCAPE down event
 static bool g_escape_down = false;
-static sapp_keycode onKeyDown(const sapp_event *evt) { 
+static sapp_keycode onKeyDown(const sapp_event *evt) {
     sapp_keycode outKeyCode = evt->key_code;
     if (evt->key_code == SAPP_KEYCODE_LEFT_SUPER) {
-         outKeyCode = SAPP_KEYCODE_RIGHT_ALT;
+        outKeyCode = SAPP_KEYCODE_RIGHT_ALT;
     }
     if (evt->modifiers & (SAPP_MODIFIER_CTRL + SAPP_MODIFIER_ALT)) {
         if (evt->key_code == SAPP_KEYCODE_F1 && !g_escape_down) {
@@ -206,28 +207,29 @@ static sapp_keycode onKeyDown(const sapp_event *evt) {
     return outKeyCode;
 }
 
-static sapp_keycode onKeyUp(const sapp_event *evt, bool* doDownEvent) {
+static sapp_keycode onKeyUp(const sapp_event *evt, bool *doDownEvent) {
     sapp_keycode outKeyCode = evt->key_code;
     *doDownEvent = false;
     if (evt->key_code == SAPP_KEYCODE_LEFT_SUPER) {
         outKeyCode = SAPP_KEYCODE_RIGHT_ALT;
     }
     if (evt->key_code == SAPP_KEYCODE_ESCAPE) {
-        if (!g_escape_down) *doDownEvent = true;
+        if (!g_escape_down)
+            *doDownEvent = true;
         g_escape_down = false;
     } else if (g_escape_down) {
         if (evt->key_code == SAPP_KEYCODE_F1 || evt->key_code == SAPP_KEYCODE_ESCAPE) {
             g_escape_down = false;
-            outKeyCode =  SAPP_KEYCODE_ESCAPE;
+            outKeyCode = SAPP_KEYCODE_ESCAPE;
         }
     }
-    
+
     return outKeyCode;
 }
 #else
 static sapp_keycode onKeyDown(const sapp_event *evt) { return evt->key_code; }
 
-static sapp_keycode onKeyUp(const sapp_event *evt, bool* doDownEvent) {
+static sapp_keycode onKeyUp(const sapp_event *evt, bool *doDownEvent) {
     *doDownEvent = false;
     return evt->key_code;
 }
@@ -245,7 +247,7 @@ cinek::ByteBuffer loadFont(const char *pathname) {
     return buffer;
 }
 
-static void imguiFontSetup(const cinek::ByteBuffer &systemFontLoBuffer,
+static void imguiFontSetup(SharedAppData *appdata, const cinek::ByteBuffer &systemFontLoBuffer,
                            const cinek::ByteBuffer &systemFontHiBuffer) {
     auto &io = ImGui::GetIO();
     // add fonts
@@ -254,12 +256,21 @@ static void imguiFontSetup(const cinek::ByteBuffer &systemFontLoBuffer,
     ImFontConfig font_cfg;
     font_cfg.FontDataOwnedByAtlas = false;
 
+    const ImWchar *latinCodepoints = io.Fonts->GetGlyphRangesDefault();
+
+    ImFontGlyphRangesBuilder glyphRangesBuilder;
+    glyphRangesBuilder.AddRanges(latinCodepoints);
+    glyphRangesBuilder.AddChar(0xe010); // open apple
+    glyphRangesBuilder.BuildRanges(&appdata->imguiUnicodeRanges);
+
     strncpy(font_cfg.Name, "A2Lo", sizeof(font_cfg.Name));
     io.Fonts->AddFontFromMemoryTTF(const_cast<uint8_t *>(systemFontLoBuffer.getHead()),
-                                   systemFontLoBuffer.getSize(), 16.0f, &font_cfg);
+                                   systemFontLoBuffer.getSize(), 16.0f, &font_cfg,
+                                   appdata->imguiUnicodeRanges.Data);
     strncpy(font_cfg.Name, "A2Hi", sizeof(font_cfg.Name));
     io.Fonts->AddFontFromMemoryTTF(const_cast<uint8_t *>(systemFontHiBuffer.getHead()),
-                                   systemFontHiBuffer.getSize(), 16.0f, &font_cfg);
+                                   systemFontHiBuffer.getSize(), 16.0f, &font_cfg,
+                                   appdata->imguiUnicodeRanges.Data);
 
     if (!io.Fonts->IsBuilt()) {
         unsigned char *font_pixels;
@@ -287,7 +298,7 @@ static void onInit(void *userdata) {
 
     clem_host_platform_init();
     stm_setup();
-    
+
 #if defined(CLEMENS_PLATFORM_WINDOWS)
     CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #endif
@@ -409,7 +420,10 @@ static void onInit(void *userdata) {
 
     g_systemFontLoBuffer = loadFont("fonts/PrintChar21.ttf");
     g_systemFontHiBuffer = loadFont("fonts/PRNumber3.ttf");
-    imguiFontSetup(g_systemFontLoBuffer, g_systemFontHiBuffer);
+    imguiFontSetup(appdata, g_systemFontLoBuffer, g_systemFontHiBuffer);
+
+    ClemensHostAssets::initialize();
+
     g_Host = new ClemensStartupView(appdata->rootPathOverride);
 }
 
@@ -474,8 +488,9 @@ static void onFrame(void *userdata) {
     }
 }
 
-static void doHostInputEvent(struct ClemensInputEvent& clemInput, uint32_t modifiers) {
-    if (clemInput.type == kClemensInputType_None) return;
+static void doHostInputEvent(struct ClemensInputEvent &clemInput, uint32_t modifiers) {
+    if (clemInput.type == kClemensInputType_None)
+        return;
     if (modifiers & SAPP_MODIFIER_CAPS) {
         g_ADBKeyToggleMask |= CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK;
     } else {
@@ -485,7 +500,6 @@ static void doHostInputEvent(struct ClemensInputEvent& clemInput, uint32_t modif
     if (g_Host)
         g_Host->input(clemInput);
 }
-
 
 static void onEvent(const sapp_event *evt, void *) {
     struct ClemensInputEvent clemInput {};
@@ -560,6 +574,9 @@ static void onCleanup(void *userdata) {
     CoUninitialize();
 #endif
     delete appdata;
+
+    ClemensHostAssets::terminate();
+
     simgui_shutdown();
     sg_shutdown();
     clem_host_platform_terminate();
@@ -571,14 +588,14 @@ sapp_desc sokol_main(int argc, char *argv[]) {
     sapp_desc sapp = {};
 
     sapp.user_data = new SharedAppData(argc, argv);
-    sapp.width = 1440;
     sapp.height = 900;
+    sapp.width = 1440;
     sapp.init_userdata_cb = &onInit;
     sapp.frame_userdata_cb = &onFrame;
     sapp.cleanup_userdata_cb = &onCleanup;
     sapp.event_userdata_cb = &onEvent;
     sapp.fail_userdata_cb = &onFail;
-    sapp.window_title = "Clemens IIgs Developer";
+    sapp.window_title = "Clemens IIGS";
     sapp.win32_console_create = true;
     sapp.win32_console_attach = true;
 

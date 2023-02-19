@@ -150,8 +150,8 @@ bool save(std::string outputPath, ClemensMachine *machine, ClemensMMIO *mmio, si
     //  are considered unique - if this changes, then we'll have to redo this
     mpack_write_cstr(&writer, "slots");
     {
-        mpack_start_array(&writer, 7);
-        for (int slotIndex = 0; slotIndex < 7; ++slotIndex) {
+        mpack_start_array(&writer, CLEM_CARD_SLOT_COUNT);
+        for (int slotIndex = 0; slotIndex < CLEM_CARD_SLOT_COUNT; ++slotIndex) {
             // TODO: clemens_mmio_card_get_name()
             const char *cardName =
                 (mmio->card_slot[slotIndex] != NULL)
@@ -164,7 +164,7 @@ bool save(std::string outputPath, ClemensMachine *machine, ClemensMMIO *mmio, si
     mpack_write_cstr(&writer, "cards");
     {
         mpack_build_map(&writer);
-        for (int slotIndex = 0; slotIndex < 7; ++slotIndex) {
+        for (int slotIndex = 0; slotIndex < CLEM_CARD_SLOT_COUNT; ++slotIndex) {
             if (!mmio->card_slot[slotIndex])
                 continue;
             const char *cardName =

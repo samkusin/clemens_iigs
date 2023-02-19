@@ -16,8 +16,10 @@
 struct ClemensConfiguration {
     std::string iniPathname;
     std::string dataDirectory;
+    std::string romFilename;
     unsigned majorVersion;
     unsigned minorVersion;
+    bool hybridInterfaceEnabled;
 
     ClemensConfiguration();
     ClemensConfiguration(std::string pathname, std::string datadir);

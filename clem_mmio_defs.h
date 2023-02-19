@@ -40,6 +40,8 @@
 /** NMI line masks for card slot triggers */
 #define CLEM_NMI_CARD_MASK (0x000000ff)
 
+#define CLEM_CARD_SLOT_COUNT 7
+
 //  These flags refer to bank 0 memory switches for address bit 17
 //  0 = Main Bank, 1 = Aux Bank ZP, Stack and Language Card
 #define CLEM_MEM_IO_MMAP_ALTZPLC 0x00000001
@@ -563,6 +565,34 @@
 #define CLEM_ADB_KEY_RESET 0x7F
 
 #define CLEM_ADB_KEY_CODE_LIMIT 0x80
+
+/* GLU register flags */
+#define CLEM_ADB_GLU_REG0_MOUSE_BTN         0x8000
+#define CLEM_ADB_GLU_REG0_MOUSE_Y_DELTA     0x7f00
+#define CLEM_ADB_GLU_REG0_MOUSE_ALWAYS_1    0x0080 /* Table 6-11 HWRef */
+#define CLEM_ADB_GLU_REG0_MOUSE_X_DELTA     0x007f
+#define CLEM_ADB_GLU_REG2_KEY_CAPS_TOGGLE   0x0002
+#define CLEM_ADB_GLU_REG2_KEY_CLEAR_NUMLOCK 0x0080
+#define CLEM_ADB_GLU_REG2_KEY_APPLE         0x0100
+#define CLEM_ADB_GLU_REG2_KEY_OPTION        0x0200
+#define CLEM_ADB_GLU_REG2_KEY_SHIFT         0x0400
+#define CLEM_ADB_GLU_REG2_KEY_CTRL          0x0800
+#define CLEM_ADB_GLU_REG2_KEY_RESET         0x1000
+#define CLEM_ADB_GLU_REG2_KEY_CAPS          0x2000
+#define CLEM_ADB_GLU_REG2_MODKEY_MASK                                                              \
+    0x7f80 /* no scroll lock or LED bits per 'ADB - The Untold Story' */
+#define CLEM_ADB_GLU_REG3_MASK_SRQ    0x2000
+#define CLEM_ADB_GLU_REG3_DEVICE_MASK 0x0F00
+
+/* See clemens_get_adb_key_modifier_states() */
+#define CLEM_ADB_KEY_MOD_STATE_CAPS    CLEM_ADB_GLU_REG2_KEY_CAPS_TOGGLE
+#define CLEM_ADB_KEY_MOD_STATE_NUMLOCK CLEM_ADB_GLU_REG2_KEY_CLEAR_NUMLOCK
+#define CLEM_ADB_KEY_MOD_STATE_APPLE   CLEM_ADB_GLU_REG2_KEY_APPLE
+#define CLEM_ADB_KEY_MOD_STATE_OPTION  CLEM_ADB_GLU_REG2_KEY_OPTION
+#define CLEM_ADB_KEY_MOD_STATE_SHIFT   CLEM_ADB_GLU_REG2_KEY_SHIFT
+#define CLEM_ADB_KEY_MOD_STATE_CTRL    CLEM_ADB_GLU_REG2_KEY_CTRL
+#define CLEM_ADB_KEY_MOD_STATE_RESET   CLEM_ADB_GLU_REG2_KEY_RESET
+#define CLEM_ADB_KEY_MOD_STATE_ESCAPE  0x00010000
 
 /** Emulated duration of every 'step' iwm_glu_sync runs. 1.023 / 2 ~ 0.511 */
 #define CLEM_IWM_SYNC_FRAME_NS           (CLEM_MEGA2_CYCLE_NS / 2)

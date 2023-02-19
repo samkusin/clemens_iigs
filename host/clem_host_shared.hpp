@@ -47,7 +47,7 @@ struct ClemensBackendConfig {
     std::string traceRootPath;
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDriveStates;
     std::array<ClemensBackendDiskDriveState, 1> smartPortDriveStates;
-    std::array<std::string, 7> cardNames;
+    std::array<std::string, CLEM_CARD_SLOT_COUNT> cardNames;
     std::vector<ClemensBackendBreakpoint> breakpoints;
     unsigned audioSamplesPerSecond;
     Type type;
@@ -123,22 +123,23 @@ template <typename Stats> struct ClemensEmulatorDiagnostics {
         return std::make_pair(0.0, false);
     }
 };
+struct ClemensBackendResult {
+    ClemensBackendCommand cmd;
+    enum Type { Succeeded, Failed };
+    Type type;
+};
 
 struct ClemensBackendState {
+    std::vector<ClemensBackendResult> results;
     ClemensMachine *machine;
     ClemensMMIO *mmio;
     double fps;
     uint64_t seqno;
+    bool isTerminated;
     bool isRunning;
     bool isTracing;
     bool isIWMTracing;
-    bool mmio_was_initialized;
-    std::optional<bool> terminated;
-    std::optional<bool> commandFailed;
-    // valid if commandFailed
-    std::optional<ClemensBackendCommand::Type> commandType;
-    // valid if a debugMessage() command was issued from the frontend
-    std::optional<std::string> message;
+    bool mmioWasInitialized;
 
     ClemensMonitor monitor;
     ClemensVideo text;
@@ -147,7 +148,6 @@ struct ClemensBackendState {
 
     unsigned hostCPUID;
     int logLevel;
-
     const ClemensBackendOutputText *logBufferStart;
     const ClemensBackendOutputText *logBufferEnd;
     const ClemensBackendBreakpoint *bpBufferStart;
@@ -162,6 +162,9 @@ struct ClemensBackendState {
     uint8_t debugMemoryPage;
 
     float emulatorSpeedMhz;
+
+    // valid if a debugMessage() command was issued from the frontend
+    std::optional<std::string> message;
 };
 
 #endif

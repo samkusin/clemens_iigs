@@ -300,6 +300,14 @@ void clemens_input_key_toggle(ClemensMMIO *mmio, unsigned enabled) {
     clem_adb_device_key_toggle(&mmio->dev_adb, enabled);
 }
 
+unsigned clemens_get_adb_key_modifier_states(ClemensMMIO *mmio) {
+    unsigned key_mod_state = mmio->dev_adb.keyb_reg[2];
+    if (mmio->dev_adb.keyb.states[CLEM_ADB_KEY_ESCAPE]) {
+        key_mod_state |= CLEM_ADB_KEY_MOD_STATE_ESCAPE;
+    }
+    return key_mod_state;
+}
+
 const uint8_t *clemens_get_ascii_from_a2code(unsigned input) {
     return clem_adb_ascii_from_a2code(input);
 }
@@ -367,7 +375,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
         clem_iwm_speed_disk_gate(mmio, &clem->tspec);
         clock.ts = clem->tspec.clocks_spent;
         clock.ref_step = clem->tspec.clocks_step_mega2;
-        for (i = 0; i < 7; ++i) {
+        for (i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
             if (mmio->card_slot[i]) {
                 mmio->card_slot[i]->io_reset(&clock, mmio->card_slot[i]->context);
             }
@@ -406,7 +414,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
 
     card_nmis = 0;
     card_irqs = 0;
-    for (i = 0; i < 7; ++i) {
+    for (i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
         if (!mmio->card_slot[i])
             continue;
         card_result = (*mmio->card_slot[i]->io_sync)(&clock, mmio->card_slot[i]->context);

@@ -370,11 +370,11 @@ enum ClemensMMIOStateType {
  */
 typedef struct ClemensMMIO {
     /** Handlers for all slots */
-    ClemensCard *card_slot[7];
+    ClemensCard *card_slot[CLEM_CARD_SLOT_COUNT];
     /** Expansion ROM area for each card.  This area is paged into addressable
      *  memory with the correct IO instructions.  Each area should be 2K in
      *  size.  As with card slot memory, slot 3 is ignored */
-    uint8_t *card_slot_expansion_memory[7];
+    uint8_t *card_slot_expansion_memory[CLEM_CARD_SLOT_COUNT];
     /* pointer to the array of bank page map pointers initialized by the
        parent machine
     */
