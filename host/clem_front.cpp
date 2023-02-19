@@ -3559,6 +3559,12 @@ void ClemensFrontend::cmdPower(std::string_view operand) {
         } else {
             CLEM_TERM_COUT.print(TerminalLine::Error, "Already on.");
         }
+    } else if (operand.empty()) {
+        if (backend_) {
+            CLEM_TERM_COUT.print(TerminalLine::Error, "Powered on.");
+        } else {
+            CLEM_TERM_COUT.print(TerminalLine::Error, "Powered off.");
+        }
     }
 }
 
