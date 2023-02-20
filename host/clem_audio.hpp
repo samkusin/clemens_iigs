@@ -23,6 +23,7 @@ class ClemensAudioDevice {
 
     void mixClemensAudio(float *buffer, int num_frames, int num_channels);
 
+    // audio sent to the hardware mixer
     uint8_t *queuedFrameBuffer_;
     uint32_t queuedFrameHead_;
     uint32_t queuedFrameTail_;

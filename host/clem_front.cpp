@@ -689,7 +689,7 @@ void ClemensFrontend::lostFocus() {
 }
 
 std::unique_ptr<ClemensBackend> ClemensFrontend::createBackend() {
-    constexpr unsigned refreshFrequency_ = 60;
+    constexpr unsigned refreshFrequency_ = 30;
     auto romPath = std::filesystem::path(config_.dataDirectory) / config_.romFilename;
     auto backend = std::make_unique<ClemensBackend>(
         romPath.string(), backendConfig_,
@@ -1155,7 +1155,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         audioFrame.frame_stride = frameReadState_.audioFrame.frame_stride;
         audioFrame.frame_start = 0;
         audioFrame.frame_count = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
-        audioFrame.frame_total = thisFrameAudioBuffer_.getCapacity() / audioFrame.frame_stride;
+        audioFrame.frame_total = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
         audio_.queue(audioFrame, deltaTime);
         thisFrameAudioBuffer_.reset();
     }
@@ -2749,8 +2749,8 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
         //  This logic is rather convoluted - we have two focus types and this logic is
         //  an attempt to determine the user's intent regarding where keyboard and mouse
         //  input goes (to the emulator vs GUI.)  Basically if the mouse pointer is in
-        //  the emulator view, all keyboard input goes to the view.  If the user mouse-clicks
-        //  inside the emulator view, all input goes to the view.
+        //  the emulator view, all keyboard input goes to the view.  If the user
+        //  mouse-clicks inside the emulator view, all input goes to the view.
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !emulatorHasMouseFocus_) {
             emulatorHasMouseFocus_ = ImGui::IsWindowHovered();
         }
@@ -3719,10 +3719,10 @@ void ClemensFrontend::cmdLog(std::string_view operand) {
     auto levelName = std::find_if(logLevelNames.begin(), logLevelNames.end(),
                                   [&operand](const char *name) { return operand == name; });
     if (levelName == logLevelNames.end()) {
-        CLEM_TERM_COUT.format(
-            TerminalLine::Error,
-            "Log level '{}' is not one of the following: DEBUG, INFO, WARN, UNIMPL or FATAL",
-            operand);
+        CLEM_TERM_COUT.format(TerminalLine::Error,
+                              "Log level '{}' is not one of the following: DEBUG, INFO, "
+                              "WARN, UNIMPL or FATAL",
+                              operand);
         return;
     }
     backend_->debugLogLevel(int(levelName - logLevelNames.begin()));

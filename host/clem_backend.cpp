@@ -677,6 +677,8 @@ void ClemensBackend::queueToFront(const Command &cmd) {
     commandQueueCondition_.notify_one();
 }
 
+//  from the emulator, obtain the number of clocks per second desired
+//
 static int64_t calculateClocksPerTimeslice(ClemensMMIO *mmio, unsigned hz) {
     bool is_machine_slow;
     return int64_t(clemens_clocks_per_second(mmio, &is_machine_slow) / hz);
@@ -886,6 +888,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             auto lastClocksSpent = machine_.tspec.clocks_spent;
             int64_t clocksPerTimeslice =
                 calculateClocksPerTimeslice(&mmio_, emulatorRefreshFrequency);
+
             clocksRemainingInTimeslice += clocksPerTimeslice;
 
             machine_.cpu.cycles_spent = 0;
@@ -894,9 +897,9 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                 clem_clocks_time_t pre_emulate_time = machine_.tspec.clocks_spent;
                 clemens_emulate_cpu(&machine_);
                 clemens_emulate_mmio(&machine_, &mmio_);
-                clem_clocks_duration_t emulate_step_time =
+                clem_clocks_duration_t emulate_step_clocks =
                     machine_.tspec.clocks_spent - pre_emulate_time;
-                clocksRemainingInTimeslice -= emulate_step_time;
+                clocksRemainingInTimeslice -= emulate_step_clocks;
                 if (stepsRemaining.has_value()) {
                     stepsRemaining = *stepsRemaining - 1;
                 }
