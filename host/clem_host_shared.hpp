@@ -162,6 +162,7 @@ struct ClemensBackendState {
     uint8_t debugMemoryPage;
 
     float emulatorSpeedMhz;
+    bool fastEmulationOn;
 
     // valid if a debugMessage() command was issued from the frontend
     std::optional<std::string> message;
