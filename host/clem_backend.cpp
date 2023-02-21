@@ -27,15 +27,8 @@ static constexpr unsigned kLogOutputLineLimit = 1024;
 static constexpr unsigned kSmartPortDiskBlockCount = 32 * 1024 * 2; // 32 MB blocks
 
 struct ClemensRunSampler {
-    //  our method of keeping the simulation in sync with real time is to rely
-    //  on two counters
-    //    - sDT = simulation counter that ticks at a fixed rate, and
-    //    - aDT = real-time timer that counts the actual time passed
-    //
-    //  if aDT < sDT, then sleep the amount of time needed to catch up with sDT
-    //  if aDT >= sDT, then clamp aDT to sDT
-    std::chrono::microseconds fixedTimeInterval;
-    std::chrono::microseconds actualTimeInterval;
+    std::chrono::microseconds referenceFrameTimer;
+    std::chrono::microseconds actualFrameTimer;
     std::chrono::microseconds sampledFrameTime;
 
     double sampledFramesPerSecond;
@@ -48,17 +41,19 @@ struct ClemensRunSampler {
     cinek::CircularBuffer<clem_clocks_duration_t, 120> cyclesBuffer;
 
     double sampledEmulatorSpeedMhz;
+    double actualEmulatorSpeedMhz;
 
     ClemensRunSampler() { reset(); }
 
     void reset() {
-        fixedTimeInterval = std::chrono::microseconds::zero();
-        actualTimeInterval = std::chrono::microseconds::zero();
+        referenceFrameTimer = std::chrono::microseconds::zero();
+        actualFrameTimer = std::chrono::microseconds::zero();
         sampledFrameTime = std::chrono::microseconds::zero();
         sampledClocksSpent = 0;
         sampledCyclesSpent = 0;
         sampledFramesPerSecond = 0.0f;
         sampledEmulatorSpeedMhz = 0.0f;
+        actualEmulatorSpeedMhz = 0.0f;
         frameTimeBuffer.clear();
         clocksBuffer.clear();
         cyclesBuffer.clear();
@@ -67,20 +62,30 @@ struct ClemensRunSampler {
     void update(std::chrono::microseconds fixedFrameInterval,
                 std::chrono::microseconds actualFrameInterval, clem_clocks_duration_t clocksSpent,
                 unsigned cyclesSpent) {
-        fixedTimeInterval += fixedFrameInterval;
-        actualTimeInterval += actualFrameInterval;
-        //  see notes at the head of this class for how delta times are calculated
-        //  in an attempt to maintain a fixed frame rate on systems where sleep()
-        //  delays can overshoot the desired sleep time (Windows especially.)
-        if (actualTimeInterval < fixedTimeInterval) {
-            std::this_thread::sleep_for(fixedTimeInterval - actualTimeInterval);
-            fixedTimeInterval -= actualTimeInterval;
-            actualTimeInterval = std::chrono::microseconds::zero();
-        } else {
+
+        // Our goal is to keep the actualFrameTimer roughly in sync with the referenceFrameTimer.
+        // Given how thread scheduling differs between platforms and machines, it's expected the
+        // "actual" timer will overshoot and undershoot the reference timer during a run.
+        // This method will attempt to keep up using a timer delay.
+
+        referenceFrameTimer += fixedFrameInterval;
+        actualFrameTimer += actualFrameInterval;
+
+        if (actualFrameTimer >= referenceFrameTimer) {
+            //  Our runner is taking too long, so try to catch up.
+            //
             std::this_thread::yield();
-            if (actualTimeInterval - fixedFrameInterval > std::chrono::microseconds(500000)) {
-                actualTimeInterval = fixedTimeInterval = std::chrono::microseconds::zero();
+            if (actualFrameTimer - referenceFrameTimer > std::chrono::microseconds(500000)) {
+                //  TODO: Check whether this value increases over time - means we have a slow
+                //  machine.  This hack below will reset the timers to cap the delay
+                actualFrameTimer = referenceFrameTimer = std::chrono::microseconds::zero();
             }
+        } else {
+            // Our runner is faster than the machine speed.  Keep our runner at the desired
+            // framerate.
+            std::this_thread::sleep_for(referenceFrameTimer - actualFrameTimer);
+            referenceFrameTimer -= actualFrameTimer;
+            actualFrameTimer = std::chrono::microseconds::zero();
         }
 
         if (frameTimeBuffer.isFull()) {
@@ -120,6 +125,7 @@ struct ClemensRunSampler {
             sampledEmulatorSpeedMhz =
                 1.023 * double(CLEM_CLOCKS_MEGA2_CYCLE * sampledCyclesSpent) / sampledClocksSpent;
         }
+        // TODO: calculate # cycles per second = actual mhz (for fast emulation mode)
     }
 };
 
@@ -677,6 +683,8 @@ void ClemensBackend::queueToFront(const Command &cmd) {
     commandQueueCondition_.notify_one();
 }
 
+//  from the emulator, obtain the number of clocks per second desired
+//
 static int64_t calculateClocksPerTimeslice(ClemensMMIO *mmio, unsigned hz) {
     bool is_machine_slow;
     return int64_t(clemens_clocks_per_second(mmio, &is_machine_slow) / hz);
@@ -726,6 +734,8 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
     ClemensBackendState publishedState{};
     publishedState.results.reserve(8);
+
+    double emulatorTimeScalar = 1.0; //  used for fast emulation
 
     while (!isTerminated) {
         bool isRunning = !stepsRemaining.has_value() || *stepsRemaining > 0;
@@ -883,9 +893,19 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
 
             clemens_rtc_set(&mmio_, (unsigned)epoch_time_1904);
 
+            // TODO: this should be an adaptive scalar to support a variety of devices.
+            // Though if the emulator runs hot (cannot execute the desired cycles in enough time),
+            // that shouldn't matter too much given that this 'speed boost' is meant to be
+            // temporary, and the emulator should catch up once the IWM is inactive.
+            if (clemens_is_drive_io_active(&mmio_)) {
+                emulatorTimeScalar = 8.0;
+            } else {
+                emulatorTimeScalar = 1.0;
+            }
             auto lastClocksSpent = machine_.tspec.clocks_spent;
             int64_t clocksPerTimeslice =
-                calculateClocksPerTimeslice(&mmio_, emulatorRefreshFrequency);
+                calculateClocksPerTimeslice(&mmio_, emulatorRefreshFrequency) * emulatorTimeScalar;
+
             clocksRemainingInTimeslice += clocksPerTimeslice;
 
             machine_.cpu.cycles_spent = 0;
@@ -894,9 +914,9 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                 clem_clocks_time_t pre_emulate_time = machine_.tspec.clocks_spent;
                 clemens_emulate_cpu(&machine_);
                 clemens_emulate_mmio(&machine_, &mmio_);
-                clem_clocks_duration_t emulate_step_time =
+                clem_clocks_duration_t emulate_step_clocks =
                     machine_.tspec.clocks_spent - pre_emulate_time;
-                clocksRemainingInTimeslice -= emulate_step_time;
+                clocksRemainingInTimeslice -= emulate_step_clocks;
                 if (stepsRemaining.has_value()) {
                     stepsRemaining = *stepsRemaining - 1;
                 }
@@ -1059,6 +1079,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             }
             publishedState.debugMemoryPage = debugMemoryPage_;
             publishedState.emulatorSpeedMhz = runSampler.sampledEmulatorSpeedMhz;
+            publishedState.fastEmulationOn = emulatorTimeScalar > 1.0f;
             publishedState.message = std::move(debugMessage);
 
             // send the published state to our listener

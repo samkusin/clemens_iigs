@@ -3,6 +3,8 @@
 
 #include "clem_types.h"
 
+#define clemens_is_irq_enabled(_clem_) (!((_clem_)->cpu.P & kClemensCPUStatus_IRQDisable))
+
 #ifdef __cplusplus
 extern "C" {
 #endif

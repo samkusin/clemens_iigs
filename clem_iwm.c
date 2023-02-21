@@ -13,6 +13,7 @@
 #include "clem_device.h"
 #include "clem_drive.h"
 #include "clem_mmio_defs.h"
+#include "clem_shared.h"
 #include "clem_smartport.h"
 #include "clem_util.h"
 
@@ -76,8 +77,16 @@
 #define CLEM_IWM_STATE_WRITE_DATA     0x13
 #define CLEM_IWM_STATE_UNKNOWN        0xFF
 
-/* cribbed this convenient table from
+// Defines how long the IWM should report it's busy for emulator hosts to support
+// optimizations like fast disk emulation.
+#define CLEM_IWM_DATA_ACCESS_NS_EXPIRATION (500000000);
+
+/* Cribbed this convenient table from
    https://github.com/whscullin/apple2js/blob/f4b0100c98c2c12988f64ffe44426fcdd5ae901b/js/cards/disk2.ts#L107
+
+   The below is a combination of read and write lss commands compiled originally from Jim Sather's
+   Understanding the Apple IIe.  In fact much of the IWM implementation relies on Sather's book, the
+   IIgs Hardware Reference, the IWM specification and later books like the SWIM chip reference.
 */
 static uint8_t s_lss_rom[256] = {
     0x18, 0x18, 0x18, 0x18, 0x0A, 0x0A, 0x0A, 0x0A, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18,
@@ -168,6 +177,21 @@ struct ClemensDrive *_clem_iwm_select_drive(struct ClemensDeviceIWM *iwm,
         return &drives[1];
     }
     return NULL;
+}
+
+bool clem_iwm_is_active(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives) {
+    struct ClemensDrive *drive;
+    if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON))
+        return false;
+    // check smartport drive
+    if (iwm->enable2 && drives->smartport->device.device_id != 0)
+        return true;
+    drive = _clem_iwm_select_drive(iwm, drives);
+    if (!drive || !drive->has_disk || !drive->is_spindle_on)
+        return false;
+    if (iwm->data_access_time_ns == 0)
+        return false;
+    return true;
 }
 
 static void _clem_iwm_reset_lss(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
@@ -467,6 +491,9 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
         }
         lss_time_left_ns -= iwm->lss_update_dt_ns;
         next_clock.ts += clem_calc_clocks_step_from_ns(iwm->lss_update_dt_ns, next_clock.ref_step);
+
+        iwm->data_access_time_ns =
+            clem_util_timer_decrement(iwm->data_access_time_ns, iwm->lss_update_dt_ns);
     }
     /* handle the 1 second drive motor timer */
     if (iwm->ns_drive_hold > 0) {
@@ -502,6 +529,7 @@ void _clem_iwm_io_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *d
             } else if (iwm->ns_drive_hold == 0) {
                 iwm->ns_drive_hold = CLEM_1SEC_NS;
             }
+            iwm->data_access_time_ns = 0;
         }
         break;
     case CLEM_MMIO_REG_IWM_DRIVE_ENABLE:
@@ -647,6 +675,7 @@ void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
                 _clem_iwm_write_mode(iwm, value);
                 break;
             case CLEM_IWM_STATE_WRITE_DATA:
+                iwm->data_access_time_ns = CLEM_IWM_DATA_ACCESS_NS_EXPIRATION;
                 break;
             default:
                 break;
@@ -743,6 +772,7 @@ uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBa
                 result = _clem_iwm_read_handshake(iwm, clock, is_noop);
                 break;
             default:
+                iwm->data_access_time_ns = CLEM_IWM_DATA_ACCESS_NS_EXPIRATION;
                 if (iwm->enable2 && !(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
                     /* all ones, empty (SWIM Chip Ref p 11 doc) */
                     result = 0xff;

@@ -147,6 +147,10 @@ void clemens_remove_smartport_disk(ClemensMMIO *mmio, unsigned drive_index,
     mmio->active_drives.smartport[drive_index].unit_id = 0;
 }
 
+bool clemens_is_drive_io_active(ClemensMMIO *mmio) {
+    return clem_iwm_is_active(&mmio->dev_iwm, &mmio->active_drives);
+}
+
 ClemensMonitor *clemens_get_monitor(ClemensMonitor *monitor, ClemensMMIO *mmio) {
     struct ClemensVGC *vgc = &mmio->vgc;
 

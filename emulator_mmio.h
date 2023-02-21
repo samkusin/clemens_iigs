@@ -142,6 +142,20 @@ void clemens_remove_smartport_disk(ClemensMMIO *mmio, unsigned drive_index,
                                    struct ClemensSmartPortDevice *device);
 
 /**
+ * @brief If the IWM is actively reading or writing to a drive, returns true.
+ *
+ * This can be used by the emulator to turn on fast emulation when reading
+ * from a disk.
+ *
+ * Criteria for this state depends on a combination of IWM states.
+ *
+ * @param mmio
+ * @return true The IWM is actively reading or writing to a drive
+ * @return false No drive access
+ */
+bool clemens_is_drive_io_active(ClemensMMIO *mmio);
+
+/**
  * @brief Forwards input from ths host machine to the ADB
  *
  * @param mmio
