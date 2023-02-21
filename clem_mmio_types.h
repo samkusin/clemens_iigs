@@ -278,6 +278,8 @@ struct ClemensDeviceIWM {
     clem_clocks_time_t last_clocks_ts;
     /** Used for async write timing */
     clem_clocks_time_t last_write_clocks_ts;
+    /** Used for determining if applications are actually using the IWM for RW disk access*/
+    uint32_t data_access_time_ns;
 
     /** Drive I/O */
     unsigned io_flags;  /**< Disk port I/O flags */

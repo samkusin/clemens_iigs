@@ -218,6 +218,16 @@ void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dri
                        struct ClemensClock *clock);
 
 /**
+ * @brief Returns if the IWM is actively in read or write mode to a specific drive
+ *
+ * @param iwm
+ * @param drives
+ * @return true
+ * @return false
+ */
+bool clem_iwm_is_active(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives);
+
+/**
  * @brief Executed from the memory subsystem for MMIO
  *
  * @param iwm IWM data
