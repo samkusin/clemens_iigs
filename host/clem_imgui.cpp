@@ -49,6 +49,40 @@ void StatusBarField(StatusBarFlags flags, const char *fmt, ...) {
     drawList->AddText(ltanchor, (ImU32)textColor, tempCharBuffer);
 }
 
+void StatusBarField(StatusBarFlags flags, ImTextureID icon, const ImVec2 &labelSize) {
+    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+    ImVec2 labelPadding = ImGui::GetStyle().FramePadding;
+    float labelBorderSize = ImGui::GetStyle().FrameBorderSize;
+    ImVec2 widgetSize((labelBorderSize + labelPadding.x) * 2.0f + labelSize.x,
+                      (labelBorderSize + labelPadding.y) * 2.0f + labelSize.y);
+    ImGui::Dummy(widgetSize);
+
+    ImColor cellBorderColor = ImGui::GetStyleColorVec4(ImGuiCol_Border);
+    ImColor cellColor = ImGui::GetStyleColorVec4(ImGuiCol_TableRowBg);
+    ImColor iconColor;
+    if (flags == StatusBarFlags_Active)
+        iconColor = ImColor(ImGui::GetStyleColorVec4(ImGuiCol_Text));
+    else
+        iconColor = ImColor(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    ImVec2 ltanchor = cursorPos;
+    ImVec2 rbanchor = ltanchor;
+    rbanchor.x += widgetSize.x;
+    rbanchor.y += widgetSize.y;
+    drawList->AddRect(ltanchor, rbanchor, (ImU32)cellBorderColor);
+    ltanchor.x += labelBorderSize;
+    ltanchor.y += labelBorderSize;
+    rbanchor.x -= labelBorderSize;
+    rbanchor.y -= labelBorderSize;
+    drawList->AddRectFilled(ltanchor, rbanchor, (ImU32)cellColor);
+    ltanchor.x += labelPadding.x;
+    ltanchor.y += labelPadding.y;
+    rbanchor.x -= labelPadding.x;
+    rbanchor.y -= labelPadding.y;
+    drawList->AddImage(icon, ltanchor, rbanchor, ImVec2(0, 0), ImVec2(1, 1), (ImU32)iconColor);
+}
+
 bool IconButton(const char *strId, ImTextureID texId, const ImVec2 &size) {
     bool result = false;
     const ImGuiStyle &style = ImGui::GetStyle();

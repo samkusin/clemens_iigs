@@ -1,7 +1,7 @@
 #ifndef CLEM_HOST_ASSETS_HPP
 #define CLEM_HOST_ASSETS_HPP
 
-#include "sokol/sokol_gfx.h"
+#include <cstdint>
 
 namespace ClemensHostAssets {
 
@@ -9,6 +9,7 @@ enum ImageId {
     kPowerButton,
     kPowerCycle,
     kSettings,
+    kHelp,
     kDebugger,
     kLoad,
     kSave,
@@ -16,11 +17,15 @@ enum ImageId {
     kStopMachine,
     kJoystick,
     kCard,
+    kFastEmulate,
     kImageCount
 };
 
 void initialize();
-sg_image getImage(ImageId imageId);
+uintptr_t getImage(ImageId imageId);
+int getImageWidth(ImageId imageId);
+int getImageHeight(ImageId imageId);
+float getImageAspect(ImageId imageId);
 void terminate();
 
 }; // namespace ClemensHostAssets
