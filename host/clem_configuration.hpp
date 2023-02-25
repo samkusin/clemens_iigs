@@ -11,6 +11,10 @@
 #define CLEM_HOST_APPLICATION_NAME "Clemens"
 #endif
 
+#define CLEM_EMULATOR_RAM_MINIMUM 256U
+#define CLEM_EMULATOR_RAM_DEFAULT 4096U
+#define CLEM_EMULATOR_RAM_MAXIMUM 8192U
+
 #include <string>
 
 struct ClemensConfiguration {
@@ -19,7 +23,11 @@ struct ClemensConfiguration {
     std::string romFilename;
     unsigned majorVersion;
     unsigned minorVersion;
+
+    unsigned ramSizeKB;
+
     bool hybridInterfaceEnabled;
+    bool fastEmulationEnabled;
 
     ClemensConfiguration();
     ClemensConfiguration(std::string pathname, std::string datadir);

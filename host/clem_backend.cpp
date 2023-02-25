@@ -404,6 +404,20 @@ bool ClemensBackend::loadSnapshot(const std::string_view &inputParam) {
     return res;
 }
 
+void ClemensBackend::enableFastEmulation(bool enable) {
+    queue(Command{Command::FastEmulation, fmt::format("{}", enable ? 1 : 0)});
+}
+
+bool ClemensBackend::enableFastEmulation(const std::string_view &inputParam) {
+    int value = 0;
+    if (std::from_chars(inputParam.data(), inputParam.data() + inputParam.size(), value).ec !=
+        std::errc{}) {
+        return false;
+    }
+    config_.enableFastEmulation = value > 0;
+    return true;
+}
+
 void ClemensBackend::runScript(std::string command) {
     queue(Command{Command::RunScript, std::move(command)});
 }
@@ -846,6 +860,10 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
                     commandFailed = true;
                 }
                 break;
+            case Command::FastEmulation:
+                if (!enableFastEmulation(command.operand))
+                    commandFailed = true;
+                break;
             case Command::RunScript:
                 if (!runScriptCommand(command.operand)) {
                     commandFailed = true;
@@ -897,7 +915,7 @@ void ClemensBackend::main(PublishStateDelegate publishDelegate) {
             // Though if the emulator runs hot (cannot execute the desired cycles in enough time),
             // that shouldn't matter too much given that this 'speed boost' is meant to be
             // temporary, and the emulator should catch up once the IWM is inactive.
-            if (clemens_is_drive_io_active(&mmio_)) {
+            if (clemens_is_drive_io_active(&mmio_) && config_.enableFastEmulation) {
                 emulatorTimeScalar = 8.0;
             } else {
                 emulatorTimeScalar = 1.0;

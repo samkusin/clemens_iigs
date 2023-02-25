@@ -2,6 +2,7 @@
 #include "clem_host_platform.h"
 #include "clem_preamble.hpp"
 
+#include "fmt/core.h"
 #include "fmt/format.h"
 #include "imgui.h"
 
@@ -316,6 +317,22 @@ auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
         break;
 
     case Mode::Finished:
+        if (config_.ramSizeKB < CLEM_EMULATOR_RAM_MINIMUM ||
+            config_.ramSizeKB > CLEM_EMULATOR_RAM_MAXIMUM) {
+            auto reconfiguredKB =
+                std::clamp(config_.ramSizeKB, CLEM_EMULATOR_RAM_MINIMUM, CLEM_EMULATOR_RAM_MAXIMUM);
+            fmt::print(stderr,
+                       "Configured emulator RAM of {}K is not supported.  Clamping to supported "
+                       "value {}K\n",
+                       config_.ramSizeKB, reconfiguredKB);
+            config_.ramSizeKB = reconfiguredKB;
+        }
+        if ((config_.ramSizeKB % 64) != 0) {
+            auto reconfiguredKB = (config_.ramSizeKB / 64) * 64;
+            fmt::print(stderr, "Configured emulator RAM {}K must be bank-aligned, clamping to {}\n",
+                       config_.ramSizeKB, reconfiguredKB);
+            config_.ramSizeKB = reconfiguredKB;
+        }
         config_.save();
         nextView = ViewType::Main;
         break;

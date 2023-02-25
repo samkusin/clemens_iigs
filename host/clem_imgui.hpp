@@ -3,6 +3,10 @@
 
 #include "imgui.h"
 
+#define CLEM_HOST_OPEN_APPLE_UTF8   "\xee\x80\x90"
+#define CLEM_HOST_FOLDER_LEFT_UTF8  "\xee\x82\x98"
+#define CLEM_HOST_FOLDER_RIGHT_UTF8 "\xee\x82\x99"
+
 namespace ClemensHostImGui {
 
 enum StatusBarFlags { StatusBarFlags_Inactive, StatusBarFlags_Active };

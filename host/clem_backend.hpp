@@ -83,6 +83,8 @@ class ClemensBackend {
     //  Save and load the machine
     void saveMachine(std::string path);
     void loadMachine(std::string path);
+    //  Enables fast IWM emulation
+    void enableFastEmulation(bool enable);
 
     void runScript(std::string command);
 
@@ -113,6 +115,7 @@ class ClemensBackend {
     bool programTrace(const std::string_view &inputParam);
     bool saveSnapshot(const std::string_view &inputParam);
     bool loadSnapshot(const std::string_view &inputParam);
+    bool enableFastEmulation(const std::string_view &inputParam);
     bool runScriptCommand(const std::string_view &command);
 
     std::optional<unsigned> checkHitBreakpoint();

@@ -261,6 +261,8 @@ static void imguiFontSetup(SharedAppData *appdata, const cinek::ByteBuffer &syst
     ImFontGlyphRangesBuilder glyphRangesBuilder;
     glyphRangesBuilder.AddRanges(latinCodepoints);
     glyphRangesBuilder.AddChar(0xe010); // open apple
+    glyphRangesBuilder.AddChar(0xe098); // folder left
+    glyphRangesBuilder.AddChar(0xe099); // folder right
     glyphRangesBuilder.BuildRanges(&appdata->imguiUnicodeRanges);
 
     strncpy(font_cfg.Name, "A2Lo", sizeof(font_cfg.Name));

@@ -75,4 +75,17 @@ const char *kGSKeyboardCommands[] = {"IIGS Keyboard Commands:\n"
 
 const char *kMouseUnlock[] = {"Press both ALT keys and CTRL to unlock mouse"};
 #endif
+
+const char *kSettingsTabMachine[] = {"Machine"};
+const char *kSettingsMachineSystemMemory[] = {"Memory"};
+
+const char *kSettingsMachineSystemSetup[] = {"System Setup"};
+const char *kSettingsMachineSystemSetupInfo[] = {
+    "These options will take effect after power cycling the emulated machine."};
+const char *kSettingsMachineROMFilename[] = {"ROM Filename"};
+
+const char *kSettingsMachineCards[] = {"Cards"};
+
+const char *kSettingsTabEmulation[] = {"Emulation"};
+
 } // namespace ClemensL10N

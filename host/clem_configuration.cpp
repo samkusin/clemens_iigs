@@ -7,7 +7,8 @@
 #include <filesystem>
 
 ClemensConfiguration::ClemensConfiguration()
-    : majorVersion(0), minorVersion(0), hybridInterfaceEnabled(false) {}
+    : majorVersion(0), minorVersion(0), ramSizeKB(CLEM_EMULATOR_RAM_DEFAULT),
+      hybridInterfaceEnabled(false), fastEmulationEnabled(true) {}
 
 ClemensConfiguration::ClemensConfiguration(std::string pathname, std::string datadir)
     : ClemensConfiguration() {
@@ -24,7 +25,9 @@ void ClemensConfiguration::copyFrom(const ClemensConfiguration &other) {
     romFilename = other.romFilename;
     majorVersion = other.majorVersion;
     minorVersion = other.minorVersion;
+    ramSizeKB = other.ramSizeKB;
     hybridInterfaceEnabled = other.hybridInterfaceEnabled;
+    fastEmulationEnabled = other.fastEmulationEnabled;
 }
 
 bool ClemensConfiguration::save() {
@@ -41,6 +44,8 @@ bool ClemensConfiguration::save() {
     fprintf(fp, "\n");
     fprintf(fp, "[emulator]\n");
     fprintf(fp, "romfile=%s\n", romFilename.c_str());
+    fprintf(fp, "ramkb=%u\n", ramSizeKB);
+    fprintf(fp, "fastiwm=%u\n", fastEmulationEnabled ? 1 : 0);
     fprintf(fp, "\n");
 
     fclose(fp);
@@ -63,6 +68,10 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
     } else if (strncmp(section, "emulator", 16) == 0) {
         if (strncmp(name, "romfile", 16) == 0) {
             config->romFilename = value;
+        } else if (strncmp(name, "ramkb", 16) == 0) {
+            config->ramSizeKB = atoi(value);
+        } else if (strncmp(name, "fastiwm", 16) == 0) {
+            config->fastEmulationEnabled = atoi(value) > 0 ? true : false;
         }
     }
     return 1;

@@ -28,7 +28,6 @@
 #include <tuple>
 
 //  Style
-#define CLEM_HOST_OPEN_APPLE_UTF8 "\xee\x80\x90"
 namespace ClemensHostStyle {
 
 static constexpr float kSideBarMinWidth = 200.0f;
@@ -52,10 +51,13 @@ ImVec2 getScaledImageSize(ClemensHostAssets::ImageId id, float size) {
 }
 } // namespace ClemensHostStyle
 
-//  TODO: Insert card to slot (non-gui)
-//  TODO: Mouse x,y scaling based on display view size vs desktop size
+//  TODO: clean up disk selection GUI
 //  TODO: blank disk gui selection for disk set (selecting combo create will
 //        enable another input widget, unselecting will gray out that widget.)
+//  TODO: help section in user-mode
+//  TODO: allow font selection/theme for GUI
+//  TODO: Insert card to slot (gui and non-gui)
+//  TODO: Mouse x,y scaling based on display view size vs desktop size
 //  TODO: preroll audio for some buffer on to handle sound clipping on lower end
 //        systems
 
@@ -650,6 +652,8 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
     backendConfig_.smartPortDriveStates[0].imagePath =
         std::filesystem::path("smartport.2mg").string();
 
+    backendConfig_.enableFastEmulation = config_.fastEmulationEnabled;
+
     debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;
     debugMemoryEditor_.WriteFn = &ClemensFrontend::imguiMemoryEditorWrite;
     CLEM_TERM_COUT.format(TerminalLine::Info, "Welcome to the Clemens IIgs Emulator {}.{}",
@@ -1220,10 +1224,13 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         break;
     case GUIMode::Settings:
         if (!settingsMode_.isStarted()) {
-            settingsMode_.start(backend_.get());
+            settingsMode_.start(config_);
         }
-        if (settingsMode_.frame(width, height, backend_.get())) {
-            settingsMode_.stop(backend_.get());
+        if (settingsMode_.frame(width, height)) {
+            settingsMode_.stop();
+            if (settingsMode_.shouldBeCommitted()) {
+                config_.save();
+            }
             setGUIMode(GUIMode::Emulator);
         }
         break;
