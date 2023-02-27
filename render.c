@@ -426,17 +426,10 @@ static void a2dhgrToIndexedRGB1x2(uint8_t *pixout0, uint8_t *pixout1, const uint
     unsigned barrel = 0x00;
     unsigned latch = 0x00;
     unsigned latch_counter = 0;
+    unsigned tail_counter = 0;
 
     scanline_byte_cnt <<= 1; // account for both scanlines/40+40
-    //  preroll first repeated bit pattern (nibble)
-    while (pixin_byte_index < scanline_byte_cnt && clock_ctr < 4) {
-        shifter <<= 1;
-        shifter |= (pixin_byte & 0x1);
-        pixin_byte >>= 1;
-        clock_ctr++;
-    }
-    latch = shifter;
-    while (pixin_byte_index < scanline_byte_cnt) {
+    while (pixin_byte_index < scanline_byte_cnt || tail_counter > 0) {
         unsigned barrel_rotate = clock_ctr % 4;
         bool pixin_bit = (pixin_byte & 0x1);
         bool shifter_hi_bit = (shifter & 0x8) >> 3;
@@ -458,9 +451,11 @@ static void a2dhgrToIndexedRGB1x2(uint8_t *pixout0, uint8_t *pixout1, const uint
         // color horizontal so UVs can be scaled appropriately from 0 to 1 without rounding or
         // worries abound text bleed.  The + 8 makes this resolution 5-bit (xxxx1000) where xxxx is
         // the latch
-        pixout = (latch << 4) + 8;
-        *(pixout0++) = pixout;
-        *(pixout1++) = pixout;
+        if (clock_ctr >= 4) {
+            pixout = (latch << 4) + 8;
+            *(pixout0++) = pixout;
+            *(pixout1++) = pixout;
+        }
 
         if (shifter == 0 || shifter == 0xf) {
             latch_counter = 3;
@@ -484,6 +479,9 @@ static void a2dhgrToIndexedRGB1x2(uint8_t *pixout0, uint8_t *pixout1, const uint
 
         //  next clock
         clock_ctr++;
+        if (tail_counter > 0) {
+            tail_counter--;
+        }
 
         //  load latch with output from barrel vs prior latch selection
         // latch = next_latch;
@@ -495,9 +493,14 @@ static void a2dhgrToIndexedRGB1x2(uint8_t *pixout0, uint8_t *pixout1, const uint
         //  advance to next byte in the video stream
         pixin_byte >>= 1;
         if ((clock_ctr % 7) == 0) {
-            ++scanlines[pixin_byte_index % 2];
-            ++pixin_byte_index;
-            pixin_byte = *scanlines[pixin_byte_index % 2];
+            if (pixin_byte_index < scanline_byte_cnt) {
+                ++scanlines[pixin_byte_index % 2];
+                ++pixin_byte_index;
+                pixin_byte = *scanlines[pixin_byte_index % 2];
+            }
+            if (pixin_byte_index == scanline_byte_cnt) {
+                tail_counter = 4;
+            }
         }
     }
 }
