@@ -312,12 +312,12 @@ static inline bool jk_ff(bool j, bool k, bool q) {
         return 1;
     return !q;
 }
-
-static void a2dhgrToABGR81x2(uint8_t *pixout0, uint8_t *pixout1, const uint8_t *scanlines[2],
-                             int scanlineByteCnt) {
+/*
+static void a2hgrToColorMap2x2(uint8_t *pixout_y0, uint8_t *pixout_y1, const uint8_t *scanline,
+                               int scanlineByteCnt) {
     int pixinByteCounter = 0;
     int pixinBitCounter = 0;
-    uint8_t pixinByte = *scanlines[0];
+    uint8_t pixinByte = *scanline;
     uint8_t shifter = 0;
     uint8_t barrel = 0;
     uint8_t latch = 0;
@@ -327,8 +327,7 @@ static void a2dhgrToABGR81x2(uint8_t *pixout0, uint8_t *pixout1, const uint8_t *
     scanlineByteCnt <<= 1;
     while (pixinByteCounter < scanlineByteCnt) {
         bool pixinBit = (pixinByte & 0x1);
-        bool colorChanged0 = (pixinBit && !(shifter & 0x8));
-        bool colorChanged1 = (!pixinBit && (shifter & 0x8));
+        bool colorChanged0 = (pixinBit && !(shifter & 0x2));
         unsigned barrelShift = (pixinBitCounter % 4);
         barrel = shifter >> barrelShift;
         barrel |= (shifter << (4 - barrelShift));
@@ -354,6 +353,154 @@ static void a2dhgrToABGR81x2(uint8_t *pixout0, uint8_t *pixout1, const uint8_t *
         }
     }
 }
+*/
+
+static void a2dhgrToABGR81x2(uint8_t *pixout0, uint8_t *pixout1, const uint8_t *scanlines[2],
+                             int scanline_byte_cnt) {
+    int pixin_byte_index = 0;
+    int clock_ctr = 0; // 1 bit per clock cycle
+    uint8_t pixin_byte = *scanlines[0];
+    unsigned shifter = 0x00;
+    unsigned barrel = 0x00;
+    unsigned latch = 0x00;
+    bool jk0 = false;
+    bool jk1 = false;
+
+    scanline_byte_cnt <<= 1; // account for both scanlines/40+40
+    while (pixin_byte_index < scanline_byte_cnt) {
+        unsigned barrel_rotate = clock_ctr % 4;
+        bool pixin_bit = (pixin_byte & 0x1);
+        bool changed_3 = pixin_bit && !(shifter & 0x8);
+        bool changed_2 = !pixin_bit && (shifter & 0x8);
+        uint8_t pixout;
+        uint8_t next_latch;
+        //  barrel rotate in an attempt to retain the original nibble for comparison
+        //  with the incoming shift register pattern
+        barrel = shifter >> barrel_rotate;
+        barrel |= (shifter << (4 - barrel_rotate));
+        barrel &= 0xf;
+
+        //  select the latch input which will be applied to the latch on the next tick
+        next_latch = (jk0 || jk1) ? latch : barrel;
+        //  output indexed RGB color
+        // scales the 4-bit color to 8-bit.  this works well with color maps define 16-pixels per
+        // color horizontal so UVs can be scaled appropriately from 0 to 1 without rounding or
+        // worries abound text bleed.  The + 8 makes this resolution 5-bit (xxxx1000) where xxxx is
+        // the latch
+        pixout = (next_latch << 4) + 8;
+        *(pixout0++) = pixout;
+        *(pixout1++) = pixout;
+
+        //  next clock
+        clock_ctr++;
+
+        jk0 = jk_ff(changed_3, shifter & 0x4, jk0);
+        jk1 = jk_ff(changed_2, !(shifter & 0x4), jk1);
+
+        //  apply bit to shift register
+        shifter <<= 1;
+        shifter |= (pixin_bit ? 1 : 0);
+        shifter &= 0xf;
+
+        //  load latch with output from barrel vs prior latch selection
+        latch = next_latch;
+
+        //  advance to next byte in the video stream
+        pixin_byte >>= 1;
+        if ((clock_ctr % 7) == 0) {
+            ++scanlines[pixin_byte_index % 2];
+            ++pixin_byte_index;
+            pixin_byte = *scanlines[pixin_byte_index % 2];
+        }
+    }
+}
+
+//  scanlines[2] = {aux_memory,main_memory} interleaved for the scanline.
+//
+static void a2dhgrToIndexedRGB1x2(uint8_t *pixout0, uint8_t *pixout1, const uint8_t *scanlines[2],
+                                  int scanline_byte_cnt) {
+    int pixin_byte_index = 0;
+    int clock_ctr = 0; // 1 bit per clock cycle
+    uint8_t pixin_byte = *scanlines[0];
+    unsigned shifter = 0x00;
+    unsigned barrel = 0x00;
+    unsigned latch = 0x00;
+    unsigned latch_counter = 0;
+
+    scanline_byte_cnt <<= 1; // account for both scanlines/40+40
+    //  preroll first repeated bit pattern (nibble)
+    while (pixin_byte_index < scanline_byte_cnt && clock_ctr < 4) {
+        shifter <<= 1;
+        shifter |= (pixin_byte & 0x1);
+        pixin_byte >>= 1;
+        clock_ctr++;
+    }
+    latch = shifter;
+    while (pixin_byte_index < scanline_byte_cnt) {
+        unsigned barrel_rotate = clock_ctr % 4;
+        bool pixin_bit = (pixin_byte & 0x1);
+        bool shifter_hi_bit = (shifter & 0x8) >> 3;
+        bool changed = pixin_bit != shifter_hi_bit;
+        uint8_t pixout;
+        uint8_t next_latch;
+        //  barrel rotate in an attempt to retain the original nibble for comparison
+        //  with the incoming shift register pattern
+        barrel = shifter >> barrel_rotate;
+        barrel |= (shifter << (4 - barrel_rotate));
+        barrel &= 0xf;
+
+        if (latch_counter == 0 || barrel == 0xf || barrel == 0x0) {
+            latch = barrel;
+        }
+
+        //  output indexed RGB color
+        // scales the 4-bit color to 8-bit.  this works well with color maps define 16-pixels per
+        // color horizontal so UVs can be scaled appropriately from 0 to 1 without rounding or
+        // worries abound text bleed.  The + 8 makes this resolution 5-bit (xxxx1000) where xxxx is
+        // the latch
+        pixout = (latch << 4) + 8;
+        *(pixout0++) = pixout;
+        *(pixout1++) = pixout;
+
+        if (shifter == 0 || shifter == 0xf) {
+            latch_counter = 3;
+        } else if (latch_counter > 0) {
+            latch_counter--;
+        } else {
+            if (changed) {
+                latch_counter = 3 - barrel_rotate;
+            }
+        }
+
+        /*
+        if (latch_counter == 0) {
+            if (changed) {
+                latch_counter = 3 - barrel_rotate;
+            }
+        } else {
+            latch_counter--;
+        }
+        */
+
+        //  next clock
+        clock_ctr++;
+
+        //  load latch with output from barrel vs prior latch selection
+        // latch = next_latch;
+
+        //  apply bit to shift register
+        shifter <<= 1;
+        shifter |= (pixin_bit ? 1 : 0);
+        shifter &= 0xf;
+        //  advance to next byte in the video stream
+        pixin_byte >>= 1;
+        if ((clock_ctr % 7) == 0) {
+            ++scanlines[pixin_byte_index % 2];
+            ++pixin_byte_index;
+            pixin_byte = *scanlines[pixin_byte_index % 2];
+        }
+    }
+}
 
 static void _render_double_hires(const ClemensVideo *video, const uint8_t *main, const uint8_t *aux,
                                  uint8_t *texture, unsigned width, unsigned height,
@@ -372,7 +519,8 @@ static void _render_double_hires(const ClemensVideo *video, const uint8_t *main,
         const uint8_t *pixsources[2] = {aux + video->scanlines[row].offset,
                                         main + video->scanlines[row].offset};
         uint8_t *pixout = texture + y * 2 * stride;
-        a2dhgrToABGR81x2(pixout, pixout + stride, pixsources, video->scanline_byte_cnt);
+        // a2dhgrToABGR81x2(pixout, pixout + stride, pixsources, video->scanline_byte_cnt);
+        a2dhgrToIndexedRGB1x2(pixout, pixout + stride, pixsources, video->scanline_byte_cnt);
         /*
         const uint8_t* pixin = pixsources[0];
         unsigned color = 0;
@@ -425,3 +573,7 @@ void clemens_render_graphics(const ClemensVideo *video, const uint8_t *memory, c
         break;
     }
 }
+
+#if defined(CLEM_RENDER_SAMPLE)
+
+#endif
