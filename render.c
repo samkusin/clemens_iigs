@@ -124,7 +124,7 @@ enum {
 //  HGR colors black, green/orange (odd), violet/blue (even), white
 //    violet even ; green odd   (hcolor 2, 1)
 //    orange even ; blue odd    (hcolor 5, 6)
-static uint8_t abgrFromHGRBitTable[kClemensRenderColorStateCount][2] = {
+static uint8_t indexFromHGRBitTable[kClemensRenderColorStateCount][2] = {
     {0, 4}, /* black */
     {2, 6}, /* even */
     {1, 5}, /* odd */
@@ -212,7 +212,7 @@ static void a2hgrToABGR8Scale2x2(uint8_t *pixout, uint8_t *pixout2, const uint8_
                     color = 3;
                 }
                 //  normalize hcolor 0 to 7 to 0-255 to be shader friendly
-                pixel = (abgrFromHGRBitTable[color][group & 1] << 5) + 16;
+                pixel = (indexFromHGRBitTable[color][group & 1] << 5) + 16;
                 pixout[xpos] = pixel;
                 pixout[xpos + 1] = pixel;
                 pixout2[xpos] = pixel;
@@ -233,11 +233,93 @@ static void a2hgrToABGR8Scale2x2(uint8_t *pixout, uint8_t *pixout2, const uint8_
     } else {
         color = 3;
     }
-    pixel = (abgrFromHGRBitTable[color][group & 1] << 5) + 16;
+    pixel = (indexFromHGRBitTable[color][group & 1] << 5) + 16;
     pixout[xpos] = pixel;
     pixout[xpos + 1] = pixel;
     pixout2[xpos] = pixel;
     pixout2[xpos + 1] = pixel;
+}
+
+//  Describes how to render a specific bit string for hires mode
+//  Generally speaking when encountering certain bit strings, our renderer
+//  can decide between black, white or color.
+//  Color is determined by the X coordinate and Bit 7 of the current byte
+
+// clang-format off
+//  Selected color is always black
+#define CLEM_RENDER_HIRES_COLOR_TYPE_BLACK   0x00
+//  Selected color determined by the color of the preceding X position
+#define CLEM_RENDER_HIRES_COLOR_TYPE_COLOR_0 0x01
+//  Selected color is determined by the current at the current X position
+#define CLEM_RENDER_HIRES_COLOR_TYPE_COLOR_1 0x02
+//  Selected color is always white
+#define CLEM_RENDER_HIRES_COLOR_TYPE_WHITE   0x03
+//
+//  There are 8 possible bit combinations which provide enough information to
+//  select one of the three types described above.
+//                                              +-This bit represents the current X
+static uint8_t s_bitpixelToColorType[8] = { //  |
+    CLEM_RENDER_HIRES_COLOR_TYPE_BLACK,     // 000
+    CLEM_RENDER_HIRES_COLOR_TYPE_BLACK,     // 001
+    CLEM_RENDER_HIRES_COLOR_TYPE_COLOR_1,   // 010
+    CLEM_RENDER_HIRES_COLOR_TYPE_WHITE,     // 011
+    CLEM_RENDER_HIRES_COLOR_TYPE_BLACK,     // 100
+    CLEM_RENDER_HIRES_COLOR_TYPE_COLOR_0,   // 101
+    CLEM_RENDER_HIRES_COLOR_TYPE_WHITE,     // 110
+    CLEM_RENDER_HIRES_COLOR_TYPE_WHITE,     // 111
+};
+// clang-format on
+
+static void a2hgrToIndexedColor2x2(uint8_t *pixout, uint8_t *pixout2, const uint8_t *scanline,
+                                   int scanline_byte_cnt) {
+    //  bits are pushed onto the shifter as we scan across the screen, so higher bits == past pixels
+    unsigned x_pos = 0;
+    int scanline_byte_index = 0;
+    uint8_t scanline_byte = *scanline;
+    uint8_t shifter = ((scanline_byte & 0x1) << 1) | ((scanline_byte & 0x2) >> 1);
+    uint8_t palette = scanline_byte >> 7;
+
+    scanline_byte >>= 2;
+    while (scanline_byte_index < scanline_byte_cnt) {
+        uint8_t pixel;
+        //  Ingest bit here - since we care only about bits 0-2, and bit 1 is the pixel
+        //  at the current X
+        shifter <<= 1;
+        shifter |= (scanline_byte & 0x1);
+        shifter &= 0x7;
+        scanline_byte >>= 1;
+        //  determine color to plot from shifter, x_pos and palette
+        //  next pixel
+        pixel = s_bitpixelToColorType[shifter];
+        switch (pixel) {
+        case CLEM_RENDER_HIRES_COLOR_TYPE_BLACK:
+            pixel = indexFromHGRBitTable[0][palette];
+            break;
+        case CLEM_RENDER_HIRES_COLOR_TYPE_COLOR_0:
+            pixel = indexFromHGRBitTable[1 + ((x_pos + 1) & 1)][palette];
+            break;
+        case CLEM_RENDER_HIRES_COLOR_TYPE_COLOR_1:
+            pixel = indexFromHGRBitTable[1 + (x_pos & 1)][palette];
+            break;
+        case CLEM_RENDER_HIRES_COLOR_TYPE_WHITE:
+            pixel = indexFromHGRBitTable[3][palette];
+            break;
+        }
+
+        //  draw it
+        *(pixout++) = pixel;
+        *(pixout++) = pixel;
+        *(pixout2++) = pixel;
+        *(pixout2++) = pixel;
+        x_pos++;
+        if ((x_pos % 7) == 0) {
+            scanline_byte_index++;
+            if (scanline_byte_index < scanline_byte_cnt) {
+                scanline_byte = scanline[scanline_byte_index];
+                palette = scanline_byte >> 7;
+            }
+        }
+    }
 }
 
 static void _render_hires(const ClemensVideo *video, const uint8_t *memory, uint8_t *texture,
@@ -249,7 +331,8 @@ static void _render_hires(const ClemensVideo *video, const uint8_t *memory, uint
         int row = i + video->scanline_start;
         const uint8_t *scanline = memory + video->scanlines[row].offset;
         uint8_t *pixout = texture + i * 2 * stride;
-        a2hgrToABGR8Scale2x2(pixout, pixout + stride, scanline);
+        // a2hgrToABGR8Scale2x2(pixout, pixout + stride, scanline);
+        a2hgrToIndexedColor2x2(pixout, pixout + stride, scanline, video->scanline_byte_cnt);
     }
 }
 
