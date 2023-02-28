@@ -112,133 +112,17 @@ static void _render_super_hires(const ClemensVideo *video, const uint8_t *memory
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-
-enum {
-    kClemensRenderZero,
-    kClemensRenderEven,
-    kClemensRenderOdd,
-    kClemensRenderOne,
-    kClemensRenderColorStateCount
-};
-
 //  HGR colors black, green/orange (odd), violet/blue (even), white
 //    violet even ; green odd   (hcolor 2, 1)
 //    orange even ; blue odd    (hcolor 5, 6)
-static uint8_t indexFromHGRBitTable[kClemensRenderColorStateCount][2] = {
+//
+//  row index comes from the CLEM_RENDER_HIRES_COLOR_TYPE_XXX constants below
+static uint8_t indexFromHGRBitTable[4][2] = {
     {0, 4}, /* black */
     {2, 6}, /* even */
     {1, 5}, /* odd */
     {3, 7}  /* white */
 };
-
-//  bit 0 = incoming pixel at x+1, bit 1 = current pixel, bit 2 = pixel at x-1
-static unsigned stateToColorAction[8] = {
-    /* b000 */ 0, //  > 2 adjacent off = black
-    /* b001 */ 0, //  2 adjacent off outgoing  = black
-    /* b010 */ 1, //  color at bit 1
-    /* b011 */ 3, //  2 adjacent on incoming = white
-    /* b100 */ 0, //  2 adhacent off incoming = black
-    /* b101 */ 2, //  color at bit 2
-    /* b110 */ 3, //  2 adjacent on outgoing = white
-    /* b111 */ 3, //  > 2 adjacent on = white
-};
-
-static void a2hgrToABGR8Scale2x2(uint8_t *pixout, uint8_t *pixout2, const uint8_t *hgr) {
-    //  input is 40 bytes of hgr data to 280 bytes (1 byte per pixel)
-    //  colors are one, zero, even, odd
-    //  strategy:
-    //
-    //  two pixels: X and X + 1, and an extra 'register' BIT = zero
-    //  1 and 1 = white; BIT = one
-    //  1 and 0 = white if BIT = one else color(BIT) where BIT = even/odd(X)
-    //  0 and 1 = black if BIT = zero else color(BIT) where BIT = even/odd(X + 1)
-    //  0 and 0 = black; BIT = zero
-    //
-    //  0  1  2  3  4  5  6  7  8  9 10 11 12
-    //  --------------------------------------
-    //  0  0                                 |black; BIT = zero
-    //     0  1                              |black if BIT = zero; BIT = even
-    //        1  0                           |color(BIT) if BIT = zero; BIT = even
-    //           0  1                        |color(BIT) if BIT = one; BIT = even
-    //              1  1                     |white; BIT = one
-    //                 1  0                  |white; if BIT = one; BIT = odd
-    //                    0  1               |color(BIT); if BIT = odd; BIT = odd
-    //                       1  0            |color(BIT); if BIT = odd; BIT = odd
-    //                          0  0         |black; BIT = zero
-    //
-    //  "BIT" really is the value at X-1, so...
-    //
-    //  X-2, X-1, X
-    //  any  1    1   = white
-    //   1   1    0   = white
-    //   0   1    0   = color(even/odd(X-1), group)
-    //   0   0    1   = black
-    //   1   0    1   = color(even/odd(X), group)
-    //  any  0    0   = black
-    //
-    //  group = bit 7 of color/pixel byte
-
-    unsigned state = 0;
-    int xpos = -2;
-    unsigned group;
-    uint8_t pixel;
-    for (int byteIdx = 0; byteIdx < 40; ++byteIdx) {
-        uint8_t byte = hgr[byteIdx];
-        group = byte >> 7;
-        unsigned pxmask = 0x1;
-        while (pxmask != 0x80) {
-            unsigned bit = byte & pxmask;
-            state <<= 1;
-            pxmask <<= 1;
-            if (bit)
-                state |= 1;
-
-            unsigned action = stateToColorAction[state & 0x7];
-            unsigned color;
-            if (xpos >= 0) {
-                if (action == 0)
-                    color = 0;
-                else if (action == 1) {
-                    if (xpos & 2)
-                        color = 2;
-                    else
-                        color = 1;
-                } else if (action == 2) {
-                    if (xpos & 2)
-                        color = 1;
-                    else
-                        color = 2;
-                } else {
-                    color = 3;
-                }
-                //  normalize hcolor 0 to 7 to 0-255 to be shader friendly
-                pixel = (indexFromHGRBitTable[color][group & 1] << 5) + 16;
-                pixout[xpos] = pixel;
-                pixout[xpos + 1] = pixel;
-                pixout2[xpos] = pixel;
-                pixout2[xpos + 1] = pixel;
-            }
-            xpos += 2;
-        }
-    }
-    state <<= 1;
-    unsigned action = stateToColorAction[state & 0x7];
-    unsigned color;
-    if (action == 0)
-        color = 0;
-    else if (action == 1) {
-        color = 2;
-    } else if (action == 2) {
-        color = 1;
-    } else {
-        color = 3;
-    }
-    pixel = (indexFromHGRBitTable[color][group & 1] << 5) + 16;
-    pixout[xpos] = pixel;
-    pixout[xpos + 1] = pixel;
-    pixout2[xpos] = pixel;
-    pixout2[xpos + 1] = pixel;
-}
 
 //  Describes how to render a specific bit string for hires mode
 //  Generally speaking when encountering certain bit strings, our renderer
@@ -275,48 +159,62 @@ static void a2hgrToIndexedColor2x2(uint8_t *pixout, uint8_t *pixout2, const uint
     //  bits are pushed onto the shifter as we scan across the screen, so higher bits == past pixels
     unsigned x_pos = 0;
     int scanline_byte_index = 0;
+    int remainder = 0;
     uint8_t scanline_byte = *scanline;
-    uint8_t shifter = ((scanline_byte & 0x1) << 1) | ((scanline_byte & 0x2) >> 1);
     uint8_t palette = scanline_byte >> 7;
+    uint8_t shifter = scanline_byte & 0x1;
+    uint8_t palette_shifter = palette;
 
-    scanline_byte >>= 2;
-    while (scanline_byte_index < scanline_byte_cnt) {
+    scanline_byte >>= 1;
+    while (scanline_byte_index < scanline_byte_cnt || remainder > 0) {
         uint8_t pixel;
+        uint8_t group;
         //  Ingest bit here - since we care only about bits 0-2, and bit 1 is the pixel
         //  at the current X
+        palette_shifter <<= 1;
+        palette_shifter |= palette;
         shifter <<= 1;
         shifter |= (scanline_byte & 0x1);
         shifter &= 0x7;
         scanline_byte >>= 1;
         //  determine color to plot from shifter, x_pos and palette
-        //  next pixel
+        //  next pixel.  the palette shifter bit 1 is the group color for the
+        //  current x position (vs bit 0, which points to x + 1, and bit 2 to x - 1)
         pixel = s_bitpixelToColorType[shifter];
+        group = (palette_shifter >> 1) & 0x1;
         switch (pixel) {
         case CLEM_RENDER_HIRES_COLOR_TYPE_BLACK:
-            pixel = indexFromHGRBitTable[0][palette];
+            pixel = indexFromHGRBitTable[0][group];
             break;
         case CLEM_RENDER_HIRES_COLOR_TYPE_COLOR_0:
-            pixel = indexFromHGRBitTable[1 + ((x_pos + 1) & 1)][palette];
+            pixel = indexFromHGRBitTable[1 + ((x_pos + 1) & 1)][group];
             break;
         case CLEM_RENDER_HIRES_COLOR_TYPE_COLOR_1:
-            pixel = indexFromHGRBitTable[1 + (x_pos & 1)][palette];
+            pixel = indexFromHGRBitTable[1 + (x_pos & 1)][group];
             break;
         case CLEM_RENDER_HIRES_COLOR_TYPE_WHITE:
-            pixel = indexFromHGRBitTable[3][palette];
+            pixel = indexFromHGRBitTable[3][group];
             break;
         }
 
         //  draw it
+        //  normalize hcolor 0 to 7 to 0-255 to be shader friendly
+        pixel <<= 5;
+        pixel += 16;
         *(pixout++) = pixel;
         *(pixout++) = pixel;
         *(pixout2++) = pixel;
         *(pixout2++) = pixel;
+        if (remainder > 0)
+            remainder--;
         x_pos++;
-        if ((x_pos % 7) == 0) {
+        if (((x_pos + 1) % 7) == 0) {
             scanline_byte_index++;
             if (scanline_byte_index < scanline_byte_cnt) {
                 scanline_byte = scanline[scanline_byte_index];
                 palette = scanline_byte >> 7;
+            } else {
+                remainder = 1;
             }
         }
     }
@@ -331,7 +229,6 @@ static void _render_hires(const ClemensVideo *video, const uint8_t *memory, uint
         int row = i + video->scanline_start;
         const uint8_t *scanline = memory + video->scanlines[row].offset;
         uint8_t *pixout = texture + i * 2 * stride;
-        // a2hgrToABGR8Scale2x2(pixout, pixout + stride, scanline);
         a2hgrToIndexedColor2x2(pixout, pixout + stride, scanline, video->scanline_byte_cnt);
     }
 }
