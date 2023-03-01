@@ -76,9 +76,15 @@ struct ClemensClock {
 #define clem_calc_ns_step_from_clocks(_clocks_step_, _clocks_step_reference_)                      \
     ((uint32_t)(CLEM_MEGA2_CYCLE_NS * (uint64_t)(_clocks_step_) / (_clocks_step_reference_)))
 
-/** _ns_ is of type uint64_t */
+/** _ns_ should be a delta time */
 #define clem_calc_clocks_step_from_ns(_ns_, _clocks_step_reference_)                               \
     ((clem_clocks_duration_t)((_ns_) * (_clocks_step_reference_)) / CLEM_MEGA2_CYCLE_NS)
+
+//#define clem_calc_clocks_step_from_ns(_ns_, _clocks_step_reference_)                               \
+//   ((clem_clocks_duration_t)(((float)(_ns_) / CLEM_MEGA2_CYCLE_NS) * (_clocks_step_reference_)))
+
+#define clem_calc_clocks_remainder_from_ns(_ns_, _clocks_step_reference_)                          \
+    ((clem_clocks_duration_t)((_ns_) * (_clocks_step_reference_)) % CLEM_MEGA2_CYCLE_NS)
 
 /**
  * @brief Defines the abstract interface to slot-based card hardware
