@@ -265,21 +265,20 @@ void clem_vgc_sync(struct ClemensVGC *vgc, struct ClemensClock *clock, const uin
             sks_vgc_sync_last_time = sks_vgc_sync_this_time;
             sks_vgc_frame_count++;
         }
+        if (sks_vgc_sync_this_time >= CLEM_MEGA2_CYCLES_PER_SECOND * clock->ref_step) {
+            unsigned h_counter = _clem_vgc_calc_h_counter(vgc->dt_scanline, clock->ref_step);
+            fprintf(stdout, "vgc: [%.2f (%u)][%u ns, dt = %u ns] {v: %u, h: %u}, vdiff: %d\n",
+                    sks_vgc_frame_count / CLEM_VGC_NTSC_FRAMES_PER_SECOND, sks_vgc_frame_count,
+                    clem_calc_ns_step_from_clocks(sks_vgc_sync_this_time, clock->ref_step),
+                    clem_calc_ns_step_from_clocks(sks_vgc_sync_this_time - sks_vgc_sync_last_time,
+                                                  clock->ref_step),
+                    v_counter, h_counter, (int)(v_counter - sks_vgc_vcounter_last));
+            fflush(stdout);
+            sks_vgc_vcounter_last = v_counter;
+            sks_vgc_sync_last_time -= (CLEM_MEGA2_CYCLES_PER_SECOND * clock->ref_step);
+            sks_vgc_sync_this_time -= (CLEM_MEGA2_CYCLES_PER_SECOND * clock->ref_step);
+        }
         sks_vgc_sync_this_time += (clock->ts - vgc->ts_last_frame);
-    }
-
-    if (sks_vgc_sync_this_time >= CLEM_MEGA2_CYCLES_PER_SECOND * clock->ref_step) {
-        unsigned h_counter = _clem_vgc_calc_h_counter(vgc->dt_scanline, clock->ref_step);
-        fprintf(stdout, "vgc: [%.2f (%u)][%u ns, dt = %u ns] {v: %u, h: %u}, vdiff: %d\n",
-                sks_vgc_frame_count / CLEM_VGC_NTSC_FRAMES_PER_SECOND, sks_vgc_frame_count,
-                clem_calc_ns_step_from_clocks(sks_vgc_sync_this_time, clock->ref_step),
-                clem_calc_ns_step_from_clocks(sks_vgc_sync_this_time - sks_vgc_sync_last_time,
-                                              clock->ref_step),
-                v_counter, h_counter, (int)(v_counter - sks_vgc_vcounter_last));
-        fflush(stdout);
-        sks_vgc_vcounter_last = v_counter;
-        sks_vgc_sync_last_time -= (CLEM_MEGA2_CYCLES_PER_SECOND * clock->ref_step);
-        sks_vgc_sync_this_time -= (CLEM_MEGA2_CYCLES_PER_SECOND * clock->ref_step);
     }
 
     vgc->ts_last_frame = clock->ts;
