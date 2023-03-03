@@ -37,12 +37,12 @@ struct ClemensRunSampler {
 
     double sampledEmulatorSpeedMhz;
     double actualEmulatorSpeedMhz;
+    std::chrono::high_resolution_clock::time_point lastFrameTimePoint;
 
     ClemensRunSampler();
 
     void reset();
-    void update(std::chrono::microseconds actualFrameInterval, clem_clocks_duration_t clocksSpent,
-                unsigned cyclesSpent);
+    void update(clem_clocks_duration_t clocksSpent, unsigned cyclesSpent);
 };
 
 //  TODO: Machine type logic could be subclassed into an Apple2GS backend, etc.
@@ -55,15 +55,15 @@ class ClemensBackend : public ClemensCommandQueueListener {
     //    scope.  The front-end should copy what it needs for its display during
     //    the delegate's scope. Once the delegate has finished, the data in
     //    ClemensBackendState should be considered invalid/undefined.
-    using PublishStateDelegate = std::function<ClemensCommandQueue(
-        const ClemensCommandQueue::ResultBuffer &, const ClemensBackendState &)>;
+    using PublishStateDelegate =
+        std::function<void(ClemensCommandQueue &, const ClemensCommandQueue::ResultBuffer &,
+                           const ClemensBackendState &)>;
     ClemensBackend(std::string romPathname, const Config &config);
     ~ClemensBackend();
 
-    ClemensCommandQueue::DispatchResult main(ClemensCommandQueue &commandQueue,
-                                             ClemensBackendState &backendState);
-
-    void post(ClemensBackendState &backendState);
+    ClemensCommandQueue::DispatchResult
+    main(ClemensBackendState &backendState, const ClemensCommandQueue::ResultBuffer &commandResults,
+         PublishStateDelegate delegate);
 
     //  these methods do not queue instructions to execute on the runner
     //  and must be executed instead on the runner thread.  They are made public
@@ -152,7 +152,6 @@ class ClemensBackend : public ClemensCommandQueueListener {
 
     std::optional<int> stepsRemaining_;
     int64_t clocksRemainingInTimeslice_;
-    uint64_t publishSeqNo_;
 };
 
 #endif

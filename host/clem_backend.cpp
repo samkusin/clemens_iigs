@@ -31,6 +31,7 @@ void ClemensRunSampler::reset() {
     referenceFrameTimer = std::chrono::microseconds::zero();
     actualFrameTimer = std::chrono::microseconds::zero();
     sampledFrameTime = std::chrono::microseconds::zero();
+    lastFrameTimePoint = std::chrono::high_resolution_clock::now();
     sampledClocksSpent = 0;
     sampledCyclesSpent = 0;
     sampledFramesPerSecond = 0.0f;
@@ -41,8 +42,11 @@ void ClemensRunSampler::reset() {
     cyclesBuffer.clear();
 }
 
-void ClemensRunSampler::update(std::chrono::microseconds actualFrameInterval,
-                               clem_clocks_duration_t clocksSpent, unsigned cyclesSpent) {
+void ClemensRunSampler::update(clem_clocks_duration_t clocksSpent, unsigned cyclesSpent) {
+    auto currentFrameTimePoint = std::chrono::high_resolution_clock::now();
+    auto actualFrameInterval = std::chrono::duration_cast<std::chrono::microseconds>(
+        currentFrameTimePoint - lastFrameTimePoint);
+    lastFrameTimePoint = currentFrameTimePoint;
 
     actualFrameTimer += actualFrameInterval;
 
@@ -157,10 +161,38 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config &config)
     }
 
     clocksRemainingInTimeslice_ = 0;
-    publishSeqNo_ = 0;
+    //  TODO: hacky - basically we start the machine in a stopped state, so a
+    //  command queued for 'run' will start everything.  Maybe it isn't hacky?
+    stepsRemaining_ = 0;
 }
 
 ClemensBackend::~ClemensBackend() {
+    //  eject and save all disks
+    for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end(); ++diskDriveIt) {
+        auto &diskDrive = *diskDriveIt;
+        if (diskDrive.imagePath.empty())
+            continue;
+
+        auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
+        auto driveType = static_cast<ClemensDriveType>(driveIndex);
+        if (clemens_eject_disk_async(&mmio_, driveType, &disks_[driveIndex])) {
+            saveDisk(driveType);
+            localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", diskDrive.imagePath);
+        }
+    }
+    for (auto hardDriveIt = smartPortDrives_.begin(); hardDriveIt != smartPortDrives_.end();
+         ++hardDriveIt) {
+        auto &drive = *hardDriveIt;
+        if (drive.imagePath.empty())
+            continue;
+        auto driveIndex = unsigned(hardDriveIt - smartPortDrives_.begin());
+        ClemensSmartPortDevice device;
+        clemens_remove_smartport_disk(&mmio_, driveIndex, &device);
+        smartPortDisks_[driveIndex].destroySmartPortDevice(&device);
+        saveSmartPortDisk(driveIndex);
+        localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", drive.imagePath);
+    }
+
     saveBRAM();
 
     //  TODO: clemens_mmio_card_eject() will clear the slot but it still needs
@@ -309,28 +341,19 @@ bool ClemensBackend::isRunning() const {
 #endif
 #endif
 
-ClemensCommandQueue::DispatchResult ClemensBackend::main(ClemensCommandQueue &commandQueue,
-                                                         ClemensBackendState &backendState) {
+ClemensCommandQueue::DispatchResult
+ClemensBackend::main(ClemensBackendState &backendState,
+                     const ClemensCommandQueue::ResultBuffer &commandResults,
+                     PublishStateDelegate delegate) {
 
     unsigned emulatorRefreshFrequency = 60;
-    auto lastFrameTimePoint = std::chrono::high_resolution_clock::now();
     std::optional<unsigned> hitBreakpoint;
 
     double emulatorTimeScalar = 1.0; //  used for fast emulation
 
-    bool wasMachineRunning = isRunning();
-    bool updateSeqNo = false;
-
-    ClemensCommandQueue::DispatchResult commandResults = commandQueue.dispatchAll(*this);
-    bool isTerminated = commandResults.second;
     bool isMachineRunning = isRunning();
-    if (wasMachineRunning != isMachineRunning) {
-        if (isMachineRunning) {
-            runSampler_.reset();
-        }
-    }
 
-    if (isMachineRunning && !isTerminated) {
+    if (isMachineRunning) {
         //  Run the emulator in either 'step' or 'run' mode.
         //
         //  RUN MODE executes several instructions in time slices to maximize
@@ -355,11 +378,12 @@ ClemensCommandQueue::DispatchResult ClemensBackend::main(ClemensCommandQueue &co
         // that shouldn't matter too much given that this 'speed boost' is meant to be
         // temporary, and the emulator should catch up once the IWM is inactive.
         if (clemens_is_drive_io_active(&mmio_)) {
-            emulatorTimeScalar = 8.0;
+            emulatorTimeScalar = 4.0;
         } else {
             emulatorTimeScalar = 1.0;
         }
         auto lastClocksSpent = machine_.tspec.clocks_spent;
+
         int64_t clocksPerTimeslice =
             calculateClocksPerTimeslice(&mmio_, emulatorRefreshFrequency) * emulatorTimeScalar;
 
@@ -393,13 +417,7 @@ ClemensCommandQueue::DispatchResult ClemensBackend::main(ClemensCommandQueue &co
             areInstructionsLogged_ = false;
         }
 
-        auto currentFrameTimePoint = std::chrono::high_resolution_clock::now();
-        auto actualFrameInterval = std::chrono::duration_cast<std::chrono::microseconds>(
-            currentFrameTimePoint - lastFrameTimePoint);
-        lastFrameTimePoint = currentFrameTimePoint;
-
-        runSampler_.update(actualFrameInterval,
-                           (clem_clocks_duration_t)(machine_.tspec.clocks_spent - lastClocksSpent),
+        runSampler_.update((clem_clocks_duration_t)(machine_.tspec.clocks_spent - lastClocksSpent),
                            machine_.cpu.cycles_spent);
 
         for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end();
@@ -436,50 +454,11 @@ ClemensCommandQueue::DispatchResult ClemensBackend::main(ClemensCommandQueue &co
                 //  TODO: SmartPort drive ejection
             }
         }
-        updateSeqNo = true;
-    }
-
-    if (isTerminated) {
-        //  eject and save all disks
-        for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end();
-             ++diskDriveIt) {
-            auto &diskDrive = *diskDriveIt;
-            if (diskDrive.imagePath.empty())
-                continue;
-
-            auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
-            auto driveType = static_cast<ClemensDriveType>(driveIndex);
-            if (clemens_eject_disk_async(&mmio_, driveType, &disks_[driveIndex])) {
-                saveDisk(driveType);
-                localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", diskDrive.imagePath);
-            }
-        }
-        for (auto hardDriveIt = smartPortDrives_.begin(); hardDriveIt != smartPortDrives_.end();
-             ++hardDriveIt) {
-            auto &drive = *hardDriveIt;
-            if (drive.imagePath.empty())
-                continue;
-            auto driveIndex = unsigned(hardDriveIt - smartPortDrives_.begin());
-            ClemensSmartPortDevice device;
-            clemens_remove_smartport_disk(&mmio_, driveIndex, &device);
-            smartPortDisks_[driveIndex].destroySmartPortDevice(&device);
-            saveSmartPortDisk(driveIndex);
-            localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", drive.imagePath);
-        }
-        updateSeqNo = true;
-    }
-
-    updateSeqNo = updateSeqNo || !commandResults.first.empty();
-
-    if (updateSeqNo) {
-        publishSeqNo_++;
     }
 
     backendState.machine = &machine_;
     backendState.mmio = &mmio_;
     backendState.fps = runSampler_.sampledFramesPerSecond;
-    backendState.seqno = publishSeqNo_;
-    backendState.isTerminated = isTerminated;
     backendState.isRunning = isMachineRunning;
     if (programTrace_ != nullptr) {
         backendState.isTracing = true;
@@ -488,8 +467,9 @@ ClemensCommandQueue::DispatchResult ClemensBackend::main(ClemensCommandQueue &co
         backendState.isTracing = false;
         backendState.isIWMTracing = false;
     }
-    backendState.mmioWasInitialized = clemens_is_initialized_simple(&machine_);
+    backendState.mmioWasInitialized = clemens_is_mmio_initialized(&mmio_);
     if (backendState.mmioWasInitialized) {
+        ClemensAudio audio;
         clemens_get_monitor(&backendState.monitor, &mmio_);
         clemens_get_text_video(&backendState.text, &mmio_);
         clemens_get_graphics_video(&backendState.graphics, &machine_, &mmio_);
@@ -503,6 +483,11 @@ ClemensCommandQueue::DispatchResult ClemensBackend::main(ClemensCommandQueue &co
                                      config_.audioSamplesPerSecond);
             }
         }
+    } else {
+        memset(&backendState.monitor, 0, sizeof(backendState.monitor));
+        memset(&backendState.text, 0, sizeof(backendState.text));
+        memset(&backendState.graphics, 0, sizeof(backendState.graphics));
+        memset(&backendState.audio, 0, sizeof(backendState.audio));
     }
     backendState.hostCPUID = clem_host_get_processor_number();
     backendState.logLevel = logLevel_;
@@ -520,23 +505,34 @@ ClemensCommandQueue::DispatchResult ClemensBackend::main(ClemensCommandQueue &co
     backendState.logInstructionEnd = loggedInstructions_.data() + loggedInstructions_.size();
 
     //  read IO memory from bank 0xe0 which ignores memory shadow settings
-    for (uint16_t ioAddr = 0xc000; ioAddr < 0xc0ff; ++ioAddr) {
-        clem_read(&machine_, &backendState.ioPageValues[ioAddr - 0xc000], ioAddr, 0xe0,
-                  CLEM_MEM_FLAG_NULL);
+    if (backendState.mmioWasInitialized) {
+        for (uint16_t ioAddr = 0xc000; ioAddr < 0xc0ff; ++ioAddr) {
+            clem_read(&machine_, &backendState.ioPageValues[ioAddr - 0xc000], ioAddr, 0xe0,
+                      CLEM_MEM_FLAG_NULL);
+        }
     }
     backendState.debugMemoryPage = debugMemoryPage_;
     backendState.emulatorSpeedMhz = runSampler_.sampledEmulatorSpeedMhz;
     backendState.fastEmulationOn = emulatorTimeScalar > 1.0f;
 
-    return commandResults;
-}
+    ClemensCommandQueue commands;
+    delegate(commands, commandResults, backendState);
 
-void ClemensBackend::post(ClemensBackendState &backendState) {
     if (backendState.mmioWasInitialized) {
         clemens_audio_next_frame(&mmio_, backendState.audio.frame_count);
     }
     logOutput_.clear();
     loggedInstructions_.clear();
+
+    auto result = commands.dispatchAll(*this);
+    //  if we're starting a run, reset the sampler so framerate can be calculated correctly
+    if (isMachineRunning != isRunning()) {
+        if (!isMachineRunning) {
+            runSampler_.reset();
+        }
+    }
+
+    return result;
 }
 
 #if defined(__GNUC__)
@@ -806,9 +802,9 @@ void ClemensBackend::onCommandReset() {
 
 void ClemensBackend::onCommandRun() { stepsRemaining_ = std::nullopt; }
 
-void ClemensBackend::onCommandBreakExecution() { *stepsRemaining_ = 0; }
+void ClemensBackend::onCommandBreakExecution() { stepsRemaining_ = 0; }
 
-void ClemensBackend::onCommandStep(unsigned count) { *stepsRemaining_ = count; }
+void ClemensBackend::onCommandStep(unsigned count) { stepsRemaining_ = count; }
 
 void ClemensBackend::onCommandAddBreakpoint(const ClemensBackendBreakpoint &breakpoint) {
     auto range = std::equal_range(

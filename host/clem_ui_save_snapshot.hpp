@@ -1,14 +1,14 @@
 #ifndef CLEM_HOST_SAVE_SNAPSHOT_UI_HPP
 #define CLEM_HOST_SAVE_SNAPSHOT_UI_HPP
 
-class ClemensBackend;
+class ClemensCommandQueue;
 
 class ClemensSaveSnapshotUI {
   public:
     bool isStarted() const;
-    void start(ClemensBackend *backend, bool isEmulatorRunning);
-    bool frame(float width, float height, ClemensBackend *backend);
-    void stop(ClemensBackend *backend);
+    void start(ClemensCommandQueue &backend, bool isEmulatorRunning);
+    bool frame(float width, float height, ClemensCommandQueue &backend);
+    void stop(ClemensCommandQueue &backend);
     void succeeded();
     void fail();
 

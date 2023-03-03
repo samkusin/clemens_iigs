@@ -131,8 +131,6 @@ struct ClemensBackendState {
     ClemensMachine *machine;
     ClemensMMIO *mmio;
     double fps;
-    uint64_t seqno;
-    bool isTerminated;
     bool isRunning;
     bool isTracing;
     bool isIWMTracing;

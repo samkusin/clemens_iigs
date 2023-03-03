@@ -37,6 +37,9 @@ class ClemensCommandQueue {
     using ResultBuffer = std::vector<ClemensBackendResult>;
     using DispatchResult = std::pair<ResultBuffer, bool>;
 
+    void queue(ClemensCommandQueue &other);
+    bool isEmpty() const { return queue_.isEmpty(); }
+
     //  execute all commands
     DispatchResult dispatchAll(ClemensCommandQueueListener &listener);
 

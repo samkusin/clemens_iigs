@@ -5,6 +5,7 @@
 
 #include "fmt/core.h"
 
+#include <cassert>
 #include <charconv>
 
 //  State affected to translate from the old main() to the new main()
@@ -12,6 +13,14 @@
 //      - dispatchAll can alter this equation - so just set isRunning again after dispatchAll()
 //      - if this isRunning has changed to ON from OFF after the call to dispatchAll, reset the run
 //      sampler.
+
+void ClemensCommandQueue::queue(ClemensCommandQueue &other) {
+    while (!queue_.isFull() && !other.queue_.isEmpty()) {
+        Command cmd;
+        other.queue_.pop(cmd);
+        queue_.push(cmd);
+    }
+}
 
 auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> DispatchResult {
     DispatchResult result;
@@ -110,9 +119,8 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
                 commandFailed ? ClemensBackendResult::Failed : ClemensBackendResult::Succeeded;
             result.first.emplace_back(commandResult);
         }
-
-        queue_.clear();
     }
+    queue_.clear();
 
     return result;
 }

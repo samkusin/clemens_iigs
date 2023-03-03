@@ -355,6 +355,10 @@ static bool _clem_mmio_niolc(struct ClemensMemory *mem) {
     return (mmio->mmap_register & CLEM_MEM_IO_MMAP_NIOLC) != 0;
 }
 
+bool clemens_is_mmio_initialized(ClemensMMIO *mmio) {
+    return mmio->state_type == kClemensMMIOStateType_Active;
+}
+
 void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     struct Clemens65C816 *cpu = &clem->cpu;
     struct ClemensClock clock;
