@@ -703,7 +703,7 @@ void ClemensFrontend::runBackend(std::unique_ptr<ClemensBackend> backend) {
     ClemensBackendState state;
 
     ClemensCommandQueue::DispatchResult results{};
-    double frameTimeLag = 0.0f;
+    // double frameTimeLag = 0.0f;
 
     // results = backend->main(commands, state)).second
     while (!results.second) {
@@ -718,7 +718,7 @@ void ClemensFrontend::runBackend(std::unique_ptr<ClemensBackend> backend) {
                                         return (uiFrameTimeDelta_ > 0.0) ||
                                                !stagedBackendQueue_.isEmpty();
                                     });
-                                    CK_TODO("Need to account for lag!!!")
+                                    // CK_TODO("Need to account for lag!!!")
                                     frameSeqNo_++;
                                     backendStateDelegate(state, lastFrameResults);
                                     commands.queue(stagedBackendQueue_);
@@ -3818,8 +3818,8 @@ void ClemensFrontend::cmdDump(std::string_view operand) {
         message += ",";
     }
     message.pop_back();
-    CK_TODO(DebugMessage : Send Message to thread so it can fill in the data)
-    // backendQueue_.debugMessage(std::move(message));
+    // CK_TODO(DebugMessage : Send Message to thread so it can fill in the data)
+    //  backendQueue_.debugMessage(std::move(message));
 }
 
 void ClemensFrontend::cmdTrace(std::string_view operand) {
