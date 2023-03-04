@@ -349,7 +349,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
     unsigned emulatorRefreshFrequency = 60;
     std::optional<unsigned> hitBreakpoint;
 
-    double emulatorTimeScalar = 1.0; //  used for fast emulation
+    unsigned emulatorVblsPerFrame = 1; // used for fast emulation
 
     bool isMachineRunning = isRunning();
 
@@ -378,25 +378,25 @@ ClemensBackend::main(ClemensBackendState &backendState,
         // that shouldn't matter too much given that this 'speed boost' is meant to be
         // temporary, and the emulator should catch up once the IWM is inactive.
         if (clemens_is_drive_io_active(&mmio_)) {
-            emulatorTimeScalar = 4.0;
+            emulatorVblsPerFrame = 4;
         } else {
-            emulatorTimeScalar = 1.0;
+            emulatorVblsPerFrame = 1;
         }
         auto lastClocksSpent = machine_.tspec.clocks_spent;
-
-        int64_t clocksPerTimeslice =
-            calculateClocksPerTimeslice(&mmio_, emulatorRefreshFrequency) * emulatorTimeScalar;
-
-        clocksRemainingInTimeslice_ += clocksPerTimeslice;
-
         machine_.cpu.cycles_spent = 0;
-        while (clocksRemainingInTimeslice_ > 0 && isRunning()) {
+
+        unsigned emulatorVblCounter = emulatorVblsPerFrame;
+        bool vblActive = mmio_.vgc.vbl_started;
+        while (emulatorVblCounter > 0 && isRunning()) {
             clem_clocks_time_t pre_emulate_time = machine_.tspec.clocks_spent;
             clemens_emulate_cpu(&machine_);
             clemens_emulate_mmio(&machine_, &mmio_);
+            if (vblActive && !mmio_.vgc.vbl_started) {
+                emulatorVblCounter--;
+            }
+            vblActive = mmio_.vgc.vbl_started;
             clem_clocks_duration_t emulate_step_clocks =
                 machine_.tspec.clocks_spent - pre_emulate_time;
-            clocksRemainingInTimeslice_ -= emulate_step_clocks;
             if (stepsRemaining_.has_value()) {
                 stepsRemaining_ = *stepsRemaining_ - 1;
             }
@@ -407,7 +407,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
                     break;
                 }
             }
-        } // clocksRemainingInTimeslice
+        }
 
         if (stepsRemaining_.has_value() && *stepsRemaining_ == 0) {
             //  if we've finished stepping through code, we are also done with our
@@ -513,7 +513,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
     }
     backendState.debugMemoryPage = debugMemoryPage_;
     backendState.emulatorSpeedMhz = runSampler_.sampledEmulatorSpeedMhz;
-    backendState.fastEmulationOn = emulatorTimeScalar > 1.0f;
+    backendState.fastEmulationOn = emulatorVblsPerFrame > 1.0f;
 
     ClemensCommandQueue commands;
     delegate(commands, commandResults, backendState);

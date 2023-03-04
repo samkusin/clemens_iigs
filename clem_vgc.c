@@ -14,12 +14,13 @@
    VBL particulars:
    http://www.1000bit.it/support/manuali/apple/technotes/iigs/tn.iigs.040.html
 */
-
+// #define CLEM_VGC_DEBUG_COUNTER_LOGGING
+#ifdef CLEM_VGC_DEBUG_COUNTER_LOGGING
 static clem_clocks_duration_t sks_vgc_sync_this_time = 0;
 static clem_clocks_duration_t sks_vgc_sync_last_time = 0;
 static unsigned sks_vgc_vcounter_last = 0;
 static unsigned sks_vgc_frame_count = 0;
-
+#endif
 static inline void _clem_vgc_set_scanline_int(struct ClemensVGC *vgc, bool enable) {
     if (enable) {
         vgc->irq_line |= CLEM_IRQ_VGC_SCAN_LINE;
@@ -223,12 +224,14 @@ void clem_vgc_sync(struct ClemensVGC *vgc, struct ClemensClock *clock, const uin
         vgc->dt_scanline = 0;
         vgc->mode_flags &= ~CLEM_VGC_INIT;
         frame_duration = 0;
+#ifdef CLEM_VGC_DEBUG_COUNTER_LOGGING
         sks_vgc_sync_this_time = 0;
         sks_vgc_sync_last_time = 0;
         sks_vgc_frame_count = 0;
         fprintf(stdout, "vgc: sync settings { %.2f us/frame, %.2f fps }\n",
                 CLEM_VGC_NTSC_SCAN_TIME_NS / 1000.0f, CLEM_VGC_NTSC_FRAMES_PER_SECOND);
         fflush(stdout);
+#endif
     } else {
         frame_duration = clock->ts - vgc->ts_scanline_0;
         v_counter = _clem_vgc_calc_v_counter(frame_duration, clock->ref_step);
@@ -254,19 +257,22 @@ void clem_vgc_sync(struct ClemensVGC *vgc, struct ClemensClock *clock, const uin
             vgc->ts_scanline_0 += frame_duration;
             vgc->vbl_started = false;
             vgc->vbl_counter++;
-            /*
+#ifdef CLEM_VGC_DEBUG_COUNTER_LOGGING
             fprintf(stdout, "vgc: [%u][%u ns, dt = %u ns] v_counter = %u\n", sks_vgc_frame_count,
                     clem_calc_ns_step_from_clocks(sks_vgc_sync_this_time, clock->ref_step),
                     clem_calc_ns_step_from_clocks(sks_vgc_sync_this_time - sks_vgc_sync_last_time,
                                                   clock->ref_step),
                     v_counter);
             fflush(stdout);
-            */
+
             sks_vgc_sync_last_time = sks_vgc_sync_this_time;
             sks_vgc_frame_count++;
+#endif
         }
+#ifdef CLEM_VGC_DEBUG_COUNTER_LOGGING
         if (sks_vgc_sync_this_time >= CLEM_MEGA2_CYCLES_PER_SECOND * clock->ref_step) {
             unsigned h_counter = _clem_vgc_calc_h_counter(vgc->dt_scanline, clock->ref_step);
+
             fprintf(stdout, "vgc: [%.2f (%u)][%u ns, dt = %u ns] {v: %u, h: %u}, vdiff: %d\n",
                     sks_vgc_frame_count / CLEM_VGC_NTSC_FRAMES_PER_SECOND, sks_vgc_frame_count,
                     clem_calc_ns_step_from_clocks(sks_vgc_sync_this_time, clock->ref_step),
@@ -274,11 +280,13 @@ void clem_vgc_sync(struct ClemensVGC *vgc, struct ClemensClock *clock, const uin
                                                   clock->ref_step),
                     v_counter, h_counter, (int)(v_counter - sks_vgc_vcounter_last));
             fflush(stdout);
+
             sks_vgc_vcounter_last = v_counter;
             sks_vgc_sync_last_time -= (CLEM_MEGA2_CYCLES_PER_SECOND * clock->ref_step);
             sks_vgc_sync_this_time -= (CLEM_MEGA2_CYCLES_PER_SECOND * clock->ref_step);
         }
         sks_vgc_sync_this_time += (clock->ts - vgc->ts_last_frame);
+#endif
     }
 
     vgc->ts_last_frame = clock->ts;
