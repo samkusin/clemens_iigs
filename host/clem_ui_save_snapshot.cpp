@@ -1,4 +1,5 @@
 #include "clem_ui_save_snapshot.hpp"
+#include "clem_command_queue.hpp"
 
 #include "clem_backend.hpp"
 #include "clem_imgui.hpp"
@@ -9,14 +10,14 @@
 
 bool ClemensSaveSnapshotUI::isStarted() const { return mode_ != Mode::None; }
 
-void ClemensSaveSnapshotUI::start(ClemensBackend *backend, bool isEmulatorRunning) {
+void ClemensSaveSnapshotUI::start(ClemensCommandQueue &backend, bool isEmulatorRunning) {
     mode_ = Mode::PromptForName;
     interruptedExecution_ = isEmulatorRunning;
     snapshotName_[0] = '\0';
-    backend->breakExecution();
+    backend.breakExecution();
 }
 
-bool ClemensSaveSnapshotUI::frame(float width, float /* height */, ClemensBackend *backend) {
+bool ClemensSaveSnapshotUI::frame(float width, float /* height */, ClemensCommandQueue &backend) {
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     switch (mode_) {
     case Mode::None:
@@ -54,7 +55,7 @@ bool ClemensSaveSnapshotUI::frame(float width, float /* height */, ClemensBacken
                 if (!selectedPath.has_extension()) {
                     selectedPath.replace_extension(".clemens-sav");
                 }
-                backend->saveMachine(selectedPath.string());
+                backend.saveMachine(selectedPath.string());
                 fmt::print("SaveSnapshotMode: saving...\n");
                 mode_ = Mode::WaitForResponse;
             }
@@ -103,9 +104,9 @@ bool ClemensSaveSnapshotUI::frame(float width, float /* height */, ClemensBacken
     return false;
 }
 
-void ClemensSaveSnapshotUI::stop(ClemensBackend *backend) {
+void ClemensSaveSnapshotUI::stop(ClemensCommandQueue &backend) {
     if (interruptedExecution_) {
-        backend->run();
+        backend.run();
     }
     mode_ = Mode::None;
 }

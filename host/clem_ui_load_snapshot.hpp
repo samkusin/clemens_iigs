@@ -3,14 +3,15 @@
 
 #include <string>
 
-class ClemensBackend;
+class ClemensCommandQueue;
 
 class ClemensLoadSnapshotUI {
   public:
     bool isStarted() const;
-    void start(ClemensBackend *backend, const std::string &snapshotDir, bool isEmulatorRunning);
-    bool frame(float width, float height, ClemensBackend *backend);
-    void stop(ClemensBackend *backend);
+    void start(ClemensCommandQueue &backend, const std::string &snapshotDir,
+               bool isEmulatorRunning);
+    bool frame(float width, float height, ClemensCommandQueue &backend);
+    void stop(ClemensCommandQueue &backend);
     void succeeded();
     void fail();
 

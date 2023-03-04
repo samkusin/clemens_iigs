@@ -25,18 +25,18 @@ struct ClemensBackendExecutedInstruction {
     char operand[32];
 };
 
-struct ClemensBackendBreakpoint {
-    enum Type { Undefined, Execute, DataRead, Write, IRQ };
-    Type type;
-    uint32_t address;
-};
-
 struct ClemensBackendDiskDriveState {
     std::string imagePath;
     bool isWriteProtected;
     bool isSpinning;
     bool isEjecting;
     bool saveFailed;
+};
+
+struct ClemensBackendBreakpoint {
+    enum Type { Undefined, Execute, DataRead, Write, IRQ };
+    Type type;
+    uint32_t address;
 };
 
 struct ClemensBackendConfig {
@@ -52,37 +52,6 @@ struct ClemensBackendConfig {
     unsigned audioSamplesPerSecond;
     bool enableFastEmulation;
     Type type;
-};
-
-struct ClemensBackendCommand {
-    enum Type {
-        Undefined,
-        Terminate,
-        SetHostUpdateFrequency,
-        ResetMachine,
-        RunMachine,
-        StepMachine,
-        Publish,
-        InsertDisk,
-        InsertBlankDisk,
-        EjectDisk,
-        Input,
-        Break,
-        AddBreakpoint,
-        DelBreakpoint,
-        WriteProtectDisk,
-        DebugMemoryPage,
-        WriteMemory,
-        DebugLogLevel,
-        DebugMessage,
-        DebugProgramTrace,
-        SaveMachine,
-        LoadMachine,
-        FastEmulation,
-        RunScript
-    };
-    Type type = Undefined;
-    std::string operand;
 };
 
 enum class ClemensBackendMachineProperty {
@@ -125,6 +94,34 @@ template <typename Stats> struct ClemensEmulatorDiagnostics {
         return std::make_pair(0.0, false);
     }
 };
+
+struct ClemensBackendCommand {
+    enum Type {
+        Undefined,
+        Terminate,
+        ResetMachine,
+        RunMachine,
+        StepMachine,
+        InsertDisk,
+        InsertBlankDisk,
+        EjectDisk,
+        Input,
+        Break,
+        AddBreakpoint,
+        DelBreakpoint,
+        WriteProtectDisk,
+        DebugMemoryPage,
+        WriteMemory,
+        DebugLogLevel,
+        DebugProgramTrace,
+        SaveMachine,
+        LoadMachine,
+        RunScript
+    };
+    Type type = Undefined;
+    std::string operand;
+};
+
 struct ClemensBackendResult {
     ClemensBackendCommand cmd;
     enum Type { Succeeded, Failed };
@@ -132,12 +129,9 @@ struct ClemensBackendResult {
 };
 
 struct ClemensBackendState {
-    std::vector<ClemensBackendResult> results;
     ClemensMachine *machine;
     ClemensMMIO *mmio;
     double fps;
-    uint64_t seqno;
-    bool isTerminated;
     bool isRunning;
     bool isTracing;
     bool isIWMTracing;

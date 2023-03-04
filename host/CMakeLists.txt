@@ -66,6 +66,7 @@ set(PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_display.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_backend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_command_queue.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_configuration.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk_library.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk_utils.cpp"

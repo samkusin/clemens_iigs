@@ -8,6 +8,15 @@ extern "C" {
 #endif
 
 /**
+ * @brief
+ *
+ * @param mmio
+ * @return true
+ * @return false
+ */
+bool clemens_is_mmio_initialized(ClemensMMIO *mmio);
+
+/**
  * @brief Emulate the I/O portion of an Apple IIgs
  *
  * This should be paired with calls to clemens_emulate_cpu().  The calls are
