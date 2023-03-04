@@ -1,4 +1,5 @@
 #include "clem_ui_load_snapshot.hpp"
+#include "clem_command_queue.hpp"
 
 #include "clem_backend.hpp"
 #include "clem_imgui.hpp"
@@ -9,16 +10,16 @@
 
 bool ClemensLoadSnapshotUI::isStarted() const { return mode_ != Mode::None; }
 
-void ClemensLoadSnapshotUI::start(ClemensBackend *backend, const std::string &snapshotDir,
+void ClemensLoadSnapshotUI::start(ClemensCommandQueue &backend, const std::string &snapshotDir,
                                   bool isEmulatorRunning) {
     mode_ = Mode::Browser;
     interruptedExecution_ = isEmulatorRunning;
     snapshotDir_ = snapshotDir;
     snapshotName_[0] = '\0';
-    backend->breakExecution();
+    backend.breakExecution();
 }
 
-bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensBackend *backend) {
+bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue &backend) {
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     switch (mode_) {
     case Mode::None:
@@ -69,7 +70,7 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensBackend *bac
             if (isOk && snapshotName_[0] != '\0') {
                 ImGui::CloseCurrentPopup();
 
-                backend->loadMachine(snapshotName_);
+                backend.loadMachine(snapshotName_);
                 fmt::print("LoadSnapshotMode: loading...\n");
                 mode_ = Mode::WaitForResponse;
             }
@@ -118,9 +119,9 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensBackend *bac
     return false;
 }
 
-void ClemensLoadSnapshotUI::stop(ClemensBackend *backend) {
+void ClemensLoadSnapshotUI::stop(ClemensCommandQueue &backend) {
     if (interruptedExecution_) {
-        backend->run();
+        backend.run();
     }
     mode_ = Mode::None;
 }

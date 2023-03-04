@@ -1,6 +1,7 @@
 #ifndef CLEM_HOST_BACKEND_HPP
 #define CLEM_HOST_BACKEND_HPP
 
+#include "clem_command_queue.hpp"
 #include "clem_host_shared.hpp"
 #include "clem_interpreter.hpp"
 #include "clem_smartport_disk.hpp"
@@ -10,19 +11,42 @@
 #include "clem_woz.h"
 
 #include <array>
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <functional>
-#include <mutex>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <vector>
 
 class ClemensProgramTrace;
 
+struct ClemensRunSampler {
+    std::chrono::microseconds referenceFrameTimer;
+    std::chrono::microseconds actualFrameTimer;
+    std::chrono::microseconds sampledFrameTime;
+
+    double sampledFramesPerSecond;
+
+    cinek::CircularBuffer<std::chrono::microseconds, 120> frameTimeBuffer;
+
+    clem_clocks_time_t sampledClocksSpent;
+    uint64_t sampledCyclesSpent;
+    cinek::CircularBuffer<clem_clocks_duration_t, 120> clocksBuffer;
+    cinek::CircularBuffer<clem_clocks_duration_t, 120> cyclesBuffer;
+
+    double sampledEmulatorSpeedMhz;
+    double actualEmulatorSpeedMhz;
+    std::chrono::high_resolution_clock::time_point lastFrameTimePoint;
+
+    ClemensRunSampler();
+
+    void reset();
+    void update(clem_clocks_duration_t clocksSpent, unsigned cyclesSpent);
+};
+
 //  TODO: Machine type logic could be subclassed into an Apple2GS backend, etc.
-class ClemensBackend {
+class ClemensBackend : public ClemensCommandQueueListener {
   public:
     using Config = ClemensBackendConfig;
 
@@ -31,60 +55,15 @@ class ClemensBackend {
     //    scope.  The front-end should copy what it needs for its display during
     //    the delegate's scope. Once the delegate has finished, the data in
     //    ClemensBackendState should be considered invalid/undefined.
-    using PublishStateDelegate = std::function<void(const ClemensBackendState &)>;
-    ClemensBackend(std::string romPathname, const Config &config,
-                   PublishStateDelegate publishDelegate);
+    using PublishStateDelegate =
+        std::function<void(ClemensCommandQueue &, const ClemensCommandQueue::ResultBuffer &,
+                           const ClemensBackendState &)>;
+    ClemensBackend(std::string romPathname, const Config &config);
     ~ClemensBackend();
 
-    //  Queues a command to the backend.   Most commands are processed on the next
-    //  execution frame.  Certain commands may hold the queue (i.e. like wait())
-    //  Priority commands like Cancel or Terminate are pushed to the front,
-    //  overriding commands like Wait.
-    void terminate();
-    //  Issues a soft reset to the machine.   This is roughly equivalent to pressing
-    //  the power button.
-    void reset();
-    //  The host should expect emulator state refreshes at this frequency if in
-    //  run mode
-    void setRefreshFrequency(unsigned hz);
-    //  Clears step mode and enter run mode
-    void run();
-    //  Steps the emulator
-    void step(unsigned count);
-    //  Will issue the publish delegate on the next machine iteration
-    void publish();
-    //  Send host input to the emulator
-    void inputEvent(const ClemensInputEvent &inputEvent);
-    //  Insert disk
-    void insertDisk(ClemensDriveType driveType, std::string diskPath);
-    //  Insert blank disk
-    void insertBlankDisk(ClemensDriveType driveType, std::string diskPath);
-    //  Eject disk
-    void ejectDisk(ClemensDriveType driveType);
-    //  Break
-    void breakExecution();
-    //  Add a breakpoint
-    void addBreakpoint(const ClemensBackendBreakpoint &breakpoint);
-    //  Remove a breakpoint
-    void removeBreakpoint(unsigned index);
-    //  Sets the write protect status on a disk in a drive
-    void writeProtectDisk(ClemensDriveType driveType, bool wp);
-    //  Sets the active debug memory page that can be read from or written to by
-    //  the front end (this value is communicated on publish)
-    void debugMemoryPage(uint8_t pageIndex);
-    //  Write a single byte to machine memory at the current debugMemoryPage
-    void debugMemoryWrite(uint16_t addr, uint8_t value);
-    //  Set logging level
-    void debugLogLevel(int logLevel);
-    //  Send a message to the publish delegate from the frontend
-    void debugMessage(std::string msg);
-    //  Enable a program trace
-    void debugProgramTrace(std::string op, std::string path);
-    //  Save and load the machine
-    void saveMachine(std::string path);
-    void loadMachine(std::string path);
-
-    void runScript(std::string command);
+    ClemensCommandQueue::DispatchResult
+    main(ClemensBackendState &backendState, const ClemensCommandQueue::ResultBuffer &commandResults,
+         PublishStateDelegate delegate);
 
     //  these methods do not queue instructions to execute on the runner
     //  and must be executed instead on the runner thread.  They are made public
@@ -95,27 +74,27 @@ class ClemensBackend {
     void assignPropertyToU32(MachineProperty property, uint32_t value);
 
   private:
-    using Command = ClemensBackendCommand;
-
-    void queue(const Command &cmd);
-    void queueToFront(const Command &cmd);
-
-    void main(PublishStateDelegate publishDelegate);
-    void resetMachine();
-    unsigned stepMachine(const std::string_view &inputParam);
-    bool insertDisk(const std::string_view &inputParam, bool allowBlank);
-    void ejectDisk(const std::string_view &inputParam);
-    bool writeProtectDisk(const std::string_view &inputParam);
-    void writeMemory(const std::string_view &inputParam);
-    void inputMachine(const std::string_view &inputParam);
-    bool addBreakpoint(const std::string_view &inputParam);
-    bool delBreakpoint(const std::string_view &inputParam);
-    bool programTrace(const std::string_view &inputParam);
-    bool saveSnapshot(const std::string_view &inputParam);
-    bool loadSnapshot(const std::string_view &inputParam);
-    bool runScriptCommand(const std::string_view &command);
+    void onCommandReset() final;
+    void onCommandRun() final;
+    void onCommandBreakExecution() final;
+    void onCommandStep(unsigned count) final;
+    void onCommandAddBreakpoint(const ClemensBackendBreakpoint &breakpoint) final;
+    bool onCommandRemoveBreakpoint(int index) final;
+    void onCommandInputEvent(const ClemensInputEvent &inputEvent) final;
+    bool onCommandInsertDisk(ClemensDriveType driveType, std::string diskPath) final;
+    bool onCommandInsertBlankDisk(ClemensDriveType driveType, std::string diskPath) final;
+    void onCommandEjectDisk(ClemensDriveType driveType) final;
+    bool onCommandWriteProtectDisk(ClemensDriveType driveType, bool wp) final;
+    void onCommandDebugMemoryPage(uint8_t pageIndex) final;
+    void onCommandDebugMemoryWrite(uint16_t addr, uint8_t value) final;
+    void onCommandDebugLogLevel(int logLevel) final;
+    bool onCommandDebugProgramTrace(std::string_view op, std::string_view path) final;
+    bool onCommandSaveMachine(std::string path) final;
+    bool onCommandLoadMachine(std::string path) final;
+    bool onCommandRunScript(std::string command) final;
 
     std::optional<unsigned> checkHitBreakpoint();
+    bool isRunning() const;
 
     void initEmulatedDiskLocalStorage();
     bool loadDisk(ClemensDriveType driveType, bool allowBlank);
@@ -142,11 +121,6 @@ class ClemensBackend {
   private:
     Config config_;
 
-    std::thread runner_;
-    std::deque<Command> commandQueue_;
-    std::mutex commandQueueMutex_;
-    std::condition_variable commandQueueCondition_;
-
     //  memory allocated once for the machine
     cinek::FixedStack slabMemory_;
     //  the actual machine object
@@ -154,6 +128,7 @@ class ClemensBackend {
     cinek::ByteBuffer diskBuffer_;
     ClemensMachine machine_;
     ClemensMMIO mmio_;
+    ClemensCard *mockingboard_;
 
     ClemensInterpreter interpreter_;
 
@@ -172,6 +147,11 @@ class ClemensBackend {
     int logLevel_;
     uint8_t debugMemoryPage_;
     bool areInstructionsLogged_;
+
+    ClemensRunSampler runSampler_;
+
+    std::optional<int> stepsRemaining_;
+    int64_t clocksRemainingInTimeslice_;
 };
 
 #endif

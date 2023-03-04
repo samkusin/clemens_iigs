@@ -1,6 +1,7 @@
 #ifndef CLEM_HOST_FRONT_HPP
 #define CLEM_HOST_FRONT_HPP
 
+#include "clem_command_queue.hpp"
 #include "clem_host_platform.h"
 #include "clem_host_view.hpp"
 
@@ -22,6 +23,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <thread>
 #include <vector>
 
 struct ImFont;
@@ -42,11 +44,15 @@ class ClemensFrontend : public ClemensHostView {
   private:
     template <typename TBufferType> friend struct FormatView;
 
-    std::unique_ptr<ClemensBackend> createBackend();
+    void createBackend();
+    void runBackend(std::unique_ptr<ClemensBackend> backend);
+    void stopBackend();
+    bool isBackendRunning() const;
 
     //  the backend state delegate is run on a separate thread and notifies
     //  when a frame has been published
-    void backendStateDelegate(const ClemensBackendState &state);
+    void backendStateDelegate(const ClemensBackendState &state,
+                              const ClemensCommandQueue::ResultBuffer &results);
     void copyState(const ClemensBackendState &state);
     void processBackendResult(const ClemensBackendResult &result);
 
@@ -107,14 +113,35 @@ class ClemensFrontend : public ClemensHostView {
 
     ClemensDisplay display_;
     ClemensAudioDevice audio_;
+
     std::unique_ptr<ClemensBackend> backend_;
 
-    //  These buffers are populated when the backend publishes the current
-    //  emulator state.   Their contents are refreshed for every publish
-    std::condition_variable framePublished_;
-    std::mutex frameMutex_;
+    //  Handles synchronization between the emulator and the UI(main) thread
+    //  The backendQueue is filled by the UI.  It will "stage" these commands
+    //  every UI frame and report its timestamp.
+    //
+    //  The worker will handle commands as long as the frameTimestamp changes.
+    //  It uses this timestamp to make sure it doesn't emulate frames beyond
+    //  those that are needed to keep in sync with the UI.  This should more or
+    //  less work with fast emulation enabled, since frames are reported back to
+    //  the frontend based on the UI's framerate using this counter.
+    std::thread backendThread_;
+    ClemensCommandQueue backendQueue_;
+    ClemensCommandQueue stagedBackendQueue_;
+    double uiFrameTimeDelta_;
+
+    // These counters are used to identify unique frames between the two threads
+    // frameSeqNo is updated per executed emulator frame.  The UI thread will
+    // check frameSeqNo against frameLastSeqNo during the synchronization phase
+    // and if they differ, then the UI has data for a new emulator state.
     uint64_t frameSeqNo_, frameLastSeqNo_;
     static const uint64_t kFrameSeqNoInvalid;
+
+    // Synchronization - UI thread will notify the emulator of new commands and
+    // timestamp.  The worker will wait until the timestamp changes and
+    // execute frames to maintain sync with the UI thread.
+    std::condition_variable readyForFrame_;
+    std::mutex frameMutex_;
 
     //  Toggle between frame memory buffers so that backendStateDelegate and frame
     //  write to and read from separate buffers, to minimize the time we need to
@@ -211,7 +238,6 @@ class ClemensFrontend : public ClemensHostView {
     //  when an event happened (command failed, termination, breakpoint hit, etc)
     struct LastCommandState {
         std::vector<ClemensBackendResult> results;
-        std::optional<bool> terminated;
         std::optional<unsigned> hitBreakpoint;
         std::optional<std::string> message;
         LogOutputNode *logNode = nullptr;

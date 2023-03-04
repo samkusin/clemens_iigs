@@ -18,7 +18,6 @@
 #include <optional>
 #include <vector>
 
-#include "cinek/circular_buffer.hpp"
 #include "fmt/format.h"
 
 static constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
@@ -26,108 +25,70 @@ static constexpr unsigned kInterpreterMemorySize = 1 * 1024 * 1024;
 static constexpr unsigned kLogOutputLineLimit = 1024;
 static constexpr unsigned kSmartPortDiskBlockCount = 32 * 1024 * 2; // 32 MB blocks
 
-struct ClemensRunSampler {
-    std::chrono::microseconds referenceFrameTimer;
-    std::chrono::microseconds actualFrameTimer;
-    std::chrono::microseconds sampledFrameTime;
+ClemensRunSampler::ClemensRunSampler() { reset(); }
 
-    double sampledFramesPerSecond;
+void ClemensRunSampler::reset() {
+    referenceFrameTimer = std::chrono::microseconds::zero();
+    actualFrameTimer = std::chrono::microseconds::zero();
+    sampledFrameTime = std::chrono::microseconds::zero();
+    lastFrameTimePoint = std::chrono::high_resolution_clock::now();
+    sampledClocksSpent = 0;
+    sampledCyclesSpent = 0;
+    sampledFramesPerSecond = 0.0f;
+    sampledEmulatorSpeedMhz = 0.0f;
+    actualEmulatorSpeedMhz = 0.0f;
+    frameTimeBuffer.clear();
+    clocksBuffer.clear();
+    cyclesBuffer.clear();
+}
 
-    cinek::CircularBuffer<std::chrono::microseconds, 120> frameTimeBuffer;
+void ClemensRunSampler::update(clem_clocks_duration_t clocksSpent, unsigned cyclesSpent) {
+    auto currentFrameTimePoint = std::chrono::high_resolution_clock::now();
+    auto actualFrameInterval = std::chrono::duration_cast<std::chrono::microseconds>(
+        currentFrameTimePoint - lastFrameTimePoint);
+    lastFrameTimePoint = currentFrameTimePoint;
 
-    clem_clocks_time_t sampledClocksSpent;
-    uint64_t sampledCyclesSpent;
-    cinek::CircularBuffer<clem_clocks_duration_t, 120> clocksBuffer;
-    cinek::CircularBuffer<clem_clocks_duration_t, 120> cyclesBuffer;
+    actualFrameTimer += actualFrameInterval;
 
-    double sampledEmulatorSpeedMhz;
-    double actualEmulatorSpeedMhz;
+    if (frameTimeBuffer.isFull()) {
+        decltype(frameTimeBuffer)::ValueType lruFrametime;
+        if (frameTimeBuffer.pop(lruFrametime)) {
+            sampledFrameTime -= lruFrametime;
+        }
+    }
+    frameTimeBuffer.push(actualFrameInterval);
+    sampledFrameTime += actualFrameInterval;
 
-    ClemensRunSampler() { reset(); }
-
-    void reset() {
-        referenceFrameTimer = std::chrono::microseconds::zero();
-        actualFrameTimer = std::chrono::microseconds::zero();
-        sampledFrameTime = std::chrono::microseconds::zero();
-        sampledClocksSpent = 0;
-        sampledCyclesSpent = 0;
-        sampledFramesPerSecond = 0.0f;
-        sampledEmulatorSpeedMhz = 0.0f;
-        actualEmulatorSpeedMhz = 0.0f;
-        frameTimeBuffer.clear();
-        clocksBuffer.clear();
-        cyclesBuffer.clear();
+    if (sampledFrameTime >= std::chrono::microseconds(100000)) {
+        sampledFramesPerSecond = frameTimeBuffer.size() * 1e6 / sampledFrameTime.count();
     }
 
-    void update(std::chrono::microseconds fixedFrameInterval,
-                std::chrono::microseconds actualFrameInterval, clem_clocks_duration_t clocksSpent,
-                unsigned cyclesSpent) {
-
-        // Our goal is to keep the actualFrameTimer roughly in sync with the referenceFrameTimer.
-        // Given how thread scheduling differs between platforms and machines, it's expected the
-        // "actual" timer will overshoot and undershoot the reference timer during a run.
-        // This method will attempt to keep up using a timer delay.
-
-        referenceFrameTimer += fixedFrameInterval;
-        actualFrameTimer += actualFrameInterval;
-
-        if (actualFrameTimer >= referenceFrameTimer) {
-            //  Our runner is taking too long, so try to catch up.
-            //
-            std::this_thread::yield();
-            if (actualFrameTimer - referenceFrameTimer > std::chrono::microseconds(500000)) {
-                //  TODO: Check whether this value increases over time - means we have a slow
-                //  machine.  This hack below will reset the timers to cap the delay
-                actualFrameTimer = referenceFrameTimer = std::chrono::microseconds::zero();
-            }
-        } else {
-            // Our runner is faster than the machine speed.  Keep our runner at the desired
-            // framerate.
-            std::this_thread::sleep_for(referenceFrameTimer - actualFrameTimer);
-            referenceFrameTimer -= actualFrameTimer;
-            actualFrameTimer = std::chrono::microseconds::zero();
-        }
-
-        if (frameTimeBuffer.isFull()) {
-            decltype(frameTimeBuffer)::ValueType lruFrametime;
-            if (frameTimeBuffer.pop(lruFrametime)) {
-                sampledFrameTime -= lruFrametime;
-            }
-        }
-        frameTimeBuffer.push(actualFrameInterval);
-        sampledFrameTime += actualFrameInterval;
-
-        if (sampledFrameTime >= std::chrono::microseconds(100000)) {
-            sampledFramesPerSecond = frameTimeBuffer.size() * 1e6 / sampledFrameTime.count();
-        }
-
-        //  calculate emulator speed by using cycles_spent * CLEM_CLOCKS_MEGA2_CYCLE
-        //  as a reference for 1.023mhz where
-        //    reference_clocks = cycles_spent * CLEM_CLOCKS_MEGA2_CYCLE
-        //    acutal_clocks = sampledClocksSpent
-        //    (reference / actual) * 1.023mhz is the emulator speed
-        if (clocksBuffer.isFull()) {
-            decltype(clocksBuffer)::ValueType lruClocksSpent = 0;
-            clocksBuffer.pop(lruClocksSpent);
-            sampledClocksSpent -= lruClocksSpent;
-        }
-        clocksBuffer.push(clocksSpent);
-        sampledClocksSpent += clocksSpent;
-
-        if (cyclesBuffer.isFull()) {
-            decltype(cyclesBuffer)::ValueType lruCycles = 0;
-            cyclesBuffer.pop(lruCycles);
-            sampledCyclesSpent -= lruCycles;
-        }
-        cyclesBuffer.push(cyclesSpent);
-        sampledCyclesSpent += cyclesSpent;
-        if (sampledClocksSpent > (CLEM_CLOCKS_MEGA2_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND / 10)) {
-            sampledEmulatorSpeedMhz =
-                1.023 * double(CLEM_CLOCKS_MEGA2_CYCLE * sampledCyclesSpent) / sampledClocksSpent;
-        }
-        // TODO: calculate # cycles per second = actual mhz (for fast emulation mode)
+    //  calculate emulator speed by using cycles_spent * CLEM_CLOCKS_MEGA2_CYCLE
+    //  as a reference for 1.023mhz where
+    //    reference_clocks = cycles_spent * CLEM_CLOCKS_MEGA2_CYCLE
+    //    acutal_clocks = sampledClocksSpent
+    //    (reference / actual) * 1.023mhz is the emulator speed
+    if (clocksBuffer.isFull()) {
+        decltype(clocksBuffer)::ValueType lruClocksSpent = 0;
+        clocksBuffer.pop(lruClocksSpent);
+        sampledClocksSpent -= lruClocksSpent;
     }
-};
+    clocksBuffer.push(clocksSpent);
+    sampledClocksSpent += clocksSpent;
+
+    if (cyclesBuffer.isFull()) {
+        decltype(cyclesBuffer)::ValueType lruCycles = 0;
+        cyclesBuffer.pop(lruCycles);
+        sampledCyclesSpent -= lruCycles;
+    }
+    cyclesBuffer.push(cyclesSpent);
+    sampledCyclesSpent += cyclesSpent;
+    if (sampledClocksSpent > (CLEM_CLOCKS_MEGA2_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND / 10)) {
+        sampledEmulatorSpeedMhz =
+            1.023 * double(CLEM_CLOCKS_MEGA2_CYCLE * sampledCyclesSpent) / sampledClocksSpent;
+    }
+    // TODO: calculate # cycles per second = actual mhz (for fast emulation mode)
+}
 
 template <typename... Args>
 void ClemensBackend::localLog(int log_level, const char *msg, Args... args) {
@@ -140,9 +101,9 @@ void ClemensBackend::localLog(int log_level, const char *msg, Args... args) {
     logOutput_.emplace_back(logLine);
 }
 
-ClemensBackend::ClemensBackend(std::string romPathname, const Config &config,
-                               PublishStateDelegate publishDelegate)
+ClemensBackend::ClemensBackend(std::string romPathname, const Config &config)
     : config_(config), slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
+      mockingboard_(nullptr),
       interpreter_(cinek::FixedStack(kInterpreterMemorySize, malloc(kInterpreterMemorySize))),
       breakpoints_(std::move(config_.breakpoints)), logLevel_(CLEM_DEBUG_LOG_INFO),
       debugMemoryPage_(0x00), areInstructionsLogged_(false) {
@@ -199,228 +160,51 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config &config,
                    smartPortDrives_[driveIndex].imagePath, driveIndex);
     }
 
-    //  Everything is ready for the main thread
-    runner_ = std::thread(&ClemensBackend::main, this, std::move(publishDelegate));
+    clocksRemainingInTimeslice_ = 0;
+    //  TODO: hacky - basically we start the machine in a stopped state, so a
+    //  command queued for 'run' will start everything.  Maybe it isn't hacky?
+    stepsRemaining_ = 0;
 }
 
 ClemensBackend::~ClemensBackend() {
-    terminate();
-    runner_.join();
+    //  eject and save all disks
+    for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end(); ++diskDriveIt) {
+        auto &diskDrive = *diskDriveIt;
+        if (diskDrive.imagePath.empty())
+            continue;
+
+        auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
+        auto driveType = static_cast<ClemensDriveType>(driveIndex);
+        if (clemens_eject_disk_async(&mmio_, driveType, &disks_[driveIndex])) {
+            saveDisk(driveType);
+            localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", diskDrive.imagePath);
+        }
+    }
+    for (auto hardDriveIt = smartPortDrives_.begin(); hardDriveIt != smartPortDrives_.end();
+         ++hardDriveIt) {
+        auto &drive = *hardDriveIt;
+        if (drive.imagePath.empty())
+            continue;
+        auto driveIndex = unsigned(hardDriveIt - smartPortDrives_.begin());
+        ClemensSmartPortDevice device;
+        clemens_remove_smartport_disk(&mmio_, driveIndex, &device);
+        smartPortDisks_[driveIndex].destroySmartPortDevice(&device);
+        saveSmartPortDisk(driveIndex);
+        localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", drive.imagePath);
+    }
+
+    saveBRAM();
+
+    //  TODO: clemens_mmio_card_eject() will clear the slot but it still needs
+    //        to be destroyed by the app
+    for (int i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
+        destroyCard(mmio_.card_slot[i]);
+        mmio_.card_slot[i] = NULL;
+    }
 
     free(slabMemory_.getHead());
 }
 
-void ClemensBackend::terminate() { queueToFront(Command{Command::Terminate}); }
-
-void ClemensBackend::reset() { queue(Command{Command::ResetMachine}); }
-
-void ClemensBackend::resetMachine() {
-    machine_.cpu.pins.resbIn = false;
-    machine_.resb_counter = 3;
-}
-
-void ClemensBackend::setRefreshFrequency(unsigned hz) {
-    queue(Command{Command::SetHostUpdateFrequency, fmt::format("{}", hz)});
-}
-
-void ClemensBackend::run() { queue(Command{Command::RunMachine}); }
-
-void ClemensBackend::step(unsigned count) {
-    queue(Command{Command::StepMachine, fmt::format("{}", count)});
-}
-
-unsigned ClemensBackend::stepMachine(const std::string_view &inputParam) {
-    unsigned count;
-    if (std::from_chars(inputParam.data(), inputParam.data() + inputParam.size(), count).ec !=
-        std::errc{}) {
-        return 0;
-    }
-    return count;
-}
-
-void ClemensBackend::publish() { queue(Command{Command::Publish}); }
-
-void ClemensBackend::insertDisk(ClemensDriveType driveType, std::string diskPath) {
-    queue(Command{Command::InsertDisk,
-                  fmt::format("{}={}", ClemensDiskUtilities::getDriveName(driveType), diskPath)});
-}
-
-bool ClemensBackend::insertDisk(const std::string_view &inputParam, bool allowBlank) {
-    auto sepPos = inputParam.find('=');
-    if (sepPos == std::string_view::npos)
-        return false;
-    auto driveName = inputParam.substr(0, sepPos);
-    auto imagePath = inputParam.substr(sepPos + 1);
-    auto driveType = ClemensDiskUtilities::getDriveType(driveName);
-    if (driveType == kClemensDrive_Invalid)
-        return false;
-
-    diskDrives_[driveType].imagePath = imagePath;
-    return loadDisk(driveType, allowBlank);
-}
-
-void ClemensBackend::insertBlankDisk(ClemensDriveType driveType, std::string diskPath) {
-    queue(Command{Command::InsertBlankDisk,
-                  fmt::format("{}={}", ClemensDiskUtilities::getDriveName(driveType), diskPath)});
-}
-
-void ClemensBackend::ejectDisk(ClemensDriveType driveType) {
-    queue(Command{Command::EjectDisk, std::string(ClemensDiskUtilities::getDriveName(driveType))});
-}
-
-void ClemensBackend::ejectDisk(const std::string_view &inputParam) {
-    auto driveType = ClemensDiskUtilities::getDriveType(inputParam);
-    diskDrives_[driveType].isEjecting = true;
-}
-
-void ClemensBackend::writeProtectDisk(ClemensDriveType driveType, bool wp) {
-    queue(Command{Command::WriteProtectDisk,
-                  fmt::format("{},{}", ClemensDiskUtilities::getDriveName(driveType), wp ? 1 : 0)});
-}
-
-bool ClemensBackend::writeProtectDisk(const std::string_view &inputParam) {
-    auto sepPos = inputParam.find(',');
-    if (sepPos == std::string_view::npos)
-        return false;
-    auto driveParam = inputParam.substr(0, sepPos);
-    auto driveType = ClemensDiskUtilities::getDriveType(driveParam);
-    auto *drive = clemens_drive_get(&mmio_, driveType);
-    if (!drive || !drive->has_disk)
-        return false;
-
-    auto enableParam = inputParam.substr(sepPos + 1);
-    drive->disk.is_write_protected = enableParam == "1";
-
-    return true;
-}
-
-void ClemensBackend::debugMemoryPage(uint8_t page) {
-    queue(Command{Command::DebugMemoryPage, std::to_string(page)});
-}
-
-void ClemensBackend::debugMemoryWrite(uint16_t addr, uint8_t value) {
-    queue(Command{Command::WriteMemory, fmt::format("{}={}", addr, value)});
-}
-
-void ClemensBackend::writeMemory(const std::string_view &inputParam) {
-    auto sepPos = inputParam.find('=');
-    if (sepPos == std::string_view::npos) {
-        return;
-    }
-    uint16_t addr;
-    if (std::from_chars(inputParam.data(), inputParam.data() + sepPos, addr).ec != std::errc{})
-        return;
-    auto valStr = inputParam.substr(sepPos + 1);
-    uint8_t value;
-    if (std::from_chars(valStr.data(), valStr.data() + valStr.size(), value).ec != std::errc{})
-        return;
-
-    clem_write(&machine_, value, addr, debugMemoryPage_, CLEM_MEM_FLAG_NULL);
-}
-
-void ClemensBackend::debugLogLevel(int logLevel) {
-    queue(Command{Command::DebugLogLevel, fmt::format("{}", logLevel)});
-}
-
-void ClemensBackend::debugMessage(std::string msg) {
-    queue(Command{Command::DebugMessage, std::move(msg)});
-}
-
-void ClemensBackend::debugProgramTrace(std::string op, std::string path) {
-    queue(Command{Command::DebugProgramTrace,
-                  fmt::format("{},{}", op, path.empty() ? "#" : path.c_str())});
-}
-
-bool ClemensBackend::programTrace(const std::string_view &inputParam) {
-    auto sepPos = inputParam.find(',');
-    auto op = inputParam.substr(0, sepPos);
-    std::string_view param;
-    if (sepPos != std::string_view::npos) {
-        param = inputParam.substr(sepPos + 1);
-        if (param == "#")
-            param = std::string_view();
-    } else {
-        param = std::string_view();
-    }
-    auto path = param;
-    if (programTrace_ == nullptr && op == "on") {
-        nextTraceSeq_ = 0;
-        programTrace_ = std::make_unique<ClemensProgramTrace>();
-        programTrace_->enableToolboxLogging(true);
-        fmt::print("Program trace enabled\n");
-        return true;
-    }
-    bool ok = true;
-    if (programTrace_ != nullptr && !path.empty()) {
-        //  save if a path was supplied
-        auto exportPath = std::filesystem::path(config_.traceRootPath) / path;
-        ok = programTrace_->exportTrace(exportPath.string().c_str());
-        if (ok) {
-            programTrace_->reset();
-            fmt::print("Exported program trace to '{}'.\n", exportPath.string());
-        } else {
-            fmt::print("ERROR: failed to export program trace to '{}'.  Trace not cleared.\n",
-                       exportPath.string());
-        }
-    }
-    if (programTrace_ != nullptr && op == "off") {
-        fmt::print("Program trace disabled\n");
-        programTrace_ = nullptr;
-    }
-    if (programTrace_) {
-        if (op == "iwm") {
-            programTrace_->enableIWMLogging(!programTrace_->isIWMLoggingEnabled());
-            fmt::print("{} tracing = {}\n", op, programTrace_->isIWMLoggingEnabled());
-        } else {
-            fmt::print("{} tracing is not recognized.\n", op);
-        }
-    }
-    return ok;
-}
-
-void ClemensBackend::saveMachine(std::string path) {
-    queue(Command{Command::SaveMachine, std::move(path)});
-}
-
-bool ClemensBackend::saveSnapshot(const std::string_view &inputParam) {
-    auto outputPath = std::filesystem::path(config_.snapshotRootPath) / inputParam;
-    return ClemensSerializer::save(outputPath.string(), &machine_, &mmio_, diskContainers_.size(),
-                                   diskContainers_.data(), diskDrives_.data(),
-                                   CLEM_SMARTPORT_DRIVE_LIMIT, smartPortDisks_.data(),
-                                   smartPortDrives_.data(), breakpoints_);
-}
-
-void ClemensBackend::loadMachine(std::string path) {
-    queue(Command{Command::LoadMachine, std::move(path)});
-}
-
-bool ClemensBackend::loadSnapshot(const std::string_view &inputParam) {
-    auto outputPath = std::filesystem::path(config_.snapshotRootPath) / inputParam;
-    bool res = ClemensSerializer::load(
-        outputPath.string(), &machine_, &mmio_, diskContainers_.size(), diskContainers_.data(),
-        diskDrives_.data(), CLEM_SMARTPORT_DRIVE_LIMIT, smartPortDisks_.data(),
-        smartPortDrives_.data(), breakpoints_, &ClemensBackend::unserializeAllocate, this);
-    saveBRAM();
-    return res;
-}
-
-void ClemensBackend::runScript(std::string command) {
-    queue(Command{Command::RunScript, std::move(command)});
-}
-
-bool ClemensBackend::runScriptCommand(const std::string_view &command) {
-    auto result = interpreter_.parse(command);
-    if (result.type == ClemensInterpreter::Result::Ok) {
-        interpreter_.execute(this);
-    } else if (result.type == ClemensInterpreter::Result::SyntaxError) {
-        // CLEM_TERM_COUT.print(TerminalLine::Error, "Syntax Error");
-        return false;
-    } else {
-        //        CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
-        return false;
-    }
-    return true;
-}
 //  TODO: Move into Clemens API clemens_mmio_find_card_name()
 static ClemensCard *findMockingboardCard(ClemensMMIO *mmio) {
     for (int cardIdx = 0; cardIdx < CLEM_CARD_SLOT_COUNT; ++cardIdx) {
@@ -534,160 +318,15 @@ bool ClemensBackend::saveSmartPortDisk(unsigned driveIndex) {
     return true;
 }
 
-static const char *sInputKeys[] = {"",      "keyD", "keyU",   "mouseD", "mouseU",
-                                   "mouse", "padl", "nopadl", NULL};
-
-void ClemensBackend::inputEvent(const ClemensInputEvent &input) {
-    CK_ASSERT_RETURN(*sInputKeys[input.type] != '\0');
-    Command cmd{Command::Input};
-    if (input.type == kClemensInputType_Paddle ||
-        input.type == kClemensInputType_PaddleDisconnected) {
-        cmd.operand = fmt::format("{}={},{},{}", sInputKeys[input.type], input.value_a,
-                                  input.value_b, input.gameport_button_mask);
-    } else {
-        cmd.operand = fmt::format("{}={},{},{}", sInputKeys[input.type], input.value_a,
-                                  input.value_b, input.adb_key_toggle_mask);
-    }
-    queue(cmd);
-}
-
-#if defined(__GNUC__)
-#if !defined(__clang__)
-//  NOTE GCC warning seems spurious for *some* std::string_view::find() cases
-//       have added plenty of guards around the line below to no avail.
-//            commaPos = !inputValueB.empty() ? inputValueB.find(',') : std::string_view::npos;
-//  ref: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=91397
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstringop-overflow"
-#endif
-#endif
-void ClemensBackend::inputMachine(const std::string_view &inputParam) {
-    if (!clemens_is_initialized_simple(&machine_)) {
-        return;
-    }
-    auto equalsTokenPos = inputParam.find('=');
-    auto name = inputParam.substr(0, equalsTokenPos);
-    auto value = inputParam.substr(equalsTokenPos + 1);
-    for (const char **keyName = &sInputKeys[0]; *keyName != NULL; ++keyName) {
-        if (name == *keyName) {
-            ClemensInputEvent inputEvent{};
-            inputEvent.type = (ClemensInputType)((int)(keyName - &sInputKeys[0]));
-            //  oh why, oh why no straightforward C++ conversion from std::string_view
-            //  to number
-            auto commaPos = value.find(',');
-            auto inputValueA = value.substr(0, commaPos);
-            inputEvent.value_a = (int16_t)std::stol(std::string(inputValueA));
-            if (commaPos != std::string_view::npos) {
-                std::string_view inputModifiers;
-                auto inputValueB = value.substr(commaPos + 1);
-                commaPos = !inputValueB.empty() ? inputValueB.find(',') : std::string_view::npos;
-                if (commaPos != std::string_view::npos) {
-                    inputModifiers = inputValueB.substr(commaPos + 1);
-                    inputValueB = inputValueB.substr(0, commaPos);
-                }
-                inputEvent.value_b = (int16_t)std::stol(std::string(inputValueB));
-                if (inputEvent.type == kClemensInputType_Paddle ||
-                    inputEvent.type == kClemensInputType_PaddleDisconnected) {
-                    inputEvent.gameport_button_mask = std::stoul(std::string(inputModifiers));
-                } else {
-                    inputEvent.adb_key_toggle_mask = std::stoul(std::string(inputModifiers));
-                }
-            }
-            clemens_input(&mmio_, &inputEvent);
-        }
-    }
-}
-#if defined(__GNUC__)
-#if !defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
-#endif
-
-void ClemensBackend::breakExecution() { queue(Command{Command::Break}); }
-
-void ClemensBackend::addBreakpoint(const ClemensBackendBreakpoint &breakpoint) {
-    Command cmd;
-    cmd.operand = fmt::format("{:s}:{:06X}",
-                              breakpoint.type == ClemensBackendBreakpoint::DataRead ? "r"
-                              : breakpoint.type == ClemensBackendBreakpoint::Write  ? "w"
-                              : breakpoint.type == ClemensBackendBreakpoint::IRQ    ? "i"
-                                                                                    : "",
-                              breakpoint.address);
-    cmd.type = Command::AddBreakpoint;
-    queue(std::move(cmd));
-}
-
-bool ClemensBackend::addBreakpoint(const std::string_view &inputParam) {
-    auto sepPos = inputParam.find(':');
-    assert(sepPos != std::string_view::npos);
-    auto type = inputParam.substr(0, sepPos);
-    auto address = inputParam.substr(sepPos + 1);
-    ClemensBackendBreakpoint bp;
-    if (type == "r") {
-        bp.type = ClemensBackendBreakpoint::DataRead;
-    } else if (type == "w") {
-        bp.type = ClemensBackendBreakpoint::Write;
-    } else if (type == "i") {
-        bp.type = ClemensBackendBreakpoint::IRQ;
-    } else {
-        bp.type = ClemensBackendBreakpoint::Execute;
-    }
-    bp.address = (uint32_t)std::stoul(std::string(address), nullptr, 16);
-    auto range = std::equal_range(
-        breakpoints_.begin(), breakpoints_.end(), bp,
-        [](const ClemensBackendBreakpoint &bp, const ClemensBackendBreakpoint &newBp) {
-            return bp.address < newBp.address;
-        });
-    while (range.first != range.second) {
-        if (range.first->type == bp.type) {
-            break;
-        }
-        range.first++;
-    }
-    if (range.first == range.second) {
-        breakpoints_.emplace(range.second, bp);
-    }
-    return true;
-}
-
-void ClemensBackend::removeBreakpoint(unsigned index) {
-    queue(Command{Command::DelBreakpoint, std::to_string(index)});
-}
-
-bool ClemensBackend::delBreakpoint(const std::string_view &inputParam) {
-    if (inputParam.empty()) {
-        breakpoints_.clear();
-        return true;
-    }
-    unsigned index = (unsigned)std::stoul(std::string(inputParam));
-    if (index >= breakpoints_.size()) {
-        return false;
-    }
-    breakpoints_.erase(breakpoints_.begin() + index);
-    return true;
-}
-
-void ClemensBackend::queue(const Command &cmd) {
-    {
-        std::lock_guard<std::mutex> queuelock(commandQueueMutex_);
-        commandQueue_.emplace_back(cmd);
-    }
-    commandQueueCondition_.notify_one();
-}
-
-void ClemensBackend::queueToFront(const Command &cmd) {
-    {
-        std::lock_guard<std::mutex> queuelock(commandQueueMutex_);
-        commandQueue_.emplace_front(cmd);
-    }
-    commandQueueCondition_.notify_one();
-}
-
 //  from the emulator, obtain the number of clocks per second desired
 //
 static int64_t calculateClocksPerTimeslice(ClemensMMIO *mmio, unsigned hz) {
     bool is_machine_slow;
     return int64_t(clemens_clocks_per_second(mmio, &is_machine_slow) / hz);
+}
+
+bool ClemensBackend::isRunning() const {
+    return !stepsRemaining_.has_value() || *stepsRemaining_ > 0;
 }
 
 #if defined(__GNUC__)
@@ -702,410 +341,198 @@ static int64_t calculateClocksPerTimeslice(ClemensMMIO *mmio, unsigned hz) {
 #endif
 #endif
 
-void ClemensBackend::main(PublishStateDelegate publishDelegate) {
-    int64_t clocksRemainingInTimeslice = 0;
-    std::optional<int> stepsRemaining = 0;
-    bool isTerminated = false;
-    bool isMachineReady = false;
+ClemensCommandQueue::DispatchResult
+ClemensBackend::main(ClemensBackendState &backendState,
+                     const ClemensCommandQueue::ResultBuffer &commandResults,
+                     PublishStateDelegate delegate) {
 
-    ClemensRunSampler runSampler;
-
-    //  TODO: clemens API clemens_mmio_card_insert()
-    for (size_t cardIdx = 0; cardIdx < config_.cardNames.size(); ++cardIdx) {
-        auto &cardName = config_.cardNames[cardIdx];
-        if (!cardName.empty()) {
-            mmio_.card_slot[cardIdx] = createCard(cardName.c_str());
-        } else {
-            mmio_.card_slot[cardIdx] = NULL;
-        }
-    }
-
-    fmt::print("Starting backend thread.\n");
-
-    ClemensCard *mockingboard = findMockingboardCard(&mmio_);
-    uint64_t publishSeqNo = 0;
     unsigned emulatorRefreshFrequency = 60;
-    auto fixedFrameInterval =
-        std::chrono::microseconds((long)std::floor(1e6 / emulatorRefreshFrequency));
-    auto lastFrameTimePoint = std::chrono::high_resolution_clock::now();
     std::optional<unsigned> hitBreakpoint;
-    std::optional<std::string> debugMessage;
-    std::vector<ClemensBackendResult> commandResults;
 
-    ClemensBackendState publishedState{};
-    publishedState.results.reserve(8);
+    unsigned emulatorVblsPerFrame = 1; // used for fast emulation
 
-    double emulatorTimeScalar = 1.0; //  used for fast emulation
+    bool isMachineRunning = isRunning();
 
-    while (!isTerminated) {
-        bool isRunning = !stepsRemaining.has_value() || *stepsRemaining > 0;
-        bool publishState = false;
-        bool updateSeqNo = false;
+    if (isMachineRunning) {
+        //  Run the emulator in either 'step' or 'run' mode.
+        //
+        //  RUN MODE executes several instructions in time slices to maximize
+        //  performance while providing feedback to the frontend.
+        //
+        //  STEP MODE executes a single instruction and decrements a 'step' counter
+        //
+        //  If neither mode is applicable, the emulator holds and this loop will
+        //  wait for commands from the frontend
+        //
+        areInstructionsLogged_ = stepsRemaining_.has_value() && (*stepsRemaining_ > 0);
 
-        std::unique_lock<std::mutex> queuelock(commandQueueMutex_);
-        if (!isRunning) {
-            //  waiting for commands
-            commandQueueCondition_.wait(queuelock, [this] { return !commandQueue_.empty(); });
+        const time_t kEpoch1904To1970Seconds = 2082844800;
+        auto epoch_time_1904 =
+            (std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) +
+             kEpoch1904To1970Seconds);
+
+        clemens_rtc_set(&mmio_, (unsigned)epoch_time_1904);
+
+        // TODO: this should be an adaptive scalar to support a variety of devices.
+        // Though if the emulator runs hot (cannot execute the desired cycles in enough time),
+        // that shouldn't matter too much given that this 'speed boost' is meant to be
+        // temporary, and the emulator should catch up once the IWM is inactive.
+        if (clemens_is_drive_io_active(&mmio_)) {
+            emulatorVblsPerFrame = 4;
+        } else {
+            emulatorVblsPerFrame = 1;
+        }
+        auto lastClocksSpent = machine_.tspec.clocks_spent;
+        machine_.cpu.cycles_spent = 0;
+
+        unsigned emulatorVblCounter = emulatorVblsPerFrame;
+        bool vblActive = mmio_.vgc.vbl_started;
+        while (emulatorVblCounter > 0 && isRunning()) {
+            clem_clocks_time_t pre_emulate_time = machine_.tspec.clocks_spent;
+            clemens_emulate_cpu(&machine_);
+            clemens_emulate_mmio(&machine_, &mmio_);
+            if (vblActive && !mmio_.vgc.vbl_started) {
+                emulatorVblCounter--;
+            }
+            vblActive = mmio_.vgc.vbl_started;
+            clem_clocks_duration_t emulate_step_clocks =
+                machine_.tspec.clocks_spent - pre_emulate_time;
+            if (stepsRemaining_.has_value()) {
+                stepsRemaining_ = *stepsRemaining_ - 1;
+            }
+            //  TODO: MMIO bypass
+            if (!breakpoints_.empty()) {
+                if ((hitBreakpoint = checkHitBreakpoint()).has_value()) {
+                    stepsRemaining_ = 0;
+                    break;
+                }
+            }
         }
 
-        //  TODO: we may just be able to use a vector for the command queue and
-        //        create a local copy of the queue to minimize time spent executing
-        //        commands.   the mutex seems to be used just for adds to the
-        //        command queue.
-        while (!commandQueue_.empty() && !isTerminated) {
-            auto command = commandQueue_.front();
-            commandQueue_.pop_front();
-            bool commandFailed = false;
-
-            switch (command.type) {
-            case Command::Terminate:
-                isTerminated = true;
-                break;
-            case Command::ResetMachine:
-                resetMachine();
-                isMachineReady = true;
-                mockingboard = findMockingboardCard(&mmio_);
-                break;
-            case Command::SetHostUpdateFrequency:
-                emulatorRefreshFrequency = std::stoul(command.operand);
-                if (emulatorRefreshFrequency) {
-                    fixedFrameInterval =
-                        std::chrono::microseconds((long)std::floor(1e6 / emulatorRefreshFrequency));
-                } else {
-                    fixedFrameInterval = std::chrono::microseconds::zero();
-                }
-                break;
-            case Command::RunMachine:
-                stepsRemaining = std::nullopt;
-                isRunning = true;
-                runSampler.reset();
-                break;
-            case Command::StepMachine:
-                *stepsRemaining = stepMachine(command.operand);
-                isRunning = true;
-                runSampler.reset();
-                break;
-            case Command::Publish:
-                publishState = true;
-                break;
-            case Command::InsertDisk:
-                if (!insertDisk(command.operand, false))
-                    commandFailed = true;
-                break;
-            case Command::InsertBlankDisk:
-                if (!insertDisk(command.operand, true))
-                    commandFailed = true;
-                break;
-            case Command::EjectDisk:
-                ejectDisk(command.operand);
-                break;
-            case Command::WriteProtectDisk:
-                writeProtectDisk(command.operand);
-                break;
-            case Command::Input:
-                inputMachine(command.operand);
-                break;
-            case Command::Break:
-                stepsRemaining = 0;
-                break;
-            case Command::AddBreakpoint:
-                if (!addBreakpoint(command.operand))
-                    commandFailed = true;
-                break;
-            case Command::DelBreakpoint:
-                if (!delBreakpoint(command.operand))
-                    commandFailed = true;
-                break;
-            case Command::DebugMemoryPage:
-                debugMemoryPage_ = (uint8_t)(std::stoul(command.operand));
-                break;
-            case Command::WriteMemory:
-                writeMemory(command.operand);
-                break;
-            case Command::DebugLogLevel:
-                logLevel_ = (int)(std::stol(command.operand));
-                break;
-            case Command::DebugMessage:
-                debugMessage = std::move(command.operand);
-                break;
-            case Command::DebugProgramTrace:
-                if (!programTrace(command.operand))
-                    commandFailed = true;
-                break;
-            case Command::SaveMachine:
-                if (!saveSnapshot(command.operand))
-                    commandFailed = true;
-                break;
-            case Command::LoadMachine:
-                if (loadSnapshot(command.operand)) {
-                    mockingboard = findMockingboardCard(&mmio_);
-                } else {
-                    //  TODO: this should force a restart - hopefully the
-                    //        frontend will save the current state prior to loading
-                    //        a new one to avoid data loss.
-                    commandFailed = true;
-                }
-                break;
-            case Command::RunScript:
-                if (!runScriptCommand(command.operand)) {
-                    commandFailed = true;
-                }
-                break;
-            case Command::Undefined:
-                break;
-            }
-
-            if (command.type != Command::Publish && command.type != Command::Input) {
-                //   queue command result
-                ClemensBackendResult commandResult;
-                commandResult.cmd = std::move(command);
-                commandResult.type =
-                    commandFailed ? ClemensBackendResult::Failed : ClemensBackendResult::Succeeded;
-                commandResults.emplace_back(commandResult);
-            }
-        }
-        queuelock.unlock();
-
-        //  TODO: these edge cases seem sloppy - but we'll need to prevent the
-        //        thread from spinning if the machine will not run
-        if (!isMachineReady || emulatorRefreshFrequency == 0) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(15));
-            continue;
-        }
-        //  if isRunning is false, we use a condition var/wait to hold the thread
-        if (isRunning && !isTerminated) {
-            //  Run the emulator in either 'step' or 'run' mode.
-            //
-            //  RUN MODE executes several instructions in time slices to maximize
-            //  performance while providing feedback to the frontend.
-            //
-            //  STEP MODE executes a single instruction and decrements a 'step' counter
-            //
-            //  If neither mode is applicable, the emulator holds and this loop will
-            //  wait for commands from the frontend
-            //
-            areInstructionsLogged_ = stepsRemaining.has_value() && (*stepsRemaining > 0);
-
-            const time_t kEpoch1904To1970Seconds = 2082844800;
-            auto epoch_time_1904 =
-                (std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) +
-                 kEpoch1904To1970Seconds);
-
-            clemens_rtc_set(&mmio_, (unsigned)epoch_time_1904);
-
-            // TODO: this should be an adaptive scalar to support a variety of devices.
-            // Though if the emulator runs hot (cannot execute the desired cycles in enough time),
-            // that shouldn't matter too much given that this 'speed boost' is meant to be
-            // temporary, and the emulator should catch up once the IWM is inactive.
-            if (clemens_is_drive_io_active(&mmio_)) {
-                emulatorTimeScalar = 8.0;
-            } else {
-                emulatorTimeScalar = 1.0;
-            }
-            auto lastClocksSpent = machine_.tspec.clocks_spent;
-            int64_t clocksPerTimeslice =
-                calculateClocksPerTimeslice(&mmio_, emulatorRefreshFrequency) * emulatorTimeScalar;
-
-            clocksRemainingInTimeslice += clocksPerTimeslice;
-
-            machine_.cpu.cycles_spent = 0;
-            while (clocksRemainingInTimeslice > 0 &&
-                   (!stepsRemaining.has_value() || *stepsRemaining > 0)) {
-                clem_clocks_time_t pre_emulate_time = machine_.tspec.clocks_spent;
-                clemens_emulate_cpu(&machine_);
-                clemens_emulate_mmio(&machine_, &mmio_);
-                clem_clocks_duration_t emulate_step_clocks =
-                    machine_.tspec.clocks_spent - pre_emulate_time;
-                clocksRemainingInTimeslice -= emulate_step_clocks;
-                if (stepsRemaining.has_value()) {
-                    stepsRemaining = *stepsRemaining - 1;
-                }
-                //  TODO: MMIO bypass
-                if (!breakpoints_.empty()) {
-                    if ((hitBreakpoint = checkHitBreakpoint()).has_value()) {
-                        stepsRemaining = 0;
-                        break;
-                    }
-                }
-            } // clocksRemainingInTimeslice
-
-            if (stepsRemaining.has_value() && *stepsRemaining == 0) {
-                //  if we've finished stepping through code, we are also done with our
-                //  timeslice and will wait for a new step/run request
-                clocksRemainingInTimeslice = 0;
-                isRunning = false;
-                areInstructionsLogged_ = false;
-            }
-
-            auto currentFrameTimePoint = std::chrono::high_resolution_clock::now();
-            auto actualFrameInterval = std::chrono::duration_cast<std::chrono::microseconds>(
-                currentFrameTimePoint - lastFrameTimePoint);
-            lastFrameTimePoint = currentFrameTimePoint;
-
-            runSampler.update(
-                fixedFrameInterval, actualFrameInterval,
-                (clem_clocks_duration_t)(machine_.tspec.clocks_spent - lastClocksSpent),
-                machine_.cpu.cycles_spent);
-
-            for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end();
-                 ++diskDriveIt) {
-                auto &diskDrive = *diskDriveIt;
-                auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
-                auto driveType = static_cast<ClemensDriveType>(driveIndex);
-                auto *clemensDrive = clemens_drive_get(&mmio_, driveType);
-                diskDrive.isSpinning = clemensDrive->is_spindle_on;
-                diskDrive.isWriteProtected = clemensDrive->disk.is_write_protected;
-                diskDrive.saveFailed = false;
-                if (diskDrive.isEjecting) {
-                    if (clemens_eject_disk_async(&mmio_, driveType, &disks_[driveIndex])) {
-                        diskDrive.isEjecting = false;
-                        if (!saveDisk(driveType))
-                            diskDrive.saveFailed = true;
-                        diskDrive.imagePath.clear();
-                        ClemensDiskUtilities::createEmptyDisk(driveType, disks_[driveType]);
-                    }
-                }
-            }
-            for (auto diskDriveIt = smartPortDrives_.begin(); diskDriveIt != smartPortDrives_.end();
-                 ++diskDriveIt) {
-                auto &diskDrive = *diskDriveIt;
-                // auto driveIndex = unsigned(diskDriveIt - smartPortDrives_.begin());
-                //  auto *clemensUnit = clemens_smartport_unit_get(&mmio_, driveIndex);
-                //   TODO: detect SmartPort drive status - enable2 only detects if the
-                //         whole bus is active - which may be fine for now since we just support
-                //         one SmartPort drive!
-                diskDrive.isSpinning = mmio_.dev_iwm.enable2;
-                diskDrive.isWriteProtected = false;
-                diskDrive.saveFailed = false;
-                if (diskDrive.isEjecting) {
-                    //  TODO: SmartPort drive ejection
-                }
-            }
-            updateSeqNo = true;
+        if (stepsRemaining_.has_value() && *stepsRemaining_ == 0) {
+            //  if we've finished stepping through code, we are also done with our
+            //  timeslice and will wait for a new step/run request
+            clocksRemainingInTimeslice_ = 0;
+            isMachineRunning = false;
+            areInstructionsLogged_ = false;
         }
 
-        if (isTerminated) {
-            //  eject and save all disks
-            for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end();
-                 ++diskDriveIt) {
-                auto &diskDrive = *diskDriveIt;
-                if (diskDrive.imagePath.empty())
-                    continue;
+        runSampler_.update((clem_clocks_duration_t)(machine_.tspec.clocks_spent - lastClocksSpent),
+                           machine_.cpu.cycles_spent);
 
-                auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
-                auto driveType = static_cast<ClemensDriveType>(driveIndex);
+        for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end();
+             ++diskDriveIt) {
+            auto &diskDrive = *diskDriveIt;
+            auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
+            auto driveType = static_cast<ClemensDriveType>(driveIndex);
+            auto *clemensDrive = clemens_drive_get(&mmio_, driveType);
+            diskDrive.isSpinning = clemensDrive->is_spindle_on;
+            diskDrive.isWriteProtected = clemensDrive->disk.is_write_protected;
+            diskDrive.saveFailed = false;
+            if (diskDrive.isEjecting) {
                 if (clemens_eject_disk_async(&mmio_, driveType, &disks_[driveIndex])) {
-                    saveDisk(driveType);
-                    localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", diskDrive.imagePath);
+                    diskDrive.isEjecting = false;
+                    if (!saveDisk(driveType))
+                        diskDrive.saveFailed = true;
+                    diskDrive.imagePath.clear();
+                    ClemensDiskUtilities::createEmptyDisk(driveType, disks_[driveType]);
                 }
             }
-            for (auto hardDriveIt = smartPortDrives_.begin(); hardDriveIt != smartPortDrives_.end();
-                 ++hardDriveIt) {
-                auto &drive = *hardDriveIt;
-                if (drive.imagePath.empty())
-                    continue;
-                auto driveIndex = unsigned(hardDriveIt - smartPortDrives_.begin());
-                ClemensSmartPortDevice device;
-                clemens_remove_smartport_disk(&mmio_, driveIndex, &device);
-                smartPortDisks_[driveIndex].destroySmartPortDevice(&device);
-                saveSmartPortDisk(driveIndex);
-                localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", drive.imagePath);
-            }
-            publishState = true;
-            updateSeqNo = true;
         }
-
-        updateSeqNo = updateSeqNo || !commandResults.empty();
-
-        if (updateSeqNo) {
-            publishSeqNo++;
+        for (auto diskDriveIt = smartPortDrives_.begin(); diskDriveIt != smartPortDrives_.end();
+             ++diskDriveIt) {
+            auto &diskDrive = *diskDriveIt;
+            // auto driveIndex = unsigned(diskDriveIt - smartPortDrives_.begin());
+            //  auto *clemensUnit = clemens_smartport_unit_get(&mmio_, driveIndex);
+            //   TODO: detect SmartPort drive status - enable2 only detects if the
+            //         whole bus is active - which may be fine for now since we just support
+            //         one SmartPort drive!
+            diskDrive.isSpinning = mmio_.dev_iwm.enable2;
+            diskDrive.isWriteProtected = false;
+            diskDrive.saveFailed = false;
+            if (diskDrive.isEjecting) {
+                //  TODO: SmartPort drive ejection
+            }
         }
-
-        //  TODO: publish emulator state using a callback
-        //        the recipient will synchronize with UI accordingly with the
-        //        assumption that once the callback returns, we can alter the state
-        //        again as needed next timeslice.
-        if (publishState) {
-            std::swap(publishedState.results, commandResults);
-            publishedState.machine = &machine_;
-            publishedState.mmio = &mmio_;
-            publishedState.fps = runSampler.sampledFramesPerSecond;
-            publishedState.seqno = publishSeqNo;
-            publishedState.isTerminated = isTerminated;
-            publishedState.isRunning = isRunning;
-            if (programTrace_ != nullptr) {
-                publishedState.isTracing = true;
-                publishedState.isIWMTracing = programTrace_->isIWMLoggingEnabled();
-            } else {
-                publishedState.isTracing = false;
-                publishedState.isIWMTracing = false;
-            }
-            publishedState.mmioWasInitialized = clemens_is_initialized_simple(&machine_);
-            if (publishedState.mmioWasInitialized) {
-                clemens_get_monitor(&publishedState.monitor, &mmio_);
-                clemens_get_text_video(&publishedState.text, &mmio_);
-                clemens_get_graphics_video(&publishedState.graphics, &machine_, &mmio_);
-                if (clemens_get_audio(&publishedState.audio, &mmio_)) {
-                    if (mockingboard) {
-                        auto &audio = publishedState.audio;
-                        float *audio_frame_head = reinterpret_cast<float *>(
-                            audio.data + audio.frame_start * audio.frame_stride);
-                        clem_card_ay3_render(mockingboard, audio_frame_head, audio.frame_count,
-                                             audio.frame_stride / sizeof(float),
-                                             config_.audioSamplesPerSecond);
-                    }
-                }
-            }
-            publishedState.hostCPUID = clem_host_get_processor_number();
-            publishedState.logLevel = logLevel_;
-            publishedState.logBufferStart = logOutput_.data();
-            publishedState.logBufferEnd = logOutput_.data() + logOutput_.size();
-            publishedState.bpBufferStart = breakpoints_.data();
-            publishedState.bpBufferEnd = breakpoints_.data() + breakpoints_.size();
-            if (hitBreakpoint.has_value()) {
-                publishedState.bpHitIndex = *hitBreakpoint;
-            }
-
-            publishedState.diskDrives = diskDrives_.data();
-            publishedState.smartDrives = smartPortDrives_.data();
-            publishedState.logInstructionStart = loggedInstructions_.data();
-            publishedState.logInstructionEnd =
-                loggedInstructions_.data() + loggedInstructions_.size();
-
-            //  read IO memory from bank 0xe0 which ignores memory shadow settings
-            for (uint16_t ioAddr = 0xc000; ioAddr < 0xc0ff; ++ioAddr) {
-                clem_read(&machine_, &publishedState.ioPageValues[ioAddr - 0xc000], ioAddr, 0xe0,
-                          CLEM_MEM_FLAG_NULL);
-            }
-            publishedState.debugMemoryPage = debugMemoryPage_;
-            publishedState.emulatorSpeedMhz = runSampler.sampledEmulatorSpeedMhz;
-            publishedState.fastEmulationOn = emulatorTimeScalar > 1.0f;
-            publishedState.message = std::move(debugMessage);
-
-            // send the published state to our listener
-            publishDelegate(publishedState);
-
-            if (publishedState.mmioWasInitialized) {
-                clemens_audio_next_frame(&mmio_, publishedState.audio.frame_count);
-            }
-            logOutput_.clear();
-            loggedInstructions_.clear();
-            commandResults.clear();
-            hitBreakpoint = std::nullopt;
-            debugMessage = std::nullopt;
-        }
-    } // !isTerminated
-
-    saveBRAM();
-
-    //  TODO: clemens_mmio_card_eject() will clear the slot but it still needs
-    //        to be destroyed by the app
-    for (int i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
-        destroyCard(mmio_.card_slot[i]);
-        mmio_.card_slot[i] = NULL;
     }
 
-    fmt::print("Terminated backend refresh thread.\n");
+    backendState.machine = &machine_;
+    backendState.mmio = &mmio_;
+    backendState.fps = runSampler_.sampledFramesPerSecond;
+    backendState.isRunning = isMachineRunning;
+    if (programTrace_ != nullptr) {
+        backendState.isTracing = true;
+        backendState.isIWMTracing = programTrace_->isIWMLoggingEnabled();
+    } else {
+        backendState.isTracing = false;
+        backendState.isIWMTracing = false;
+    }
+    backendState.mmioWasInitialized = clemens_is_mmio_initialized(&mmio_);
+    if (backendState.mmioWasInitialized) {
+        ClemensAudio audio;
+        clemens_get_monitor(&backendState.monitor, &mmio_);
+        clemens_get_text_video(&backendState.text, &mmio_);
+        clemens_get_graphics_video(&backendState.graphics, &machine_, &mmio_);
+        if (clemens_get_audio(&backendState.audio, &mmio_)) {
+            if (mockingboard_) {
+                auto &audio = backendState.audio;
+                float *audio_frame_head =
+                    reinterpret_cast<float *>(audio.data + audio.frame_start * audio.frame_stride);
+                clem_card_ay3_render(mockingboard_, audio_frame_head, audio.frame_count,
+                                     audio.frame_stride / sizeof(float),
+                                     config_.audioSamplesPerSecond);
+            }
+        }
+    } else {
+        memset(&backendState.monitor, 0, sizeof(backendState.monitor));
+        memset(&backendState.text, 0, sizeof(backendState.text));
+        memset(&backendState.graphics, 0, sizeof(backendState.graphics));
+        memset(&backendState.audio, 0, sizeof(backendState.audio));
+    }
+    backendState.hostCPUID = clem_host_get_processor_number();
+    backendState.logLevel = logLevel_;
+    backendState.logBufferStart = logOutput_.data();
+    backendState.logBufferEnd = logOutput_.data() + logOutput_.size();
+    backendState.bpBufferStart = breakpoints_.data();
+    backendState.bpBufferEnd = breakpoints_.data() + breakpoints_.size();
+    if (hitBreakpoint.has_value()) {
+        backendState.bpHitIndex = *hitBreakpoint;
+    }
+
+    backendState.diskDrives = diskDrives_.data();
+    backendState.smartDrives = smartPortDrives_.data();
+    backendState.logInstructionStart = loggedInstructions_.data();
+    backendState.logInstructionEnd = loggedInstructions_.data() + loggedInstructions_.size();
+
+    //  read IO memory from bank 0xe0 which ignores memory shadow settings
+    if (backendState.mmioWasInitialized) {
+        for (uint16_t ioAddr = 0xc000; ioAddr < 0xc0ff; ++ioAddr) {
+            clem_read(&machine_, &backendState.ioPageValues[ioAddr - 0xc000], ioAddr, 0xe0,
+                      CLEM_MEM_FLAG_NULL);
+        }
+    }
+    backendState.debugMemoryPage = debugMemoryPage_;
+    backendState.emulatorSpeedMhz = runSampler_.sampledEmulatorSpeedMhz;
+    backendState.fastEmulationOn = emulatorVblsPerFrame > 1.0f;
+
+    ClemensCommandQueue commands;
+    delegate(commands, commandResults, backendState);
+
+    if (backendState.mmioWasInitialized) {
+        clemens_audio_next_frame(&mmio_, backendState.audio.frame_count);
+    }
+    logOutput_.clear();
+    loggedInstructions_.clear();
+
+    auto result = commands.dispatchAll(*this);
+    //  if we're starting a run, reset the sampler so framerate can be calculated correctly
+    if (isMachineRunning != isRunning()) {
+        if (!isMachineRunning) {
+            runSampler_.reset();
+        }
+    }
+
+    return result;
 }
 
 #if defined(__GNUC__)
@@ -1236,6 +663,18 @@ void ClemensBackend::initApple2GS() {
     audioMixBuffer.data =
         (uint8_t *)(slabMemory_.allocate(audioMixBuffer.frame_count * audioMixBuffer.stride));
     clemens_assign_audio_mix_buffer(&mmio_, &audioMixBuffer);
+
+    //  TODO: clemens API clemens_mmio_card_insert()
+    for (size_t cardIdx = 0; cardIdx < config_.cardNames.size(); ++cardIdx) {
+        auto &cardName = config_.cardNames[cardIdx];
+        if (!cardName.empty()) {
+            mmio_.card_slot[cardIdx] = createCard(cardName.c_str());
+        } else {
+            mmio_.card_slot[cardIdx] = NULL;
+        }
+    }
+
+    mockingboard_ = findMockingboardCard(&mmio_);
 }
 
 void ClemensBackend::saveBRAM() {
@@ -1353,4 +792,152 @@ void ClemensBackend::assignPropertyToU32(MachineProperty property, uint32_t valu
         machine_.cpu.regs.PC = (uint16_t)(value & 0xff);
         break;
     };
+}
+
+void ClemensBackend::onCommandReset() {
+    machine_.cpu.pins.resbIn = false;
+    machine_.resb_counter = 3;
+    mockingboard_ = findMockingboardCard(&mmio_);
+}
+
+void ClemensBackend::onCommandRun() { stepsRemaining_ = std::nullopt; }
+
+void ClemensBackend::onCommandBreakExecution() { stepsRemaining_ = 0; }
+
+void ClemensBackend::onCommandStep(unsigned count) { stepsRemaining_ = count; }
+
+void ClemensBackend::onCommandAddBreakpoint(const ClemensBackendBreakpoint &breakpoint) {
+    auto range = std::equal_range(
+        breakpoints_.begin(), breakpoints_.end(), breakpoint,
+        [](const ClemensBackendBreakpoint &breakpoint, const ClemensBackendBreakpoint &newBp) {
+            return breakpoint.address < newBp.address;
+        });
+    while (range.first != range.second) {
+        if (range.first->type == breakpoint.type) {
+            break;
+        }
+        range.first++;
+    }
+    if (range.first == range.second) {
+        breakpoints_.emplace(range.second, breakpoint);
+    }
+}
+
+bool ClemensBackend::onCommandRemoveBreakpoint(int index) {
+    if (index < 0) {
+        breakpoints_.clear();
+        return true;
+    }
+    if (index >= (int)breakpoints_.size()) {
+        return false;
+    }
+    breakpoints_.erase(breakpoints_.begin() + index);
+    return true;
+}
+
+void ClemensBackend::onCommandInputEvent(const ClemensInputEvent &inputEvent) {
+    if (!clemens_is_initialized_simple(&machine_)) {
+        return;
+    }
+    clemens_input(&mmio_, &inputEvent);
+}
+
+bool ClemensBackend::onCommandInsertDisk(ClemensDriveType driveType, std::string diskPath) {
+    diskDrives_[driveType].imagePath = diskPath;
+    return loadDisk(driveType, false);
+}
+
+bool ClemensBackend::onCommandInsertBlankDisk(ClemensDriveType driveType, std::string diskPath) {
+    diskDrives_[driveType].imagePath = diskPath;
+    return loadDisk(driveType, true);
+}
+
+void ClemensBackend::onCommandEjectDisk(ClemensDriveType driveType) {
+    diskDrives_[driveType].isEjecting = true;
+}
+
+bool ClemensBackend::onCommandWriteProtectDisk(ClemensDriveType driveType, bool wp) {
+    auto *drive = clemens_drive_get(&mmio_, driveType);
+    if (!drive || !drive->has_disk)
+        return false;
+    drive->disk.is_write_protected = wp;
+    return true;
+}
+
+void ClemensBackend::onCommandDebugMemoryPage(uint8_t pageIndex) { debugMemoryPage_ = pageIndex; }
+
+void ClemensBackend::onCommandDebugMemoryWrite(uint16_t addr, uint8_t value) {
+    clem_write(&machine_, value, addr, debugMemoryPage_, CLEM_MEM_FLAG_NULL);
+}
+
+void ClemensBackend::onCommandDebugLogLevel(int logLevel) { logLevel_ = logLevel; }
+
+bool ClemensBackend::onCommandDebugProgramTrace(std::string_view op, std::string_view path) {
+    if (programTrace_ == nullptr && op == "on") {
+        nextTraceSeq_ = 0;
+        programTrace_ = std::make_unique<ClemensProgramTrace>();
+        programTrace_->enableToolboxLogging(true);
+        fmt::print("Program trace enabled\n");
+        return true;
+    }
+    bool ok = true;
+    if (programTrace_ != nullptr && !path.empty()) {
+        //  save if a path was supplied
+        auto exportPath = std::filesystem::path(config_.traceRootPath) / path;
+        ok = programTrace_->exportTrace(exportPath.string().c_str());
+        if (ok) {
+            programTrace_->reset();
+            fmt::print("Exported program trace to '{}'.\n", exportPath.string());
+        } else {
+            fmt::print("ERROR: failed to export program trace to '{}'.  Trace not cleared.\n",
+                       exportPath.string());
+        }
+    }
+    if (programTrace_ != nullptr && op == "off") {
+        fmt::print("Program trace disabled\n");
+        programTrace_ = nullptr;
+    }
+    if (programTrace_) {
+        if (op == "iwm") {
+            programTrace_->enableIWMLogging(!programTrace_->isIWMLoggingEnabled());
+            fmt::print("{} tracing = {}\n", op, programTrace_->isIWMLoggingEnabled());
+        } else {
+            fmt::print("{} tracing is not recognized.\n", op);
+        }
+    }
+    return ok;
+}
+
+bool ClemensBackend::onCommandSaveMachine(std::string path) {
+    auto outputPath = std::filesystem::path(config_.snapshotRootPath) / path;
+    saveBRAM();
+    return ClemensSerializer::save(outputPath.string(), &machine_, &mmio_, diskContainers_.size(),
+                                   diskContainers_.data(), diskDrives_.data(),
+                                   CLEM_SMARTPORT_DRIVE_LIMIT, smartPortDisks_.data(),
+                                   smartPortDrives_.data(), breakpoints_);
+}
+
+bool ClemensBackend::onCommandLoadMachine(std::string path) {
+    auto outputPath = std::filesystem::path(config_.snapshotRootPath) / path;
+    bool res = ClemensSerializer::load(
+        outputPath.string(), &machine_, &mmio_, diskContainers_.size(), diskContainers_.data(),
+        diskDrives_.data(), CLEM_SMARTPORT_DRIVE_LIMIT, smartPortDisks_.data(),
+        smartPortDrives_.data(), breakpoints_, &ClemensBackend::unserializeAllocate, this);
+    mockingboard_ = findMockingboardCard(&mmio_);
+    saveBRAM();
+    return res;
+}
+
+bool ClemensBackend::onCommandRunScript(std::string command) {
+    auto result = interpreter_.parse(command);
+    if (result.type == ClemensInterpreter::Result::Ok) {
+        interpreter_.execute(this);
+    } else if (result.type == ClemensInterpreter::Result::SyntaxError) {
+        // CLEM_TERM_COUT.print(TerminalLine::Error, "Syntax Error");
+        return false;
+    } else {
+        //        CLEM_TERM_COUT.print(TerminalLine::Error, "Unrecognized command!");
+        return false;
+    }
+    return true;
 }

@@ -582,8 +582,6 @@ static std::string getCommandTypeName(ClemensBackendCommand::Type type) {
         return "ResetMachine";
     case ClemensBackendCommand::RunMachine:
         return "RunMachine";
-    case ClemensBackendCommand::SetHostUpdateFrequency:
-        return "SetHostUpdateFrequency";
     case ClemensBackendCommand::Terminate:
         return "Terminate";
     default:
@@ -605,7 +603,7 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
                                  const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
     : config_(config), displayProvider_(systemFontLoBuffer, systemFontHiBuffer),
-      display_(displayProvider_), audio_(), frameSeqNo_(kFrameSeqNoInvalid),
+      display_(displayProvider_), audio_(), uiFrameTimeDelta_(0.0), frameSeqNo_(kFrameSeqNoInvalid),
       frameLastSeqNo_(kFrameSeqNoInvalid),
       frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
@@ -654,7 +652,7 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
 }
 
 ClemensFrontend::~ClemensFrontend() {
-    backend_ = nullptr;
+    stopBackend();
     audio_.stop();
     clem_joystick_close_devices();
     delete[] thisFrameAudioBuffer_.getHead();
@@ -679,7 +677,7 @@ void ClemensFrontend::input(ClemensInputEvent input) {
             input.value_b =
                 std::clamp(int16_t(input.value_b * kMouseScalar), (int16_t)(-63), (int16_t)(63));
         }
-        backend_->inputEvent(input);
+        backendQueue_.inputEvent(input);
     }
 }
 
@@ -688,29 +686,73 @@ void ClemensFrontend::lostFocus() {
     emulatorHasKeyboardFocus_ = false;
 }
 
-std::unique_ptr<ClemensBackend> ClemensFrontend::createBackend() {
-    constexpr unsigned refreshFrequency_ = 60;
+void ClemensFrontend::createBackend() {
     auto romPath = std::filesystem::path(config_.dataDirectory) / config_.romFilename;
-    auto backend = std::make_unique<ClemensBackend>(
-        romPath.string(), backendConfig_,
-        std::bind(&ClemensFrontend::backendStateDelegate, this, std::placeholders::_1));
-    backend->setRefreshFrequency(refreshFrequency_);
-    backend->reset();
-    backend->run();
-    fmt::print("Creating new backend emulator refreshing @ {} Hz.\n", refreshFrequency_);
-    return backend;
+    auto backend = std::make_unique<ClemensBackend>(romPath.string(), backendConfig_);
+
+    uiFrameTimeDelta_ = 0.0;
+    backendQueue_.reset();
+    backendQueue_.run();
+
+    fmt::print("Creating new backend emulator.\n");
+
+    backendThread_ = std::thread(&ClemensFrontend::runBackend, this, std::move(backend));
 }
 
-void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state) {
+void ClemensFrontend::runBackend(std::unique_ptr<ClemensBackend> backend) {
+    ClemensBackendState state;
+
+    ClemensCommandQueue::DispatchResult results{};
+    // double frameTimeLag = 0.0f;
+
+    // results = backend->main(commands, state)).second
+    while (!results.second) {
+        //  TODO: need to account for lag!!!
+
+        results = backend->main(state, results.first,
+                                [this](ClemensCommandQueue &commands,
+                                       const ClemensCommandQueue::ResultBuffer &lastFrameResults,
+                                       const ClemensBackendState &state) {
+                                    std::unique_lock<std::mutex> lk(frameMutex_);
+                                    readyForFrame_.wait(lk, [this]() {
+                                        return (uiFrameTimeDelta_ > 0.0) ||
+                                               !stagedBackendQueue_.isEmpty();
+                                    });
+                                    // CK_TODO("Need to account for lag!!!")
+                                    frameSeqNo_++;
+                                    backendStateDelegate(state, lastFrameResults);
+                                    commands.queue(stagedBackendQueue_);
+                                    // frameTimeLag += uiFrameTimeDelta_;
+                                    uiFrameTimeDelta_ = 0.0;
+                                });
+    }
+}
+
+void ClemensFrontend::stopBackend() {
+    if (backendThread_.joinable()) {
+        backendQueue_.terminate();
+        {
+            std::lock_guard<std::mutex> lk(frameMutex_);
+            stagedBackendQueue_.queue(backendQueue_);
+        }
+        readyForFrame_.notify_one();
+        backendThread_.join();
+    }
+    backendThread_ = std::thread();
+}
+
+bool ClemensFrontend::isBackendRunning() const { return backendThread_.joinable(); }
+
+void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state,
+                                           const ClemensCommandQueue::ResultBuffer &results) {
+
+    //  prevent reallocation of the results vector
+    std::copy(results.begin(), results.end(), std::back_inserter(lastCommandState_.results));
+
     copyState(state);
-    framePublished_.notify_all();
 }
 
 void ClemensFrontend::copyState(const ClemensBackendState &state) {
-    std::lock_guard<std::mutex> frameLock(frameMutex_);
-
-    frameSeqNo_ = state.seqno;
-
     frameWriteMemory_.reset();
 
     frameWriteState_.mark = 0xdeadbeef;
@@ -834,7 +876,7 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     memcpy(frameWriteState_.bram, state.mmio->dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
 
     frameWriteState_.memoryViewBank = state.debugMemoryPage;
-    if (!state.isRunning) {
+    if (!state.isRunning && state.mmioWasInitialized) {
         frameWriteState_.memoryView = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
         //  read every byte from the memory controller - which can be 'slow' enough
         //  to effect framerate on some systems.   so we only update memory state
@@ -888,20 +930,17 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
         }
     }
 
-    //  prevent reallocation of the results vector
-    std::copy(state.results.begin(), state.results.end(),
-              std::back_inserter(lastCommandState_.results));
     if (!lastCommandState_.message.has_value() && state.message.has_value()) {
         lastCommandState_.message = cmdMessageFromBackend(*state.message, state.machine);
     }
-    if (!lastCommandState_.terminated.has_value()) {
-        lastCommandState_.terminated = state.isTerminated;
+
+    if (state.audio.data) {
+        auto audioBufferSize = int32_t(state.audio.frame_count * state.audio.frame_stride);
+        auto audioBufferRange = lastCommandState_.audioBuffer.forwardSize(audioBufferSize);
+        memcpy(audioBufferRange.first, state.audio.data, cinek::length(audioBufferRange));
+    } else {
+        lastCommandState_.audioBuffer.reset();
     }
-
-    auto audioBufferSize = int32_t(state.audio.frame_count * state.audio.frame_stride);
-    auto audioBufferRange = lastCommandState_.audioBuffer.forwardSize(audioBufferSize);
-    memcpy(audioBufferRange.first, state.audio.data, cinek::length(audioBufferRange));
-
     frameWriteState_.logLevel = state.logLevel;
     for (auto *logItem = state.logBufferStart; logItem != state.logBufferEnd; ++logItem) {
         LogOutputNode *logMemory = reinterpret_cast<LogOutputNode *>(frameMemory_.allocate(
@@ -951,7 +990,7 @@ void ClemensFrontend::pollJoystickDevices() {
     constexpr int32_t kHostAxisMagnitude = CLEM_HOST_JOYSTICK_AXIS_DELTA * 2;
     unsigned index;
 
-    if (!backend_) {
+    if (!isBackendRunning()) {
         return;
     }
 
@@ -1000,10 +1039,10 @@ void ClemensFrontend::pollJoystickDevices() {
     joystickSlotCount_ = std::max(joystickSlotCount_, joystickCount);
     if (joystickCount < 1)
         return;
-    backend_->inputEvent(inputs[0]);
+    backendQueue_.inputEvent(inputs[0]);
     if (joystickCount < 2)
         return;
-    backend_->inputEvent(inputs[1]);
+    backendQueue_.inputEvent(inputs[1]);
 }
 
 auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInterop &interop)
@@ -1018,113 +1057,109 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
 
     bool isNewFrame = false;
     bool isBackendTerminated = false;
-
-    std::unique_lock<std::mutex> frameLock(frameMutex_);
-    framePublished_.wait_for(frameLock, std::chrono::milliseconds::zero(),
-                             [this]() { return frameSeqNo_ != frameLastSeqNo_; });
-
-    isNewFrame = frameLastSeqNo_ != frameSeqNo_;
-    if (isNewFrame) {
-        lastFrameCPURegs_ = frameReadState_.cpu.regs;
-        lastFrameCPUPins_ = frameReadState_.cpu.pins;
-        lastFrameIRQs_ = frameReadState_.irqs;
-        lastFrameNMIs_ = frameReadState_.nmis;
-        lastFrameIWM_ = frameReadState_.iwm;
-        if (frameReadState_.ioPage) {
-            memcpy(lastFrameIORegs_, frameReadState_.ioPage, 256);
-        }
-        std::swap(frameWriteMemory_, frameReadMemory_);
-        std::swap(frameWriteState_, frameReadState_);
-        //  display log lines
-        LogOutputNode *logNode = lastCommandState_.logNode;
-        while (logNode) {
-            if (consoleLines_.isFull()) {
-                consoleLines_.pop();
+    {
+        std::lock_guard<std::mutex> frameLock(frameMutex_);
+        isNewFrame = frameLastSeqNo_ != frameSeqNo_;
+        if (isNewFrame) {
+            lastFrameCPURegs_ = frameReadState_.cpu.regs;
+            lastFrameCPUPins_ = frameReadState_.cpu.pins;
+            lastFrameIRQs_ = frameReadState_.irqs;
+            lastFrameNMIs_ = frameReadState_.nmis;
+            lastFrameIWM_ = frameReadState_.iwm;
+            if (frameReadState_.ioPage) {
+                memcpy(lastFrameIORegs_, frameReadState_.ioPage, 256);
             }
-            TerminalLine logLine;
-            logLine.text.assign((char *)logNode + sizeof(LogOutputNode), logNode->sz);
-            switch (logNode->logLevel) {
-            case CLEM_DEBUG_LOG_DEBUG:
-                logLine.type = TerminalLine::Debug;
-                break;
-            case CLEM_DEBUG_LOG_INFO:
-                logLine.type = TerminalLine::Info;
-                break;
-            case CLEM_DEBUG_LOG_WARN:
-                logLine.type = TerminalLine::Warn;
-                break;
-            case CLEM_DEBUG_LOG_FATAL:
-            case CLEM_DEBUG_LOG_UNIMPL:
-                logLine.type = TerminalLine::Error;
-                break;
-            default:
-                logLine.type = TerminalLine::Info;
-                break;
+            std::swap(frameWriteMemory_, frameReadMemory_);
+            std::swap(frameWriteState_, frameReadState_);
+            //  display log lines
+            LogOutputNode *logNode = lastCommandState_.logNode;
+            while (logNode) {
+                if (consoleLines_.isFull()) {
+                    consoleLines_.pop();
+                }
+                TerminalLine logLine;
+                logLine.text.assign((char *)logNode + sizeof(LogOutputNode), logNode->sz);
+                switch (logNode->logLevel) {
+                case CLEM_DEBUG_LOG_DEBUG:
+                    logLine.type = TerminalLine::Debug;
+                    break;
+                case CLEM_DEBUG_LOG_INFO:
+                    logLine.type = TerminalLine::Info;
+                    break;
+                case CLEM_DEBUG_LOG_WARN:
+                    logLine.type = TerminalLine::Warn;
+                    break;
+                case CLEM_DEBUG_LOG_FATAL:
+                case CLEM_DEBUG_LOG_UNIMPL:
+                    logLine.type = TerminalLine::Error;
+                    break;
+                default:
+                    logLine.type = TerminalLine::Info;
+                    break;
+                }
+                consoleLines_.push(std::move(logLine));
+                logNode = logNode->next;
+                consoleChanged_ = true;
             }
-            consoleLines_.push(std::move(logLine));
-            logNode = logNode->next;
-            consoleChanged_ = true;
-        }
-        lastCommandState_.logNode = lastCommandState_.logNodeTail = nullptr;
-        //  display last few log instructions
-        LogInstructionNode *logInstructionNode = lastCommandState_.logInstructionNode;
+            lastCommandState_.logNode = lastCommandState_.logNodeTail = nullptr;
+            //  display last few log instructions
+            LogInstructionNode *logInstructionNode = lastCommandState_.logInstructionNode;
 
-        while (logInstructionNode) {
-            ClemensBackendExecutedInstruction *execInstruction = logInstructionNode->begin;
-            ClemensTraceExecutedInstruction instruction;
-            while (execInstruction != logInstructionNode->end) {
-                instruction.fromInstruction(execInstruction->data, execInstruction->operand);
-                CLEM_TERM_COUT.format(TerminalLine::Opcode, "({}) {:02X}/{:04X} {} {}",
-                                      instruction.cycles_spent, instruction.pc >> 16,
-                                      instruction.pc & 0xffff, instruction.opcode,
-                                      instruction.operand);
-                ++execInstruction;
+            while (logInstructionNode) {
+                ClemensBackendExecutedInstruction *execInstruction = logInstructionNode->begin;
+                ClemensTraceExecutedInstruction instruction;
+                while (execInstruction != logInstructionNode->end) {
+                    instruction.fromInstruction(execInstruction->data, execInstruction->operand);
+                    CLEM_TERM_COUT.format(TerminalLine::Opcode, "({}) {:02X}/{:04X} {} {}",
+                                          instruction.cycles_spent, instruction.pc >> 16,
+                                          instruction.pc & 0xffff, instruction.opcode,
+                                          instruction.operand);
+                    ++execInstruction;
+                }
+                logInstructionNode = logInstructionNode->next;
             }
-            logInstructionNode = logInstructionNode->next;
-        }
-        lastCommandState_.logInstructionNode = lastCommandState_.logInstructionNodeTail = nullptr;
+            lastCommandState_.logInstructionNode = lastCommandState_.logInstructionNodeTail =
+                nullptr;
 
-        breakpoints_.clear();
-        for (unsigned bpIndex = 0; bpIndex < frameReadState_.breakpointCount; ++bpIndex) {
-            breakpoints_.emplace_back(frameReadState_.breakpoints[bpIndex]);
-            backendConfig_.breakpoints.push_back(breakpoints_.back());
-        }
-        backendConfig_.breakpoints = breakpoints_;
-
-        if (!lastCommandState_.results.empty()) {
-            for (auto &result : lastCommandState_.results) {
-                processBackendResult(result);
+            breakpoints_.clear();
+            for (unsigned bpIndex = 0; bpIndex < frameReadState_.breakpointCount; ++bpIndex) {
+                breakpoints_.emplace_back(frameReadState_.breakpoints[bpIndex]);
+                backendConfig_.breakpoints.push_back(breakpoints_.back());
             }
-            lastCommandState_.results.clear();
-        }
-        if (lastCommandState_.hitBreakpoint.has_value()) {
-            unsigned bpIndex = *lastCommandState_.hitBreakpoint;
-            CLEM_TERM_COUT.format(TerminalLine::Info, "Breakpoint {} hit {:02X}/{:04X}.", bpIndex,
-                                  (breakpoints_[bpIndex].address >> 16) & 0xff,
-                                  breakpoints_[bpIndex].address & 0xffff);
-            emulatorHasMouseFocus_ = false;
-            lastCommandState_.hitBreakpoint = std::nullopt;
-        }
-        if (lastCommandState_.message.has_value()) {
-            cmdMessageLocal(*lastCommandState_.message);
-            lastCommandState_.message = std::nullopt;
-        }
-        if (lastCommandState_.terminated.has_value()) {
-            isBackendTerminated = *lastCommandState_.terminated;
-            lastCommandState_.terminated = std::nullopt;
-        }
+            backendConfig_.breakpoints = breakpoints_;
 
-        for (size_t driveIndex = 0; driveIndex < frameReadState_.diskDrives.size(); ++driveIndex) {
-            backendConfig_.diskDriveStates[driveIndex] = frameReadState_.diskDrives[driveIndex];
+            if (!lastCommandState_.results.empty()) {
+                for (auto &result : lastCommandState_.results) {
+                    processBackendResult(result);
+                }
+                lastCommandState_.results.clear();
+            }
+            if (lastCommandState_.hitBreakpoint.has_value()) {
+                unsigned bpIndex = *lastCommandState_.hitBreakpoint;
+                CLEM_TERM_COUT.format(TerminalLine::Info, "Breakpoint {} hit {:02X}/{:04X}.",
+                                      bpIndex, (breakpoints_[bpIndex].address >> 16) & 0xff,
+                                      breakpoints_[bpIndex].address & 0xffff);
+                emulatorHasMouseFocus_ = false;
+                lastCommandState_.hitBreakpoint = std::nullopt;
+            }
+            if (lastCommandState_.message.has_value()) {
+                cmdMessageLocal(*lastCommandState_.message);
+                lastCommandState_.message = std::nullopt;
+            }
+
+            for (size_t driveIndex = 0; driveIndex < frameReadState_.diskDrives.size();
+                 ++driveIndex) {
+                backendConfig_.diskDriveStates[driveIndex] = frameReadState_.diskDrives[driveIndex];
+            }
+
+            frameMemory_.reset();
+
+            std::swap(lastCommandState_.audioBuffer, thisFrameAudioBuffer_);
         }
-
-        frameMemory_.reset();
-
-        std::swap(lastCommandState_.audioBuffer, thisFrameAudioBuffer_);
-
-        frameLastSeqNo_ = frameSeqNo_;
+        uiFrameTimeDelta_ = deltaTime;
+        stagedBackendQueue_.queue(backendQueue_);
     }
-    frameLock.unlock();
+    readyForFrame_.notify_one();
 
     //  render video
     //  video is rendered to a texture and the UVs of the display on the virtual
@@ -1168,7 +1203,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
 
     if (isBackendTerminated) {
         fflush(stdout);
-        backend_ = nullptr;
     }
 
     switch (guiMode_) {
@@ -1196,26 +1230,26 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         break;
     case GUIMode::SaveSnapshot:
         if (!saveSnapshotMode_.isStarted()) {
-            saveSnapshotMode_.start(backend_.get(), frameReadState_.isRunning);
+            saveSnapshotMode_.start(backendQueue_, frameReadState_.isRunning);
         }
-        if (saveSnapshotMode_.frame(width, height, backend_.get())) {
-            saveSnapshotMode_.stop(backend_.get());
+        if (saveSnapshotMode_.frame(width, height, backendQueue_)) {
+            saveSnapshotMode_.stop(backendQueue_);
             guiMode_ = GUIMode::Emulator;
         }
         break;
     case GUIMode::LoadSnapshot:
         if (!loadSnapshotMode_.isStarted()) {
-            loadSnapshotMode_.start(backend_.get(), backendConfig_.snapshotRootPath,
+            loadSnapshotMode_.start(backendQueue_, backendConfig_.snapshotRootPath,
                                     frameReadState_.isRunning);
         }
-        if (loadSnapshotMode_.frame(width, height, backend_.get())) {
-            loadSnapshotMode_.stop(backend_.get());
+        if (loadSnapshotMode_.frame(width, height, backendQueue_)) {
+            loadSnapshotMode_.stop(backendQueue_);
             guiMode_ = GUIMode::Emulator;
         }
         break;
     case GUIMode::RebootEmulator:
-        if (!backend_) {
-            backend_ = createBackend();
+        if (!isBackendRunning()) {
+            createBackend();
             setGUIMode(GUIMode::StartingEmulator);
         }
         break;
@@ -1239,9 +1273,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         }
     }
 
-    if (backend_) {
-        backend_->publish();
-    }
     if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
         if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) {
             if (ImGui::IsKeyDown(ImGuiKey_RightAlt) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) {
@@ -1380,7 +1411,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     ImGui::Spacing();
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
                         ImVec2(style.ItemSpacing.x * 1.5f, style.ItemSpacing.y));
-    if (backend_) {
+    if (isBackendRunning()) {
         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
@@ -1393,7 +1424,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     if (ClemensHostImGui::IconButton(
             "Power", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kPowerButton),
             kIconSize)) {
-        if (backend_) {
+        if (isBackendRunning()) {
             cmdPower("off");
         } else {
             cmdPower("on");
@@ -1404,7 +1435,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     }
     ImGui::PopStyleColor(3);
 
-    if (backend_ && !delayRebootTimer_.has_value()) {
+    if (isBackendRunning() && !delayRebootTimer_.has_value()) {
         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
@@ -1417,7 +1448,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     if (ClemensHostImGui::IconButton(
             "Settings", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kSettings),
             kIconSize)) {
-        if (backend_ && !isEmulatorStarting()) {
+        if (isBackendRunning() && !isEmulatorStarting()) {
             if (!delayRebootTimer_.has_value()) {
                 rebootInternal();
             }
@@ -1433,7 +1464,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     if (ClemensHostImGui::IconButton(
             "Load Snapshot", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kLoad),
             kIconSize)) {
-        if (backend_ && !isEmulatorStarting()) {
+        if (isBackendRunning() && !isEmulatorStarting()) {
             setGUIMode(GUIMode::LoadSnapshot);
         }
     }
@@ -1444,7 +1475,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     if (ClemensHostImGui::IconButton(
             "Save Snapshot", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kSave),
             kIconSize)) {
-        if (backend_ && !isEmulatorStarting()) {
+        if (isBackendRunning() && !isEmulatorStarting()) {
             setGUIMode(GUIMode::SaveSnapshot);
         }
     }
@@ -1597,7 +1628,7 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
 
     ImGui::SameLine();
     ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-    if (backend_) {
+    if (isBackendRunning()) {
         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
@@ -1620,7 +1651,7 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
                     "Continue",
                     ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kStopMachine),
                     kIconSize)) {
-                backend_->breakExecution();
+                backendQueue_.breakExecution();
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
                 ImGui::SetTooltip("Stop execution");
@@ -1630,7 +1661,7 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
                     "Continue",
                     ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kRunMachine),
                     kIconSize)) {
-                backend_->run();
+                backendQueue_.run();
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
                 ImGui::SetTooltip("Continue execution");
@@ -1859,7 +1890,7 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
         if (ImGui::Button("WP")) {
             if (isDiskInDrive) {
                 wp = !wp;
-                backend_->writeProtectDisk(driveType, wp);
+                backendQueue_.writeProtectDisk(driveType, wp);
             }
         }
         ImGui::PopStyleColor(3);
@@ -1933,7 +1964,7 @@ void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType, float w
             diskLibrary_.update();
         }
         if (!drive.imagePath.empty() && !drive.isEjecting && ImGui::Selectable("<eject>")) {
-            backend_->ejectDisk(driveType);
+            backendQueue_.ejectDisk(driveType);
         }
         if (drive.imagePath.empty()) {
             if (ImGui::Selectable("<insert blank disk>")) {
@@ -1954,7 +1985,7 @@ void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType, float w
                 }
             });
             if (!selectedPath.empty()) {
-                backend_->insertDisk(driveType, selectedPath.string());
+                backendQueue_.insertDisk(driveType, selectedPath.string());
             }
             ImGui::Separator();
         }
@@ -2156,7 +2187,7 @@ void ClemensFrontend::doMachineDebugMemoryDisplay() {
     uint8_t bank = frameReadState_.memoryViewBank;
     if (ImGui::InputScalar("Bank", ImGuiDataType_U8, &bank, NULL, NULL, "%02X",
                            ImGuiInputTextFlags_CharsHexadecimal)) {
-        backend_->debugMemoryPage((uint8_t)(bank & 0xff));
+        backendQueue_.debugMemoryPage((uint8_t)(bank & 0xff));
     }
     debugMemoryEditor_.OptAddrDigitsCount = 4;
     debugMemoryEditor_.Cols = 8;
@@ -2164,7 +2195,6 @@ void ClemensFrontend::doMachineDebugMemoryDisplay() {
 }
 
 void ClemensFrontend::doMachineDebugDOCDisplay() {
-
     auto &doc = frameReadState_.doc;
 
     ImGui::BeginTable("MMIO_Ensoniq_Global", 3);
@@ -2247,7 +2277,7 @@ ImU8 ClemensFrontend::imguiMemoryEditorRead(const ImU8 *mem_ptr, size_t off) {
 
 void ClemensFrontend::imguiMemoryEditorWrite(ImU8 *mem_ptr, size_t off, ImU8 value) {
     auto *self = reinterpret_cast<ClemensFrontend *>(mem_ptr);
-    self->backend_->debugMemoryWrite((uint16_t)(off & 0xffff), value);
+    self->backendQueue_.debugMemoryWrite((uint16_t)(off & 0xffff), value);
 }
 
 void ClemensFrontend::doMachineDebugIORegister(uint8_t *ioregsold, uint8_t *ioregs, uint8_t reg) {
@@ -3268,7 +3298,7 @@ void ClemensFrontend::doNewBlankDisk(int /*width */, int /*height*/) {
     }
     auto diskPath = diskDirectory / importDiskSetName_;
     diskPath.replace_extension("woz");
-    backend_->insertBlankDisk(importDriveType_, diskPath.string());
+    backendQueue_.insertBlankDisk(importDriveType_, diskPath.string());
     setGUIMode(GUIMode::Emulator);
 }
 
@@ -3500,7 +3530,7 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
                 CLEM_TERM_COUT.format(TerminalLine::Error, "Breakpoint {} doesn't exist", index);
                 return;
             }
-            backend_->removeBreakpoint(index);
+            backendQueue_.removeBreakpoint(index);
         }
         return;
     }
@@ -3547,7 +3577,7 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
     } else if (operand == "irq") {
         breakpoint.type = ClemensBackendBreakpoint::IRQ;
         breakpoint.address = 0x0;
-        backend_->addBreakpoint(breakpoint);
+        backendQueue_.addBreakpoint(breakpoint);
         return;
     } else {
         breakpoint.type = ClemensBackendBreakpoint::Execute;
@@ -3571,7 +3601,7 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
         return;
     }
     if (operand.empty()) {
-        backend_->breakExecution();
+        backendQueue_.breakExecution();
     } else {
         address[6] = '\0';
         char *addressEnd = NULL;
@@ -3581,11 +3611,11 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
                                   operand);
             return;
         }
-        backend_->addBreakpoint(breakpoint);
+        backendQueue_.addBreakpoint(breakpoint);
     }
 }
 
-void ClemensFrontend::cmdRun(std::string_view /*operand*/) { backend_->run(); }
+void ClemensFrontend::cmdRun(std::string_view /*operand*/) { backendQueue_.run(); }
 
 void ClemensFrontend::cmdStep(std::string_view operand) {
     unsigned count = 1;
@@ -3597,14 +3627,14 @@ void ClemensFrontend::cmdStep(std::string_view operand) {
             return;
         }
     }
-    backend_->step(count);
+    backendQueue_.step(count);
 }
 
 void ClemensFrontend::rebootInternal() {
     setGUIMode(GUIMode::RebootEmulator);
     delayRebootTimer_ = 0.0f;
-    if (backend_) {
-        backend_->terminate();
+    if (isBackendRunning()) {
+        stopBackend();
         CLEM_TERM_COUT.print(TerminalLine::Info, "Rebooting machine...");
     } else {
         CLEM_TERM_COUT.print(TerminalLine::Info, "Powering machine...");
@@ -3615,8 +3645,8 @@ void ClemensFrontend::cmdReboot(std::string_view /*operand*/) { rebootInternal()
 
 void ClemensFrontend::cmdPower(std::string_view operand) {
     if (operand == "off") {
-        if (backend_) {
-            backend_->terminate();
+        if (isBackendRunning()) {
+            stopBackend();
             setGUIMode(GUIMode::NoEmulator);
             audio_.stop();
             CLEM_TERM_COUT.print(TerminalLine::Info, "Shutting down machine...");
@@ -3624,14 +3654,14 @@ void ClemensFrontend::cmdPower(std::string_view operand) {
             CLEM_TERM_COUT.print(TerminalLine::Error, "Not powered on.");
         }
     } else if (operand == "on") {
-        if (!backend_) {
+        if (!isBackendRunning()) {
             rebootInternal();
             audio_.start();
         } else {
             CLEM_TERM_COUT.print(TerminalLine::Error, "Already on.");
         }
     } else if (operand.empty()) {
-        if (backend_) {
+        if (isBackendRunning()) {
             CLEM_TERM_COUT.print(TerminalLine::Error, "Powered on.");
         } else {
             CLEM_TERM_COUT.print(TerminalLine::Error, "Powered off.");
@@ -3639,7 +3669,7 @@ void ClemensFrontend::cmdPower(std::string_view operand) {
     }
 }
 
-void ClemensFrontend::cmdReset(std::string_view /*operand*/) { backend_->reset(); }
+void ClemensFrontend::cmdReset(std::string_view /*operand*/) { backendQueue_.reset(); }
 
 void ClemensFrontend::cmdDisk(std::string_view operand) {
     // disk
@@ -3680,18 +3710,18 @@ void ClemensFrontend::cmdDisk(std::string_view operand) {
     std::string_view diskOpValue;
     if (sepPos == std::string_view::npos) {
         if (diskOpType == "eject") {
-            backend_->ejectDisk(driveType);
+            backendQueue_.ejectDisk(driveType);
         } else {
             validOp = false;
         }
     } else {
         diskOpValue = trimToken(diskOpExpr, sepPos + 1);
         if (diskOpType == "file") {
-            backend_->insertDisk(driveType, std::string(diskOpValue));
+            backendQueue_.insertDisk(driveType, std::string(diskOpValue));
         } else if (diskOpType == "wprot") {
             bool wprot;
             if (parseBool(diskOpValue, wprot)) {
-                backend_->writeProtectDisk(driveType, wprot);
+                backendQueue_.writeProtectDisk(driveType, wprot);
             } else {
                 validValue = false;
             }
@@ -3725,7 +3755,7 @@ void ClemensFrontend::cmdLog(std::string_view operand) {
                               operand);
         return;
     }
-    backend_->debugLogLevel(int(levelName - logLevelNames.begin()));
+    backendQueue_.debugLogLevel(int(levelName - logLevelNames.begin()));
 }
 
 static std::tuple<std::array<std::string_view, 8>, std::string_view, size_t>
@@ -3788,7 +3818,8 @@ void ClemensFrontend::cmdDump(std::string_view operand) {
         message += ",";
     }
     message.pop_back();
-    backend_->debugMessage(std::move(message));
+    // CK_TODO(DebugMessage : Send Message to thread so it can fill in the data)
+    //  backendQueue_.debugMessage(std::move(message));
 }
 
 void ClemensFrontend::cmdTrace(std::string_view operand) {
@@ -3847,7 +3878,7 @@ void ClemensFrontend::cmdTrace(std::string_view operand) {
         CLEM_TERM_COUT.print(TerminalLine::Error,
                              "Operation only allowed while tracing is active.");
     }
-    backend_->debugProgramTrace(std::string(params[0]), path);
+    backendQueue_.debugProgramTrace(std::string(params[0]), path);
 }
 
 std::string ClemensFrontend::cmdMessageFromBackend(std::string_view message,
@@ -3954,7 +3985,7 @@ void ClemensFrontend::cmdSave(std::string_view operand) {
         CLEM_TERM_COUT.print(TerminalLine::Error, "Save requires a filename.");
         return;
     }
-    backend_->saveMachine(std::string(params[0]));
+    backendQueue_.saveMachine(std::string(params[0]));
 }
 
 void ClemensFrontend::cmdLoad(std::string_view operand) {
@@ -3963,7 +3994,7 @@ void ClemensFrontend::cmdLoad(std::string_view operand) {
         CLEM_TERM_COUT.print(TerminalLine::Error, "Load requires a filename.");
         return;
     }
-    backend_->loadMachine(std::string(params[0]));
+    backendQueue_.loadMachine(std::string(params[0]));
 }
 
 void ClemensFrontend::cmdGet(std::string_view operand) {
@@ -4010,7 +4041,7 @@ void ClemensFrontend::cmdADBMouse(std::string_view operand) {
         CLEM_TERM_COUT.print(TerminalLine::Error, "ADBMouse invalid parameters.");
         return;
     }
-    backend_->inputEvent(input);
+    backendQueue_.inputEvent(input);
     CLEM_TERM_COUT.print(TerminalLine::Info, "Input sent.");
 }
 
@@ -4025,5 +4056,5 @@ void ClemensFrontend::cmdMinimode(std::string_view operand) {
 }
 
 void ClemensFrontend::cmdScript(std::string_view command) {
-    backend_->runScript(std::string(command));
+    backendQueue_.runScript(std::string(command));
 }
