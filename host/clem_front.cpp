@@ -1268,6 +1268,9 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
             setGUIMode(GUIMode::Emulator);
         }
         break;
+    case GUIMode::Help:
+        doHelpScreen(width, height);
+        break;
     case GUIMode::RebootEmulator:
         if (!isBackendRunning()) {
             createBackend();
@@ -1519,6 +1522,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
     if (ClemensHostImGui::IconButton(
             "Help", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kHelp), kIconSize)) {
+        setGUIMode(GUIMode::Help);
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
         ImGui::SetTooltip("Help");
@@ -3031,6 +3035,20 @@ void ClemensFrontend::layoutConsoleLines() {
     if (consoleChanged_) {
         ImGui::SetScrollHereY();
         consoleChanged_ = false;
+    }
+}
+
+void ClemensFrontend::doHelpScreen(int width, int height) {
+    if (!ImGui::IsPopupOpen("Clemens IIGS Help")) {
+        ImGui::OpenPopup("Clemens IIGS Help");
+    }
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(
+        ImVec2(std::max(720.0f, width * 0.80f), std::max(512.0f, height * 0.80f)));
+    if (ImGui::BeginPopupModal("Clemens IIGS Help", NULL)) {
+        ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kSettingsHelp));
+        ImGui::EndPopup();
     }
 }
 

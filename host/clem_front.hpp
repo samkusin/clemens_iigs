@@ -324,6 +324,8 @@ class ClemensFrontend : public ClemensHostView {
     void doNewBlankDiskFlow(int width, int height);
     void doNewBlankDisk(int width, int height);
 
+    void doHelpScreen(int width, int height);
+
     bool isEmulatorStarting() const;
     bool isEmulatorActive() const;
 

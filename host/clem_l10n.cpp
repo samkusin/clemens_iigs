@@ -1,3 +1,5 @@
+#include "clem_l10n.hpp"
+
 namespace ClemensL10N {
 const char *kWelcomeText[] = {"Clemens IIGS Emulator v%d.%d\n"
                               "\n\n"
@@ -87,5 +89,7 @@ const char *kSettingsMachineROMFilename[] = {"ROM Filename"};
 const char *kSettingsMachineCards[] = {"Cards"};
 
 const char *kSettingsTabEmulation[] = {"Emulation"};
+
+#include "strings/clem_help.inl"
 
 } // namespace ClemensL10N

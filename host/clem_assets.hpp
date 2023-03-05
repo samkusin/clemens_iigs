@@ -2,11 +2,13 @@
 #define CLEM_HOST_ASSETS_HPP
 
 #include <cstdint>
+#include <string_view>
 
 namespace ClemensHostAssets {
 
 enum ImageId {
-    kPowerButton,
+    kInvalidImageId = -1,
+    kPowerButton = 0,
     kPowerCycle,
     kSettings,
     kHelp,
@@ -18,6 +20,8 @@ enum ImageId {
     kJoystick,
     kCard,
     kFastEmulate,
+    kFirstNamedImage,
+    kLastNamedImage = kFirstNamedImage + 64,
     kImageCount
 };
 
@@ -26,6 +30,7 @@ uintptr_t getImage(ImageId imageId);
 int getImageWidth(ImageId imageId);
 int getImageHeight(ImageId imageId);
 float getImageAspect(ImageId imageId);
+ImageId getImageFromName(std::string_view name);
 void terminate();
 
 }; // namespace ClemensHostAssets

@@ -3,6 +3,7 @@
 #include "stb_image.h"
 
 #include "sokol/sokol_gfx.h"
+#include <cstring>
 
 namespace ClemensHostAssets {
 
@@ -28,6 +29,11 @@ struct ImageInfo {
 } // namespace
 
 static ImageInfo g_allImages[kImageCount];
+
+static const char *g_namedImages[kLastNamedImage - kFirstNamedImage] = {
+    "",
+    NULL,
+};
 
 ImageInfo loadImageFromPNG(const uint8_t *data, size_t dataSize) {
     ImageInfo image{};
@@ -66,12 +72,33 @@ void initialize() {
     g_allImages[kHelp] = loadImageFromPNG(help_png, help_png_len);
     g_allImages[kCard] = loadImageFromPNG(card_icon_png, card_icon_png_len);
     g_allImages[kFastEmulate] = loadImageFromPNG(fast_emulate_png, fast_emulate_png_len);
+
+    int lastNamedImageId = kFirstNamedImage;
+    // g_allImages[lastNamedImageId] = loadImageFromPNG()
+    for (; lastNamedImageId < kLastNamedImage; lastNamedImageId++) {
+        g_allImages[lastNamedImageId].image.id = SG_INVALID_ID;
+    }
 }
 
 uintptr_t getImage(ImageId imageId) { return g_allImages[imageId].image.id; }
 
 float getImageAspect(ImageId imageId) {
     return float(g_allImages[imageId].width) / g_allImages[imageId].height;
+}
+
+int getImageWidth(ImageId imageId) { return float(g_allImages[imageId].width); }
+
+int getImageHeight(ImageId imageId) { return float(g_allImages[imageId].height); }
+
+ImageId getImageFromName(std::string_view name) {
+    for (int i = kFirstNamedImage; i < kLastNamedImage; ++i) {
+        if (g_namedImages[i - kFirstNamedImage] == NULL)
+            break;
+        if (!name.compare(g_namedImages[i - kFirstNamedImage])) {
+            return ImageId(i);
+        }
+    }
+    return kInvalidImageId;
 }
 
 void terminate() {

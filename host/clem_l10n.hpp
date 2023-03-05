@@ -19,6 +19,8 @@ extern const char *kSettingsMachineSystemMemory[];
 extern const char *kSettingsMachineCards[];
 extern const char *kSettingsTabEmulation[];
 
+extern const char *kSettingsHelp[];
+
 constexpr unsigned kLanguageDefault = 0;
 
 } // namespace ClemensL10N
