@@ -13,9 +13,10 @@ class ClemensSettingsUI {
     void stop();
 
   private:
-    enum class Mode { None, Active, Commit, Cancelled };
+    enum class Mode { None, Active, ROMFileBrowse, ROMFileBrowseError, Commit, Cancelled };
     Mode mode_ = Mode::None;
     ClemensConfiguration config_;
+    std::string errorMessage_;
     char romFilename_[64];
     int ramSizeKB_;
     bool nonstandardRAMSize_;

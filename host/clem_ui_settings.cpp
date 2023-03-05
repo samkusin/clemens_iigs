@@ -56,7 +56,9 @@ bool ClemensSettingsUI::frame(float width, float height) {
                     ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsMachineSystemSetup));
                     ImGui::TextWrapped("%s", CLEM_L10N_LABEL(kSettingsMachineSystemSetupInfo));
                     ImGui::Spacing();
-                    ImGui::Button(CLEM_HOST_FOLDER_LEFT_UTF8 CLEM_HOST_FOLDER_RIGHT_UTF8);
+                    if (ImGui::Button(CLEM_HOST_FOLDER_LEFT_UTF8 CLEM_HOST_FOLDER_RIGHT_UTF8)) {
+                        mode_ = Mode::ROMFileBrowse;
+                    }
                     ImGui::SameLine();
                     ImGui::InputText(CLEM_L10N_LABEL(kSettingsMachineROMFilename), romFilename_,
                                      sizeof(romFilename_));
@@ -106,6 +108,42 @@ bool ClemensSettingsUI::frame(float width, float height) {
             ImGui::EndPopup();
         }
     } break;
+    case Mode::ROMFileBrowse: {
+        auto result = ClemensHostImGui::ROMFileBrowser(width, height, config_.dataDirectory);
+        if (result.type == ClemensHostImGui::ROMFileBrowserResult::Ok) {
+            config_.romFilename = result.filename;
+            auto cnt = config_.romFilename.copy(romFilename_, sizeof(romFilename_) - 1);
+            romFilename_[cnt] = '\0';
+            mode_ = Mode::Active;
+        } else if (result.type == ClemensHostImGui::ROMFileBrowserResult::Cancel) {
+            mode_ = Mode::Active;
+        } else if (result.type == ClemensHostImGui::ROMFileBrowserResult::Error) {
+            errorMessage_ =
+                fmt::format("There was a problem copying the ROM file {}.", result.filename);
+            mode_ = Mode::ROMFileBrowseError;
+        }
+        break;
+    }
+    case Mode::ROMFileBrowseError:
+        if (!ImGui::IsPopupOpen("SettingsError")) {
+            ImGui::OpenPopup("SettingsError");
+        }
+        ImGui::SetNextWindowPos(center, 0, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(width * 0.50f, 0.0f));
+        if (ImGui::BeginPopupModal("SettingsError", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::PushTextWrapPos();
+            ImGui::NewLine();
+            ImGui::TextUnformatted(errorMessage_.c_str());
+            ImGui::NewLine();
+            ImGui::Separator();
+            ImGui::PopTextWrapPos();
+            if (ImGui::Button("OK", ImVec2(240, 0))) {
+                mode_ = Mode::Active;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        break;
     case Mode::Commit:
         return true;
     case Mode::Cancelled:
