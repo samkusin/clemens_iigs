@@ -4,4 +4,12 @@ const char *kSettingsHelp[] = {
 # Clemens IIGS
 
 A quick reference.
+
+## Disk Access
+
+whatever
+
+### Importing
+
+blah blah blah
     )"};

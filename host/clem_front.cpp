@@ -3039,16 +3039,44 @@ void ClemensFrontend::layoutConsoleLines() {
 }
 
 void ClemensFrontend::doHelpScreen(int width, int height) {
+    static bool isOpen = false;
     if (!ImGui::IsPopupOpen("Clemens IIGS Help")) {
         ImGui::OpenPopup("Clemens IIGS Help");
+        isOpen = true;
     }
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(
         ImVec2(std::max(720.0f, width * 0.80f), std::max(512.0f, height * 0.80f)));
-    if (ImGui::BeginPopupModal("Clemens IIGS Help", NULL)) {
-        ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kSettingsHelp));
+    if (ImGui::BeginPopupModal("Clemens IIGS Help", &isOpen)) {
+        if (ImGui::BeginTabBar("HelpSections")) {
+            if (ImGui::BeginTabItem("Summary")) {
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kSettingsHelp));
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Hotkeys")) {
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kSettingsHelp));
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Disk Selection")) {
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kSettingsHelp));
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Debugger")) {
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kSettingsHelp));
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+        }
+
         ImGui::EndPopup();
+    }
+    if (!isOpen) {
+        if (isBackendRunning()) {
+            guiMode_ = GUIMode::Emulator;
+        } else {
+            guiMode_ = GUIMode::NoEmulator;
+        }
     }
 }
 

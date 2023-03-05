@@ -5,6 +5,7 @@
 * Build Windows and Linux versions with their default settings
   * Windows - D3D11
   * Linux - OpenGL
+  * MacOS - OpenGL
   * Debug and Release executables
 * Ensure all suppported platforms' release binaries launch to startup
 

@@ -16,6 +16,16 @@ static sg_image g_imgui_font_img;
 
 static ImFont *g_fonts[kFontTotalCount];
 
+static ImU32 getMarkdownH1Color() { return IM_COL32(255, 255, 0, 255); }
+
+static ImU32 getMarkdownH2Color() {
+    return (ImU32)(ImColor(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled)));
+}
+
+static ImU32 getMarkdownH3Color() {
+    return (ImU32)(ImColor(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled)));
+}
+
 void FontSetup(ImVector<ImWchar> &unicodeRanges, const cinek::ByteBuffer &systemFontLoBuffer,
                const cinek::ByteBuffer &systemFontHiBuffer) {
     auto &io = ImGui::GetIO();
@@ -52,14 +62,14 @@ void FontSetup(ImVector<ImWchar> &unicodeRanges, const cinek::ByteBuffer &system
     strncpy(font_cfg.Name, "A2LoMed", sizeof(font_cfg.Name));
     g_fonts[kFontDefaultMedium] = io.Fonts->AddFontFromMemoryTTF(
         const_cast<uint8_t *>(systemFontLoBuffer.getHead()), systemFontLoBuffer.getSize(),
-        kFontSize * 3, &font_cfg, unicodeRanges.Data);
+        kFontSize * 1.5f, &font_cfg, unicodeRanges.Data);
 
     font_cfg = ImFontConfig();
     font_cfg.FontDataOwnedByAtlas = false;
     strncpy(font_cfg.Name, "A2HiMed", sizeof(font_cfg.Name));
     g_fonts[kFontNarrowMedium] = io.Fonts->AddFontFromMemoryTTF(
         const_cast<uint8_t *>(systemFontHiBuffer.getHead()), systemFontHiBuffer.getSize(),
-        kFontSize * 3, &font_cfg, unicodeRanges.Data);
+        kFontSize * 1.5f, &font_cfg, unicodeRanges.Data);
 
     if (!io.Fonts->IsBuilt()) {
         unsigned char *font_pixels;
@@ -217,16 +227,30 @@ void markdownFormatCallback(const ImGui::MarkdownFormatInfo &markdownFormatInfo,
     switch (markdownFormatInfo.type) {
         // example: change the colour of heading level 2
     case ImGui::MarkdownFormatType::HEADING: {
-        if (markdownFormatInfo.level == 1) {
-            if (start) {
+        if (start) {
+            if (markdownFormatInfo.level == 1) {
                 ImGui::PushFont(g_fonts[kFontDefaultMedium]);
-                ImGui::PushStyleColor(ImGuiCol_Text,
-                                      ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+                ImGui::PushStyleColor(ImGuiCol_Text, getMarkdownH1Color());
+            } else if (markdownFormatInfo.level == 2) {
+                ImGui::PushFont(g_fonts[kFontDefaultMedium]);
+                ImGui::PushStyleColor(ImGuiCol_Text, getMarkdownH2Color());
             } else {
-                ImGui::PopStyleColor();
-                ImGui::PopFont();
+                ImGui::PushFont(g_fonts[kFontDefault]);
+                ImGui::PushStyleColor(ImGuiCol_Text, getMarkdownH3Color());
+            }
+        } else {
+            ImGui::PopStyleColor();
+            ImGui::PopFont();
+            if (markdownFormatInfo.level == 1) {
+                ImGui::Separator();
+                ImGui::Spacing();
+            } else if (markdownFormatInfo.level == 2) {
+                ImGui::Separator();
+            } else {
+                ImGui::Separator();
             }
         }
+
         break;
     }
     default:
@@ -240,9 +264,6 @@ void Markdown(std::string_view markdown) {
     config.linkCallback = markdownLinkCallback;
     config.tooltipCallback = nullptr;
     config.imageCallback = markdownImageCallback;
-    config.headingFormats[0] = {g_fonts[kFontNarrow], true};
-    config.headingFormats[1] = {g_fonts[kFontNarrow], false};
-    config.headingFormats[2] = {g_fonts[kFontNarrow], false};
     config.formatCallback = markdownFormatCallback;
     ImGui::Markdown(markdown.data(), markdown.size(), config);
 }
