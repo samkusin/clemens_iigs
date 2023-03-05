@@ -2,11 +2,13 @@
 #include "clem_assets.hpp"
 
 #include "imgui.h"
+#include "imgui_filedialog/ImGuiFileDialog.h"
 #include "imgui_markdown.h"
 
 #include "sokol/sokol_gfx.h"
 
 #include <cstdio>
+#include <filesystem>
 #include <string_view>
 
 namespace ClemensHostImGui {
@@ -245,6 +247,44 @@ void Markdown(std::string_view markdown) {
     config.headingFormats[2] = {g_fonts[kFontNarrow], false};
     config.formatCallback = markdownFormatCallback;
     ImGui::Markdown(markdown.data(), markdown.size(), config);
+}
+
+auto ROMFileBrowser(int width, int height, const std::string &dataDirectory)
+    -> ROMFileBrowserResult {
+    ROMFileBrowserResult result;
+    result.type = ROMFileBrowserResult::Continue;
+    if (!ImGuiFileDialog::Instance()->IsOpened("Select ROM)")) {
+        ImGuiFileDialog::Instance()->OpenDialog("Select ROM", "Select a ROM", ".*", ".", 1, nullptr,
+                                                ImGuiFileDialogFlags_Modal);
+    }
+    if (ImGuiFileDialog::Instance()->Display(
+            "Select ROM", ImGuiWindowFlags_NoCollapse,
+            ImVec2(std::max(width * 0.75f, 640.0f), std::max(height * 0.75f, 480.0f)),
+            ImVec2(width, height))) {
+
+        if (ImGuiFileDialog::Instance()->IsOk()) {
+            std::error_code errc;
+            auto filePath = std::filesystem::path(ImGuiFileDialog::Instance()->GetFilePathName());
+            auto fileName = ImGuiFileDialog::Instance()->GetCurrentFileName();
+            auto destinationPath = std::filesystem::path(dataDirectory) / fileName;
+            if (filePath == destinationPath) {
+                result.filename = fileName;
+                result.type = ROMFileBrowserResult::Ok;
+            } else if (std::filesystem::copy_file(filePath, destinationPath,
+                                                  std::filesystem::copy_options::overwrite_existing,
+                                                  errc)) {
+                result.filename = fileName;
+                result.type = ROMFileBrowserResult::Ok;
+            } else {
+                result.filename = fileName;
+                result.type = ROMFileBrowserResult::Error;
+            }
+        } else {
+            result.type = ROMFileBrowserResult::Cancel;
+        }
+        ImGuiFileDialog::Instance()->Close();
+    }
+    return result;
 }
 
 } // namespace ClemensHostImGui
