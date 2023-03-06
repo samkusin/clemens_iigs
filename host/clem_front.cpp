@@ -638,7 +638,6 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
         cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
     thisFrameAudioBuffer_ = cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
 
-    backendConfig_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
     backendConfig_.dataRootPath = config_.dataDirectory;
     backendConfig_.diskLibraryRootPath = diskLibraryRootPath_;
     backendConfig_.traceRootPath = diskTracesRootPath_;
@@ -649,8 +648,6 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
     //       UI to make it happen
     backendConfig_.smartPortDriveStates[0].imagePath =
         std::filesystem::path("smartport.2mg").string();
-
-    backendConfig_.enableFastEmulation = config_.fastEmulationEnabled;
 
     debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;
     debugMemoryEditor_.WriteFn = &ClemensFrontend::imguiMemoryEditorWrite;
@@ -695,6 +692,11 @@ void ClemensFrontend::lostFocus() {
 
 void ClemensFrontend::createBackend() {
     auto romPath = std::filesystem::path(config_.dataDirectory) / config_.romFilename;
+
+    backendConfig_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
+    backendConfig_.ramSizeKB = config_.ramSizeKB;
+    backendConfig_.enableFastEmulation = config_.fastEmulationEnabled;
+
     auto backend = std::make_unique<ClemensBackend>(romPath.string(), backendConfig_);
 
     uiFrameTimeDelta_ = 0.0;
@@ -1261,10 +1263,12 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
             settingsMode_.start(config_);
         }
         if (settingsMode_.frame(width, height)) {
-            settingsMode_.stop();
             if (settingsMode_.shouldBeCommitted()) {
+                config_ = settingsMode_.getConfiguration();
                 config_.save();
+                backendQueue_.enableFastDiskEmulation(config_.fastEmulationEnabled);
             }
+            settingsMode_.stop();
             setGUIMode(GUIMode::Emulator);
         }
         break;
@@ -1538,7 +1542,12 @@ void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
     ImGui::BeginChild("PeripheralsAndCards");
     const ImGuiStyle &drawStyle = ImGui::GetStyle();
     ImDrawList *drawList = ImGui::GetWindowDrawList();
-
+    if (ImGui::CollapsingHeader("Motherboard", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Indent();
+        ImGui::Text("Memory: %uK", backendConfig_.ramSizeKB);
+        ImGui::Unindent();
+    }
+    ImGui::Separator();
     if (ImGui::CollapsingHeader("Peripherals", ImGuiTreeNodeFlags_DefaultOpen)) {
         for (unsigned slot = 0; slot < joystickSlotCount_; ++slot) {
             ImColor color = joysticks_[slot].isConnected ? ImColor(255, 255, 255, 255)
@@ -3051,19 +3060,19 @@ void ClemensFrontend::doHelpScreen(int width, int height) {
     if (ImGui::BeginPopupModal("Clemens IIGS Help", &isOpen)) {
         if (ImGui::BeginTabBar("HelpSections")) {
             if (ImGui::BeginTabItem("Summary")) {
-                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kSettingsHelp));
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kEmulatorHelp));
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Hotkeys")) {
-                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kSettingsHelp));
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kEmulatorHelp));
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Disk Selection")) {
-                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kSettingsHelp));
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kEmulatorHelp));
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Debugger")) {
-                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kSettingsHelp));
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kEmulatorHelp));
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();

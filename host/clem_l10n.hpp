@@ -12,14 +12,17 @@ extern const char *kMouseLock[];
 extern const char *kViewInput[];
 extern const char *kMouseUnlock[];
 extern const char *kSettingsTabMachine[];
+extern const char *kSettingsNotAvailable[];
 extern const char *kSettingsMachineSystemSetup[];
 extern const char *kSettingsMachineSystemSetupInfo[];
 extern const char *kSettingsMachineROMFilename[];
 extern const char *kSettingsMachineSystemMemory[];
 extern const char *kSettingsMachineCards[];
 extern const char *kSettingsTabEmulation[];
+extern const char *kSettingsEmulationFastDisk[];
+extern const char *kSettingsEmulationFaskDiskHelp[];
 
-extern const char *kSettingsHelp[];
+extern const char *kEmulatorHelp[];
 
 constexpr unsigned kLanguageDefault = 0;
 

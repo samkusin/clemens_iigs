@@ -107,6 +107,16 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
                 commandFailed = true;
             }
             break;
+        case Command::FastDiskEmulation: {
+            int value = 0;
+            if (std::from_chars(cmd.operand.data(), cmd.operand.data() + cmd.operand.size(), value)
+                    .ec != std::errc{}) {
+                commandFailed = true;
+            } else {
+                listener.onCommandFastDiskEmulation(value == 1);
+            }
+            break;
+        }
         case Command::Undefined:
             break;
         }
@@ -366,5 +376,9 @@ void ClemensCommandQueue::inputMachine(ClemensCommandQueueListener &listener,
 #pragma GCC diagnostic pop
 #endif
 #endif
+
+void ClemensCommandQueue::enableFastDiskEmulation(bool enable) {
+    queue(Command{Command::FastDiskEmulation, fmt::format("{}", enable ? 1 : 0)});
+}
 
 void ClemensCommandQueue::queue(const Command &cmd) { queue_.push(cmd); }

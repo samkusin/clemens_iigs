@@ -1,5 +1,5 @@
 
-const char *kSettingsHelp[] = {
+const char *kEmulatorHelp[] = {
     R"(
 # Clemens IIGS
 

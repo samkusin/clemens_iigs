@@ -56,8 +56,7 @@ Windows takes priority.  For Linux, perhaps run a subset of these.
 * DOS 3.3 Master Disk startup
 * ProDOS 8 Master Disk startup
 * ProDOS 16 Master Disk startup
-* GS/OS System 5 Disk startup
-  * System 6 will require Smartport support which is not ready yet
+* GS/OS System 6 Disk startup
 * Oregon Trail Disk startup (5.25" WOZ simple copy protection should pass)
 * Neuromancer Disk startup
   * Audio and Visuals should look right

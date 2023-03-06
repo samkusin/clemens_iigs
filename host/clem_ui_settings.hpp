@@ -13,6 +13,10 @@ class ClemensSettingsUI {
     void stop();
 
   private:
+    bool willRequireRestart() const;
+    void updateConfig();
+
+  private:
     enum class Mode { None, Active, ROMFileBrowse, ROMFileBrowseError, Commit, Cancelled };
     Mode mode_ = Mode::None;
     ClemensConfiguration config_;

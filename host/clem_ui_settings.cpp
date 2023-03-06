@@ -53,15 +53,19 @@ bool ClemensSettingsUI::frame(float width, float height) {
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
                                     ImVec2(itemSpacing.x, itemSpacing.y * 1.5f));
                 if (ImGui::BeginTabItem(CLEM_L10N_LABEL(kSettingsTabMachine))) {
-                    ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsMachineSystemSetup));
-                    ImGui::TextWrapped("%s", CLEM_L10N_LABEL(kSettingsMachineSystemSetupInfo));
                     ImGui::Spacing();
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 0, 255));
+                    ImGui::TextWrapped("%s", CLEM_L10N_LABEL(kSettingsMachineSystemSetupInfo));
+                    ImGui::PopStyleColor();
+                    ImGui::Spacing();
+                    ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsMachineSystemSetup));
                     if (ImGui::Button(CLEM_HOST_FOLDER_LEFT_UTF8 CLEM_HOST_FOLDER_RIGHT_UTF8)) {
                         mode_ = Mode::ROMFileBrowse;
                     }
                     ImGui::SameLine();
                     ImGui::InputText(CLEM_L10N_LABEL(kSettingsMachineROMFilename), romFilename_,
                                      sizeof(romFilename_));
+                    ImGui::Spacing();
                     ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsMachineSystemMemory));
                     if (nonstandardRAMSize_) {
                         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
@@ -82,12 +86,21 @@ bool ClemensSettingsUI::frame(float width, float height) {
                     }
                     ImGui::Spacing();
                     ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsMachineCards));
-
-                    // ImGui::Combo("Slot 4", )
-
+                    ImGui::Spacing();
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 0, 255));
+                    ImGui::TextWrapped("%s", CLEM_L10N_LABEL(kSettingsNotAvailable));
+                    ImGui::PopStyleColor();
+                    ImGui::Spacing();
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem(CLEM_L10N_LABEL(kSettingsTabEmulation))) {
+                    ImGui::Checkbox(CLEM_L10N_LABEL(kSettingsEmulationFastDisk),
+                                    &config_.fastEmulationEnabled);
+                    ImGui::Indent();
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 0, 255));
+                    ImGui::TextWrapped("%s", CLEM_L10N_LABEL(kSettingsEmulationFaskDiskHelp));
+                    ImGui::PopStyleColor();
+                    ImGui::Unindent();
                     ImGui::EndTabItem();
                 }
                 ImGui::PopStyleVar();
@@ -144,12 +157,42 @@ bool ClemensSettingsUI::frame(float width, float height) {
             ImGui::EndPopup();
         }
         break;
-    case Mode::Commit:
-        return true;
+    case Mode::Commit: {
+        bool confirmed = false;
+        if (willRequireRestart()) {
+            if (!ImGui::IsPopupOpen("Settings Committed")) {
+                ImGui::OpenPopup("Settings Committed");
+            }
+            if (ImGui::BeginPopupModal("Settings Committed")) {
+                ImGui::Spacing();
+                ImGui::Text("Machine settings will take effect on the next power cycle.");
+                ImGui::Separator();
+                if (ImGui::Button("Ok")) {
+                    ImGui::CloseCurrentPopup();
+                    updateConfig();
+                    confirmed = true;
+                }
+                ImGui::EndPopup();
+            }
+        } else {
+            updateConfig();
+            confirmed = true;
+        }
+        return confirmed;
+    }
     case Mode::Cancelled:
         return true;
     }
     return false;
+}
+
+bool ClemensSettingsUI::willRequireRestart() const {
+    return (config_.ramSizeKB != (unsigned)(ramSizeKB_)) || (config_.romFilename != romFilename_);
+}
+
+void ClemensSettingsUI::updateConfig() {
+    config_.ramSizeKB = ramSizeKB_;
+    config_.romFilename = romFilename_;
 }
 
 bool ClemensSettingsUI::shouldBeCommitted() const { return mode_ == Mode::Commit; }
