@@ -101,7 +101,7 @@
 */
 
 #define CLEM_ENSONIQ_OSC_LIMIT        32
-#define CLEM_ENSONIQ_REG_OSC_OIR_MASK 0xbe // 01000001 are always on and unchanged
+#define CLEM_ENSONIQ_REG_OSC_OIR_MASK 0xbe // ~(01000001) are always on and unchanged
 
 static uint16_t s_ensoniq_ptr_bits_mask[8] = {0xff00, 0xfe00, 0xfc00, 0xf800,
                                               0xf000, 0xe000, 0xc000, 0x8000};
@@ -318,15 +318,20 @@ void clem_ensoniq_write_data(struct ClemensDeviceEnsoniq *doc, uint8_t value) {
     if (doc->is_access_ram) {
         doc->sound_ram[doc->address & 0xffff] = value;
     } else {
+        uint8_t oldvalue = doc->reg[doc->address & 0xff];
         /* TODO: write to specific registers that require special handling */
         switch (doc->address & 0xff) {
         case CLEM_ENSONIQ_REG_OSC_OIR:
             // appears to be a NOP (no mention of writing to E0 in the cortland docs,
             // and having apps write the IRQ status seems dangerous for hardware to allow)
-            CLEM_LOG("DOC: Ignoring direct write to OIR value %02x", value);
+            CLEM_LOG("DOC: Ignoring direct write to OIR %02x (cur: %02X)", value, oldvalue);
             break;
         case CLEM_ENSONIQ_REG_OSC_ENABLE:
-            CLEM_DEBUG("DOC: OSC Enable set to %02x", value);
+            if (value > 64) {
+                CLEM_LOG("DOC: OSC Enable set a value > expected maximum 64 (%02x)", value);
+                value &= 0x7f;
+            }
+            doc->reg[doc->address & 0xff] = value;
             break;
         case CLEM_ENSONIQ_REG_OSC_ADC:
             // should be a no-op
