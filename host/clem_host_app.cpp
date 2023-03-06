@@ -5,7 +5,7 @@
 #include <combaseapi.h>
 #endif
 
-#include "imgui.h"
+#include "clem_imgui.hpp"
 
 #include <array>
 #include <cmath>
@@ -44,8 +44,6 @@ static uint64_t g_lastTime = 0;
 static ClemensHostView *g_Host = nullptr;
 static sg_pass_action g_sgPassAction;
 static unsigned g_ADBKeyToggleMask = 0;
-static sg_image g_imgui_font_img;
-
 static cinek::ByteBuffer g_systemFontLoBuffer;
 static cinek::ByteBuffer g_systemFontHiBuffer;
 
@@ -247,52 +245,6 @@ cinek::ByteBuffer loadFont(const char *pathname) {
     return buffer;
 }
 
-static void imguiFontSetup(SharedAppData *appdata, const cinek::ByteBuffer &systemFontLoBuffer,
-                           const cinek::ByteBuffer &systemFontHiBuffer) {
-    auto &io = ImGui::GetIO();
-    // add fonts
-    io.Fonts->Clear();
-
-    ImFontConfig font_cfg;
-    font_cfg.FontDataOwnedByAtlas = false;
-
-    const ImWchar *latinCodepoints = io.Fonts->GetGlyphRangesDefault();
-
-    ImFontGlyphRangesBuilder glyphRangesBuilder;
-    glyphRangesBuilder.AddRanges(latinCodepoints);
-    glyphRangesBuilder.AddChar(0xe010); // open apple
-    glyphRangesBuilder.BuildRanges(&appdata->imguiUnicodeRanges);
-
-    strncpy(font_cfg.Name, "A2Lo", sizeof(font_cfg.Name));
-    io.Fonts->AddFontFromMemoryTTF(const_cast<uint8_t *>(systemFontLoBuffer.getHead()),
-                                   systemFontLoBuffer.getSize(), 16.0f, &font_cfg,
-                                   appdata->imguiUnicodeRanges.Data);
-    strncpy(font_cfg.Name, "A2Hi", sizeof(font_cfg.Name));
-    io.Fonts->AddFontFromMemoryTTF(const_cast<uint8_t *>(systemFontHiBuffer.getHead()),
-                                   systemFontHiBuffer.getSize(), 16.0f, &font_cfg,
-                                   appdata->imguiUnicodeRanges.Data);
-
-    if (!io.Fonts->IsBuilt()) {
-        unsigned char *font_pixels;
-        int font_width, font_height;
-        io.Fonts->GetTexDataAsRGBA32(&font_pixels, &font_width, &font_height);
-        sg_image_desc img_desc;
-        memset(&img_desc, 0, sizeof(img_desc));
-        img_desc.width = font_width;
-        img_desc.height = font_height;
-        img_desc.pixel_format = SG_PIXELFORMAT_RGBA8;
-        img_desc.wrap_u = SG_WRAP_CLAMP_TO_EDGE;
-        img_desc.wrap_v = SG_WRAP_CLAMP_TO_EDGE;
-        img_desc.min_filter = SG_FILTER_LINEAR;
-        img_desc.mag_filter = SG_FILTER_LINEAR;
-        img_desc.data.subimage[0][0].ptr = font_pixels;
-        img_desc.data.subimage[0][0].size = (size_t)(font_width * font_height) * sizeof(uint32_t);
-        img_desc.label = "sokol-imgui-font";
-        g_imgui_font_img = sg_make_image(&img_desc);
-        io.Fonts->TexID = (ImTextureID)(uintptr_t)g_imgui_font_img.id;
-    }
-}
-
 static void onInit(void *userdata) {
     auto *appdata = reinterpret_cast<SharedAppData *>(userdata);
 
@@ -420,8 +372,8 @@ static void onInit(void *userdata) {
 
     g_systemFontLoBuffer = loadFont("fonts/PrintChar21.ttf");
     g_systemFontHiBuffer = loadFont("fonts/PRNumber3.ttf");
-    imguiFontSetup(appdata, g_systemFontLoBuffer, g_systemFontHiBuffer);
-
+    ClemensHostImGui::FontSetup(appdata->imguiUnicodeRanges, g_systemFontLoBuffer,
+                                g_systemFontHiBuffer);
     ClemensHostAssets::initialize();
 
     g_Host = new ClemensStartupView(appdata->rootPathOverride);

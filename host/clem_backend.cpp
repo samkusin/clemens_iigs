@@ -318,12 +318,14 @@ bool ClemensBackend::saveSmartPortDisk(unsigned driveIndex) {
     return true;
 }
 
+/*
 //  from the emulator, obtain the number of clocks per second desired
 //
 static int64_t calculateClocksPerTimeslice(ClemensMMIO *mmio, unsigned hz) {
     bool is_machine_slow;
     return int64_t(clemens_clocks_per_second(mmio, &is_machine_slow) / hz);
 }
+*/
 
 bool ClemensBackend::isRunning() const {
     return !stepsRemaining_.has_value() || *stepsRemaining_ > 0;
@@ -346,7 +348,6 @@ ClemensBackend::main(ClemensBackendState &backendState,
                      const ClemensCommandQueue::ResultBuffer &commandResults,
                      PublishStateDelegate delegate) {
 
-    unsigned emulatorRefreshFrequency = 60;
     std::optional<unsigned> hitBreakpoint;
 
     unsigned emulatorVblsPerFrame = 1; // used for fast emulation
@@ -377,7 +378,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
         // Though if the emulator runs hot (cannot execute the desired cycles in enough time),
         // that shouldn't matter too much given that this 'speed boost' is meant to be
         // temporary, and the emulator should catch up once the IWM is inactive.
-        if (clemens_is_drive_io_active(&mmio_)) {
+        if (clemens_is_drive_io_active(&mmio_) && config_.enableFastEmulation) {
             emulatorVblsPerFrame = 4;
         } else {
             emulatorVblsPerFrame = 1;
@@ -388,15 +389,12 @@ ClemensBackend::main(ClemensBackendState &backendState,
         unsigned emulatorVblCounter = emulatorVblsPerFrame;
         bool vblActive = mmio_.vgc.vbl_started;
         while (emulatorVblCounter > 0 && isRunning()) {
-            clem_clocks_time_t pre_emulate_time = machine_.tspec.clocks_spent;
             clemens_emulate_cpu(&machine_);
             clemens_emulate_mmio(&machine_, &mmio_);
             if (vblActive && !mmio_.vgc.vbl_started) {
                 emulatorVblCounter--;
             }
             vblActive = mmio_.vgc.vbl_started;
-            clem_clocks_duration_t emulate_step_clocks =
-                machine_.tspec.clocks_spent - pre_emulate_time;
             if (stepsRemaining_.has_value()) {
                 stepsRemaining_ = *stepsRemaining_ - 1;
             }
@@ -469,7 +467,6 @@ ClemensBackend::main(ClemensBackendState &backendState,
     }
     backendState.mmioWasInitialized = clemens_is_mmio_initialized(&mmio_);
     if (backendState.mmioWasInitialized) {
-        ClemensAudio audio;
         clemens_get_monitor(&backendState.monitor, &mmio_);
         clemens_get_text_video(&backendState.text, &mmio_);
         clemens_get_graphics_video(&backendState.graphics, &machine_, &mmio_);
@@ -940,4 +937,9 @@ bool ClemensBackend::onCommandRunScript(std::string command) {
         return false;
     }
     return true;
+}
+
+void ClemensBackend::onCommandFastDiskEmulation(bool enabled) {
+    fmt::print("{} fast disk emulation when IWM is active\n", enabled ? "Enable" : "Disable");
+    config_.enableFastEmulation = enabled;
 }

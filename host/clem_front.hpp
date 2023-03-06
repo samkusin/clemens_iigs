@@ -15,6 +15,7 @@
 #include "clem_host_shared.hpp"
 #include "clem_ui_load_snapshot.hpp"
 #include "clem_ui_save_snapshot.hpp"
+#include "clem_ui_settings.hpp"
 #include "imgui.h"
 #include "imgui_memory_editor.h"
 
@@ -62,8 +63,8 @@ class ClemensFrontend : public ClemensHostView {
     void doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions);
     void doUserMenuDisplay(float width);
     void doMachinePeripheralDisplay(float width);
+    void doDebuggerQuickbar(float width);
     void doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float dividerXPos);
-
     void doViewInputInstructions(ImVec2 dimensions);
     void doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize);
     void doMachineDiagnosticsDisplay();
@@ -248,6 +249,7 @@ class ClemensFrontend : public ClemensHostView {
         uint32_t memoryCaptureSize = 0;
         uint8_t *memory = nullptr;
         cinek::ByteBuffer audioBuffer;
+        bool isFastEmulationOn;
     };
 
     ClemensBackendConfig backendConfig_;
@@ -322,6 +324,8 @@ class ClemensFrontend : public ClemensHostView {
     void doNewBlankDiskFlow(int width, int height);
     void doNewBlankDisk(int width, int height);
 
+    void doHelpScreen(int width, int height);
+
     bool isEmulatorStarting() const;
     bool isEmulatorActive() const;
 
@@ -339,6 +343,8 @@ class ClemensFrontend : public ClemensHostView {
         NewBlankDisk,
         LoadSnapshot,
         SaveSnapshot,
+        Settings,
+        Help,
         RebootEmulator,
         StartingEmulator,
         NoEmulator
@@ -356,6 +362,7 @@ class ClemensFrontend : public ClemensHostView {
 
     ClemensLoadSnapshotUI loadSnapshotMode_;
     ClemensSaveSnapshotUI saveSnapshotMode_;
+    ClemensSettingsUI settingsMode_;
 
     std::optional<float> delayRebootTimer_;
 };

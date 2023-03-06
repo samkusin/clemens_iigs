@@ -30,6 +30,7 @@ class ClemensCommandQueueListener {
     virtual bool onCommandSaveMachine(std::string path) = 0;
     virtual bool onCommandLoadMachine(std::string path) = 0;
     virtual bool onCommandRunScript(std::string command) = 0;
+    virtual void onCommandFastDiskEmulation(bool enabled) = 0;
 };
 
 class ClemensCommandQueue {
@@ -83,8 +84,10 @@ class ClemensCommandQueue {
     //  Save and load the machine
     void saveMachine(std::string path);
     void loadMachine(std::string path);
-
+    //  Runs a script command for debugging
     void runScript(std::string command);
+    //  Enables fast disk emulation
+    void enableFastDiskEmulation(bool enable);
 
   private:
     bool insertDisk(ClemensCommandQueueListener &listener, const std::string_view &inputParam,

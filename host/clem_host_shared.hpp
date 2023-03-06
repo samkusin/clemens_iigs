@@ -50,6 +50,8 @@ struct ClemensBackendConfig {
     std::array<std::string, CLEM_CARD_SLOT_COUNT> cardNames;
     std::vector<ClemensBackendBreakpoint> breakpoints;
     unsigned audioSamplesPerSecond;
+    unsigned ramSizeKB;
+    bool enableFastEmulation;
     Type type;
 };
 
@@ -115,7 +117,8 @@ struct ClemensBackendCommand {
         DebugProgramTrace,
         SaveMachine,
         LoadMachine,
-        RunScript
+        RunScript,
+        FastDiskEmulation
     };
     Type type = Undefined;
     std::string operand;

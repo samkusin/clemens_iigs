@@ -1,7 +1,9 @@
 #include "clem_startup_view.hpp"
 #include "clem_host_platform.h"
+#include "clem_imgui.hpp"
 #include "clem_preamble.hpp"
 
+#include "fmt/core.h"
 #include "fmt/format.h"
 #include "imgui.h"
 
@@ -211,8 +213,6 @@ auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
                 if (ImGui::Button("OK", ImVec2(240, 0))) {
                     mode_ = Mode::ROMFileBrowser;
                     ImGui::CloseCurrentPopup();
-                    ImGuiFileDialog::Instance()->OpenDialog("Select ROM", "Select a ROM", ".*", ".",
-                                                            1, nullptr, ImGuiFileDialogFlags_Modal);
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Continue without ROM", ImVec2(300, 0))) {
@@ -253,36 +253,19 @@ auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
         }
         break;
 
-    case Mode::ROMFileBrowser:
-        if (ImGuiFileDialog::Instance()->Display(
-                "Select ROM", ImGuiWindowFlags_NoCollapse,
-                ImVec2(std::max(width * 0.75f, 640.0f), std::max(height * 0.75f, 480.0f)),
-                ImVec2(width, height))) {
-
-            if (ImGuiFileDialog::Instance()->IsOk()) {
-                std::error_code errc;
-                auto filePath =
-                    std::filesystem::path(ImGuiFileDialog::Instance()->GetFilePathName());
-                auto fileName = ImGuiFileDialog::Instance()->GetCurrentFileName();
-                auto destinationPath = std::filesystem::path(config_.dataDirectory) / fileName;
-                if (filePath == destinationPath) {
-                    config_.romFilename = fileName;
-                    mode_ = Mode::ROMCheck;
-                } else if (std::filesystem::copy_file(
-                               filePath, destinationPath,
-                               std::filesystem::copy_options::overwrite_existing, errc)) {
-                    config_.romFilename = fileName;
-                    mode_ = Mode::ROMCheck;
-                } else {
-                    setupError_ = fmt::format("Failed to copy ROM file {}", filePath.string());
-                    mode_ = Mode::SetupError;
-                }
-            } else {
-                mode_ = Mode::ROMCheck;
-            }
-            ImGuiFileDialog::Instance()->Close();
+    case Mode::ROMFileBrowser: {
+        auto result = ClemensHostImGui::ROMFileBrowser(width, height, config_.dataDirectory);
+        if (result.type == ClemensHostImGui::ROMFileBrowserResult::Ok) {
+            config_.romFilename = result.filename;
+            mode_ = Mode::ROMCheck;
+        } else if (result.type == ClemensHostImGui::ROMFileBrowserResult::Cancel) {
+            mode_ = Mode::ROMCheck;
+        } else if (result.type == ClemensHostImGui::ROMFileBrowserResult::Error) {
+            setupError_ = fmt::format("Failed to copy ROM file {}", result.filename);
+            mode_ = Mode::SetupError;
         }
         break;
+    }
 
     case Mode::SetupError: {
         if (!ImGui::IsPopupOpen("Error")) {
@@ -316,6 +299,22 @@ auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
         break;
 
     case Mode::Finished:
+        if (config_.ramSizeKB < CLEM_EMULATOR_RAM_MINIMUM ||
+            config_.ramSizeKB > CLEM_EMULATOR_RAM_MAXIMUM) {
+            auto reconfiguredKB =
+                std::clamp(config_.ramSizeKB, CLEM_EMULATOR_RAM_MINIMUM, CLEM_EMULATOR_RAM_MAXIMUM);
+            fmt::print(stderr,
+                       "Configured emulator RAM of {}K is not supported.  Clamping to supported "
+                       "value {}K\n",
+                       config_.ramSizeKB, reconfiguredKB);
+            config_.ramSizeKB = reconfiguredKB;
+        }
+        if ((config_.ramSizeKB % 64) != 0) {
+            auto reconfiguredKB = (config_.ramSizeKB / 64) * 64;
+            fmt::print(stderr, "Configured emulator RAM {}K must be bank-aligned, clamping to {}\n",
+                       config_.ramSizeKB, reconfiguredKB);
+            config_.ramSizeKB = reconfiguredKB;
+        }
         config_.save();
         nextView = ViewType::Main;
         break;

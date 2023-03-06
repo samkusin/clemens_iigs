@@ -28,7 +28,6 @@
 #include <tuple>
 
 //  Style
-#define CLEM_HOST_OPEN_APPLE_UTF8 "\xee\x80\x90"
 namespace ClemensHostStyle {
 
 static constexpr float kSideBarMinWidth = 200.0f;
@@ -45,14 +44,20 @@ ImU32 getFrameColor(const ClemensFrontend &) { return kDarkFrameColor; }
 ImU32 getInsetColor(const ClemensFrontend &) { return kDarkInsetColor; }
 
 ImTextureID getImTextureOfAsset(ClemensHostAssets::ImageId id) {
-    return (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(id).id);
+    return (ImTextureID)(ClemensHostAssets::getImage(id));
+}
+ImVec2 getScaledImageSize(ClemensHostAssets::ImageId id, float size) {
+    return ImVec2(ClemensHostAssets::getImageAspect(id) * size, size);
 }
 } // namespace ClemensHostStyle
 
-//  TODO: Insert card to slot (non-gui)
-//  TODO: Mouse x,y scaling based on display view size vs desktop size
+//  TODO: clean up disk selection GUI
 //  TODO: blank disk gui selection for disk set (selecting combo create will
 //        enable another input widget, unselecting will gray out that widget.)
+//  TODO: help section in user-mode
+//  TODO: allow font selection/theme for GUI
+//  TODO: Insert card to slot (gui and non-gui)
+//  TODO: Mouse x,y scaling based on display view size vs desktop size
 //  TODO: preroll audio for some buffer on to handle sound clipping on lower end
 //        systems
 
@@ -633,7 +638,6 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
         cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
     thisFrameAudioBuffer_ = cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
 
-    backendConfig_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
     backendConfig_.dataRootPath = config_.dataDirectory;
     backendConfig_.diskLibraryRootPath = diskLibraryRootPath_;
     backendConfig_.traceRootPath = diskTracesRootPath_;
@@ -688,6 +692,11 @@ void ClemensFrontend::lostFocus() {
 
 void ClemensFrontend::createBackend() {
     auto romPath = std::filesystem::path(config_.dataDirectory) / config_.romFilename;
+
+    backendConfig_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
+    backendConfig_.ramSizeKB = config_.ramSizeKB;
+    backendConfig_.enableFastEmulation = config_.fastEmulationEnabled;
+
     auto backend = std::make_unique<ClemensBackend>(romPath.string(), backendConfig_);
 
     uiFrameTimeDelta_ = 0.0;
@@ -976,6 +985,8 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
         lastCommandState_.logInstructionNodeTail = logInstMemory;
     }
 
+    lastCommandState_.isFastEmulationOn = state.fastEmulationOn;
+
     if (state.message.has_value()) {
         fmt::print("debug message: {}\n", *state.message);
     }
@@ -1247,6 +1258,23 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
             guiMode_ = GUIMode::Emulator;
         }
         break;
+    case GUIMode::Settings:
+        if (!settingsMode_.isStarted()) {
+            settingsMode_.start(config_);
+        }
+        if (settingsMode_.frame(width, height)) {
+            if (settingsMode_.shouldBeCommitted()) {
+                config_ = settingsMode_.getConfiguration();
+                config_.save();
+                backendQueue_.enableFastDiskEmulation(config_.fastEmulationEnabled);
+            }
+            settingsMode_.stop();
+            setGUIMode(GUIMode::Emulator);
+        }
+        break;
+    case GUIMode::Help:
+        doHelpScreen(width, height);
+        break;
     case GUIMode::RebootEmulator:
         if (!isBackendRunning()) {
             createBackend();
@@ -1393,15 +1421,25 @@ void ClemensFrontend::doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions) {
     //  Separator
     //  Display Joystick 1 and 2 status
     //  Display OS specific instructions
+    const ImGuiStyle &style = ImGui::GetStyle();
+    ImVec2 quickBarSize(dimensions.x, 24.0f + (style.FramePadding.y + style.FrameBorderSize +
+                                               style.WindowPadding.y + style.WindowBorderSize) *
+                                                  2);
+    ImVec2 sidebarSize(dimensions.x, dimensions.y - quickBarSize.y);
     ImGui::SetNextWindowPos(anchor);
-    ImGui::SetNextWindowSize(dimensions);
+    ImGui::SetNextWindowSize(sidebarSize);
     ImGui::Begin("SidePanel", nullptr,
-                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                     ImGuiWindowFlags_NoMove);
-    doUserMenuDisplay(dimensions.x);
-    doMachineDiskDisplay(dimensions.x);
-    doMachinePeripheralDisplay(dimensions.x);
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus);
+    doUserMenuDisplay(sidebarSize.x);
+    doMachineDiskDisplay(sidebarSize.x);
+    doMachinePeripheralDisplay(sidebarSize.x);
+    ImGui::End();
+    anchor.y += sidebarSize.y;
+    ImGui::SetNextWindowPos(anchor);
+    ImGui::SetNextWindowSize(quickBarSize);
+    ImGui::Begin("Quickbar", nullptr,
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus);
+    doDebuggerQuickbar(quickBarSize.x);
     ImGui::End();
 }
 
@@ -1410,7 +1448,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     const ImVec2 kIconSize(24.0f, 24.0f);
     ImGui::Spacing();
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
-                        ImVec2(style.ItemSpacing.x * 1.5f, style.ItemSpacing.y));
+                        ImVec2(style.ItemSpacing.x * 1.25f, style.ItemSpacing.y));
     if (isBackendRunning()) {
         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
@@ -1448,11 +1486,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     if (ClemensHostImGui::IconButton(
             "Settings", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kSettings),
             kIconSize)) {
-        if (isBackendRunning() && !isEmulatorStarting()) {
-            if (!delayRebootTimer_.has_value()) {
-                rebootInternal();
-            }
-        }
+        setGUIMode(GUIMode::Settings);
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
         ImGui::SetTooltip("Settings");
@@ -1483,25 +1517,44 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
         ImGui::SetTooltip("Save Snapshot");
     }
     ImGui::PopStyleColor(3);
+
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
+    if (ClemensHostImGui::IconButton(
+            "Help", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kHelp), kIconSize)) {
+        setGUIMode(GUIMode::Help);
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        ImGui::SetTooltip("Help");
+    }
+    ImGui::PopStyleColor(3);
+
     ImGui::PopStyleVar();
     ImGui::Spacing();
     ImGui::Separator();
 }
 
-void ClemensFrontend::doMachinePeripheralDisplay(float) {
+void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
     ImGui::BeginChild("PeripheralsAndCards");
     const ImGuiStyle &drawStyle = ImGui::GetStyle();
     ImDrawList *drawList = ImGui::GetWindowDrawList();
-
+    if (ImGui::CollapsingHeader("Motherboard", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Indent();
+        ImGui::Text("Memory: %uK", backendConfig_.ramSizeKB);
+        ImGui::Unindent();
+    }
+    ImGui::Separator();
     if (ImGui::CollapsingHeader("Peripherals", ImGuiTreeNodeFlags_DefaultOpen)) {
         for (unsigned slot = 0; slot < joystickSlotCount_; ++slot) {
             ImColor color = joysticks_[slot].isConnected ? ImColor(255, 255, 255, 255)
                                                          : ImColor(128, 128, 128, 255);
             ImGui::Spacing();
-            ImGui::Image(
-                (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kJoystick)
-                                             .id),
-                ImVec2(32.0f, 32.0f), ImVec2(0, 0), ImVec2(1, 1), color.Value);
+            ImGui::Image(ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kJoystick),
+                         ImVec2(32.0f, 32.0f), ImVec2(0, 0), ImVec2(1, 1), color.Value);
             ImGui::SameLine();
             ImGui::BeginGroup();
             {
@@ -1577,9 +1630,8 @@ void ClemensFrontend::doMachinePeripheralDisplay(float) {
             if (frameWriteState_.cards[slot].empty())
                 continue;
             ImGui::Spacing();
-            ImGui::Image(
-                (ImTextureID)(uintptr_t)(ClemensHostAssets::getImage(ClemensHostAssets::kCard).id),
-                ImVec2(32.0f, 32.0f));
+            ImGui::Image(ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kCard),
+                         ImVec2(32.0f, 32.0f));
             ImGui::SameLine();
             ImGui::BeginGroup();
             ImGui::Text("Slot %u", slot + 1);
@@ -1597,7 +1649,6 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
     //  Display Mouse Lock/Focus
     //  Display Key Focus
     //  Display Option, Open Apple, Ctrl, Reset, Escape, Caps lock in abbrev/icons
-    const ImVec2 kIconSize(24.0f, 24.0f);
     ImGui::SetNextWindowPos(anchor);
     ImGui::SetNextWindowSize(dimensions);
     ImGui::Begin("InfoStatus", nullptr,
@@ -1627,7 +1678,57 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
                                      "1 Mhz");
 
     ImGui::SameLine();
+    ClemensHostImGui::StatusBarField(
+        lastCommandState_.isFastEmulationOn ? ClemensHostImGui::StatusBarFlags_Active
+                                            : ClemensHostImGui::StatusBarFlags_Inactive,
+        ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kFastEmulate),
+        ClemensHostStyle::getScaledImageSize(ClemensHostAssets::kFastEmulate,
+                                             ImGui::GetTextLineHeight()));
+
+    ImGui::SameLine(dividerXPos);
     ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+    ClemensHostImGui::StatusBarField(isCtrlDown ? ClemensHostImGui::StatusBarFlags_Active
+                                                : ClemensHostImGui::StatusBarFlags_Inactive,
+                                     "CTRL");
+    ImGui::SameLine();
+    ClemensHostImGui::StatusBarField(isEscapeDown ? ClemensHostImGui::StatusBarFlags_Active
+                                                  : ClemensHostImGui::StatusBarFlags_Inactive,
+                                     "ESC");
+    ImGui::SameLine();
+    ClemensHostImGui::StatusBarField(isOptionDown ? ClemensHostImGui::StatusBarFlags_Active
+                                                  : ClemensHostImGui::StatusBarFlags_Inactive,
+                                     "OPT");
+    ImGui::SameLine();
+    ClemensHostImGui::StatusBarField(isOpenAppleDown ? ClemensHostImGui::StatusBarFlags_Active
+                                                     : ClemensHostImGui::StatusBarFlags_Inactive,
+                                     " " CLEM_HOST_OPEN_APPLE_UTF8 " ");
+    ImGui::SameLine(0.0f, ImGui::GetFont()->GetCharAdvance('A') * 2);
+
+    float rightSideWidth =
+        (ImGui::GetStyle().FrameBorderSize + ImGui::GetStyle().FramePadding.x) * 2 +
+        ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0.0f, "RESET0").x;
+
+    ImVec2 inputInstructionSize = ImVec2(dimensions.x - ImGui::GetCursorPos().x - rightSideWidth,
+                                         ImGui::GetTextLineHeight() + statusItemPaddingHeight);
+    doViewInputInstructions(inputInstructionSize);
+
+    ImGui::SameLine(anchor.x + dimensions.x - rightSideWidth);
+    ClemensHostImGui::StatusBarField(isResetDown ? ClemensHostImGui::StatusBarFlags_Active
+                                                 : ClemensHostImGui::StatusBarFlags_Inactive,
+                                     "RESET");
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor(2);
+
+    ImGui::End();
+}
+
+void ClemensFrontend::doDebuggerQuickbar(float /*width */) {
+    const ImGuiStyle &style = ImGui::GetStyle();
+    float lineHeight = ImGui::GetWindowHeight() - (style.FramePadding.y + style.FrameBorderSize -
+                                                   style.WindowBorderSize + style.WindowPadding.y) *
+                                                      2;
+    const ImVec2 kIconSize(lineHeight, lineHeight);
     if (isBackendRunning()) {
         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
@@ -1636,7 +1737,7 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
         if (ClemensHostImGui::IconButton(
                 "CycleButton",
                 ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kPowerCycle), kIconSize)) {
-            if (!isEmulatorStarting()) {
+            if (isBackendRunning() && !isEmulatorStarting()) {
                 if (!delayRebootTimer_.has_value()) {
                     rebootInternal();
                 }
@@ -1679,43 +1780,6 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
         }
         ImGui::PopStyleColor(3);
     }
-
-    ImGui::SameLine(dividerXPos);
-    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-    ImGui::SameLine();
-    ClemensHostImGui::StatusBarField(isCtrlDown ? ClemensHostImGui::StatusBarFlags_Active
-                                                : ClemensHostImGui::StatusBarFlags_Inactive,
-                                     "CTRL");
-    ImGui::SameLine();
-    ClemensHostImGui::StatusBarField(isEscapeDown ? ClemensHostImGui::StatusBarFlags_Active
-                                                  : ClemensHostImGui::StatusBarFlags_Inactive,
-                                     "ESC");
-    ImGui::SameLine();
-    ClemensHostImGui::StatusBarField(isOptionDown ? ClemensHostImGui::StatusBarFlags_Active
-                                                  : ClemensHostImGui::StatusBarFlags_Inactive,
-                                     "OPT");
-    ImGui::SameLine();
-    ClemensHostImGui::StatusBarField(isOpenAppleDown ? ClemensHostImGui::StatusBarFlags_Active
-                                                     : ClemensHostImGui::StatusBarFlags_Inactive,
-                                     " " CLEM_HOST_OPEN_APPLE_UTF8 " ");
-    ImGui::SameLine(0.0f, ImGui::GetFont()->GetCharAdvance('A') * 2);
-
-    float rightSideWidth =
-        (ImGui::GetStyle().FrameBorderSize + ImGui::GetStyle().FramePadding.x) * 2 +
-        ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0.0f, "RESET0").x;
-
-    ImVec2 inputInstructionSize = ImVec2(dimensions.x - ImGui::GetCursorPos().x - rightSideWidth,
-                                         ImGui::GetTextLineHeight() + statusItemPaddingHeight);
-    doViewInputInstructions(inputInstructionSize);
-
-    ImGui::SameLine(anchor.x + dimensions.x - rightSideWidth);
-    ClemensHostImGui::StatusBarField(isResetDown ? ClemensHostImGui::StatusBarFlags_Active
-                                                 : ClemensHostImGui::StatusBarFlags_Inactive,
-                                     "RESET");
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(2);
-
-    ImGui::End();
 }
 
 static ImColor getDefaultColor(bool hi) {
@@ -2980,6 +3044,48 @@ void ClemensFrontend::layoutConsoleLines() {
     if (consoleChanged_) {
         ImGui::SetScrollHereY();
         consoleChanged_ = false;
+    }
+}
+
+void ClemensFrontend::doHelpScreen(int width, int height) {
+    static bool isOpen = false;
+    if (!ImGui::IsPopupOpen("Clemens IIGS Help")) {
+        ImGui::OpenPopup("Clemens IIGS Help");
+        isOpen = true;
+    }
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(
+        ImVec2(std::max(720.0f, width * 0.80f), std::max(512.0f, height * 0.80f)));
+    if (ImGui::BeginPopupModal("Clemens IIGS Help", &isOpen)) {
+        if (ImGui::BeginTabBar("HelpSections")) {
+            if (ImGui::BeginTabItem("Summary")) {
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kEmulatorHelp));
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Hotkeys")) {
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kEmulatorHelp));
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Disk Selection")) {
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kEmulatorHelp));
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Debugger")) {
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kEmulatorHelp));
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+        }
+
+        ImGui::EndPopup();
+    }
+    if (!isOpen) {
+        if (isBackendRunning()) {
+            guiMode_ = GUIMode::Emulator;
+        } else {
+            guiMode_ = GUIMode::NoEmulator;
+        }
     }
 }
 

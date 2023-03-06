@@ -207,6 +207,7 @@ All projects below have permissive enough licenses (MIT, BSD, Apache) to be dist
 * [stb_truetype.h](https://github.com/nothings/stb/blob/master/stb_truetype.h) For font rendering
 * [Fonts](https://www.kreativekorp.com/software/fonts/apple2.shtml) From Kreative Korp for 40/80 column text
 * [Dear ImGui](https://github.com/ocornut/imgui) A well-known IMGUI C++ library
+* [Dear ImGui Markdown](https://github.com/juliettef/imgui_markdown) ImGui Markdown Implementation
 * [Sokol](https://github.com/floooh/sokol) A cross-platform minimal rendering backend
 * [fmt](https://github.com/fmtlib/fmt) A minimal std::format implementation
 * [doctest](https://github.com/doctest/doctest) A minimal C++ single-header testing framework
