@@ -3585,6 +3585,7 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
     CLEM_TERM_COUT.print(TerminalLine::Info,
                          "b]reak erase,<index>        - remove breakpoint with index");
     CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak irq                  - break on IRQ");
+    CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak brk                  - break on IRQ");
     CLEM_TERM_COUT.print(TerminalLine::Info, "b]reak list                 - list all breakpoints");
     CLEM_TERM_COUT.print(TerminalLine::Info,
                          "g]et <register>             - return the current value of a register");
@@ -3685,6 +3686,10 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
         breakpoint.address = 0x0;
         backendQueue_.addBreakpoint(breakpoint);
         return;
+    } else if (operand == "brk") {
+        breakpoint.type = ClemensBackendBreakpoint::BRK;
+        breakpoint.address = 0x0;
+        backendQueue_.addBreakpoint(breakpoint);
     } else {
         breakpoint.type = ClemensBackendBreakpoint::Execute;
     }

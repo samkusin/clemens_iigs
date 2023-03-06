@@ -34,7 +34,7 @@ struct ClemensBackendDiskDriveState {
 };
 
 struct ClemensBackendBreakpoint {
-    enum Type { Undefined, Execute, DataRead, Write, IRQ };
+    enum Type { Undefined, Execute, DataRead, Write, IRQ, BRK };
     Type type;
     uint32_t address;
 };

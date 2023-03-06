@@ -405,6 +405,8 @@ ClemensBackend::main(ClemensBackendState &backendState,
                     break;
                 }
             }
+            if (!machine_.cpu.enabled)
+                break;
         }
 
         if (stepsRemaining_.has_value() && *stepsRemaining_ == 0) {
@@ -565,6 +567,11 @@ std::optional<unsigned> ClemensBackend::checkHitBreakpoint() {
             break;
         case ClemensBackendBreakpoint::IRQ:
             if (machine_.cpu.state_type == kClemensCPUStateType_IRQ) {
+                return index;
+            }
+            break;
+        case ClemensBackendBreakpoint::BRK:
+            if (machine_.cpu.regs.IR == CLEM_OPC_BRK) {
                 return index;
             }
             break;
