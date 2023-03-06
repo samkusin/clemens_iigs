@@ -3643,14 +3643,15 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
     }
     if (operand == "list") {
         //  TODO: granular listing based on operand
-        static const char *bpType[] = {"unknown", "execute", "data-read", "write", "IRQ"};
+        static const char *bpType[] = {"unknown", "execute", "data-read", "write", "IRQ", "BRK"};
         if (breakpoints_.empty()) {
             CLEM_TERM_COUT.print(TerminalLine::Info, "No breakpoints defined.");
             return;
         }
         for (size_t i = 0; i < breakpoints_.size(); ++i) {
             auto &bp = breakpoints_[i];
-            if (bp.type == ClemensBackendBreakpoint::IRQ) {
+            if (bp.type == ClemensBackendBreakpoint::IRQ ||
+                bp.type == ClemensBackendBreakpoint::BRK) {
                 CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {}", i, bpType[bp.type]);
             } else {
                 CLEM_TERM_COUT.format(TerminalLine::Info, "bp #{}: {:02X}/{:04X} {}", i,
@@ -3690,6 +3691,7 @@ void ClemensFrontend::cmdBreak(std::string_view operand) {
         breakpoint.type = ClemensBackendBreakpoint::BRK;
         breakpoint.address = 0x0;
         backendQueue_.addBreakpoint(breakpoint);
+        return;
     } else {
         breakpoint.type = ClemensBackendBreakpoint::Execute;
     }

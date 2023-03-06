@@ -496,6 +496,8 @@ ClemensBackend::main(ClemensBackendState &backendState,
     backendState.bpBufferEnd = breakpoints_.data() + breakpoints_.size();
     if (hitBreakpoint.has_value()) {
         backendState.bpHitIndex = *hitBreakpoint;
+    } else {
+        backendState.bpHitIndex = std::nullopt;
     }
 
     backendState.diskDrives = diskDrives_.data();
