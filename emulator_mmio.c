@@ -194,29 +194,11 @@ ClemensVideo *clemens_get_text_video(ClemensVideo *video, ClemensMMIO *mmio) {
     return video;
 }
 
-void _clem_build_rgba_palettes(ClemensVideo *video, uint8_t *e1_bank) {
-    /* 4 bits per channel -> 8 bits
-       byte 0 - green:blue, byte 1 - none:red nibbles
-    */
-    uint8_t *src = e1_bank + 0x9e00;
-    unsigned i, r, g, b;
-    for (i = 0; i < 256; ++i, src += 2) {
-        b = src[0] & 0xf;
-        g = src[0] >> 4;
-        r = src[1] & 0xf;
-
-        video->rgba[i] =
-            (((r << 4) | r) << 24) | (((g << 4) | g) << 16) | (((b << 4) | b) << 8) | 0xff;
-    }
-    src = e1_bank + 0x9d00;
-    for (i = 0; i < video->scanline_count; ++i) {
-        video->scanlines[i].control = src[i];
-    }
-}
-
 ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *clem,
                                          ClemensMMIO *mmio) {
     struct ClemensVGC *vgc = &mmio->vgc;
+    uint8_t *memory;
+    int i;
     bool use_page_2 = (mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
                       !(mmio->mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE);
     video->vbl_counter = vgc->vbl_counter;
@@ -226,7 +208,12 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *cl
         video->scanline_byte_cnt = 160;
         video->scanline_limit = CLEM_VGC_SHGR_SCANLINE_COUNT;
         video->scanlines = vgc->shgr_scanlines;
-        _clem_build_rgba_palettes(video, clem->mem.mega2_bank_map[1]);
+        video->rgb = vgc->shgr_palettes;
+        video->rgb_buffer_size = sizeof(vgc->shgr_palettes);
+        memory = clem->mem.mega2_bank_map[1] + 0x9d00;
+        for (i = 0; i < video->scanline_count; ++i) {
+            video->scanlines[i].control = memory[i];
+        }
         return video;
     } else if (vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE) {
         video->scanline_start = 0;

@@ -53,6 +53,25 @@ static bool _clem_vgc_is_scanline_int_enabled(const uint8_t *mega2_e1, unsigned 
     return false;
 }
 
+static void _clem_vgc_scanline_build_rgb_palette(struct ClemensVGC *vgc, unsigned v_counter,
+                                                 const uint8_t *mega2_e1) {
+    uint16_t *rgb_dest;
+    const uint8_t *rgb_src;
+    unsigned palette, i;
+    if (v_counter >= CLEM_VGC_FIRST_VISIBLE_SCANLINE_CNTR) {
+        v_counter -= CLEM_VGC_FIRST_VISIBLE_SCANLINE_CNTR;
+        if (v_counter >= CLEM_VGC_SHGR_SCANLINE_COUNT) {
+            return;
+        }
+    }
+    palette = mega2_e1[0x9d00 + v_counter] & CLEM_VGC_SCANLINE_PALETTE_INDEX_MASK;
+    rgb_src = &mega2_e1[0x9e00 + palette * 32];
+    rgb_dest = &vgc->shgr_palettes[16 * v_counter];
+    for (i = 0; i < 16; ++i, rgb_src += 2, rgb_dest++) {
+        *rgb_dest = ((uint16_t)(rgb_src[1]) << 8) | rgb_src[0];
+    }
+}
+
 void clem_vgc_reset(struct ClemensVGC *vgc) {
     /* setup scanline maps for all of the different modes */
     ClemensVideo *video;
@@ -132,12 +151,16 @@ void clem_vgc_reset(struct ClemensVGC *vgc) {
             line[row * 8 + inner].control = 0;
         }
     }
+    //  linear mapping (otherwise is not supported on the IIgs I believe)
     line = &vgc->shgr_scanlines[0];
     offset = 0x2000;
-    for (row = 0; row < 200; ++row, ++line) {
+    for (row = 0; row < CLEM_VGC_SHGR_SCANLINE_COUNT; ++row, ++line) {
         line->offset = offset;
         line->control = 0;
         offset += 160;
+    }
+    for (row = 0; row < CLEM_VGC_SHGR_SCANLINE_COUNT * 16; ++row, ++line) {
+        vgc->shgr_palettes[row] = 0x0000;
     }
 }
 
@@ -244,6 +267,7 @@ void clem_vgc_sync(struct ClemensVGC *vgc, struct ClemensClock *clock, const uin
                     _clem_vgc_set_scanline_int(vgc, true);
                 }
             }
+            _clem_vgc_scanline_build_rgb_palette(vgc, v_counter, mega2_bank1);
         }
 
         // TODO: vbl only once per VBL frame?

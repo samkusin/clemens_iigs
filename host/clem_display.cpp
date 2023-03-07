@@ -47,6 +47,10 @@ static int kGraphicsTextureHeight = 512;
 static int kRenderTargetWidth = 1024;
 static int kRenderTargetHeight = 512;
 
+static int kColorTexelSize = 4;
+static int kColorTextureWidth = 16 * kColorTexelSize;
+static int kColorTextureHeight = 256 * kColorTexelSize;
+
 namespace {
 
 //  NTSC and IIgs versions
@@ -178,6 +182,14 @@ void defineUniformBlocks(sg_shader_desc &shaderDesc) {
     shaderDesc.vs.uniform_blocks[0].uniforms[3].name = "offsets";
     shaderDesc.vs.uniform_blocks[0].uniforms[3].type = SG_UNIFORMTYPE_FLOAT2;
 #endif
+
+#if defined(CK3D_BACKEND_D3D11)
+    shaderDesc.attrs[0].sem_name = "POSITION";
+    shaderDesc.attrs[1].sem_name = "TEXCOORD";
+    shaderDesc.attrs[1].sem_index = 1;
+    shaderDesc.attrs[2].sem_name = "COLOR";
+    shaderDesc.attrs[2].sem_index = 1;
+#endif
 }
 
 } // namespace
@@ -226,13 +238,6 @@ ClemensDisplayProvider::ClemensDisplayProvider(const cinek::ByteBuffer &systemFo
     //  create shader
     sg_shader_desc shaderDesc = {};
     defineUniformBlocks(shaderDesc);
-#if defined(CK3D_BACKEND_D3D11)
-    shaderDesc.attrs[0].sem_name = "POSITION";
-    shaderDesc.attrs[1].sem_name = "TEXCOORD";
-    shaderDesc.attrs[1].sem_index = 1;
-    shaderDesc.attrs[2].sem_name = "COLOR";
-    shaderDesc.attrs[2].sem_index = 1;
-#endif
     shaderDesc.vs.source = VS_VERTEX_SOURCE;
     shaderDesc.fs.images[0].image_type = SG_IMAGETYPE_2D;
 #if defined(CK3D_BACKEND_GL)
@@ -260,13 +265,6 @@ ClemensDisplayProvider::ClemensDisplayProvider(const cinek::ByteBuffer &systemFo
     //  create hires pipeline and vertex buffer, no alpha blending, triangles
     shaderDesc = {};
     defineUniformBlocks(shaderDesc);
-#if defined(CK3D_BACKEND_D3D11)
-    shaderDesc.attrs[0].sem_name = "POSITION";
-    shaderDesc.attrs[1].sem_name = "TEXCOORD";
-    shaderDesc.attrs[1].sem_index = 1;
-    shaderDesc.attrs[2].sem_name = "COLOR";
-    shaderDesc.attrs[2].sem_index = 1;
-#endif
     shaderDesc.vs.source = VS_VERTEX_SOURCE;
     shaderDesc.fs.images[0].image_type = SG_IMAGETYPE_2D;
     shaderDesc.fs.images[1].image_type = SG_IMAGETYPE_2D;
@@ -288,22 +286,20 @@ ClemensDisplayProvider::ClemensDisplayProvider(const cinek::ByteBuffer &systemFo
     renderPipelineDesc.depth.pixel_format = SG_PIXELFORMAT_NONE;
     hiresPipeline_ = sg_make_pipeline(renderPipelineDesc);
 
-    //  create hires pipeline and vertex buffer, no alpha blending, triangles
+    //  create super hires pipeline and vertex buffer, no alpha blending, triangles
     shaderDesc = {};
     defineUniformBlocks(shaderDesc);
-#if defined(CK3D_BACKEND_D3D11)
-    shaderDesc.attrs[0].sem_name = "POSITION";
-    shaderDesc.attrs[1].sem_name = "TEXCOORD";
-    shaderDesc.attrs[1].sem_index = 1;
-    shaderDesc.attrs[2].sem_name = "COLOR";
-    shaderDesc.attrs[2].sem_index = 1;
-#endif
     shaderDesc.vs.source = VS_VERTEX_SOURCE;
+    shaderDesc.fs.uniform_blocks[0].size = sizeof(ClemensDisplayFragmentParams);
     shaderDesc.fs.images[0].image_type = SG_IMAGETYPE_2D;
     shaderDesc.fs.images[1].image_type = SG_IMAGETYPE_2D;
 #if defined(CK3D_BACKEND_GL)
-    shaderDesc.fs.images[0].name = "hgr_tex";
-    shaderDesc.fs.images[1].name = "hcolor_tex";
+    shaderDesc.fs.uniform_blocks[0].uniforms[0].name = "screen_params";
+    shaderDesc.fs.uniform_blocks[0].uniforms[0].type = SG_UNIFORMTYPE_FLOAT4;
+    shaderDesc.fs.uniform_blocks[0].uniforms[1].name = "color_params";
+    shaderDesc.fs.uniform_blocks[0].uniforms[1].type = SG_UNIFORMTYPE_FLOAT4;
+    shaderDesc.fs.images[0].name = "screen_tex";
+    shaderDesc.fs.images[1].name = "color_tex";
 #endif
     shaderDesc.fs.source = FS_SUPER_SOURCE;
     superHiresShader_ = sg_make_shader(shaderDesc);
@@ -408,11 +404,12 @@ ClemensDisplay::ClemensDisplay(ClemensDisplayProvider &provider) : provider_(pro
     imageDesc.data.subimage[0][0].size = sizeof(dblHiresColorData);
     dblhgrColorArray_ = sg_make_image(imageDesc);
 
-    emulatorRGBABuffer_ = new uint8_t[1024 * 8];
+    emulatorRGBABuffer_ = new uint8_t[kColorTextureWidth * kColorTextureHeight * 4];
+    memset(emulatorRGBABuffer_, 0, kColorTextureWidth * kColorTextureHeight * 4);
 
     imageDesc = {};
-    imageDesc.width = 256;
-    imageDesc.height = 8;
+    imageDesc.width = kColorTextureWidth;
+    imageDesc.height = kColorTextureHeight;
     imageDesc.type = SG_IMAGETYPE_2D;
     imageDesc.pixel_format = SG_PIXELFORMAT_RGBA8;
     imageDesc.min_filter = SG_FILTER_LINEAR;
@@ -813,35 +810,77 @@ void ClemensDisplay::renderSuperHiresGraphics(const ClemensVideo &video, const u
         buffer0 += kGraphicsTextureWidth * 2;
     }
 
-    for (int y = 0; y < 8; ++y) {
-        uint8_t *texdata = &emulatorRGBABuffer_[1024 * y];
-        for (int x = 0; x < 256; ++x) {
-            texdata[x * 4] = (uint8_t)(video.rgba[x] >> 24);
-            texdata[x * 4 + 1] = (uint8_t)((video.rgba[x] >> 16) & 0xff);
-            texdata[x * 4 + 2] = (uint8_t)((video.rgba[x] >> 8) & 0xff);
-            texdata[x * 4 + 3] = (uint8_t)(video.rgba[x] & 0xff);
+    //  generate palette from up to 3200 colors (16 colors per scanline)
+    uint8_t *rgbaout = emulatorRGBABuffer_;
+    const uint16_t *rgbpalette = video.rgb;
+    for (int y = 0; y < video.scanline_count; ++y) {
+        for (int yt = 0; yt < kColorTexelSize; ++yt) {
+            uint8_t *rgboutRow = rgbaout;
+            for (int x = 0; x < 16; ++x, rgboutRow += 12) {
+                uint8_t red = uint8_t((rgbpalette[x] & 0x0f00) >> 8);
+                uint8_t green = uint8_t(rgbpalette[x] & 0x00f0) >> 4;
+                uint8_t blue = uint8_t(rgbpalette[x] & 0x000f);
+                red |= (red << 4);
+                green |= (green << 4);
+                blue |= (blue << 4);
+                rgboutRow[x] = red;
+                rgboutRow[x + 4] = red;
+                rgboutRow[x + 8] = red;
+                rgboutRow[x + 12] = red;
+                ++rgboutRow;
+                rgboutRow[x] = green;
+                rgboutRow[x + 4] = green;
+                rgboutRow[x + 8] = green;
+                rgboutRow[x + 12] = green;
+                ++rgboutRow;
+                rgboutRow[x] = blue;
+                rgboutRow[x + 4] = blue;
+                rgboutRow[x + 8] = blue;
+                rgboutRow[x + 12] = blue;
+                ++rgboutRow;
+                rgboutRow[x] = 0xff;
+                rgboutRow[x + 4] = 0xff;
+                rgboutRow[x + 8] = 0xff;
+                rgboutRow[x + 12] = 0xff;
+                ++rgboutRow;
+            }
+            rgbaout += kColorTextureWidth * 4;
         }
+        rgbpalette += 16;
     }
-
+    // finally set up the color texture and shader/pipeline for rendering
     sg_image_data graphicsImageData = {};
     graphicsImageData.subimage[0][0].ptr = emulatorVideoBuffer_;
     graphicsImageData.subimage[0][0].size = kGraphicsTextureWidth * kGraphicsTextureHeight;
     sg_update_image(graphicsTarget_, graphicsImageData);
 
     graphicsImageData.subimage[0][0].ptr = emulatorRGBABuffer_;
-    graphicsImageData.subimage[0][0].size = 256 * 4 * 8;
+    graphicsImageData.subimage[0][0].size = kColorTextureWidth * kColorTextureHeight * 4;
     sg_update_image(rgbaColorArray_, graphicsImageData);
 
+    sg_apply_pipeline(provider_.superHiresPipeline_);
+    sg_range rangeParam;
     auto vertexParams =
         createVertexParams(emulatorVideoDimensions_[0], emulatorVideoDimensions_[1]);
-    sg_range rangeParam;
     rangeParam.ptr = &vertexParams;
     rangeParam.size = sizeof(vertexParams);
-
-    sg_apply_pipeline(provider_.superHiresPipeline_);
     sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, rangeParam);
 
-    //  texture contains a scaled version of the original 280 x 160/192 screen
+    ClemensDisplayFragmentParams fragmentParams;
+    //  all pixels are scaled 1x2 from the emulated display on the render target
+    fragmentParams.screen_params[0] = kGraphicsTextureWidth;
+    fragmentParams.screen_params[1] = kGraphicsTextureHeight;
+    fragmentParams.screen_params[2] = 1;
+    fragmentParams.screen_params[3] = 2;
+    fragmentParams.color_params[0] = kColorTextureWidth;
+    fragmentParams.color_params[1] = kColorTextureHeight;
+    fragmentParams.color_params[2] = kColorTexelSize;
+    fragmentParams.color_params[3] = kColorTexelSize;
+    rangeParam.ptr = &fragmentParams;
+    rangeParam.size = sizeof(fragmentParams);
+    sg_apply_uniforms(SG_SHADERSTAGE_FS, 0, rangeParam);
+
+    //  texture contains a scaled version of the original 640 x 200 screen
     //  to avoid UV rounding issues
     DrawVertex vertices[6];
     float y_scalar = emulatorVideoDimensions_[1] / 200.0f;

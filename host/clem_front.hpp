@@ -295,6 +295,7 @@ class ClemensFrontend : public ClemensHostView {
   private:
     void doMachineDebugMemoryDisplay();
     void doMachineDebugDOCDisplay();
+    void doMachineDebugVGCDisplay();
     void doMachineDebugCoreIODisplay();
     void doMachineDebugVideoIODisplay();
     void doMachineDebugDiskIODisplay();
@@ -309,6 +310,8 @@ class ClemensFrontend : public ClemensHostView {
 
     static ImU8 imguiMemoryEditorRead(const ImU8 *mem_ptr, size_t off);
     static void imguiMemoryEditorWrite(ImU8 *mem_ptr, size_t off, ImU8 value);
+
+    int vgcDebugMinScanline_, vgcDebugMaxScanline_;
 
     std::array<ClemensHostJoystick, CLEM_HOST_JOYSTICK_LIMIT> joysticks_;
     unsigned joystickSlotCount_;

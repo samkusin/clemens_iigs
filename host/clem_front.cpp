@@ -11,6 +11,7 @@
 #include "clem_l10n.hpp"
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
+#include "clem_mmio_types.h"
 #include "emulator.h"
 #include "emulator_mmio.h"
 #include "imgui.h"
@@ -621,8 +622,8 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       diskTracesRootPath_{
           (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_TRACES_DIR).string()},
       diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0),
-      debugIOMode_(DebugIOMode::Core), joystickSlotCount_(0), guiMode_(GUIMode::RebootEmulator),
-      guiPrevMode_(GUIMode::NoEmulator) {
+      debugIOMode_(DebugIOMode::Core), vgcDebugMinScanline_(0), vgcDebugMaxScanline_(0),
+      joystickSlotCount_(0), guiMode_(GUIMode::RebootEmulator), guiPrevMode_(GUIMode::NoEmulator) {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -783,6 +784,10 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
             frameWriteMemory_.allocateArray<ClemensScanline>(state.graphics.scanline_limit);
         memcpy(frameWriteState_.graphicsFrame.scanlines, state.graphics.scanlines,
                sizeof(ClemensScanline) * state.graphics.scanline_limit);
+        frameWriteState_.graphicsFrame.rgb = frameWriteMemory_.allocateArray<uint16_t>(
+            frameWriteState_.graphicsFrame.rgb_buffer_size);
+        memcpy(frameWriteState_.graphicsFrame.rgb, state.graphics.rgb,
+               state.graphics.rgb_buffer_size);
     }
     frameWriteState_.audioFrame = state.audio;
     frameWriteState_.backendCPUID = state.hostCPUID;
@@ -1846,6 +1851,10 @@ void ClemensFrontend::doMachineStateLayout(ImVec2 rootAnchor, ImVec2 rootSize) {
             doMachineDebugDOCDisplay();
             ImGui::EndTabItem();
         }
+        if (ImGui::BeginTabItem("VGC")) {
+            doMachineDebugVGCDisplay();
+            ImGui::EndTabItem();
+        }
         ImGui::EndTabBar();
     }
     ImGui::EndChild();
@@ -2258,6 +2267,18 @@ void ClemensFrontend::doMachineDebugMemoryDisplay() {
     debugMemoryEditor_.DrawContents(this, CLEM_IIGS_BANK_SIZE, (size_t)(bank) << 16);
 }
 
+ImU8 ClemensFrontend::imguiMemoryEditorRead(const ImU8 *mem_ptr, size_t off) {
+    const auto *self = reinterpret_cast<const ClemensFrontend *>(mem_ptr);
+    if (!self->frameReadState_.memoryView)
+        return 0x00;
+    return self->frameReadState_.memoryView[off & 0xffff];
+}
+
+void ClemensFrontend::imguiMemoryEditorWrite(ImU8 *mem_ptr, size_t off, ImU8 value) {
+    auto *self = reinterpret_cast<ClemensFrontend *>(mem_ptr);
+    self->backendQueue_.debugMemoryWrite((uint16_t)(off & 0xffff), value);
+}
+
 void ClemensFrontend::doMachineDebugDOCDisplay() {
     auto &doc = frameReadState_.doc;
 
@@ -2332,16 +2353,26 @@ void ClemensFrontend::doMachineDebugDOCDisplay() {
     ImGui::EndTable();
 }
 
-ImU8 ClemensFrontend::imguiMemoryEditorRead(const ImU8 *mem_ptr, size_t off) {
-    const auto *self = reinterpret_cast<const ClemensFrontend *>(mem_ptr);
-    if (!self->frameReadState_.memoryView)
-        return 0x00;
-    return self->frameReadState_.memoryView[off & 0xffff];
-}
+void ClemensFrontend::doMachineDebugVGCDisplay() {
+    //  display ClemensVideo for current video mode, which may be mixed
+    //      inspect frameReadState.textFrame for lores, hires or text modes
+    //      inspect frameReadState.graphicsFrame for the various modes
+    //
+    //  information to communicate
+    //      1. Super Hires Mode
+    //          - View Scanline Info from Scanline A to B (DragRangeInt2)
+    //          - Draw table of scanline data where each row has the scanline info
+    //            plus visual palette info
+    //          - Row: IRQ, 640/320, ColorFill, Palette Index, Palette 0-15 RGB boxes
+    auto &graphics = frameReadState_.graphicsFrame;
+    auto &text = frameReadState_.textFrame;
 
-void ClemensFrontend::imguiMemoryEditorWrite(ImU8 *mem_ptr, size_t off, ImU8 value) {
-    auto *self = reinterpret_cast<ClemensFrontend *>(mem_ptr);
-    self->backendQueue_.debugMemoryWrite((uint16_t)(off & 0xffff), value);
+    if (graphics.format == kClemensVideoFormat_Super_Hires) {
+        ImGui::LabelText("Mode", "Super Hires");
+        ImGui::DragIntRange2("scanlines", &vgcDebugMinScanline_, &vgcDebugMaxScanline_, 1,
+                             graphics.scanline_start, graphics.scanline_count, "Start: %d",
+                             "End: %d");
+    }
 }
 
 void ClemensFrontend::doMachineDebugIORegister(uint8_t *ioregsold, uint8_t *ioregs, uint8_t reg) {
