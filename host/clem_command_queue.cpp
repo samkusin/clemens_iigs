@@ -3,6 +3,7 @@
 
 #include "cinek/ckdebug.h"
 
+#include "clem_host_shared.hpp"
 #include "fmt/core.h"
 
 #include <cassert>
@@ -267,6 +268,7 @@ void ClemensCommandQueue::addBreakpoint(const ClemensBackendBreakpoint &breakpoi
                               breakpoint.type == ClemensBackendBreakpoint::DataRead ? "r"
                               : breakpoint.type == ClemensBackendBreakpoint::Write  ? "w"
                               : breakpoint.type == ClemensBackendBreakpoint::IRQ    ? "i"
+                              : breakpoint.type == ClemensBackendBreakpoint::BRK    ? "b"
                                                                                     : "",
                               breakpoint.address);
     cmd.type = Command::AddBreakpoint;
@@ -286,6 +288,8 @@ bool ClemensCommandQueue::addBreakpoint(ClemensCommandQueueListener &listener,
         bp.type = ClemensBackendBreakpoint::Write;
     } else if (type == "i") {
         bp.type = ClemensBackendBreakpoint::IRQ;
+    } else if (type == "b") {
+        bp.type = ClemensBackendBreakpoint::BRK;
     } else {
         bp.type = ClemensBackendBreakpoint::Execute;
     }
