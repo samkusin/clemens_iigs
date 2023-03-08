@@ -816,33 +816,29 @@ void ClemensDisplay::renderSuperHiresGraphics(const ClemensVideo &video, const u
     for (int y = 0; y < video.scanline_count; ++y) {
         for (int yt = 0; yt < kColorTexelSize; ++yt) {
             uint8_t *rgboutRow = rgbaout;
-            for (int x = 0; x < 16; ++x, rgboutRow += 12) {
+            for (int x = 0; x < 16; ++x) {
                 uint8_t red = uint8_t((rgbpalette[x] & 0x0f00) >> 8);
                 uint8_t green = uint8_t(rgbpalette[x] & 0x00f0) >> 4;
                 uint8_t blue = uint8_t(rgbpalette[x] & 0x000f);
                 red |= (red << 4);
                 green |= (green << 4);
                 blue |= (blue << 4);
-                rgboutRow[x] = red;
-                rgboutRow[x + 4] = red;
-                rgboutRow[x + 8] = red;
-                rgboutRow[x + 12] = red;
-                ++rgboutRow;
-                rgboutRow[x] = green;
-                rgboutRow[x + 4] = green;
-                rgboutRow[x + 8] = green;
-                rgboutRow[x + 12] = green;
-                ++rgboutRow;
-                rgboutRow[x] = blue;
-                rgboutRow[x + 4] = blue;
-                rgboutRow[x + 8] = blue;
-                rgboutRow[x + 12] = blue;
-                ++rgboutRow;
-                rgboutRow[x] = 0xff;
-                rgboutRow[x + 4] = 0xff;
-                rgboutRow[x + 8] = 0xff;
-                rgboutRow[x + 12] = 0xff;
-                ++rgboutRow;
+                *(rgboutRow++) = red;
+                *(rgboutRow++) = green;
+                *(rgboutRow++) = blue;
+                *(rgboutRow++) = 0xff;
+                *(rgboutRow++) = red;
+                *(rgboutRow++) = green;
+                *(rgboutRow++) = blue;
+                *(rgboutRow++) = 0xff;
+                *(rgboutRow++) = red;
+                *(rgboutRow++) = green;
+                *(rgboutRow++) = blue;
+                *(rgboutRow++) = 0xff;
+                *(rgboutRow++) = red;
+                *(rgboutRow++) = green;
+                *(rgboutRow++) = blue;
+                *(rgboutRow++) = 0xff;
             }
             rgbaout += kColorTextureWidth * 4;
         }
