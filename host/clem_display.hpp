@@ -19,6 +19,11 @@ struct ClemensDisplayVertexParams {
     float offsets[2];
 };
 
+struct ClemensDisplayFragmentParams {
+    float screen_params[4];
+    float color_params[4];
+};
+
 class ClemensDisplayProvider {
   public:
     ClemensDisplayProvider(const cinek::ByteBuffer &systemFontLoBuffer,

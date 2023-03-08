@@ -249,6 +249,8 @@ struct ClemensVGC {
     struct ClemensScanline hgr_1_scanlines[CLEM_VGC_HGR_SCANLINE_COUNT];
     struct ClemensScanline hgr_2_scanlines[CLEM_VGC_HGR_SCANLINE_COUNT];
     struct ClemensScanline shgr_scanlines[CLEM_VGC_SHGR_SCANLINE_COUNT];
+    /* bgr- (4:4:4) bits 0 - 11 */
+    uint16_t shgr_palettes[16 * CLEM_VGC_SHGR_SCANLINE_COUNT];
 
     /* Used for precise-ish timing of vertical blank and scanline irqs */
     clem_clocks_time_t ts_last_frame;
@@ -451,7 +453,12 @@ typedef struct {
     int scanline_limit;
     enum ClemensVideoFormat format;
     unsigned vbl_counter;
-    uint32_t rgba[256]; /**< Superhires palette data (16 x 16) rgba */
+    /** Pointer to 200 scanlines of 16 colors (4:4:4) each = 3200 * 2 bytes.  RGB word
+        where bits 0-3 are blue, 4-7 are green and 8-11 are red.  This pointer is
+        owned by the internal VGC data structure and remains valid until the next call to
+        clemens_emulate_cpu(). */
+    uint16_t *rgb;
+    unsigned rgb_buffer_size;
 } ClemensVideo;
 
 typedef struct {

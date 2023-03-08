@@ -13,22 +13,23 @@
  */
 
 /* IN all of these functions, it's assumed out_x_limit is aligned with 4 pixels
+ * Super hires colors are indexed 0-15 but scaled up to 0-255 to avoid precision loss
+ * when working with shaders
  */
 static void _render_super_hires_320(const uint8_t *scan_row, unsigned scan_control,
                                     unsigned scan_cnt, uint8_t *out_row, unsigned out_x_limit) {
     unsigned scan_x = 0, out_x = 0;
-    uint8_t palette_off = (scan_control & CLEM_VGC_SCANLINE_PALETTE_INDEX_MASK) << 4;
     uint8_t pixel;
     for (; scan_x < scan_cnt && out_x < out_x_limit; ++scan_x) {
-        pixel = scan_row[scan_x] >> 4;
-        out_row[out_x] = palette_off + pixel;
+        pixel = (scan_row[scan_x] & 0xf0);
+        out_row[out_x] = pixel;
         out_x++;
-        out_row[out_x] = palette_off + pixel;
+        out_row[out_x] = pixel;
         out_x++;
-        pixel = scan_row[scan_x] & 0xf;
-        out_row[out_x] = palette_off + pixel;
+        pixel = (scan_row[scan_x] & 0xf) << 4;
+        out_row[out_x] = pixel;
         out_x++;
-        out_row[out_x] = palette_off + pixel;
+        out_row[out_x] = pixel;
         out_x++;
     }
 }
@@ -38,23 +39,22 @@ static void _render_super_hires_320_fill(const uint8_t *scan_row, unsigned scan_
                                          unsigned out_x_limit) {
 
     unsigned scan_x = 0, out_x = 0;
-    uint8_t palette_off = (scan_control & CLEM_VGC_SCANLINE_PALETTE_INDEX_MASK) << 4;
     // NOTE: HW ref says these values are undetermined if the first scan byte is
     //       zero.   Rather than emulating this undetermined behavior, set as 0
     //       which will mean palette index 0
     uint8_t pixel_a = 0, pixel_b = 0;
     while (scan_x < scan_cnt && out_x < out_x_limit) {
         if (scan_row[scan_x]) {
-            pixel_a = scan_row[scan_x] >> 4;
-            pixel_b = scan_row[scan_x] & 0xf;
+            pixel_a = (scan_row[scan_x] & 0xf0);
+            pixel_b = (scan_row[scan_x] & 0xf) << 4;
         }
-        out_row[out_x] = palette_off + pixel_a;
+        out_row[out_x] = pixel_a;
         out_x++;
-        out_row[out_x] = palette_off + pixel_a;
+        out_row[out_x] = pixel_a;
         out_x++;
-        out_row[out_x] = palette_off + pixel_b;
+        out_row[out_x] = pixel_b;
         out_x++;
-        out_row[out_x] = palette_off + pixel_a;
+        out_row[out_x] = pixel_a;
         out_x++;
     }
 }
@@ -67,20 +67,19 @@ static void _render_super_hires_640(const uint8_t *scan_row, unsigned scan_contr
     // Dithering will be performed by the host as this step doesn't output RGBA
     // values but palette indices (like in 320 mode)
     unsigned scan_x = 0, out_x = 0;
-    uint8_t palette_off = (scan_control & CLEM_VGC_SCANLINE_PALETTE_INDEX_MASK) << 4;
     uint8_t pixel;
     for (; scan_x < scan_cnt && out_x < out_x_limit; ++scan_x) {
         pixel = scan_row[scan_x] >> 6;
-        out_row[out_x] = (palette_off + 0x08) + pixel;
+        out_row[out_x] = (0x08 + pixel) << 4;
         out_x++;
         pixel = (scan_row[scan_x] >> 4) & 0x3;
-        out_row[out_x] = (palette_off + 0x0c) + pixel;
+        out_row[out_x] = (0x0c + pixel) << 4;
         out_x++;
         pixel = (scan_row[scan_x] >> 2) & 0x3;
-        out_row[out_x] = (palette_off + 0x00) + pixel;
+        out_row[out_x] = (0x00 + pixel) << 4;
         out_x++;
         pixel = scan_row[scan_x] & 0x3;
-        out_row[out_x] = (palette_off + 0x04) + pixel;
+        out_row[out_x] = (0x04 + pixel) << 4;
         out_x++;
     }
 }
