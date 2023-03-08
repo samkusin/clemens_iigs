@@ -1,0 +1,23 @@
+/*
+    More or less the same implementation as the GLSL version
+*/
+cbuffer Globals {
+  float4 screen_params;
+  float4 color_params;
+};
+
+Texture2D<float4> screen_tex : register(t0);
+Texture2D<float4> color_tex : register(t1);
+sampler smp : register(s0);
+
+float4 main(float2 uv : TEXCOORD0, float4 color : COLOR0) : SV_Target0 {
+  //  color_index = 0 to 15
+  //  scanline = 0 to 199 scaled down using screen texel height (likely by 2)
+  float color_index = floor(screen_tex.Sample(smp, uv).x * 255.0 / 16.0 + 0.5);
+  float scanline = floor(uv.y * screen_params.y / screen_params.w + 0.5);
+  float2 color_uv =
+      float2((color_index + 0.5) * color_params.z / color_params.x,
+             (scanline + 0.5) * color_params.w / color_params.y);
+  float4 texl_color = color_tex.Sample(smp, color_uv);
+  return texl_color * color;
+}
