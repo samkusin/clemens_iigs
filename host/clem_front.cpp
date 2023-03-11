@@ -844,6 +844,9 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     unsigned diskTrackIndex = frameWriteState_.iwm.qtr_track_index;
 
     frameWriteState_.adb.mod_states = clemens_get_adb_key_modifier_states(state.mmio);
+    for (int i = 0; i < 4; ++i) {
+        frameWriteState_.adb.mouse_reg[i] = state.mmio->dev_adb.mouse_reg[i];
+    }
 
     if (iwmDrive->disk.meta_track_map[diskTrackIndex] != 0xff) {
         diskTrackIndex = iwmDrive->disk.meta_track_map[diskTrackIndex];
@@ -1082,6 +1085,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
             lastFrameIRQs_ = frameReadState_.irqs;
             lastFrameNMIs_ = frameReadState_.nmis;
             lastFrameIWM_ = frameReadState_.iwm;
+            lastFrameADBStatus_ = frameReadState_.adb;
             if (frameReadState_.ioPage) {
                 memcpy(lastFrameIORegs_, frameReadState_.ioPage, 256);
             }
@@ -2766,11 +2770,31 @@ void ClemensFrontend::doMachineDebugADBDisplay() {
     ImGui::TextUnformatted(" ");
     ImGui::EndTable();
 
+    ImVec4 fieldColor;
     ImGui::TableNextColumn();
     ImGui::BeginTable("PARAMS", 2, ImGuiTableFlags_SizingFixedFit);
     ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 8);
     ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);
     ImGui::TableHeadersRow();
+    ImGui::TableNextColumn();
+    if (lastFrameADBStatus_.mouse_reg[0] != frameReadState_.adb.mouse_reg[0]) {
+        fieldColor = getModifiedColor(true, frameReadState_.isRunning);
+    } else {
+        fieldColor = getDefaultColor(true);
+    }
+    ImGui::TextColored(fieldColor, "ADB.M0");
+    ImGui::TableNextColumn();
+    ImGui::TextColored(fieldColor, "%04x", frameReadState_.adb.mouse_reg[0]);
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    if (lastFrameADBStatus_.mouse_reg[0] != frameReadState_.adb.mouse_reg[0]) {
+        fieldColor = getModifiedColor(true, frameReadState_.isRunning);
+    } else {
+        fieldColor = getDefaultColor(true);
+    }
+    ImGui::TextColored(fieldColor, "ADB.M3");
+    ImGui::TableNextColumn();
+    ImGui::TextColored(fieldColor, "%04x", frameReadState_.adb.mouse_reg[3]);
     ImGui::EndTable();
 
     ImGui::EndTable();

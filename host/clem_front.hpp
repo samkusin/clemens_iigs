@@ -185,6 +185,7 @@ class ClemensFrontend : public ClemensHostView {
 
     struct ADBStatus {
         unsigned mod_states;
+        uint16_t mouse_reg[4];
     };
 
     // This state comes in for any update to the emulator per frame.  As such
@@ -264,6 +265,7 @@ class ClemensFrontend : public ClemensHostView {
 
     ClemensCPUPins lastFrameCPUPins_;
     ClemensCPURegs lastFrameCPURegs_;
+    ADBStatus lastFrameADBStatus_;
     IWMStatus lastFrameIWM_;
     uint32_t lastFrameIRQs_, lastFrameNMIs_;
     uint8_t lastFrameIORegs_[256];
