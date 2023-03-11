@@ -25,6 +25,8 @@ union ClemensSerializerVariant {
 
 struct ClemensSerializerRecord kVGC[] = {
     /* scan lines are generated */
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensVGC, kClemensSerializerTypeUInt8, shgr_palettes,
+                                 16 * CLEM_VGC_SHGR_SCANLINE_COUNT, 0),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensVGC, ts_last_frame),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensVGC, ts_scanline_0),
     CLEM_SERIALIZER_RECORD_DURATION(struct ClemensVGC, dt_scanline),
