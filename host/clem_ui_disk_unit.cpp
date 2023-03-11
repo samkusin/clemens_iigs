@@ -92,10 +92,14 @@ bool ClemensDiskUnitUI::frame(float width, float height, ClemensCommandQueue &ba
 
     switch (mode_) {
     case Mode::InsertBlankDisk:
+        doBlankDiskFlow(viewportSize.x, viewportSize.y);
         break;
 
     case Mode::ImportDisks:
         doImportDiskFlow(viewportSize.x, viewportSize.y);
+        break;
+
+    case Mode::CreateDiskSet:
         break;
 
     case Mode::FinishImportDisks:
@@ -140,6 +144,7 @@ void ClemensDiskUnitUI::doImportDiskFlow(float width, float height) {
     if (!ImGui::IsPopupOpen("Select Destination")) {
         ImGui::OpenPopup("Select Destination");
         selectedEntry_ = "";
+        diskNameEntry_[0] = '\0';
     }
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
@@ -155,8 +160,9 @@ void ClemensDiskUnitUI::doImportDiskFlow(float width, float height) {
                     continue;
 
                 auto filename = entry.path().parent_path();
-                bool isSelected = ImGui::Selectable(filename.c_str(), filename == selectedEntry_,
-                                                    ImGuiSelectableFlags_AllowDoubleClick);
+                bool isSelected =
+                    ImGui::Selectable(filename.string().c_str(), filename == selectedEntry_,
+                                      ImGuiSelectableFlags_AllowDoubleClick);
                 if (!isOk && isSelected) {
                     if (ImGui::IsItemHovered() &&
                         ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
@@ -167,8 +173,17 @@ void ClemensDiskUnitUI::doImportDiskFlow(float width, float height) {
             }
             ImGui::EndListBox();
         }
+        if (ImGui::Button("Create Directory")) {
+        }
+        ImGui::SameLine();
+        if (ImGui::InputText("##DiskSetName", diskNameEntry_, sizeof(diskNameEntry_),
+                             ImGuiInputTextFlags_EnterReturnsTrue)) {
+            mode_ = Mode::CreateDiskSet;
+            ImGui::CloseCurrentPopup();
+        }
         ImGui::Separator();
-        if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+        if (ImGui::Button("Ok") ||
+            (ImGui::IsKeyPressed(ImGuiKey_Enter) && mode_ != Mode::CreateDiskSet)) {
             isOk = true;
         }
         ImGui::SameLine();
@@ -181,5 +196,11 @@ void ClemensDiskUnitUI::doImportDiskFlow(float width, float height) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
+    }
+}
+
+void ClemensDiskUnitUI::doBlankDiskFlow(float width, float height) {
+    if (!ImGui::IsPopupOpen("Enter Disk Set Name")) {
+        ImGui::OpenPopup("Enter Disk Set Name");
     }
 }

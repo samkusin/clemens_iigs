@@ -4,6 +4,7 @@
 
 #include "clem_disk.h"
 
+#include <string>
 #include <vector>
 
 class ClemensCommandQueue;
@@ -24,18 +25,20 @@ class ClemensDiskUnitUI {
 
   private:
     void doImportDiskFlow(float width, float height);
+    void doBlankDiskFlow(float width, float height);
 
   private:
     ClemensDiskLibrary &diskLibrary_;
     ClemensDriveType diskDriveType_;
     unsigned int diskDriveCategoryType_;
 
-    enum class Mode { None, InsertBlankDisk, ImportDisks, FinishImportDisks, Exit };
+    enum class Mode { None, InsertBlankDisk, ImportDisks, FinishImportDisks, CreateDiskSet, Exit };
     Mode mode_;
     bool generatingDiskList_;
 
     std::vector<std::string> importDiskFiles_;
     std::string selectedEntry_;
+    char diskNameEntry_[256];
 };
 
 #endif
