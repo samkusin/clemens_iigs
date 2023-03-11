@@ -6,7 +6,6 @@
 namespace ClemensL10N {
 
 extern const char *kWelcomeText[];
-extern const char *kFirstTimeUse[];
 extern const char *kGSKeyboardCommands[];
 extern const char *kMouseLock[];
 extern const char *kViewInput[];
@@ -23,6 +22,8 @@ extern const char *kSettingsEmulationFastDisk[];
 extern const char *kSettingsEmulationFaskDiskHelp[];
 
 extern const char *kEmulatorHelp[];
+extern const char *kDiskSelectionHelp[];
+extern const char *kDebuggerHelp[];
 
 constexpr unsigned kLanguageDefault = 0;
 

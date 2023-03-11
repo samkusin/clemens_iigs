@@ -13,6 +13,7 @@
 #include "clem_disk_library.hpp"
 #include "clem_display.hpp"
 #include "clem_host_shared.hpp"
+#include "clem_ui_disk_unit.hpp"
 #include "clem_ui_load_snapshot.hpp"
 #include "clem_ui_save_snapshot.hpp"
 #include "clem_ui_settings.hpp"
@@ -363,6 +364,7 @@ class ClemensFrontend : public ClemensHostView {
     std::vector<std::string> importDiskFiles_;
     std::string messageModalString_;
 
+    ClemensDiskUnitUI diskUnit_[kClemensDrive_Count];
     ClemensLoadSnapshotUI loadSnapshotMode_;
     ClemensSaveSnapshotUI saveSnapshotMode_;
     ClemensSettingsUI settingsMode_;

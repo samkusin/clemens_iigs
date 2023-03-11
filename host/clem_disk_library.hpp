@@ -17,32 +17,33 @@
 //    performance due to filesystem issues becomes a concern.
 //
 class ClemensDiskLibrary {
-public:
-  ClemensDiskLibrary(std::filesystem::path libraryRootPath,
-                     unsigned diskType, unsigned diskSetInitialCount,
-                     unsigned diskEntryInitialCount);
+  public:
+    ClemensDiskLibrary(std::filesystem::path libraryRootPath, unsigned diskType,
+                       unsigned diskSetInitialCount, unsigned diskEntryInitialCount);
 
-  void reset(std::filesystem::path libraryRootPath, unsigned diskType);
-  void update();
+    void reset(unsigned diskType);
+    void update();
 
-  struct DiskEntry {
-    std::filesystem::path location;
-    unsigned diskType = CLEM_DISK_TYPE_NONE;
-    explicit operator bool() const { return diskType != CLEM_DISK_TYPE_NONE; }
-  };
+    struct DiskEntry {
+        std::filesystem::path location;
+        unsigned diskType = CLEM_DISK_TYPE_NONE;
+        explicit operator bool() const { return diskType != CLEM_DISK_TYPE_NONE; }
+    };
 
-  void iterate(std::function<void(const DiskEntry&)> callback);
+    void iterate(std::function<void(const DiskEntry &)> callback);
 
-private:
-  struct DiskEntryNode {
-    DiskEntry entry;
-    int nextEntryIndex = -1;
-  };
-  unsigned diskType_;
-  std::filesystem::path libraryRootPath_;
-  std::filesystem::directory_iterator libraryRootIterator_;
-  std::vector<DiskEntryNode> diskSets_;
-  std::vector<DiskEntryNode> diskEntries_;
+    const std::filesystem::path getLibraryRootPath() const { return libraryRootPath_; }
+
+  private:
+    struct DiskEntryNode {
+        DiskEntry entry;
+        int nextEntryIndex = -1;
+    };
+    unsigned diskType_;
+    std::filesystem::path libraryRootPath_;
+    std::filesystem::directory_iterator libraryRootIterator_;
+    std::vector<DiskEntryNode> diskSets_;
+    std::vector<DiskEntryNode> diskEntries_;
 };
 
 #endif

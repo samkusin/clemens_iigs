@@ -30,8 +30,9 @@ void StatusBarField(StatusBarFlags flags, ImTextureID icon, const ImVec2 &size);
 //  use styling to color the image only with transparent background
 bool IconButton(const char *strId, ImTextureID texId, const ImVec2 &size);
 
-//  uses the ImGui markdown widget
-void Markdown(std::string_view markdown);
+//  uses the ImGui markdown widget.
+//  returns the link to navigate to if selected
+std::string Markdown(std::string_view markdown);
 
 struct ROMFileBrowserResult {
     enum Type { Ok, Cancel, Error, Continue };

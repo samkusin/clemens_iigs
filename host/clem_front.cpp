@@ -12,6 +12,7 @@
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
 #include "clem_mmio_types.h"
+#include "clem_ui_disk_unit.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 #include "imgui.h"
@@ -623,7 +624,11 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
           (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_TRACES_DIR).string()},
       diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512), diskComboStateFlags_(0),
       debugIOMode_(DebugIOMode::Core), vgcDebugMinScanline_(0), vgcDebugMaxScanline_(0),
-      joystickSlotCount_(0), guiMode_(GUIMode::RebootEmulator), guiPrevMode_(GUIMode::NoEmulator) {
+      joystickSlotCount_(0), guiMode_(GUIMode::RebootEmulator),
+      guiPrevMode_(GUIMode::NoEmulator), diskUnit_{{diskLibrary_, kClemensDrive_3_5_D1},
+                                                   {diskLibrary_, kClemensDrive_3_5_D2},
+                                                   {diskLibrary_, kClemensDrive_5_25_D1},
+                                                   {diskLibrary_, kClemensDrive_5_25_D2}} {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -2026,11 +2031,11 @@ void ClemensFrontend::doMachineDiskSelection(ClemensDriveType driveType, float w
                           ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightLarge)) {
         if (!(diskComboStateFlags_ & (1 << driveType))) {
             if (driveType == kClemensDrive_3_5_D1 || driveType == kClemensDrive_3_5_D2) {
-                diskLibrary_.reset(diskLibraryRootPath_, CLEM_DISK_TYPE_3_5);
+                diskLibrary_.reset(CLEM_DISK_TYPE_3_5);
             } else if (driveType == kClemensDrive_5_25_D1 || driveType == kClemensDrive_5_25_D2) {
-                diskLibrary_.reset(diskLibraryRootPath_, CLEM_DISK_TYPE_5_25);
+                diskLibrary_.reset(CLEM_DISK_TYPE_5_25);
             } else {
-                diskLibrary_.reset(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE);
+                diskLibrary_.reset(CLEM_DISK_TYPE_NONE);
             }
             diskComboStateFlags_ |= (1 << driveType);
         } else {
@@ -3095,15 +3100,15 @@ void ClemensFrontend::doHelpScreen(int width, int height) {
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Hotkeys")) {
-                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kEmulatorHelp));
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kGSKeyboardCommands));
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Disk Selection")) {
-                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kEmulatorHelp));
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kDiskSelectionHelp));
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Debugger")) {
-                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kEmulatorHelp));
+                ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kDebuggerHelp));
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
