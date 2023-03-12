@@ -1,6 +1,8 @@
 #include "clem_disk_library.hpp"
 #include "clem_woz.h"
 
+#include "fmt/format.h"
+
 #include <algorithm>
 #include <fstream>
 
@@ -15,6 +17,13 @@ ClemensDiskLibrary::ClemensDiskLibrary(std::filesystem::path libraryRootPath, un
 void ClemensDiskLibrary::reset(unsigned diskType) {
     diskSets_.clear();
     diskEntries_.clear();
+    if (!std::filesystem::exists(libraryRootPath_)) {
+        std::error_code errc{};
+        if (!std::filesystem::create_directories(libraryRootPath_, errc)) {
+            fmt::print(stderr, "Unable to create library directory {} with error {}\n",
+                       libraryRootPath_.string(), errc.message());
+        }
+    }
     libraryRootIterator_ = std::filesystem::directory_iterator(libraryRootPath_);
     diskType_ = diskType;
 }

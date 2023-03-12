@@ -31,6 +31,7 @@ class ClemensDiskUnitUI {
     void doFinishImportDisks(float width, float height);
     void doRetryFlow(float width, float height, ClemensCommandQueue &backend);
     void doExit(float width, float height);
+    void doCancel(float width, float height);
 
     enum DiskSetSelectorResult {
         None,   //  no selection made
@@ -49,12 +50,14 @@ class ClemensDiskUnitUI {
         CreateBlankDisk,
         FinishImportDisks,
         Retry,
+        Cancelled,
         Exit
     };
     enum class ErrorMode { None, CannotCreateDiskSet, CannotCreateDisk, ImportFailed };
 
     void startFlow(Mode mode);
     void retry();
+    void cancel();
     void finish(std::string errorString = "");
     void createBlankDisk(ClemensCommandQueue &backendQueue);
     std::pair<std::string, bool> importDisks(const std::string &outputPath);
@@ -66,6 +69,7 @@ class ClemensDiskUnitUI {
 
     Mode mode_;
     Mode retryMode_;
+    Mode finishedMode_;
     std::string errorString_;
 
     bool generatingDiskList_;

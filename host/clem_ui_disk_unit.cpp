@@ -16,11 +16,21 @@
 namespace {
 
 const ImVec2 guiDialogSizeLarge(float viewWidth, float viewHeight) {
-    return ImVec2(std::max(800.0f, viewWidth * 0.80f), std::max(600.0f, viewHeight * 0.60f));
+    return ImVec2(std::max(800.0f, viewWidth * 0.80f), std::max(480.0f, viewHeight * 0.60f));
+}
+
+const ImVec2 guiDialogSizeMedium(float viewWidth, float viewHeight) {
+    return ImVec2(std::max(640.0f, viewWidth * 0.60f), std::max(320.0f, viewHeight * 0.50f));
 }
 
 const ImVec2 guiDialogSizeSmall(float viewWidth, float viewHeight) {
-    return ImVec2(std::max(640.0f, viewWidth * 0.60f), std::max(320.0f, viewHeight * 0.60f));
+    return ImVec2(std::max(640.0f, viewWidth * 0.50f), std::max(200.0f, viewHeight * 0.25f));
+}
+
+void positionMessageModal(ImVec2 size) {
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(size);
 }
 
 static const char *sDriveDescription[] = {"3.5 inch 800K", "3.5 inch 800K", "5.25 inch 140K",
@@ -147,7 +157,9 @@ bool ClemensDiskUnitUI::frame(float width, float height, ClemensCommandQueue &ba
         //  final state, transition to None or display error
         doExit(viewportSize.x, viewportSize.y);
         break;
-
+    case Mode::Cancelled:
+        doCancel(viewportSize.x, viewportSize.y);
+        break;
     case Mode::None:
         break;
     }
@@ -158,6 +170,7 @@ bool ClemensDiskUnitUI::frame(float width, float height, ClemensCommandQueue &ba
 void ClemensDiskUnitUI::startFlow(Mode mode) {
     mode_ = mode;
     retryMode_ = Mode::None;
+    finishedMode_ = Mode::None;
     errorString_.clear();
     importDiskFiles_.clear();
     selectedDiskSetName_.clear();
@@ -169,8 +182,14 @@ void ClemensDiskUnitUI::retry() {
     mode_ = Mode::Retry;
 }
 
+void ClemensDiskUnitUI::cancel() {
+    finishedMode_ = mode_;
+    mode_ = Mode::Cancelled;
+}
+
 void ClemensDiskUnitUI::finish(std::string errorString) {
     errorString_ = std::move(errorString);
+    finishedMode_ = mode_;
     mode_ = Mode::Exit;
 }
 
@@ -194,7 +213,7 @@ void ClemensDiskUnitUI::doImportDiskFlow(float width, float height) {
                 }
             }
             if (importDiskFiles_.empty()) {
-                mode_ = Mode::Exit;
+                cancel();
                 return;
             }
             ImGuiFileDialog::Instance()->Close();
@@ -208,7 +227,7 @@ void ClemensDiskUnitUI::doImportDiskFlow(float width, float height) {
         selectedDiskSetName_ = diskNameEntry_;
         mode_ = Mode::CreateDiskSet;
     } else if (selectorResult == DiskSetSelectorResult::Cancel) {
-        mode_ = Mode::Exit;
+        cancel();
     }
 }
 
@@ -222,7 +241,7 @@ void ClemensDiskUnitUI::doBlankDiskFlow(float width, float height) {
         selectedDiskSetName_ = diskNameEntry_;
         mode_ = Mode::CreateDiskSet;
     } else if (selectorResult == DiskSetSelectorResult::Cancel) {
-        mode_ = Mode::Exit;
+        cancel();
     }
 }
 
@@ -233,11 +252,9 @@ auto ClemensDiskUnitUI::doDiskSetSelector(float width, float height) -> DiskSetS
         selectedDiskSetName_ = "";
         diskNameEntry_[0] = '\0';
     }
-    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(guiDialogSizeLarge(width, height));
+    positionMessageModal(guiDialogSizeMedium(width, height));
     if (ImGui::BeginPopupModal("Select Destination")) {
-        float footerSize = 3 * ImGui::GetFrameHeightWithSpacing();
+        float footerSize = 4 * ImGui::GetFrameHeightWithSpacing();
         ImVec2 listSize(-FLT_MIN, ImGui::GetWindowHeight() - footerSize);
         bool isOk = false;
 
@@ -247,6 +264,9 @@ auto ClemensDiskUnitUI::doDiskSetSelector(float width, float height) -> DiskSetS
                 bool isSelected =
                     ImGui::Selectable(filename.c_str(), filename == selectedDiskSetName_,
                                       ImGuiSelectableFlags_AllowDoubleClick);
+                if (isSelected || selectedDiskSetName_.empty()) {
+                    selectedDiskSetName_ = filename;
+                }
                 if (!isOk && isSelected) {
                     if (ImGui::IsItemHovered() &&
                         ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
@@ -257,7 +277,7 @@ auto ClemensDiskUnitUI::doDiskSetSelector(float width, float height) -> DiskSetS
             });
             ImGui::EndListBox();
         }
-        if (ImGui::Button("Create Directory")) {
+        if (ImGui::Button("Create Directory") && diskNameEntry_[0] != '\0') {
             result = DiskSetSelectorResult::Create;
         }
         ImGui::SameLine();
@@ -266,9 +286,14 @@ auto ClemensDiskUnitUI::doDiskSetSelector(float width, float height) -> DiskSetS
             result = DiskSetSelectorResult::Create;
         }
         ImGui::Separator();
-        if (ImGui::Button("Ok") ||
-            (ImGui::IsKeyPressed(ImGuiKey_Enter) && result != DiskSetSelectorResult::Create)) {
-            result = DiskSetSelectorResult::Ok;
+        ImGui::Spacing();
+        if (ImGui::Button("Ok") || isOk ||
+            ImGui::IsKeyPressed(ImGuiKey_Enter) && result != DiskSetSelectorResult::Create) {
+            if (diskNameEntry_[0] != '\0') {
+                result = DiskSetSelectorResult::Create;
+            } else {
+                result = DiskSetSelectorResult::Ok;
+            }
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
@@ -292,8 +317,10 @@ void ClemensDiskUnitUI::doCreateDiskSet(float width, float height) {
     if (!std::filesystem::exists(diskSetPath)) {
         std::error_code errc{};
         if (!std::filesystem::create_directory(diskSetPath, errc)) {
-            finish(fmt::format("Unable to create disk set '%s'", selectedDiskSetName_));
+            finish(fmt::format("Unable to create disk set '{}'", selectedDiskSetName_));
             return;
+        } else {
+            fmt::print("Created directory '{}'\n", selectedDiskSetName_);
         }
     }
     if (importDiskFiles_.empty()) {
@@ -311,12 +338,13 @@ void ClemensDiskUnitUI::doCreateBlankDisk(float width, float height, ClemensComm
     //
     if (!ImGui::IsPopupOpen("Enter Disk Name")) {
         ImGui::OpenPopup("Enter Disk Name");
+        diskNameEntry_[0] = '\0';
     }
     std::filesystem::path blankDiskPath;
-    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(guiDialogSizeSmall(width, height));
-    if (ImGui::BeginPopupModal("Enter Disk Set Name", NULL, 0)) {
+    positionMessageModal(guiDialogSizeSmall(width, height));
+    if (ImGui::BeginPopupModal("Enter Disk Name", NULL, 0)) {
+        const float footerSize = 2 * ImGui::GetFrameHeightWithSpacing();
+        const float footerY = ImGui::GetWindowHeight() - footerSize;
         ImGui::Spacing();
         bool isOk = false;
         //  TODO: seems the user has to enter text and press enter always to confirm
@@ -336,6 +364,9 @@ void ClemensDiskUnitUI::doCreateBlankDisk(float width, float height, ClemensComm
         isOk = ImGui::InputText("##2", diskNameEntry_, sizeof(diskNameEntry_),
                                 ImGuiInputTextFlags_EnterReturnsTrue);
         ImGui::EndTable();
+        ImGui::SetCursorPosY(footerY);
+        ImGui::Separator();
+        ImGui::Spacing();
         if (ImGui::Button("Ok") || isOk) {
             //  create the blank disk here
             blankDiskPath = diskLibrary_.getLibraryRootPath() / selectedDiskSetName_;
@@ -369,13 +400,16 @@ void ClemensDiskUnitUI::createBlankDisk(ClemensCommandQueue &backendQueue) {
 }
 
 void ClemensDiskUnitUI::doFinishImportDisks(float width, float height) {
+    //  TODO: schedule a job for importDisks() as it can for over a second if
+    //        there are > 4 disks.
     auto diskSetPath = diskLibrary_.getLibraryRootPath() / selectedDiskSetName_;
     auto result = importDisks(diskSetPath.string());
     if (!result.second) {
         finish(std::move(result.first));
     } else {
-        finish(fmt::format("Import disks into {} completed.", selectedDiskSetName_));
+        finish();
     }
+    fmt::print("Finishing up dialog...\n");
 }
 
 std::pair<std::string, bool> ClemensDiskUnitUI::importDisks(const std::string &outputPath) {
@@ -393,6 +427,8 @@ std::pair<std::string, bool> ClemensDiskUnitUI::importDisks(const std::string &o
             return std::make_pair(fmt::format("Failed to import disk image {} for drive format {}",
                                               imagePath, sDriveDescription[diskDriveType_]),
                                   false);
+        } else {
+            fmt::print("Adding disk image {} to import set.\n", imagePath);
         }
         switch (diskDriveType_) {
         case kClemensDrive_3_5_D1:
@@ -422,6 +458,8 @@ std::pair<std::string, bool> ClemensDiskUnitUI::importDisks(const std::string &o
         return std::make_pair(fmt::format("Import build step failed for drive type {}",
                                           sDriveDescription[diskDriveType_]),
                               false);
+    } else {
+        fmt::print("Imported disk images to set '{}'\n", selectedDiskSetName_);
     }
 
     return std::make_pair(outputPath, true);
@@ -431,9 +469,7 @@ void ClemensDiskUnitUI::doRetryFlow(float width, float height, ClemensCommandQue
     if (!ImGui::IsPopupOpen("Warning")) {
         ImGui::OpenPopup("Warning");
     }
-    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(guiDialogSizeSmall(width, height));
+    positionMessageModal(guiDialogSizeSmall(width, height));
     if (ImGui::BeginPopupModal("Warning")) {
         auto cursorPos = ImGui::GetCursorPos();
         auto contentRegionAvail = ImGui::GetContentRegionAvail();
@@ -477,16 +513,41 @@ void ClemensDiskUnitUI::doRetryFlow(float width, float height, ClemensCommandQue
     }
 }
 
+void ClemensDiskUnitUI::doCancel(float width, float height) {
+    if (!ImGui::IsPopupOpen("Message")) {
+        ImGui::OpenPopup("Message");
+    }
+    positionMessageModal(guiDialogSizeSmall(width, height));
+    if (ImGui::BeginPopupModal("Message")) {
+        const float footerSize = 2 * ImGui::GetFrameHeightWithSpacing();
+        const float footerY = ImGui::GetWindowHeight() - footerSize;
+        ImGui::Spacing();
+        switch (finishedMode_) {
+        case Mode::ImportDisks:
+            ImGui::TextUnformatted("No disks imported.");
+            break;
+        default:
+            ImGui::TextUnformatted("Operation cancelled.");
+            break;
+        }
+        ImGui::SetCursorPosY(footerY);
+        ImGui::Separator();
+        ImGui::Spacing();
+        if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            mode_ = Mode::None;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
 void ClemensDiskUnitUI::doExit(float width, float height) {
     //  do error gui or just quit based on error mode
     if (!errorString_.empty()) {
         if (!ImGui::IsPopupOpen("Error")) {
             ImGui::OpenPopup("Error");
         }
-        ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(guiDialogSizeSmall(width, height));
-
+        positionMessageModal(guiDialogSizeSmall(width, height));
         if (ImGui::BeginPopupModal("Error")) {
             ImGui::Spacing();
             ImGui::PushTextWrapPos(0.0f);
@@ -500,7 +561,31 @@ void ClemensDiskUnitUI::doExit(float width, float height) {
             }
             ImGui::EndPopup();
         }
-    } else {
-        mode_ = Mode::None;
+    } else if (mode_ == Mode::Exit) {
+        if (!ImGui::IsPopupOpen("Message")) {
+            ImGui::OpenPopup("Message");
+        }
+        positionMessageModal(guiDialogSizeSmall(width, height));
+        if (ImGui::BeginPopupModal("Message")) {
+            const float footerSize = 2 * ImGui::GetFrameHeightWithSpacing();
+            const float footerY = ImGui::GetWindowHeight() - footerSize;
+            ImGui::Spacing();
+            switch (finishedMode_) {
+            case Mode::FinishImportDisks:
+                ImGui::TextUnformatted(
+                    fmt::format("Import disks into {} completed.", selectedDiskSetName_).c_str());
+                break;
+            default:
+                ImGui::TextUnformatted("Operation completed.");
+            }
+            ImGui::SetCursorPosY(footerY);
+            ImGui::Separator();
+            ImGui::Spacing();
+            if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+                mode_ = Mode::None;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
     }
 }
