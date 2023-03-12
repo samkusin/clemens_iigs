@@ -31,12 +31,12 @@ class ClemensDiskUnitUI {
     void doFinishImportDisks(float width, float height);
     void doRetryFlow(float width, float height, ClemensCommandQueue &backend);
     void doExit(float width, float height);
-    void doCancel(float width, float height);
 
     enum DiskSetSelectorResult {
         None,   //  no selection made
         Ok,     //  diskNameEntry_ is populated with the name of the set to use
         Create, //  diskNameEntry_ is populated with the name of the set to create
+        Retry,
         Cancel
     };
 

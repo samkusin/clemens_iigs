@@ -157,9 +157,6 @@ bool ClemensDiskUnitUI::frame(float width, float height, ClemensCommandQueue &ba
         //  final state, transition to None or display error
         doExit(viewportSize.x, viewportSize.y);
         break;
-    case Mode::Cancelled:
-        doCancel(viewportSize.x, viewportSize.y);
-        break;
     case Mode::None:
         break;
     }
@@ -184,7 +181,7 @@ void ClemensDiskUnitUI::retry() {
 
 void ClemensDiskUnitUI::cancel() {
     finishedMode_ = mode_;
-    mode_ = Mode::Cancelled;
+    mode_ = Mode::None;
 }
 
 void ClemensDiskUnitUI::finish(std::string errorString) {
@@ -224,10 +221,11 @@ void ClemensDiskUnitUI::doImportDiskFlow(float width, float height) {
     if (selectorResult == DiskSetSelectorResult::Ok) {
         mode_ = Mode::FinishImportDisks;
     } else if (selectorResult == DiskSetSelectorResult::Create) {
-        selectedDiskSetName_ = diskNameEntry_;
         mode_ = Mode::CreateDiskSet;
     } else if (selectorResult == DiskSetSelectorResult::Cancel) {
         cancel();
+    } else if (selectorResult == DiskSetSelectorResult::Retry) {
+        retry();
     }
 }
 
@@ -238,10 +236,11 @@ void ClemensDiskUnitUI::doBlankDiskFlow(float width, float height) {
         importDiskFiles_.clear();
         mode_ = Mode::CreateBlankDisk;
     } else if (selectorResult == DiskSetSelectorResult::Create) {
-        selectedDiskSetName_ = diskNameEntry_;
         mode_ = Mode::CreateDiskSet;
     } else if (selectorResult == DiskSetSelectorResult::Cancel) {
         cancel();
+    } else if (selectorResult == DiskSetSelectorResult::Retry) {
+        retry();
     }
 }
 
@@ -300,6 +299,15 @@ auto ClemensDiskUnitUI::doDiskSetSelector(float width, float height) -> DiskSetS
             result = DiskSetSelectorResult::Cancel;
         }
         if (result != DiskSetSelectorResult::None) {
+            // disk set requirement enforced here
+            if (result != DiskSetSelectorResult::Cancel) {
+                if (diskNameEntry_[0]) {
+                    selectedDiskSetName_ = diskNameEntry_;
+                }
+                if (selectedDiskSetName_.empty()) {
+                    result = DiskSetSelectorResult::Retry;
+                }
+            }
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -466,11 +474,11 @@ std::pair<std::string, bool> ClemensDiskUnitUI::importDisks(const std::string &o
 }
 
 void ClemensDiskUnitUI::doRetryFlow(float width, float height, ClemensCommandQueue &backend) {
-    if (!ImGui::IsPopupOpen("Warning")) {
-        ImGui::OpenPopup("Warning");
+    if (!ImGui::IsPopupOpen("Retry")) {
+        ImGui::OpenPopup("Retry");
     }
     positionMessageModal(guiDialogSizeSmall(width, height));
-    if (ImGui::BeginPopupModal("Warning")) {
+    if (ImGui::BeginPopupModal("Retry")) {
         auto cursorPos = ImGui::GetCursorPos();
         auto contentRegionAvail = ImGui::GetContentRegionAvail();
         ImGui::Spacing();
@@ -479,6 +487,11 @@ void ClemensDiskUnitUI::doRetryFlow(float width, float height, ClemensCommandQue
         case Mode::CreateBlankDisk:
             ImGui::TextUnformatted(importDiskFiles_.front().c_str());
             ImGui::TextUnformatted("already exists.");
+            break;
+
+        case Mode::ImportDisks:
+        case Mode::InsertBlankDisk:
+            ImGui::TextUnformatted("You must select or create a disk set when importing disks.");
             break;
         }
         ImGui::PopTextWrapPos();
@@ -493,13 +506,15 @@ void ClemensDiskUnitUI::doRetryFlow(float width, float height, ClemensCommandQue
                 ImGui::CloseCurrentPopup();
                 finish();
             }
+            ImGui::SameLine();
+            break;
+        case Mode::ImportDisks:
+        case Mode::InsertBlankDisk:
             break;
         default:
             assert(false);
             break;
         }
-
-        ImGui::SameLine();
         if (ImGui::Button("Back")) {
             ImGui::CloseCurrentPopup();
             mode_ = retryMode_;
@@ -507,35 +522,11 @@ void ClemensDiskUnitUI::doRetryFlow(float width, float height, ClemensCommandQue
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
             ImGui::CloseCurrentPopup();
-            finish("Could not create a blank disk.");
-        }
-        ImGui::EndPopup();
-    }
-}
-
-void ClemensDiskUnitUI::doCancel(float width, float height) {
-    if (!ImGui::IsPopupOpen("Message")) {
-        ImGui::OpenPopup("Message");
-    }
-    positionMessageModal(guiDialogSizeSmall(width, height));
-    if (ImGui::BeginPopupModal("Message")) {
-        const float footerSize = 2 * ImGui::GetFrameHeightWithSpacing();
-        const float footerY = ImGui::GetWindowHeight() - footerSize;
-        ImGui::Spacing();
-        switch (finishedMode_) {
-        case Mode::ImportDisks:
-            ImGui::TextUnformatted("No disks imported.");
-            break;
-        default:
-            ImGui::TextUnformatted("Operation cancelled.");
-            break;
-        }
-        ImGui::SetCursorPosY(footerY);
-        ImGui::Separator();
-        ImGui::Spacing();
-        if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-            mode_ = Mode::None;
-            ImGui::CloseCurrentPopup();
+            if (retryMode_ == Mode::CreateBlankDisk) {
+                finish("Could not create a blank disk.");
+            } else {
+                cancel();
+            }
         }
         ImGui::EndPopup();
     }
