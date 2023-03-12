@@ -85,9 +85,6 @@ struct ClemensClock {
     ((clem_clocks_duration_t)((clem_clocks_time_t)(_ns_) * (_clocks_step_reference_) /             \
                               CLEM_MEGA2_CYCLE_NS))
 
-//#define clem_calc_clocks_step_from_ns(_ns_, _clocks_step_reference_)                               \
-//   ((clem_clocks_duration_t)(((float)(_ns_) / CLEM_MEGA2_CYCLE_NS) * (_clocks_step_reference_)))
-
 #define clem_calc_clocks_remainder_from_ns(_ns_, _clocks_step_reference_)                          \
     ((clem_clocks_duration_t)((_ns_) * (_clocks_step_reference_)) % CLEM_MEGA2_CYCLE_NS)
 
