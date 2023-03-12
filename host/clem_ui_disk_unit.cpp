@@ -400,9 +400,10 @@ void ClemensDiskUnitUI::createBlankDisk(ClemensCommandQueue &backendQueue) {
     backendQueue.insertBlankDisk(diskDriveType_, diskPath.string());
 }
 
-void ClemensDiskUnitUI::doFinishImportDisks(float width, float /*height */) {
+void ClemensDiskUnitUI::doFinishImportDisks(float /*width */, float /*height */) {
     //  TODO: schedule a job for importDisks() as it can for over a second if
-    //        there are > 4 disks.
+    //        there are > 4 disks.  this is why I've kept this method as a
+    //        state so GUI can be implemented when its needed
     auto diskSetPath = diskLibrary_.getLibraryRootPath() / selectedDiskSetName_;
     auto result = importDisks(diskSetPath.string());
     if (!result.second) {

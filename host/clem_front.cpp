@@ -2282,7 +2282,7 @@ void ClemensFrontend::doMachineDebugVGCDisplay() {
     //            plus visual palette info
     //          - Row: IRQ, 640/320, ColorFill, Palette Index, Palette 0-15 RGB boxes
     auto &graphics = frameReadState_.graphicsFrame;
-    auto &text = frameReadState_.textFrame;
+    // auto &text = frameReadState_.textFrame;
 
     if (graphics.format == kClemensVideoFormat_Super_Hires) {
         ImGui::LabelText("Mode", "Super Hires");
