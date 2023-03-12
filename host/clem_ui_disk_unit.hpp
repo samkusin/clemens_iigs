@@ -26,18 +26,52 @@ class ClemensDiskUnitUI {
   private:
     void doImportDiskFlow(float width, float height);
     void doBlankDiskFlow(float width, float height);
+    void doCreateDiskSet(float width, float height);
+    void doCreateBlankDisk(float width, float height, ClemensCommandQueue &backend);
+    void doFinishImportDisks(float width, float height);
+    void doRetryFlow(float width, float height, ClemensCommandQueue &backend);
+    void doExit(float width, float height);
+
+    enum DiskSetSelectorResult {
+        None,   //  no selection made
+        Ok,     //  diskNameEntry_ is populated with the name of the set to use
+        Create, //  diskNameEntry_ is populated with the name of the set to create
+        Cancel
+    };
+
+    DiskSetSelectorResult doDiskSetSelector(float width, float height);
+
+    enum class Mode {
+        None,
+        InsertBlankDisk,
+        ImportDisks,
+        CreateDiskSet,
+        CreateBlankDisk,
+        FinishImportDisks,
+        Retry,
+        Exit
+    };
+    enum class ErrorMode { None, CannotCreateDiskSet, CannotCreateDisk, ImportFailed };
+
+    void startFlow(Mode mode);
+    void retry();
+    void finish(std::string errorString = "");
+    void createBlankDisk(ClemensCommandQueue &backendQueue);
+    std::pair<std::string, bool> importDisks(const std::string &outputPath);
 
   private:
     ClemensDiskLibrary &diskLibrary_;
     ClemensDriveType diskDriveType_;
     unsigned int diskDriveCategoryType_;
 
-    enum class Mode { None, InsertBlankDisk, ImportDisks, FinishImportDisks, CreateDiskSet, Exit };
     Mode mode_;
+    Mode retryMode_;
+    std::string errorString_;
+
     bool generatingDiskList_;
 
     std::vector<std::string> importDiskFiles_;
-    std::string selectedEntry_;
+    std::string selectedDiskSetName_;
     char diskNameEntry_[256];
 };
 

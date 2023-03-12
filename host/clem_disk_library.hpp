@@ -31,6 +31,7 @@ class ClemensDiskLibrary {
     };
 
     void iterate(std::function<void(const DiskEntry &)> callback);
+    void iterateSets(std::function<void(const DiskEntry &)> callback);
 
     const std::filesystem::path getLibraryRootPath() const { return libraryRootPath_; }
 

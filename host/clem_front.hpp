@@ -291,8 +291,6 @@ class ClemensFrontend : public ClemensHostView {
     std::string diskTracesRootPath_;
     ClemensDiskLibrary diskLibrary_;
 
-    unsigned diskComboStateFlags_; // if opened, flag == 1 else 0
-
   private:
     void doMachineDebugMemoryDisplay();
     void doMachineDebugDOCDisplay();
@@ -320,14 +318,6 @@ class ClemensFrontend : public ClemensHostView {
     void pollJoystickDevices();
 
   private:
-    //  UI State Specific Flows
-    void doModalOperations(int width, int height);
-    void doImportDiskSetFlowStart(int width, int height);
-    void doImportDiskSetReplaceOld(int width, int height);
-    void doImportDiskSet(int width, int height);
-    void doNewBlankDiskFlow(int width, int height);
-    void doNewBlankDisk(int width, int height);
-
     void doHelpScreen(int width, int height);
 
     bool isEmulatorStarting() const;
@@ -337,14 +327,6 @@ class ClemensFrontend : public ClemensHostView {
         Empty,
         Preamble,
         Emulator,
-        ImportDiskModal,
-        BlankDiskModal,
-        ImportDiskSetFlow,
-        ImportDiskSetReplaceOld,
-        ImportDiskSet,
-        NewBlankDiskFlow,
-        NewBlankDiskReplaceOld,
-        NewBlankDisk,
         LoadSnapshot,
         SaveSnapshot,
         Settings,

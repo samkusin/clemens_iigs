@@ -31,7 +31,7 @@ void ClemensDiskLibrary::update() {
         return;
     }
     DiskEntryNode diskSetEntryNode;
-    diskSetEntryNode.entry.location = dirEntry.path().parent_path();
+    diskSetEntryNode.entry.location = dirEntry.path().filename();
     int prevDiskEntryIndex = -1;
     uint8_t wozBuffer[80];
     for (auto &childDirEntry : std::filesystem::directory_iterator(dirEntry.path())) {
@@ -109,5 +109,11 @@ void ClemensDiskLibrary::iterate(std::function<void(const DiskEntry &)> callback
             callback(diskEntries_[nextEntryIndex].entry);
             nextEntryIndex = diskEntries_[nextEntryIndex].nextEntryIndex;
         }
+    }
+}
+
+void ClemensDiskLibrary::iterateSets(std::function<void(const DiskEntry &)> callback) {
+    for (auto &diskSetNode : diskSets_) {
+        callback(diskSetNode.entry);
     }
 }
