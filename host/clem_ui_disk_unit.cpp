@@ -52,7 +52,7 @@ ClemensDiskUnitUI::ClemensDiskUnitUI(ClemensDiskLibrary &diskLibrary,
     }
 }
 
-bool ClemensDiskUnitUI::frame(float width, float height, ClemensCommandQueue &backendQueue,
+bool ClemensDiskUnitUI::frame(float width, float /* height */, ClemensCommandQueue &backendQueue,
                               const ClemensBackendDiskDriveState &diskDrive, const char *driveName,
                               bool showLabel) {
     // ALWAYS RENDER THE SELECTOR as it is part of the main GUI.
@@ -129,13 +129,6 @@ bool ClemensDiskUnitUI::frame(float width, float height, ClemensCommandQueue &ba
         //  output will be importDiskFiles_ if not empty
         //  transitions to CreateDiskSet or FinishImportDisks
         doImportDiskFlow(viewportSize.x, viewportSize.y);
-        break;
-    case Mode::CreateDiskSet:
-        //  selectedDiskSetName_ will be the disk set name
-        //  transition from either InsertBlankDisk or ImportDisks
-        //  transition to FinishImportDisks if importDiskFiles_ is not empty
-        //  transition to CreateBlankDisk if importDiskFiles_ is empty
-        doCreateDiskSet(viewportSize.x, viewportSize.y);
         break;
     case Mode::CreateBlankDisk:
         //  selectedDiskSetName_ will be the disk set name
@@ -221,7 +214,7 @@ void ClemensDiskUnitUI::doImportDiskFlow(float width, float height) {
     if (selectorResult == DiskSetSelectorResult::Ok) {
         mode_ = Mode::FinishImportDisks;
     } else if (selectorResult == DiskSetSelectorResult::Create) {
-        mode_ = Mode::CreateDiskSet;
+        createDiskSet();
     } else if (selectorResult == DiskSetSelectorResult::Cancel) {
         cancel();
     } else if (selectorResult == DiskSetSelectorResult::Retry) {
@@ -236,7 +229,7 @@ void ClemensDiskUnitUI::doBlankDiskFlow(float width, float height) {
         importDiskFiles_.clear();
         mode_ = Mode::CreateBlankDisk;
     } else if (selectorResult == DiskSetSelectorResult::Create) {
-        mode_ = Mode::CreateDiskSet;
+        createDiskSet();
     } else if (selectorResult == DiskSetSelectorResult::Cancel) {
         cancel();
     } else if (selectorResult == DiskSetSelectorResult::Retry) {
@@ -259,7 +252,7 @@ auto ClemensDiskUnitUI::doDiskSetSelector(float width, float height) -> DiskSetS
 
         if (ImGui::BeginListBox("##DestinationList", listSize)) {
             diskLibrary_.iterateSets([&isOk, this](const ClemensDiskLibrary::DiskEntry &entry) {
-                auto &filename = entry.location.string();
+                auto filename = entry.location.string();
                 bool isSelected =
                     ImGui::Selectable(filename.c_str(), filename == selectedDiskSetName_,
                                       ImGuiSelectableFlags_AllowDoubleClick);
@@ -287,7 +280,7 @@ auto ClemensDiskUnitUI::doDiskSetSelector(float width, float height) -> DiskSetS
         ImGui::Separator();
         ImGui::Spacing();
         if (ImGui::Button("Ok") || isOk ||
-            ImGui::IsKeyPressed(ImGuiKey_Enter) && result != DiskSetSelectorResult::Create) {
+            (ImGui::IsKeyPressed(ImGuiKey_Enter) && result != DiskSetSelectorResult::Create)) {
             if (diskNameEntry_[0] != '\0') {
                 result = DiskSetSelectorResult::Create;
             } else {
@@ -315,7 +308,7 @@ auto ClemensDiskUnitUI::doDiskSetSelector(float width, float height) -> DiskSetS
     return result;
 }
 
-void ClemensDiskUnitUI::doCreateDiskSet(float width, float height) {
+void ClemensDiskUnitUI::createDiskSet() {
     //  selectedDiskSetName_ will be the disk set name
     //  detect if the disk set already exists
     //      true: just continue to next state
@@ -407,7 +400,7 @@ void ClemensDiskUnitUI::createBlankDisk(ClemensCommandQueue &backendQueue) {
     backendQueue.insertBlankDisk(diskDriveType_, diskPath.string());
 }
 
-void ClemensDiskUnitUI::doFinishImportDisks(float width, float height) {
+void ClemensDiskUnitUI::doFinishImportDisks(float width, float /*height */) {
     //  TODO: schedule a job for importDisks() as it can for over a second if
     //        there are > 4 disks.
     auto diskSetPath = diskLibrary_.getLibraryRootPath() / selectedDiskSetName_;
@@ -492,6 +485,9 @@ void ClemensDiskUnitUI::doRetryFlow(float width, float height, ClemensCommandQue
         case Mode::ImportDisks:
         case Mode::InsertBlankDisk:
             ImGui::TextUnformatted("You must select or create a disk set when importing disks.");
+            break;
+        default:
+            assert(false);
             break;
         }
         ImGui::PopTextWrapPos();
