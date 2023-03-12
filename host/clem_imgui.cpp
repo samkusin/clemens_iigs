@@ -15,6 +15,7 @@ namespace ClemensHostImGui {
 
 static char tempCharBuffer[256];
 static sg_image g_imgui_font_img;
+static char tempLinkBuffer[256];
 
 static ImFont *g_fonts[kFontTotalCount];
 
@@ -193,7 +194,9 @@ bool IconButton(const char *strId, ImTextureID texId, const ImVec2 &size) {
 }
 
 void markdownLinkCallback(ImGui::MarkdownLinkCallbackData data) {
-    // TODO: implement per platform the call to view a browser page
+    const int kMaxLinkBufferSize = std::min(data.linkLength, int(sizeof(tempLinkBuffer)) - 1);
+    strncpy(tempLinkBuffer, data.link, kMaxLinkBufferSize);
+    tempLinkBuffer[kMaxLinkBufferSize] = '\0';
 }
 
 // https://github.com/juliettef/imgui_markdown/blob/e1e7885b1f02fe279ee4af3e513cecfa672d127d/imgui_markdown.h#L119
@@ -261,13 +264,16 @@ void markdownFormatCallback(const ImGui::MarkdownFormatInfo &markdownFormatInfo,
 }
 
 //  uses the ImGui markdown widget
-void Markdown(std::string_view markdown) {
+std::string Markdown(std::string_view markdown) {
     ImGui::MarkdownConfig config;
     config.linkCallback = markdownLinkCallback;
     config.tooltipCallback = nullptr;
     config.imageCallback = markdownImageCallback;
     config.formatCallback = markdownFormatCallback;
+
+    tempLinkBuffer[0] = '\0';
     ImGui::Markdown(markdown.data(), markdown.size(), config);
+    return std::string(tempLinkBuffer);
 }
 
 auto ROMFileBrowser(int width, int height, const std::string &dataDirectory)

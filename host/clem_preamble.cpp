@@ -1,5 +1,6 @@
 #include "clem_preamble.hpp"
 #include "clem_configuration.hpp"
+#include "clem_imgui.hpp"
 #include "clem_l10n.hpp"
 
 #include "imgui.h"
@@ -54,9 +55,7 @@ auto ClemensPreamble::frame(int width, int height) -> Result {
         if (ImGui::BeginPopupModal("FirstUse", NULL, ImGuiWindowFlags_NoResize)) {
             auto contentSize = ImGui::GetContentRegionAvail();
             ImGui::BeginChild(ImGui::GetID("text"), ImVec2(-FLT_MIN, contentSize.y - 50));
-            ImGui::TextWrapped("%s\n\n", ClemensL10N::kGSKeyboardCommands[kLanguageDefault]);
-            ImGui::TextWrapped("%s", ClemensL10N::kFirstTimeUse[kLanguageDefault]);
-
+            ClemensHostImGui::Markdown(ClemensL10N::kEmulatorHelp[kLanguageDefault]);
             ImGui::EndChild();
             if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
                 ImGui::CloseCurrentPopup();

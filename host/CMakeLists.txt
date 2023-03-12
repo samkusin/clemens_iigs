@@ -79,6 +79,7 @@ set(PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_l10n.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_preamble.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_program_trace.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_disk_unit.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_load_snapshot.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_save_snapshot.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_settings.cpp"
