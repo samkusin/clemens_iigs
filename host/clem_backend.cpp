@@ -35,11 +35,22 @@ void ClemensRunSampler::reset() {
     sampledClocksSpent = 0;
     sampledCyclesSpent = 0;
     sampledFramesPerSecond = 0.0f;
-    sampledEmulatorSpeedMhz = 0.0f;
-    actualEmulatorSpeedMhz = 0.0f;
+    sampledMachineSpeedMhz = 0.0f;
+    avgVBLsPerFrame = 0.0f;
+    sampledVblsSpent = 0;
+    emulatorVblsPerFrame = 1;
+    fastModeEnabled = false;
     frameTimeBuffer.clear();
     clocksBuffer.clear();
     cyclesBuffer.clear();
+    vblsBuffer.clear();
+}
+
+void ClemensRunSampler::enableFastMode() { fastModeEnabled = true; }
+
+void ClemensRunSampler::disableFastMode() {
+    fastModeEnabled = false;
+    emulatorVblsPerFrame = 1;
 }
 
 void ClemensRunSampler::update(clem_clocks_duration_t clocksSpent, unsigned cyclesSpent) {
@@ -84,10 +95,30 @@ void ClemensRunSampler::update(clem_clocks_duration_t clocksSpent, unsigned cycl
     cyclesBuffer.push(cyclesSpent);
     sampledCyclesSpent += cyclesSpent;
     if (sampledClocksSpent > (CLEM_CLOCKS_MEGA2_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND / 10)) {
-        sampledEmulatorSpeedMhz =
-            1.023 * double(CLEM_CLOCKS_MEGA2_CYCLE * sampledCyclesSpent) / sampledClocksSpent;
+        double cyclesPerClock = (double)sampledCyclesSpent / sampledClocksSpent;
+        sampledMachineSpeedMhz = 1.023 * cyclesPerClock * CLEM_CLOCKS_MEGA2_CYCLE;
     }
-    // TODO: calculate # cycles per second = actual mhz (for fast emulation mode)
+
+    if (vblsBuffer.isFull()) {
+        decltype(vblsBuffer)::ValueType lruVbls = 0;
+        vblsBuffer.pop(lruVbls);
+        sampledVblsSpent -= lruVbls;
+    }
+    vblsBuffer.push(emulatorVblsPerFrame);
+    sampledVblsSpent += emulatorVblsPerFrame;
+    if (fastModeEnabled) {
+        if (sampledFramesPerSecond > 45.0) {
+            emulatorVblsPerFrame += 1;
+        } else if (sampledFramesPerSecond < 35.0) {
+            emulatorVblsPerFrame -= 1;
+        }
+        if (emulatorVblsPerFrame < 1)
+            emulatorVblsPerFrame = 1;
+
+    } else {
+        emulatorVblsPerFrame = 1;
+    }
+    avgVBLsPerFrame = (double)sampledVblsSpent / vblsBuffer.size();
 }
 
 template <typename... Args>
@@ -350,8 +381,6 @@ ClemensBackend::main(ClemensBackendState &backendState,
 
     std::optional<unsigned> hitBreakpoint;
 
-    unsigned emulatorVblsPerFrame = 1; // used for fast emulation
-
     bool isMachineRunning = isRunning();
 
     if (isMachineRunning) {
@@ -379,14 +408,14 @@ ClemensBackend::main(ClemensBackendState &backendState,
         // that shouldn't matter too much given that this 'speed boost' is meant to be
         // temporary, and the emulator should catch up once the IWM is inactive.
         if (clemens_is_drive_io_active(&mmio_) && config_.enableFastEmulation) {
-            emulatorVblsPerFrame = 4;
+            runSampler_.enableFastMode();
         } else {
-            emulatorVblsPerFrame = 1;
+            runSampler_.disableFastMode();
         }
         auto lastClocksSpent = machine_.tspec.clocks_spent;
         machine_.cpu.cycles_spent = 0;
 
-        unsigned emulatorVblCounter = emulatorVblsPerFrame;
+        unsigned emulatorVblCounter = runSampler_.emulatorVblsPerFrame;
         bool vblActive = mmio_.vgc.vbl_started;
         while (emulatorVblCounter > 0 && isRunning()) {
             clemens_emulate_cpu(&machine_);
@@ -513,8 +542,9 @@ ClemensBackend::main(ClemensBackendState &backendState,
         }
     }
     backendState.debugMemoryPage = debugMemoryPage_;
-    backendState.emulatorSpeedMhz = runSampler_.sampledEmulatorSpeedMhz;
-    backendState.fastEmulationOn = emulatorVblsPerFrame > 1.0f;
+    backendState.machineSpeedMhz = runSampler_.sampledMachineSpeedMhz;
+    backendState.avgVBLsPerFrame = runSampler_.avgVBLsPerFrame;
+    backendState.fastEmulationOn = runSampler_.emulatorVblsPerFrame > 1;
 
     ClemensCommandQueue commands;
     delegate(commands, commandResults, backendState);

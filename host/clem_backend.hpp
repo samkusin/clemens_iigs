@@ -28,21 +28,28 @@ struct ClemensRunSampler {
 
     double sampledFramesPerSecond;
 
-    cinek::CircularBuffer<std::chrono::microseconds, 120> frameTimeBuffer;
+    cinek::CircularBuffer<std::chrono::microseconds, 60> frameTimeBuffer;
 
     clem_clocks_time_t sampledClocksSpent;
     uint64_t sampledCyclesSpent;
-    cinek::CircularBuffer<clem_clocks_duration_t, 120> clocksBuffer;
-    cinek::CircularBuffer<clem_clocks_duration_t, 120> cyclesBuffer;
+    cinek::CircularBuffer<clem_clocks_duration_t, 60> clocksBuffer;
+    cinek::CircularBuffer<clem_clocks_duration_t, 60> cyclesBuffer;
 
-    double sampledEmulatorSpeedMhz;
-    double actualEmulatorSpeedMhz;
+    double sampledMachineSpeedMhz;
     std::chrono::high_resolution_clock::time_point lastFrameTimePoint;
+
+    double avgVBLsPerFrame;
+    cinek::CircularBuffer<unsigned, 30> vblsBuffer;
+    unsigned sampledVblsSpent;
+    unsigned emulatorVblsPerFrame;
+    bool fastModeEnabled;
 
     ClemensRunSampler();
 
     void reset();
     void update(clem_clocks_duration_t clocksSpent, unsigned cyclesSpent);
+    void enableFastMode();
+    void disableFastMode();
 };
 
 //  TODO: Machine type logic could be subclassed into an Apple2GS backend, etc.
