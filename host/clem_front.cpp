@@ -800,7 +800,8 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     frameWriteState_.mmioWasInitialized = state.mmioWasInitialized;
     frameWriteState_.isTracing = state.isTracing;
     frameWriteState_.isRunning = state.isRunning;
-    frameWriteState_.emulatorSpeedMhz = state.emulatorSpeedMhz;
+    frameWriteState_.machineSpeedMhz = state.machineSpeedMhz;
+    frameWriteState_.avgVBLsPerFrame = state.avgVBLsPerFrame;
     frameWriteState_.emulatorClock.ts = state.machine->tspec.clocks_spent;
     frameWriteState_.emulatorClock.ref_step = CLEM_CLOCKS_MEGA2_CYCLE;
     //  copy over component state as needed
@@ -1881,7 +1882,13 @@ void ClemensFrontend::doMachineDiagnosticsDisplay() {
     ImGui::TableNextColumn();
     ImGui::Text("RUN");
     ImGui::TableNextColumn();
-    ImGui::Text("%3.3f mhz", frameReadState_.emulatorSpeedMhz);
+    if (lastCommandState_.isFastEmulationOn) {
+        ImGui::Text("%1.3f (x%3.1f)", frameReadState_.machineSpeedMhz,
+                    frameReadState_.avgVBLsPerFrame);
+
+    } else {
+        ImGui::Text("%1.3f mhz", frameReadState_.machineSpeedMhz);
+    }
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
     ImGui::TextUnformatted("");
@@ -1892,7 +1899,7 @@ void ClemensFrontend::doMachineDiagnosticsDisplay() {
     unsigned minutes = (emulatorTime % 3600000) / 60000;
     unsigned seconds = ((emulatorTime % 3600000) % 60000) / 1000;
     unsigned milliseconds = ((emulatorTime % 3600000) % 60000) % 1000;
-    ImGui::Text("%02u:%02u:%02u.%03u", hours, minutes, seconds, milliseconds);
+    ImGui::Text("%02u:%02u:%02u.%01u", hours, minutes, seconds, milliseconds);
     ImGui::EndTable();
 }
 

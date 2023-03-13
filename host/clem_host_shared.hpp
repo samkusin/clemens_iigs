@@ -159,7 +159,8 @@ struct ClemensBackendState {
     uint8_t ioPageValues[256]; // 0xc000 - 0xc0ff
     uint8_t debugMemoryPage;
 
-    float emulatorSpeedMhz;
+    float machineSpeedMhz;
+    float avgVBLsPerFrame;
     bool fastEmulationOn;
 
     // valid if a debugMessage() command was issued from the frontend

@@ -209,7 +209,8 @@ class ClemensFrontend : public ClemensHostView {
         std::array<ClemensBackendDiskDriveState, CLEM_SMARTPORT_DRIVE_LIMIT> smartDrives;
         std::array<std::string, CLEM_CARD_SLOT_COUNT> cards;
 
-        float emulatorSpeedMhz;
+        float machineSpeedMhz;
+        float avgVBLsPerFrame;
         ClemensClock emulatorClock;
 
         Clemens65C816 cpu;
