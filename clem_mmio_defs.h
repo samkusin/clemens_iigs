@@ -102,6 +102,9 @@
 /**
  * IO Registers
  */
+
+#define CLEM_MMIO_MAKE_IO_ADDRESS(_reg_) (0xc000 | (uint8_t)(_reg_))
+
 /** Keyboard data (bits 6-0) and strobe (bit 7) */
 #define CLEM_MMIO_REG_KEYB_READ 0x00
 

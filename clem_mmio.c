@@ -360,8 +360,9 @@ static inline uint8_t _clem_mmio_statereg_c068(ClemensMMIO *mmio) {
     if (mmio->mmap_register & CLEM_MEM_IO_MMAP_ALTZPLC) {
         value |= 0x80;
     }
-    /* TODO PAGE2 TEXT */
-
+    if (mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) {
+        value |= 0x40;
+    }
     if (mmio->mmap_register & CLEM_MEM_IO_MMAP_RAMRD) {
         value |= 0x20;
     }
@@ -390,8 +391,9 @@ static uint8_t _clem_mmio_statereg_c068_set(ClemensMMIO *mmio, uint8_t value) {
     }
     /*  PAGE2 text - TODO when video options are fleshed out */
     if (value & 0x40) {
-        CLEM_UNIMPLEMENTED("c068 PAGE2 Text");
+        mmap_register |= CLEM_MEM_IO_MMAP_TXTPAGE2;
     } else {
+        mmap_register &= ~CLEM_MEM_IO_MMAP_TXTPAGE2;
     }
     /*  RAMRD */
     if (value & 0x20) {
@@ -605,10 +607,10 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_ALTZPLC) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_READC3ROM:
-        result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_C3ROM) ? 0x80 : 00;
+        result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_C3ROM) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_80COLSTORE_TEST:
-        result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE) ? 0x80 : 00;
+        result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_VBLBAR:
     case CLEM_MMIO_REG_VGC_VERTCNT:
@@ -619,19 +621,19 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         result = (mmio->vgc.mode_flags & CLEM_VGC_GRAPHICS_MODE) ? 0x00 : 0x80;
         break;
     case CLEM_MMIO_REG_MIXED_TEST:
-        result = (mmio->vgc.mode_flags & CLEM_VGC_MIXED_TEXT) ? 0x80 : 0x80;
+        result = (mmio->vgc.mode_flags & CLEM_VGC_MIXED_TEXT) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_TXTPAGE2_TEST:
-        result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x80 : 00;
+        result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_ALTCHARSET_TEST:
-        result = (mmio->vgc.mode_flags & CLEM_VGC_ALTCHARSET) ? 0x80 : 00;
+        result = (mmio->vgc.mode_flags & CLEM_VGC_ALTCHARSET) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_HIRES_TEST:
-        result = (mmio->vgc.mode_flags & CLEM_VGC_HIRES) ? 0x80 : 00;
+        result = (mmio->vgc.mode_flags & CLEM_VGC_HIRES) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_80COLUMN_TEST:
-        result = (mmio->vgc.mode_flags & CLEM_VGC_80COLUMN_TEXT) ? 0x80 : 00;
+        result = (mmio->vgc.mode_flags & CLEM_VGC_80COLUMN_TEXT) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_VGC_TEXT_COLOR:
         result = (uint8_t)((mmio->vgc.text_fg_color << 4) | mmio->vgc.text_bg_color);
