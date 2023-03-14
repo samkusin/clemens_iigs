@@ -535,7 +535,8 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     uint8_t ioreg = addr & 0xff;
     bool is_noop = (flags & CLEM_OP_IO_NO_OP) != 0;
 
-    //  TODO: some registers go through the CYA access path which runs faster
+    //  SHADOW, CYA, DMA are fast
+    //  SLOT, STATE are fast (read-only)
     *mega2_access = true;
 
     ref_clock.ts = tspec->clocks_spent;
@@ -649,6 +650,7 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         break;
     case CLEM_MMIO_REG_SLOTROMSEL:
         result = _clem_mmio_slotromsel_c02d(mmio);
+        *mega2_access = false;
         break;
     case CLEM_MMIO_REG_SPKR:
         result = clem_sound_read_switch(&mmio->dev_audio, ioreg, flags);
@@ -662,10 +664,13 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         break;
     case CLEM_MMIO_REG_SHADOW:
         result = _clem_mmio_shadow_c035(mmio);
+        *mega2_access = false;
         break;
     case CLEM_MMIO_REG_SPEED:
         result = mmio->speed_c036;
+        *mega2_access = false;
         break;
+    // TODO: DMA?  fast access as well
     case CLEM_MMIO_REG_RTC_CTL:
         if (!is_noop) {
             clem_rtc_command(&mmio->dev_rtc, tspec->clocks_spent, CLEM_IO_READ);
@@ -792,6 +797,7 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         break;
     case CLEM_MMIO_REG_STATEREG:
         result = _clem_mmio_statereg_c068(mmio);
+        *mega2_access = false;
         break;
     case CLEM_MMIO_REG_LC2_RAM_WP:
     case CLEM_MMIO_REG_LC2_RAM_WP2:
@@ -861,6 +867,7 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
     bool is_noop = (flags & CLEM_OP_IO_NO_OP) != 0;
     uint8_t ioreg = (addr & 0xff);
 
+    //  SHADOW, SPEED and DMA are fast
     *mega2_access = true;
 
     ref_clock.ts = tspec->clocks_spent;
@@ -974,9 +981,11 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
         break;
     case CLEM_MMIO_REG_SHADOW:
         _clem_mmio_shadow_c035_set(mmio, data);
+        *mega2_access = false;
         break;
     case CLEM_MMIO_REG_SPEED:
         _clem_mmio_speed_c036_set(mmio, tspec, data);
+        *mega2_access = false;
         break;
     case CLEM_MMIO_REG_SCC_B_CMD:
     case CLEM_MMIO_REG_SCC_A_CMD:

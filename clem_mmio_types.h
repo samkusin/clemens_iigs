@@ -254,9 +254,9 @@ struct ClemensVGC {
 
     /* Used for precise-ish timing of vertical blank and scanline irqs */
     clem_clocks_time_t ts_last_frame;
-    clem_clocks_time_t ts_scanline_0;
     clem_clocks_duration_t dt_scanline;
     unsigned vbl_counter;
+    unsigned v_counter;
 
     /* amalgom of possible display modes */
     unsigned mode_flags;

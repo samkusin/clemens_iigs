@@ -3,8 +3,16 @@
 #include "clem_util.h"
 
 static inline void _clem_mem_cycle(ClemensMachine *clem, bool mega2_access) {
-    clem->tspec.clocks_spent +=
-        mega2_access ? clem->tspec.clocks_step_mega2 : (clem->tspec.clocks_step);
+    // TODO: trying to avoid keeping track of two clock counters (PHI2 and PHI0)
+    //       for now, using a single PHI2 and sync to a PHI0 cycle if accessing
+    //       the mega2.
+    if (mega2_access) {
+        // SYNC? seems to slow the system down entirely when I/O is accessed (even speaker audio)
+        // clem->tspec.clocks_spent += (clem->tspec.clocks_spent % clem->tspec.clocks_step_mega2);
+        clem->tspec.clocks_spent += clem->tspec.clocks_step_mega2;
+    } else {
+        clem->tspec.clocks_spent += clem->tspec.clocks_step;
+    }
     ++clem->cpu.cycles_spent;
 }
 

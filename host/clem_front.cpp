@@ -2292,6 +2292,7 @@ void ClemensFrontend::doMachineDebugVGCDisplay() {
     //          - Draw table of scanline data where each row has the scanline info
     //            plus visual palette info
     //          - Row: IRQ, 640/320, ColorFill, Palette Index, Palette 0-15 RGB boxes
+
     auto &graphics = frameReadState_.graphicsFrame;
     // auto &text = frameReadState_.textFrame;
 
