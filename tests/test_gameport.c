@@ -24,7 +24,7 @@ static clem_clocks_time_t emulator_ref_ts;
 static void gameport_sync(clem_clocks_duration_t delta_clocks) {
     struct ClemensClock clocks;
     clocks.ts = emulator_ref_ts;
-    clocks.ref_step = CLEM_CLOCKS_MEGA2_CYCLE;
+    clocks.ref_step = CLEM_CLOCKS_PHI0_CYCLE;
     clem_gameport_sync(&adb_device.gameport, &clocks);
     emulator_ref_ts += delta_clocks;
 }
@@ -173,7 +173,7 @@ static void _test_util_paddle_xy(unsigned paddle_mask, uint8_t padl_x, uint8_t p
         } else {
             TEST_ASSERT_BIT_LOW_MESSAGE(7, result, msg);
         }
-        gameport_sync(CLEM_CLOCKS_MEGA2_CYCLE);
+        gameport_sync(CLEM_CLOCKS_PHI0_CYCLE);
         paddle_time_ns[0] = _test_util_get_paddle_time_ns(padl_x_idx);
         paddle_time_ns[1] = _test_util_get_paddle_time_ns(padl_y_idx);
     }

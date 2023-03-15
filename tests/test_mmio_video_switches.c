@@ -24,9 +24,9 @@ static void fixture_sync(int ticks) {
 
 void setUp(void) {
     tspec.clocks_spent = 0;
-    tspec.clocks_step_mega2 = CLEM_CLOCKS_MEGA2_CYCLE;
-    tspec.clocks_step_fast = CLEM_CLOCKS_FAST_CYCLE;
-    tspec.clocks_step = CLEM_CLOCKS_MEGA2_CYCLE;
+    tspec.clocks_step_mega2 = CLEM_CLOCKS_PHI0_CYCLE;
+    tspec.clocks_step_fast = CLEM_CLOCKS_PHI2_FAST_CYCLE;
+    tspec.clocks_step = CLEM_CLOCKS_PHI0_CYCLE;
 
     memset(&mmio, 0, sizeof(mmio));
     clem_mmio_reset(&mmio, tspec.clocks_step_mega2);

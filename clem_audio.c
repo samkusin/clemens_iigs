@@ -39,7 +39,7 @@
 #define CLEM_AUDIO_CTL_VOLUME_MASK  0x07
 
 /* integer only multiply by the ratio of 102300/89489 (1023khz/894.886khz) */
-#define CLEM_ENSONIQ_CLOCKS_PER_CYCLE (CLEM_CLOCKS_MEGA2_CYCLE * 102300 / 89489)
+#define CLEM_ENSONIQ_CLOCKS_PER_CYCLE (CLEM_CLOCKS_PHI0_CYCLE * 1023000U / 894886U)
 
 /*
   Ensoniq 5503 DOC emulation.
@@ -63,7 +63,7 @@
 
   The scan rate (number of iterations per second) is 894.88625 Khz / (OSC + 2),
   and accordingly relies on the number of active oscillators.  Per oscillator,
-  _sync_ budgets (CLEM_CLOCKS_MEGA2_CYCLE * 1023 Khz/894.88625 Khz) clocks.
+  _sync_ budgets (CLEM_CLOCKS_PHI0_CYCLE * 1023 Khz/894.88625 Khz) clocks.
 
   Registers:
     FC (0x00 : 0x20, 0x01 : 0x21, ...) define a 16-bit LE increment added to
@@ -415,7 +415,7 @@ void clem_sound_reset(struct ClemensDeviceAudio *glu) {
     /* mix buffer reset */
     glu->dt_mix_frame = 0;
     if (glu->mix_buffer.frames_per_second > 0) {
-        glu->dt_mix_sample = (CLEM_CLOCKS_MEGA2_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND) /
+        glu->dt_mix_sample = (CLEM_CLOCKS_PHI0_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND) /
                              (glu->mix_buffer.frames_per_second);
         glu->tone_frame_delta =
             (glu->tone_frequency * CLEM_PI_2) / glu->mix_buffer.frames_per_second;

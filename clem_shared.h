@@ -15,13 +15,17 @@ typedef uint8_t *(*ClemensSerializerAllocateCb)(unsigned, void *);
  *
  *  The clocks per mega2 cycle value will always be the largest.
  *
- *  If you divide the CLEM_CLOCKS_MEGA2_CYCLE by the CLEM_CLOCKS_FAST_CYCLE
+ *  If you divide the CLEM_CLOCKS_PHI0_CYCLE by the CLEM_CLOCKS_PHI2_FAST_CYCLE
  *  the value will be the effective maximum clock speed in Mhz of the CPU.
  */
-#define CLEM_CLOCKS_FAST_CYCLE       1023U
-#define CLEM_CLOCKS_MEGA2_CYCLE      2864U
+#define CLEM_CLOCKS_14MHZ_CYCLE     100U                           // 14.318 Mhz
+#define CLEM_CLOCKS_PHI2_FAST_CYCLE (CLEM_CLOCKS_14MHZ_CYCLE * 5)  // 2.864  Mhz
+#define CLEM_CLOCKS_PHI0_CYCLE      (CLEM_CLOCKS_14MHZ_CYCLE * 14) // 1.023  Mhz
+
 #define CLEM_MEGA2_CYCLE_NS          978
 #define CLEM_MEGA2_CYCLES_PER_SECOND 1023000U
+
+//#define CLEM_CLOCKS_MEGA2_CYCLE 2864U
 
 /* Attempt to mimic VDA and VPA per memory access */
 #define CLEM_MEM_FLAG_BUS_IO       (0x4)
