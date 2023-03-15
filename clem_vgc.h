@@ -35,6 +35,9 @@ void clem_vgc_write_switch(struct ClemensVGC *vgc, struct ClemensClock *clock, u
 void clem_vgc_shgr_scanline(struct ClemensScanline *scanline, uint8_t *dest,
                             const uint8_t *src_bank);
 
+void clem_vgc_calc_counters(struct ClemensVGC *vgc, struct ClemensClock *clock, unsigned *v_counter,
+                            unsigned *h_counter);
+
 #ifdef __cplusplus
 }
 #endif

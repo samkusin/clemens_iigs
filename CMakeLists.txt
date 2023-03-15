@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.15)
 
 project(clemens_65816 LANGUAGES C)
 
+option(BUILD_TESTING "Build tests" ON)
+
 set (CMAKE_C_STANDARD 11)
 
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")

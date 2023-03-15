@@ -29,15 +29,6 @@ static inline void _clem_vgc_set_scanline_int(struct ClemensVGC *vgc, bool enabl
     }
 }
 
-static inline unsigned _clem_vgc_calc_v_counter(clem_clocks_duration_t duration,
-                                                clem_clocks_duration_t ref_step) {
-
-    unsigned v_counter = (unsigned)(((uint64_t)duration * CLEM_MEGA2_CYCLE_NS) /
-                                    (CLEM_VGC_HORIZ_SCAN_TIME_NS * ref_step));
-
-    return v_counter & 0x1ff; /* 9 bits */
-}
-
 static inline unsigned _clem_vgc_calc_h_counter(clem_clocks_duration_t duration,
                                                 clem_clocks_duration_t ref_step) {
     return (duration / clem_calc_clocks_step_from_ns(980, ref_step)) & 0x7f; /* 7 bits */
@@ -238,15 +229,14 @@ void clem_vgc_sync(struct ClemensVGC *vgc, struct ClemensClock *clock, const uin
              Trigger IRQ (vgc->irq_line) if inside VBL region
              And of course, super hi-res
     */
-    clem_clocks_duration_t frame_duration;
-    unsigned v_counter;
+    clem_clocks_duration_t scanline_duration = CLEM_VGC_HORIZ_SCAN_DURATION(clock->ref_step);
+    unsigned scanline_limit = CLEM_VGC_NTSC_SCANLINE_COUNT;
+    unsigned delta_tmp;
 
     if (vgc->mode_flags & CLEM_VGC_INIT) {
         vgc->ts_last_frame = clock->ts;
-        vgc->ts_scanline_0 = clock->ts;
         vgc->dt_scanline = 0;
         vgc->mode_flags &= ~CLEM_VGC_INIT;
-        frame_duration = 0;
 #ifdef CLEM_VGC_DEBUG_COUNTER_LOGGING
         sks_vgc_sync_this_time = 0;
         sks_vgc_sync_last_time = 0;
@@ -256,29 +246,27 @@ void clem_vgc_sync(struct ClemensVGC *vgc, struct ClemensClock *clock, const uin
         fflush(stdout);
 #endif
     } else {
-        frame_duration = clock->ts - vgc->ts_scanline_0;
-        v_counter = _clem_vgc_calc_v_counter(frame_duration, clock->ref_step);
-
         vgc->dt_scanline += (clock->ts - vgc->ts_last_frame);
-        if (vgc->dt_scanline >= CLEM_VGC_HORIZ_SCAN_DURATION(clock->ref_step)) {
-            vgc->dt_scanline -= CLEM_VGC_HORIZ_SCAN_DURATION(clock->ref_step);
+        while (vgc->dt_scanline >= scanline_duration) {
             if (vgc->scanline_irq_enable && (vgc->mode_flags & CLEM_VGC_SUPER_HIRES)) {
-                if (_clem_vgc_is_scanline_int_enabled(mega2_bank1, v_counter)) {
+                if (_clem_vgc_is_scanline_int_enabled(mega2_bank1, vgc->v_counter)) {
                     _clem_vgc_set_scanline_int(vgc, true);
                 }
             }
-            _clem_vgc_scanline_build_rgb_palette(vgc, v_counter, mega2_bank1);
+            _clem_vgc_scanline_build_rgb_palette(vgc, vgc->v_counter, mega2_bank1);
+            vgc->dt_scanline -= scanline_duration;
+            vgc->v_counter++;
         }
 
         // TODO: vbl only once per VBL frame?
-        if (v_counter >= CLEM_VGC_VBL_NTSC_LOWER_BOUND && !vgc->vbl_started) {
+        if (vgc->v_counter >= CLEM_VGC_VBL_NTSC_LOWER_BOUND && !vgc->vbl_started) {
             if (vgc->mode_flags & CLEM_VGC_ENABLE_VBL_IRQ) {
                 vgc->irq_line |= CLEM_IRQ_VGC_BLANK;
             }
             vgc->vbl_started = true;
         }
-        if (frame_duration >= CLEM_VGC_NTSC_SCAN_DURATION(clock->ref_step)) {
-            vgc->ts_scanline_0 += frame_duration;
+        if (vgc->v_counter >= scanline_limit) {
+            vgc->v_counter -= scanline_limit;
             vgc->vbl_started = false;
             vgc->vbl_counter++;
 #ifdef CLEM_VGC_DEBUG_COUNTER_LOGGING
@@ -316,15 +304,25 @@ void clem_vgc_sync(struct ClemensVGC *vgc, struct ClemensClock *clock, const uin
     vgc->ts_last_frame = clock->ts;
 }
 
+void clem_vgc_calc_counters(struct ClemensVGC *vgc, struct ClemensClock *clock, unsigned *v_counter,
+                            unsigned *h_counter) {
+    /* 65 cycles per horizontal scanline, 978 ns per horizontal count = 63.57us
+       and include wraparound since this is called during a read from I/O register switch and some
+       time might have passed before the last call to sync(). */
+    clem_clocks_duration_t scanline_duration = vgc->dt_scanline + (clock->ts - vgc->ts_last_frame);
+    unsigned v_counter_delta = scanline_duration / CLEM_VGC_HORIZ_SCAN_DURATION(clock->ref_step);
+    scanline_duration -= v_counter_delta * CLEM_VGC_HORIZ_SCAN_DURATION(clock->ref_step);
+    *v_counter = vgc->v_counter + v_counter_delta;
+    *h_counter = _clem_vgc_calc_h_counter(scanline_duration, clock->ref_step);
+}
+
 uint8_t clem_vgc_read_switch(struct ClemensVGC *vgc, struct ClemensClock *clock, uint8_t ioreg,
                              uint8_t flags) {
     uint8_t result = 0x00;
     unsigned v_counter;
     unsigned h_counter;
 
-    /* 65 cycles per horizontal scanline, 978 ns per horizontal count = 63.57us*/
-    v_counter = _clem_vgc_calc_v_counter(clock->ts - vgc->ts_scanline_0, clock->ref_step);
-    h_counter = _clem_vgc_calc_h_counter(vgc->dt_scanline, clock->ref_step);
+    clem_vgc_calc_counters(vgc, clock, &v_counter, &h_counter);
 
     switch (ioreg) {
     case CLEM_MMIO_REG_VBLBAR:

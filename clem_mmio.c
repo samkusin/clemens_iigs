@@ -360,8 +360,9 @@ static inline uint8_t _clem_mmio_statereg_c068(ClemensMMIO *mmio) {
     if (mmio->mmap_register & CLEM_MEM_IO_MMAP_ALTZPLC) {
         value |= 0x80;
     }
-    /* TODO PAGE2 TEXT */
-
+    if (mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) {
+        value |= 0x40;
+    }
     if (mmio->mmap_register & CLEM_MEM_IO_MMAP_RAMRD) {
         value |= 0x20;
     }
@@ -390,8 +391,9 @@ static uint8_t _clem_mmio_statereg_c068_set(ClemensMMIO *mmio, uint8_t value) {
     }
     /*  PAGE2 text - TODO when video options are fleshed out */
     if (value & 0x40) {
-        CLEM_UNIMPLEMENTED("c068 PAGE2 Text");
+        mmap_register |= CLEM_MEM_IO_MMAP_TXTPAGE2;
     } else {
+        mmap_register &= ~CLEM_MEM_IO_MMAP_TXTPAGE2;
     }
     /*  RAMRD */
     if (value & 0x20) {
@@ -533,7 +535,8 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     uint8_t ioreg = addr & 0xff;
     bool is_noop = (flags & CLEM_OP_IO_NO_OP) != 0;
 
-    //  TODO: some registers go through the CYA access path which runs faster
+    //  SHADOW, CYA, DMA are fast
+    //  SLOT, STATE are fast (read-only)
     *mega2_access = true;
 
     ref_clock.ts = tspec->clocks_spent;
@@ -605,10 +608,10 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_ALTZPLC) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_READC3ROM:
-        result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_C3ROM) ? 0x80 : 00;
+        result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_C3ROM) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_80COLSTORE_TEST:
-        result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE) ? 0x80 : 00;
+        result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_VBLBAR:
     case CLEM_MMIO_REG_VGC_VERTCNT:
@@ -619,19 +622,19 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         result = (mmio->vgc.mode_flags & CLEM_VGC_GRAPHICS_MODE) ? 0x00 : 0x80;
         break;
     case CLEM_MMIO_REG_MIXED_TEST:
-        result = (mmio->vgc.mode_flags & CLEM_VGC_MIXED_TEXT) ? 0x80 : 0x80;
+        result = (mmio->vgc.mode_flags & CLEM_VGC_MIXED_TEXT) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_TXTPAGE2_TEST:
-        result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x80 : 00;
+        result = (mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_ALTCHARSET_TEST:
-        result = (mmio->vgc.mode_flags & CLEM_VGC_ALTCHARSET) ? 0x80 : 00;
+        result = (mmio->vgc.mode_flags & CLEM_VGC_ALTCHARSET) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_HIRES_TEST:
-        result = (mmio->vgc.mode_flags & CLEM_VGC_HIRES) ? 0x80 : 00;
+        result = (mmio->vgc.mode_flags & CLEM_VGC_HIRES) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_80COLUMN_TEST:
-        result = (mmio->vgc.mode_flags & CLEM_VGC_80COLUMN_TEXT) ? 0x80 : 00;
+        result = (mmio->vgc.mode_flags & CLEM_VGC_80COLUMN_TEXT) ? 0x80 : 0x00;
         break;
     case CLEM_MMIO_REG_VGC_TEXT_COLOR:
         result = (uint8_t)((mmio->vgc.text_fg_color << 4) | mmio->vgc.text_bg_color);
@@ -647,6 +650,7 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         break;
     case CLEM_MMIO_REG_SLOTROMSEL:
         result = _clem_mmio_slotromsel_c02d(mmio);
+        *mega2_access = false;
         break;
     case CLEM_MMIO_REG_SPKR:
         result = clem_sound_read_switch(&mmio->dev_audio, ioreg, flags);
@@ -660,10 +664,13 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         break;
     case CLEM_MMIO_REG_SHADOW:
         result = _clem_mmio_shadow_c035(mmio);
+        *mega2_access = false;
         break;
     case CLEM_MMIO_REG_SPEED:
         result = mmio->speed_c036;
+        *mega2_access = false;
         break;
+    // TODO: DMA?  fast access as well
     case CLEM_MMIO_REG_RTC_CTL:
         if (!is_noop) {
             clem_rtc_command(&mmio->dev_rtc, tspec->clocks_spent, CLEM_IO_READ);
@@ -790,6 +797,7 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         break;
     case CLEM_MMIO_REG_STATEREG:
         result = _clem_mmio_statereg_c068(mmio);
+        *mega2_access = false;
         break;
     case CLEM_MMIO_REG_LC2_RAM_WP:
     case CLEM_MMIO_REG_LC2_RAM_WP2:
@@ -859,6 +867,7 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
     bool is_noop = (flags & CLEM_OP_IO_NO_OP) != 0;
     uint8_t ioreg = (addr & 0xff);
 
+    //  SHADOW, SPEED and DMA are fast
     *mega2_access = true;
 
     ref_clock.ts = tspec->clocks_spent;
@@ -972,9 +981,11 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
         break;
     case CLEM_MMIO_REG_SHADOW:
         _clem_mmio_shadow_c035_set(mmio, data);
+        *mega2_access = false;
         break;
     case CLEM_MMIO_REG_SPEED:
         _clem_mmio_speed_c036_set(mmio, tspec, data);
+        *mega2_access = false;
         break;
     case CLEM_MMIO_REG_SCC_B_CMD:
     case CLEM_MMIO_REG_SCC_A_CMD:

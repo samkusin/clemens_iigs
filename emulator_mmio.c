@@ -167,6 +167,7 @@ ClemensMonitor *clemens_get_monitor(ClemensMonitor *monitor, ClemensMMIO *mmio) 
         monitor->width = 560;
         monitor->height = 384;
     }
+
     return monitor;
 }
 
@@ -397,8 +398,8 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     //  1 fast cycle = 1 mega2 cycle (ns) / (clocks_step_mega2 / clocks_step) =
     //      (1 mega2 cycle (ns) * clocks_step) / clocks_step_mega2
 
-    // TODO: calculate delta_ns per emulate call to call 'real-time' systems
-    //      like VGC
+    //  TODO: this mega2_cycles thing is not really used (really old code)... remove it.
+    //        deal with 60hz timer differently.
     delta_mega2_cycles =
         (uint32_t)((clem->tspec.clocks_spent / clem->tspec.clocks_step_mega2) - mmio->mega2_cycles);
     mmio->mega2_cycles += delta_mega2_cycles;
