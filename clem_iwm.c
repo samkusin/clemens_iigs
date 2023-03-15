@@ -665,7 +665,7 @@ void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
         }
         break;
     default:
-        clem_iwm_glu_sync(iwm, drives, clock);
+        // clem_iwm_glu_sync(iwm, drives, clock);
         _clem_iwm_io_switch(iwm, drives, clock, ioreg, CLEM_IO_WRITE);
         if (ioreg & 1) {
             iwm->data = value;
@@ -760,7 +760,7 @@ uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBa
         break;
     default:
         if (!is_noop) {
-            clem_iwm_glu_sync(iwm, drives, clock);
+            // clem_iwm_glu_sync(iwm, drives, clock);
             _clem_iwm_io_switch(iwm, drives, clock, ioreg, CLEM_IO_READ);
         }
         if (!(ioreg & 1)) {

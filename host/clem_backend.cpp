@@ -74,9 +74,9 @@ void ClemensRunSampler::update(clem_clocks_duration_t clocksSpent, unsigned cycl
         sampledFramesPerSecond = frameTimeBuffer.size() * 1e6 / sampledFrameTime.count();
     }
 
-    //  calculate emulator speed by using cycles_spent * CLEM_CLOCKS_MEGA2_CYCLE
+    //  calculate emulator speed by using cycles_spent * CLEM_CLOCKS_PHI0_CYCLE
     //  as a reference for 1.023mhz where
-    //    reference_clocks = cycles_spent * CLEM_CLOCKS_MEGA2_CYCLE
+    //    reference_clocks = cycles_spent * CLEM_CLOCKS_PHI0_CYCLE
     //    acutal_clocks = sampledClocksSpent
     //    (reference / actual) * 1.023mhz is the emulator speed
     if (clocksBuffer.isFull()) {
@@ -94,9 +94,9 @@ void ClemensRunSampler::update(clem_clocks_duration_t clocksSpent, unsigned cycl
     }
     cyclesBuffer.push(cyclesSpent);
     sampledCyclesSpent += cyclesSpent;
-    if (sampledClocksSpent > (CLEM_CLOCKS_MEGA2_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND / 10)) {
+    if (sampledClocksSpent > (CLEM_CLOCKS_PHI0_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND / 10)) {
         double cyclesPerClock = (double)sampledCyclesSpent / sampledClocksSpent;
-        sampledMachineSpeedMhz = 1.023 * cyclesPerClock * CLEM_CLOCKS_MEGA2_CYCLE;
+        sampledMachineSpeedMhz = 1.023 * cyclesPerClock * CLEM_CLOCKS_PHI0_CYCLE;
     }
 
     if (vblsBuffer.isFull()) {
@@ -675,8 +675,8 @@ cinek::ByteBuffer ClemensBackend::loadROM(const char *romPathname) {
 
 void ClemensBackend::initApple2GS() {
     const unsigned kFPIBankCount = CLEM_IIGS_FPI_MAIN_RAM_BANK_LIMIT;
-    const uint32_t kClocksPerFastCycle = CLEM_CLOCKS_FAST_CYCLE;
-    const uint32_t kClocksPerSlowCycle = CLEM_CLOCKS_MEGA2_CYCLE;
+    const uint32_t kClocksPerFastCycle = CLEM_CLOCKS_PHI2_FAST_CYCLE;
+    const uint32_t kClocksPerSlowCycle = CLEM_CLOCKS_PHI0_CYCLE;
     int result =
         clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle, romBuffer_.getHead(),
                      romBuffer_.getSize(), slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
