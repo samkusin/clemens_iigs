@@ -76,13 +76,13 @@ typedef struct {
  * a change to perform any platform specific initialization not handled by
  * the cross-platform application framework used.
  */
-void clem_host_platform_init();
+void clem_host_platform_init(void);
 
 /**
  * @brief Reverses clem_host_platform_init()
  *
  */
-void clem_host_platform_terminate();
+void clem_host_platform_terminate(void);
 
 /**
  * @brief Returns the current processor the local thread is running on
@@ -91,7 +91,7 @@ void clem_host_platform_terminate();
  *
  * @return unsigned
  */
-unsigned clem_host_get_processor_number();
+unsigned clem_host_get_processor_number(void);
 
 /**
  * @brief Generates a UUID using the preferred OS method
@@ -144,7 +144,7 @@ unsigned clem_joystick_poll(ClemensHostJoystick *joysticks);
  * @brief Terminates the active joystick system.
  *
  */
-void clem_joystick_close_devices();
+void clem_joystick_close_devices(void);
 
 #ifdef __cplusplus
 }

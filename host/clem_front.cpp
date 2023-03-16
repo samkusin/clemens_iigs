@@ -625,10 +625,10 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512),
       debugIOMode_(DebugIOMode::Core), vgcDebugMinScanline_(0), vgcDebugMaxScanline_(0),
       joystickSlotCount_(0), guiMode_(GUIMode::RebootEmulator),
-      guiPrevMode_(GUIMode::NoEmulator), diskUnit_{{diskLibrary_, kClemensDrive_3_5_D1},
-                                                   {diskLibrary_, kClemensDrive_3_5_D2},
-                                                   {diskLibrary_, kClemensDrive_5_25_D1},
-                                                   {diskLibrary_, kClemensDrive_5_25_D2}} {
+      guiPrevMode_(GUIMode::RebootEmulator), diskUnit_{{diskLibrary_, kClemensDrive_3_5_D1},
+                                                       {diskLibrary_, kClemensDrive_3_5_D2},
+                                                       {diskLibrary_, kClemensDrive_5_25_D1},
+                                                       {diskLibrary_, kClemensDrive_5_25_D2}} {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -1281,8 +1281,31 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
             setGUIMode(GUIMode::Emulator);
         }
         break;
-    case GUIMode::NoEmulator:
-        break;
+    case GUIMode::ShutdownEmulator: {
+        if (!ImGui::IsPopupOpen("Shutdown Emulator")) {
+            ImGui::OpenPopup("Shutdown Emulator");
+        }
+        ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(std::min(width * 0.5f, 640.0f), 0.0f));
+        if (ImGui::BeginPopupModal("Shutdown Emulator", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Spacing();
+            ImGui::TextUnformatted(CLEM_L10N_LABEL(kExitMessage));
+            ImGui::NewLine();
+            ImGui::Separator();
+            if (ImGui::Button("YES") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+                interop.exitApp = true;
+                ImGui::CloseCurrentPopup();
+                setGUIMode(GUIMode::Empty);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("No") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                ImGui::CloseCurrentPopup();
+                setGUIMode(GUIMode::Emulator);
+            }
+            ImGui::EndPopup();
+        }
+    } break;
     default:
         break;
     }
@@ -1457,11 +1480,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     if (ClemensHostImGui::IconButton(
             "Power", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kPowerButton),
             kIconSize)) {
-        if (isBackendRunning()) {
-            cmdPower("off");
-        } else {
-            cmdPower("on");
-        }
+        setGUIMode(GUIMode::ShutdownEmulator);
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
         ImGui::SetTooltip("Power");
@@ -2804,36 +2823,26 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
     screenV0 = 1.0f;
     screenV1 = 1.0f - screenV1;
 #endif
-    if (guiMode_ == GUIMode::NoEmulator) {
-        ImVec4 tint_col = ImVec4(0.1f, 0.1f, 0.1f, 0.5f);
-        emulatorHasKeyboardFocus_ = false;
-        emulatorHasMouseFocus_ = false;
-        ImGui::GetWindowDrawList()->AddRectFilled(
-            ImVec2(monitorAnchor.x, monitorAnchor.y),
-            ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y),
-            ImGui::GetColorU32(tint_col));
 
-    } else {
-        ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // No tint
-        ImGui::GetWindowDrawList()->AddImage(
-            texId, ImVec2(monitorAnchor.x, monitorAnchor.y),
-            ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y),
-            ImVec2(0, screenV0), ImVec2(screenU, screenV1), ImGui::GetColorU32(tint_col));
+    ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // No tint
+    ImGui::GetWindowDrawList()->AddImage(
+        texId, ImVec2(monitorAnchor.x, monitorAnchor.y),
+        ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y),
+        ImVec2(0, screenV0), ImVec2(screenU, screenV1), ImGui::GetColorU32(tint_col));
 
-        //  This logic is rather convoluted - we have two focus types and this logic is
-        //  an attempt to determine the user's intent regarding where keyboard and mouse
-        //  input goes (to the emulator vs GUI.)  Basically if the mouse pointer is in
-        //  the emulator view, all keyboard input goes to the view.  If the user
-        //  mouse-clicks inside the emulator view, all input goes to the view.
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !emulatorHasMouseFocus_) {
-            emulatorHasMouseFocus_ = ImGui::IsWindowHovered();
-        }
-        emulatorHasKeyboardFocus_ = emulatorHasMouseFocus_;
-        if (ImGui::IsWindowFocused()) {
-            emulatorHasKeyboardFocus_ = true;
-        }
-        emulatorHasKeyboardFocus_ = emulatorHasKeyboardFocus_ || ImGui::IsWindowHovered();
+    //  This logic is rather convoluted - we have two focus types and this logic is
+    //  an attempt to determine the user's intent regarding where keyboard and mouse
+    //  input goes (to the emulator vs GUI.)  Basically if the mouse pointer is in
+    //  the emulator view, all keyboard input goes to the view.  If the user
+    //  mouse-clicks inside the emulator view, all input goes to the view.
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !emulatorHasMouseFocus_) {
+        emulatorHasMouseFocus_ = ImGui::IsWindowHovered();
     }
+    emulatorHasKeyboardFocus_ = emulatorHasMouseFocus_;
+    if (ImGui::IsWindowFocused()) {
+        emulatorHasKeyboardFocus_ = true;
+    }
+    emulatorHasKeyboardFocus_ = emulatorHasKeyboardFocus_ || ImGui::IsWindowHovered();
 
     ImGui::EndChild();
     ImGui::End();
@@ -3061,11 +3070,7 @@ void ClemensFrontend::doHelpScreen(int width, int height) {
         ImGui::EndPopup();
     }
     if (!isOpen) {
-        if (isBackendRunning()) {
-            guiMode_ = GUIMode::Emulator;
-        } else {
-            guiMode_ = GUIMode::NoEmulator;
-        }
+        guiMode_ = GUIMode::Emulator;
     }
 }
 
@@ -3073,9 +3078,7 @@ bool ClemensFrontend::isEmulatorStarting() const {
     return guiMode_ == GUIMode::RebootEmulator || guiMode_ == GUIMode::StartingEmulator;
 }
 
-bool ClemensFrontend::isEmulatorActive() const {
-    return guiMode_ != GUIMode::NoEmulator && !isEmulatorStarting();
-}
+bool ClemensFrontend::isEmulatorActive() const { return !isEmulatorStarting(); }
 
 static std::string_view trimToken(const std::string_view &token, size_t off = 0,
                                   size_t length = std::string_view::npos) {
@@ -3131,8 +3134,8 @@ void ClemensFrontend::executeCommand(std::string_view command) {
         cmdBreak(operand);
     } else if (action == "reboot") {
         cmdReboot(operand);
-    } else if (action == "power") {
-        cmdPower(operand);
+    } else if (action == "shutdown") {
+        cmdShutdown(operand);
     } else if (action == "reset") {
         cmdReset(operand);
     } else if (action == "disk") {
@@ -3164,7 +3167,7 @@ void ClemensFrontend::cmdHelp(std::string_view operand) {
     if (!operand.empty()) {
         CLEM_TERM_COUT.print(TerminalLine::Warn, "Command specific help not yet supported.");
     }
-    CLEM_TERM_COUT.print(TerminalLine::Info, "power {on|off}              - power the machine");
+    CLEM_TERM_COUT.print(TerminalLine::Info, "shutdown                    - exit the emulator");
     CLEM_TERM_COUT.print(TerminalLine::Info,
                          "minimode                    - returns to user display mode");
     CLEM_TERM_COUT.print(TerminalLine::Info,
@@ -3362,30 +3365,8 @@ void ClemensFrontend::rebootInternal() {
 
 void ClemensFrontend::cmdReboot(std::string_view /*operand*/) { rebootInternal(); }
 
-void ClemensFrontend::cmdPower(std::string_view operand) {
-    if (operand == "off") {
-        if (isBackendRunning()) {
-            stopBackend();
-            setGUIMode(GUIMode::NoEmulator);
-            audio_.stop();
-            CLEM_TERM_COUT.print(TerminalLine::Info, "Shutting down machine...");
-        } else {
-            CLEM_TERM_COUT.print(TerminalLine::Error, "Not powered on.");
-        }
-    } else if (operand == "on") {
-        if (!isBackendRunning()) {
-            rebootInternal();
-            audio_.start();
-        } else {
-            CLEM_TERM_COUT.print(TerminalLine::Error, "Already on.");
-        }
-    } else if (operand.empty()) {
-        if (isBackendRunning()) {
-            CLEM_TERM_COUT.print(TerminalLine::Error, "Powered on.");
-        } else {
-            CLEM_TERM_COUT.print(TerminalLine::Error, "Powered off.");
-        }
-    }
+void ClemensFrontend::cmdShutdown(std::string_view /*operand*/) {
+    setGUIMode(GUIMode::ShutdownEmulator);
 }
 
 void ClemensFrontend::cmdReset(std::string_view /*operand*/) { backendQueue_.reset(); }

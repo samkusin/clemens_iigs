@@ -5,6 +5,8 @@
 
 namespace ClemensL10N {
 
+extern const char *kExitMessage[];
+
 extern const char *kWelcomeText[];
 extern const char *kGSKeyboardCommands[];
 extern const char *kMouseLock[];

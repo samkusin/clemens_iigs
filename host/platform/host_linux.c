@@ -23,7 +23,7 @@
 #include <uuid/uuid.h>
 
 //  seems to be a reliable way to call getcpu() regardless of glibc/distribution
-static inline unsigned local_getcpu() {
+static inline unsigned local_getcpu(void) {
 #ifdef SYS_getcpu
     int cpu, status;
     status = syscall(SYS_getcpu, &cpu, NULL, NULL);
@@ -33,18 +33,18 @@ static inline unsigned local_getcpu() {
 #endif
 }
 
-void clem_host_platform_init() {}
+void clem_host_platform_init(void) {}
 
-void clem_host_platform_terminate() {}
+void clem_host_platform_terminate(void) {}
 
-unsigned clem_host_get_processor_number() { return local_getcpu(); }
+unsigned clem_host_get_processor_number(void) { return local_getcpu(); }
 
 void clem_host_uuid_gen(ClemensHostUUID *uuid) {
     assert(sizeof(uuid_t) <= sizeof(uuid->data));
     uuid_generate(uuid->data);
 }
 
-char *get_process_executable_path(char *outpath, size_t* outpath_size) {
+char *get_process_executable_path(char *outpath, size_t *outpath_size) {
     //   TODO: /proc/self/exe
     struct stat file_stat;
     ssize_t bufsz;
@@ -231,7 +231,7 @@ static int _clem_joystick_evdev_normalize_value(int value, struct ClemensEvdevAx
     return (int)(scalar * CLEM_HOST_JOYSTICK_AXIS_DELTA);
 }
 
-static void _clem_joystick_evdev_clear_devices() {
+static void _clem_joystick_evdev_clear_devices(void) {
     unsigned i;
     for (i = 0; i < CLEM_HOST_JOYSTICK_LIMIT; ++i) {
         _clem_joystick_evdev_close(&s_joysticks[i]);
@@ -243,7 +243,7 @@ static void _clem_joystick_evdev_clear_devices() {
 //  specific device and the device enumeration couldn't find that device.
 //  If so, then this function is called again to enumerate all valid devices
 //
-void _clem_joystick_evdev_enum_devices() {
+void _clem_joystick_evdev_enum_devices(void) {
     DIR *dir;
     struct dirent *entry;
     size_t prefix_len = strlen(CLEM_HOST_EVDEV_PREFIX);
@@ -369,4 +369,4 @@ unsigned clem_joystick_poll(ClemensHostJoystick *joysticks) {
     return CLEM_HOST_JOYSTICK_LIMIT;
 }
 
-void clem_joystick_close_devices() { _clem_joystick_evdev_clear_devices(); }
+void clem_joystick_close_devices(void) { _clem_joystick_evdev_clear_devices(); }
