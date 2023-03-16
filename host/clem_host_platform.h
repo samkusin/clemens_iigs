@@ -45,9 +45,9 @@
 #elif defined(CLEMENS_PLATFORM_LINUX)
 #define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT ""
 #elif defined(CLEMENS_PLATFORM_MACOS)
-#define CLEM_HOST_JOYSTICK_PROVIDER_GAMECONTROLLER  "gamecontroller"
-#define CLEM_HOST_JOYSTICK_PROVIDER_HIDIOKIT  "hid-iokit"
-#define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT CLEM_HOST_JOYSTICK_PROVIDER_GAMECONTROLLER
+#define CLEM_HOST_JOYSTICK_PROVIDER_GAMECONTROLLER "gamecontroller"
+#define CLEM_HOST_JOYSTICK_PROVIDER_HIDIOKIT       "hid-iokit"
+#define CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT        CLEM_HOST_JOYSTICK_PROVIDER_GAMECONTROLLER
 #endif
 
 #ifdef __cplusplus
@@ -80,7 +80,7 @@ void clem_host_platform_init();
 
 /**
  * @brief Reverses clem_host_platform_init()
- * 
+ *
  */
 void clem_host_platform_terminate();
 

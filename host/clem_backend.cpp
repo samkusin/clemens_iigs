@@ -1,4 +1,5 @@
 #include "clem_backend.hpp"
+#include "cinek/ckdefs.h"
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
 #include "clem_host_shared.hpp"
@@ -13,6 +14,7 @@
 #include <chrono>
 #include <cstdarg>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -20,10 +22,37 @@
 
 #include "fmt/format.h"
 
-static constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
-static constexpr unsigned kInterpreterMemorySize = 1 * 1024 * 1024;
-static constexpr unsigned kLogOutputLineLimit = 1024;
-static constexpr unsigned kSmartPortDiskBlockCount = 32 * 1024 * 2; // 32 MB blocks
+namespace {
+
+constexpr unsigned kSlabMemorySize = 32 * 1024 * 1024;
+constexpr unsigned kInterpreterMemorySize = 1 * 1024 * 1024;
+constexpr unsigned kLogOutputLineLimit = 1024;
+constexpr unsigned kSmartPortDiskBlockCount = 32 * 1024 * 2; // 32 MB blocks
+
+//  TODO: candidate for moving into the platform-specific codebase if the
+//  C runtime method doesn't work on all platforms
+//
+//  reference: https://stackoverflow.com/a/44063597
+//
+//  The idea here is that since gmtime returns the calendar time, mktime will
+//  return the epoch time, converting it back to UTC
+int get_local_epoch_time_delta_in_seconds() {
+    struct tm split_time_utc;
+    struct tm *split_time_utc_ptr;
+    time_t time_raw = time(NULL);
+    time_t time_utc;
+#if CK_COMPILER_MSVC
+    gmtime_s(&split_time_utc, &time_raw);
+    split_time_utc_ptr = &split_time_utc;
+#else
+    split_time_utc_ptr = gmtime_r(&time_raw, &split_time_utc);
+#endif
+    split_time_utc_ptr->tm_isdst = -1;
+    time_utc = mktime(split_time_utc_ptr);
+    return (int)difftime(time_raw, time_utc);
+}
+
+} // namespace
 
 ClemensRunSampler::ClemensRunSampler() { reset(); }
 
@@ -374,6 +403,14 @@ bool ClemensBackend::isRunning() const {
 #endif
 #endif
 
+static void setClemensMMIOLocalEpochTime(ClemensMMIO *mmio) {
+    time_t epoch_time = time(NULL);
+    int time_adjustment = get_local_epoch_time_delta_in_seconds();
+    constexpr time_t kEpoch1904To1970Seconds = 2082844800;
+    auto epoch_time_1904 = epoch_time + time_adjustment + kEpoch1904To1970Seconds;
+    clemens_rtc_set(mmio, (unsigned)epoch_time_1904);
+}
+
 ClemensCommandQueue::DispatchResult
 ClemensBackend::main(ClemensBackendState &backendState,
                      const ClemensCommandQueue::ResultBuffer &commandResults,
@@ -396,12 +433,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
         //
         areInstructionsLogged_ = stepsRemaining_.has_value() && (*stepsRemaining_ > 0);
 
-        const time_t kEpoch1904To1970Seconds = 2082844800;
-        auto epoch_time_1904 =
-            (std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) +
-             kEpoch1904To1970Seconds);
-
-        clemens_rtc_set(&mmio_, (unsigned)epoch_time_1904);
+        setClemensMMIOLocalEpochTime(&mmio_);
 
         // TODO: this should be an adaptive scalar to support a variety of devices.
         // Though if the emulator runs hot (cannot execute the desired cycles in enough time),
