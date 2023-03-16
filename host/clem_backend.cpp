@@ -42,7 +42,8 @@ int get_local_epoch_time_delta_in_seconds() {
     time_t time_raw = time(NULL);
     time_t time_utc;
 #if CK_COMPILER_MSVC
-    split_time_utc_ptr = gmtime_s(&time_raw, &split_time_utc);
+    gmtime_s(&split_time_utc, &time_raw);
+    split_time_utc_ptr = &split_time_utc;
 #else
     split_time_utc_ptr = gmtime_r(&time_raw, &split_time_utc);
 #endif

@@ -42,7 +42,7 @@
 /**@{*/
 
 #ifdef _MSC_VER
-#define CK_COMPILER_ 1
+#define CK_COMPILER_MSVC 1
 #else
 #define CK_COMPILER_MSVC 0
 #endif
