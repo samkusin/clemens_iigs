@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cstdarg>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -374,6 +375,14 @@ bool ClemensBackend::isRunning() const {
 #endif
 #endif
 
+static void setClemensMMIOLocalEpochTime(ClemensMMIO *mmio, time_t epochTime) {
+    struct tm *regionTime = localtime(&epochTime);
+    epochTime = mktime(regionTime);
+    constexpr time_t kEpoch1904To1970Seconds = 2082844800;
+    auto epoch_time_1904 = epochTime + regionTime->tm_gmtoff + kEpoch1904To1970Seconds;
+    clemens_rtc_set(mmio, (unsigned)epoch_time_1904);
+}
+
 ClemensCommandQueue::DispatchResult
 ClemensBackend::main(ClemensBackendState &backendState,
                      const ClemensCommandQueue::ResultBuffer &commandResults,
@@ -382,6 +391,8 @@ ClemensBackend::main(ClemensBackendState &backendState,
     std::optional<unsigned> hitBreakpoint;
 
     bool isMachineRunning = isRunning();
+    time_t epoch_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    setClemensMMIOLocalEpochTime(&mmio_, epoch_time);
 
     if (isMachineRunning) {
         //  Run the emulator in either 'step' or 'run' mode.
@@ -396,12 +407,12 @@ ClemensBackend::main(ClemensBackendState &backendState,
         //
         areInstructionsLogged_ = stepsRemaining_.has_value() && (*stepsRemaining_ > 0);
 
-        const time_t kEpoch1904To1970Seconds = 2082844800;
-        auto epoch_time_1904 =
-            (std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) +
-             kEpoch1904To1970Seconds);
-
-        clemens_rtc_set(&mmio_, (unsigned)epoch_time_1904);
+        time_t next_epoch_time =
+            std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        if (next_epoch_time != epoch_time) {
+            epoch_time = next_epoch_time;
+            setClemensMMIOLocalEpochTime(&mmio_, epoch_time);
+        }
 
         // TODO: this should be an adaptive scalar to support a variety of devices.
         // Though if the emulator runs hot (cannot execute the desired cycles in enough time),

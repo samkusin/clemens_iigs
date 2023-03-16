@@ -155,7 +155,7 @@ Inside the project directory execute the following.
 ```
 cmake -B build -DCMAKE_BUILD_TYPE=<Debug|RelWithDbgInfo|Release> -DBUILD_TESTING=OFF
 cmake --build build --config <Debug|RelWithDbgInfo|Release>
-cp build-run/clemens_iigs/clemens_iigs <your_selected_install_directory>
+cp build/host/clemens_iigs <your_selected_install_directory>
 ```
 
 ### Windows
