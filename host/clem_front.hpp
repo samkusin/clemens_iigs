@@ -91,7 +91,7 @@ class ClemensFrontend : public ClemensHostView {
     void cmdBreak(std::string_view operand);
     void cmdRun(std::string_view operand);
     void cmdReboot(std::string_view operand);
-    void cmdPower(std::string_view operand);
+    void cmdShutdown(std::string_view operand);
     void cmdReset(std::string_view operand);
     void cmdDisk(std::string_view operand);
     void cmdStep(std::string_view operand);
@@ -336,7 +336,7 @@ class ClemensFrontend : public ClemensHostView {
         Help,
         RebootEmulator,
         StartingEmulator,
-        NoEmulator
+        ShutdownEmulator
     };
     void setGUIMode(GUIMode guiMode);
 

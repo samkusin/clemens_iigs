@@ -231,7 +231,7 @@ static int _clem_joystick_evdev_normalize_value(int value, struct ClemensEvdevAx
     return (int)(scalar * CLEM_HOST_JOYSTICK_AXIS_DELTA);
 }
 
-static void _clem_joystick_evdev_clear_devices() {
+static void _clem_joystick_evdev_clear_devices(void) {
     unsigned i;
     for (i = 0; i < CLEM_HOST_JOYSTICK_LIMIT; ++i) {
         _clem_joystick_evdev_close(&s_joysticks[i]);
@@ -243,7 +243,7 @@ static void _clem_joystick_evdev_clear_devices() {
 //  specific device and the device enumeration couldn't find that device.
 //  If so, then this function is called again to enumerate all valid devices
 //
-void _clem_joystick_evdev_enum_devices() {
+void _clem_joystick_evdev_enum_devices(void) {
     DIR *dir;
     struct dirent *entry;
     size_t prefix_len = strlen(CLEM_HOST_EVDEV_PREFIX);
