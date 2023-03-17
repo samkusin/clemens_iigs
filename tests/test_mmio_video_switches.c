@@ -28,7 +28,7 @@ void setUp(void) {
     tspec.clocks_step = CLEM_CLOCKS_PHI0_CYCLE;
 
     memset(&mmio, 0, sizeof(mmio));
-    clem_mmio_reset(&mmio, CLEM_CLOCKS_PHI0_CYCLE);
+    clem_mmio_reset(&mmio);
 }
 
 void tearDown(void) {}
