@@ -25,7 +25,9 @@ static inline void _clem_vgc_set_scanline_int(struct ClemensVGC *vgc, bool enabl
 
 static inline unsigned _clem_vgc_calc_h_counter(clem_clocks_duration_t duration,
                                                 clem_clocks_duration_t ref_step) {
-    return (duration / clem_calc_clocks_step_from_ns(980, ref_step)) & 0x7f; /* 7 bits */
+    // TODO: this uses avg ns per cycle over a scanline vs 0-63 = 978 and 64 = 1108ns
+    //       if this is ever needed, a reminder here.
+    return (duration / clem_calc_clocks_step_from_ns(CLEM_PHI0_CYCLE_NS)) & 0x7f; /* 7 bits */
 }
 
 static bool _clem_vgc_is_scanline_int_enabled(const uint8_t *mega2_e1, unsigned v_counter) {
@@ -206,10 +208,7 @@ void clem_vgc_scanline_enable_int(struct ClemensVGC *vgc, bool enable) {
 }
 
 #define CLEM_VGC_HORIZ_SCAN_DURATION(_ref_step_)                                                   \
-    (clem_calc_clocks_step_from_ns(CLEM_VGC_HORIZ_SCAN_TIME_NS, _ref_step_))
-
-#define CLEM_VGC_NTSC_SCAN_DURATION(_ref_step_)                                                    \
-    (clem_calc_clocks_step_from_ns_long(CLEM_VGC_NTSC_SCAN_TIME_NS, _ref_step_))
+    (clem_calc_clocks_step_from_ns(CLEM_VGC_HORIZ_SCAN_TIME_NS))
 
 #define CLEM_VGC_NTSC_FRAMES_PER_SECOND (1e6f / (CLEM_VGC_NTSC_SCAN_TIME_NS / 1000.0f))
 

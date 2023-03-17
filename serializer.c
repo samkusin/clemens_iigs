@@ -154,6 +154,7 @@ struct ClemensSerializerRecord kIWM[] = {
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, last_clocks_ts),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, last_write_clocks_ts),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, data_access_time_ns),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceIWM, state_update_clocks_dt),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, io_flags),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, out_phase),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, enable2),
@@ -172,7 +173,6 @@ struct ClemensSerializerRecord kIWM[] = {
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, ns_drive_hold),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, lss_state),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, lss_write_reg),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, lss_update_dt_ns),
     /* skip enable_debug and all debug options */
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
