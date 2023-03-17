@@ -154,6 +154,7 @@ struct ClemensSerializerRecord kIWM[] = {
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, last_clocks_ts),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, last_write_clocks_ts),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, data_access_time_ns),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceIWM, state_update_clocks_dt),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, io_flags),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, out_phase),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, enable2),
@@ -172,7 +173,6 @@ struct ClemensSerializerRecord kIWM[] = {
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, ns_drive_hold),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, lss_state),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, lss_write_reg),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, lss_update_dt_ns),
     /* skip enable_debug and all debug options */
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
@@ -291,7 +291,6 @@ struct ClemensSerializerRecord kMMIO[] = {
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, last_data_address),
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, emulator_detect),
     CLEM_SERIALIZER_RECORD_UINT8(ClemensMMIO, new_video_c029),
-    CLEM_SERIALIZER_RECORD_DURATION(ClemensMMIO, clocks_step_mega2),
     CLEM_SERIALIZER_RECORD_UINT8(ClemensMMIO, speed_c036),
     CLEM_SERIALIZER_RECORD_UINT64(ClemensMMIO, mega2_cycles),
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, timer_60hz_us),
@@ -311,8 +310,11 @@ struct ClemensSerializerRecord kMemory[] = {
 struct ClemensSerializerRecord kTimeSpec[] = {
     CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, clocks_step),
     CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, clocks_step_fast),
-    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, clocks_step_mega2),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensTimeSpec, clocks_spent),
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensTimeSpec, clocks_next_phi0),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, phi0_clocks_stretch),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, phi0_current_step),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensTimeSpec, mega2_scanline_ctr),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 struct ClemensSerializerRecord kCPURegs[] = {

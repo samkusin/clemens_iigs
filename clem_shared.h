@@ -17,16 +17,27 @@ typedef uint8_t *(*ClemensSerializerAllocateCb)(unsigned, void *);
  *  Yet since most time calculations in the emulator are done with fixed point-like
  *  math, the aim is to keep the clocks count per cycle high enough for fixed
  *  math to work with unsigned 32-bit numbers.
- *  
+ *
  *  Based on this, care should be taken when attempting to emulate a 8mhz machine
  *  in the future - though most I/O is performed using PHI0 cycles.
- * 
+ *
  *  If you divide the CLEM_CLOCKS_PHI0_CYCLE by the CLEM_CLOCKS_PHI2_FAST_CYCLE
  *  the value will be the effective maximum clock speed in Mhz of the CPU.
  */
+
 #define CLEM_CLOCKS_14MHZ_CYCLE     200U                           // 14.318 Mhz
+#define CLEM_CLOCKS_7MHZ_CYCLE      400U                           // 7.159  Mhz
+#define CLEM_CLOCKS_4MHZ_CYCLE      700U                           // 4.091  Mhz
+#define CLEM_CLOCKS_2MHZ_CYCLE      (CLEM_CLOCKS_14MHZ_CYCLE * 7)  // 2.045  Mhz
 #define CLEM_CLOCKS_PHI2_FAST_CYCLE (CLEM_CLOCKS_14MHZ_CYCLE * 5)  // 2.864  Mhz
 #define CLEM_CLOCKS_PHI0_CYCLE      (CLEM_CLOCKS_14MHZ_CYCLE * 14) // 1.023  Mhz
+
+// IMPORTANT! This is rounded from 69.8ns - which when scaling up to PHI0 translates
+//            to 977.7 ns without rounding.  Due to the stretch cycle, this effectively
+//            rounds up to 980ns, which is really what most system timings rely on
+//            So, rounding up.  Bon chance.
+#define CLEM_14MHZ_CYCLE_NS 70U
+#define CLEM_PHI0_CYCLE_NS  980U
 
 #define CLEM_MEGA2_CYCLE_NS          978
 #define CLEM_MEGA2_CYCLES_PER_SECOND 1023000U
@@ -74,29 +85,19 @@ struct ClemensClock {
     clem_clocks_duration_t ref_step;
 };
 
-/** _clock_ is of type ClemensClock */
-#define clem_calc_secs_from_clocks(_clock_)                                                        \
-    ((CLEM_MEGA2_CYCLE_NS * (uint64_t)((_clock_)->ts / (_clock_)->ref_step)) * 1.0e-9)
-
-/* BEWARE - these macros act on sub second time intervals (per frame deltas.)
-   Do not use these utilities to calculate values over long time intervals
+/** _clock_ is of type ClemensClock
+    BEWARE - these macros act on sub second time intervals (per frame deltas.)
+    Do not use these utilities to calculate values over long time intervals
 */
-/** _clocks_step_ and _clocks_step_reference_ is of type clem_clocks_duration_t
- */
-#define clem_calc_ns_step_from_clocks(_clocks_step_, _clocks_step_reference_)                      \
-    ((uint32_t)(CLEM_MEGA2_CYCLE_NS * (uint64_t)(_clocks_step_) / (_clocks_step_reference_)))
+#define clem_calc_ns_step_from_clocks(_clocks_step_)                                               \
+    ((unsigned)(CLEM_14MHZ_CYCLE_NS * (_clocks_step_) / CLEM_CLOCKS_14MHZ_CYCLE))
 
-/** _ns_ should be a delta time - this will break for deltas > 1ms */
-#define clem_calc_clocks_step_from_ns(_ns_, _clocks_step_reference_)                               \
-    ((clem_clocks_duration_t)((_ns_) * (_clocks_step_reference_)) / CLEM_MEGA2_CYCLE_NS)
+#define clem_calc_clocks_step_from_ns(_ns_)                                                        \
+    ((clem_clocks_duration_t)((_ns_)*CLEM_CLOCKS_14MHZ_CYCLE) / CLEM_14MHZ_CYCLE_NS)
 
-/** _ns_ should be a delta time < 1 second */
-#define clem_calc_clocks_step_from_ns_long(_ns_, _clocks_step_reference_)                          \
-    ((clem_clocks_duration_t)((clem_clocks_time_t)(_ns_) * (_clocks_step_reference_) /             \
-                              CLEM_MEGA2_CYCLE_NS))
-
-#define clem_calc_clocks_remainder_from_ns(_ns_, _clocks_step_reference_)                          \
-    ((clem_clocks_duration_t)((_ns_) * (_clocks_step_reference_)) % CLEM_MEGA2_CYCLE_NS)
+/* intentional - paranthesized expression should be done first to avoid precision loss*/
+#define clem_calc_secs_from_clocks(_clock_)                                                        \
+    ((CLEM_14MHZ_CYCLE_NS * (uint64_t)((_clock_)->ts / CLEM_CLOCKS_14MHZ_CYCLE)) * 1.0e-9)
 
 /**
  * @brief Defines the abstract interface to slot-based card hardware

@@ -470,12 +470,10 @@ unsigned _ay3_render(struct ClemensAY38913 *psg, clem_clocks_duration_t duration
                      float *out, unsigned out_limit, unsigned samples_per_frame,
                      unsigned samples_per_second) {
 
-    float render_window_secs =
-        clem_calc_ns_step_from_clocks(duration, CLEM_CLOCKS_PHI0_CYCLE) * 1e-9f;
+    float render_window_secs = clem_calc_ns_step_from_clocks(duration) * 1e-9f;
     float sample_dt = 1.0f / samples_per_second;
     unsigned sample_count = 0;
-    clem_clocks_duration_t render_dt =
-        clem_calc_clocks_step_from_ns(sample_dt * 1e9f, CLEM_CLOCKS_PHI0_CYCLE);
+    clem_clocks_duration_t render_dt = clem_calc_clocks_step_from_ns(sample_dt * 1e9f);
     clem_clocks_duration_t render_ts = 0;
     float render_t;
     uint32_t queue_index = 0;

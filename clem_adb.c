@@ -1802,7 +1802,7 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
 
 void clem_gameport_sync(struct ClemensDeviceGameport *gameport, struct ClemensClock *clocks) {
     clem_clocks_duration_t dt_clocks = clocks->ts - gameport->ts_last_frame;
-    unsigned delta_ns = (unsigned)(clem_calc_ns_step_from_clocks(dt_clocks, clocks->ref_step));
+    unsigned delta_ns = (unsigned)(clem_calc_ns_step_from_clocks(dt_clocks));
     int paddle_index;
     uint32_t charge_time;
     for (paddle_index = 0; paddle_index < 4; ++paddle_index) {

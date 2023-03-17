@@ -515,7 +515,7 @@ void clem_sound_glu_sync(struct ClemensDeviceAudio *glu, struct ClemensClock *cl
     }
 
 #if CLEM_AUDIO_DIAGNOSTICS
-    glu->diag_dt_ns += clem_calc_ns_step_from_clocks(dt_clocks, clocks->ref_step);
+    glu->diag_dt_ns += clem_calc_ns_step_from_clocks(dt_clocks);
     glu->diag_dt += dt_clocks;
     if (glu->diag_dt_ns >= CLEM_1SEC_NS) {
         float scalar = ((float)CLEM_1SEC_NS) / glu->diag_dt_ns;

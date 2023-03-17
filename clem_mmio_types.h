@@ -283,6 +283,9 @@ struct ClemensDeviceIWM {
     /** Used for determining if applications are actually using the IWM for RW disk access*/
     uint32_t data_access_time_ns;
 
+    /** Clocks delta per update, has two modes - fast and slow, 4mhz/2mhz */
+    clem_clocks_duration_t state_update_clocks_dt;
+
     /** Drive I/O */
     unsigned io_flags;  /**< Disk port I/O flags */
     unsigned out_phase; /**< PH0-PH3 bits sent to drive */
@@ -301,12 +304,11 @@ struct ClemensDeviceIWM {
     bool latch_mode;          /**< If True, latch value lasts for full 8 xfer */
     bool clock_8mhz;          /**< If True, 8mhz clock - never used? */
 
-    unsigned state;            /**< The current IWM register state */
-    unsigned ns_latch_hold;    /**< The latch value expiration timer */
-    unsigned ns_drive_hold;    /**< Time until drive motor off */
-    unsigned lss_state;        /**< State of our custom LSS */
-    unsigned lss_write_reg;    /**< Used for detecting write underruns */
-    unsigned lss_update_dt_ns; /**< Fast mode = 250ns, Slow = 500ns */
+    unsigned state;         /**< The current IWM register state */
+    unsigned ns_latch_hold; /**< The latch value expiration timer */
+    unsigned ns_drive_hold; /**< Time until drive motor off */
+    unsigned lss_state;     /**< State of our custom LSS */
+    unsigned lss_write_reg; /**< Used for detecting write underruns */
 
     bool enable_debug; /**< If True, activates file logging */
 };
@@ -417,7 +419,6 @@ typedef struct ClemensMMIO {
     uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
     uint8_t fpi_ram_bank_count; // the number of RAM banks available to the memory mapper
 
-    clem_clocks_duration_t clocks_step_mega2;
     uint64_t mega2_cycles;            // number of mega2 pulses/ticks since startup
     uint32_t timer_60hz_us;           // used for executing logic per 1/60th second
     int32_t card_expansion_rom_index; // card slot has the mutex on C800-CFFF
