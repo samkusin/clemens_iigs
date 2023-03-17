@@ -419,7 +419,6 @@ typedef struct ClemensMMIO {
     uint8_t speed_c036;         // see kClemensMMIOSpeed_xxx
     uint8_t fpi_ram_bank_count; // the number of RAM banks available to the memory mapper
 
-    clem_clocks_duration_t clocks_step_mega2;
     uint64_t mega2_cycles;            // number of mega2 pulses/ticks since startup
     uint32_t timer_60hz_us;           // used for executing logic per 1/60th second
     int32_t card_expansion_rom_index; // card slot has the mutex on C800-CFFF

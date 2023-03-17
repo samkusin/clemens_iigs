@@ -54,10 +54,6 @@ struct ClemensTimeSpec {
     /** used for calculating the next clock edge for PHI0, and when 0 is at the
     stretch cycle */
     unsigned mega2_scanline_ctr;
-
-    //  TODO: remove
-    /* typically FPI speed mhz * clocks_step_fast */
-    clem_clocks_duration_t clocks_step_mega2;
 };
 
 /* Note that in emulation mode, the EmulatedBrk flag should be

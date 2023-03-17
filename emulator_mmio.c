@@ -324,7 +324,7 @@ uint64_t clemens_clocks_per_second(ClemensMMIO *mmio, bool *is_slow_speed) {
     } else {
         *is_slow_speed = true;
     }
-    return mmio->clocks_step_mega2 * CLEM_MEGA2_CYCLES_PER_SECOND;
+    return CLEM_CLOCKS_PHI0_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND;
 }
 
 static void _clem_mmio_write_hook(struct ClemensMemory *mem, struct ClemensTimeSpec *tspec,
@@ -366,11 +366,11 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
         clem->mem.mmio_read = _clem_mmio_read_hook;
         clem->mem.mmio_niolc = _clem_mmio_niolc;
         clem_disk_reset_drives(&mmio->active_drives);
-        clem_mmio_reset(mmio, clem->tspec.clocks_step_mega2);
+        clem_mmio_reset(mmio);
         /* extension cards reset handling */
         clem_iwm_speed_disk_gate(mmio, &clem->tspec);
         clock.ts = clem->tspec.clocks_spent;
-        clock.ref_step = clem->tspec.clocks_step_mega2;
+        clock.ref_step = CLEM_CLOCKS_PHI0_CYCLE;
         for (i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
             if (mmio->card_slot[i]) {
                 mmio->card_slot[i]->io_reset(&clock, mmio->card_slot[i]->context);
@@ -401,12 +401,12 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     //  TODO: this mega2_cycles thing is not really used (really old code)... remove it.
     //        deal with 60hz timer differently.
     delta_mega2_cycles =
-        (uint32_t)((clem->tspec.clocks_spent / clem->tspec.clocks_step_mega2) - mmio->mega2_cycles);
+        (uint32_t)((clem->tspec.clocks_spent / CLEM_CLOCKS_PHI0_CYCLE) - mmio->mega2_cycles);
     mmio->mega2_cycles += delta_mega2_cycles;
     mmio->timer_60hz_us += delta_mega2_cycles;
 
     clock.ts = clem->tspec.clocks_spent;
-    clock.ref_step = clem->tspec.clocks_step_mega2;
+    clock.ref_step = CLEM_CLOCKS_PHI0_CYCLE;
 
     card_nmis = 0;
     card_irqs = 0;

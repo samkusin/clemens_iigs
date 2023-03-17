@@ -16,7 +16,7 @@ static void fixture_sync(int ticks) {
     struct ClemensClock clocks;
     for (int i = 0; i < ticks; ++i) {
         clocks.ts = tspec.clocks_spent;
-        clocks.ref_step = tspec.clocks_step_mega2;
+        clocks.ref_step = CLEM_CLOCKS_PHI0_CYCLE;
         clem_vgc_sync(&mmio.vgc, &clocks, e0_bank, e1_bank);
         tspec.clocks_spent += tspec.clocks_step;
     }
@@ -24,12 +24,11 @@ static void fixture_sync(int ticks) {
 
 void setUp(void) {
     tspec.clocks_spent = 0;
-    tspec.clocks_step_mega2 = CLEM_CLOCKS_PHI0_CYCLE;
     tspec.clocks_step_fast = CLEM_CLOCKS_PHI2_FAST_CYCLE;
     tspec.clocks_step = CLEM_CLOCKS_PHI0_CYCLE;
 
     memset(&mmio, 0, sizeof(mmio));
-    clem_mmio_reset(&mmio, tspec.clocks_step_mega2);
+    clem_mmio_reset(&mmio, CLEM_CLOCKS_PHI0_CYCLE);
 }
 
 void tearDown(void) {}

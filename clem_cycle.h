@@ -21,9 +21,6 @@ static inline void _clem_timespec_init(struct ClemensTimeSpec *tspec,
     tspec->phi0_current_step = CLEM_CLOCKS_PHI0_CYCLE;
     tspec->clocks_next_phi0 = CLEM_CLOCKS_PHI0_CYCLE;
     tspec->mega2_scanline_ctr = 0;
-
-    //  TODO: remove
-    tspec->clocks_step_mega2 = CLEM_CLOCKS_PHI0_CYCLE;
 }
 
 static inline void _clem_timespec_next_step(struct ClemensTimeSpec *tspec,

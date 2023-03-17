@@ -540,7 +540,7 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     *mega2_access = true;
 
     ref_clock.ts = tspec->clocks_spent;
-    ref_clock.ref_step = *mega2_access ? tspec->clocks_step_mega2 : tspec->clocks_step;
+    ref_clock.ref_step = *mega2_access ? CLEM_CLOCKS_PHI0_CYCLE : tspec->clocks_step;
 
     if (flags & CLEM_OP_IO_CARD) {
         uint8_t slot_idx;
@@ -871,7 +871,7 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
     *mega2_access = true;
 
     ref_clock.ts = tspec->clocks_spent;
-    ref_clock.ref_step = *mega2_access ? tspec->clocks_step_mega2 : tspec->clocks_step;
+    ref_clock.ref_step = *mega2_access ? CLEM_CLOCKS_PHI0_CYCLE : tspec->clocks_step;
 
     if ((flags & CLEM_OP_IO_CARD) && addr >= 0xC100) {
         uint8_t slot_idx = (uint8_t)(addr >> 8) - 0xc0 - 1;
@@ -1636,9 +1636,9 @@ void _clem_mmio_init_page_maps(ClemensMMIO *mmio, uint32_t memory_flags) {
     clem_mmio_restore(mmio);
 }
 
-void clem_mmio_reset(ClemensMMIO *mmio, clem_clocks_duration_t mega2_clocks_step) {
+void clem_mmio_reset(ClemensMMIO *mmio) {
     clem_timer_reset(&mmio->dev_timer);
-    clem_rtc_reset(&mmio->dev_rtc, mega2_clocks_step);
+    clem_rtc_reset(&mmio->dev_rtc, CLEM_CLOCKS_PHI0_CYCLE);
     clem_adb_reset(&mmio->dev_adb);
     clem_sound_reset(&mmio->dev_audio);
     clem_vgc_reset(&mmio->vgc);
@@ -1654,8 +1654,7 @@ void clem_mmio_restore(ClemensMMIO *mmio) {
 }
 
 void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
-                    struct ClemensMemoryPageMap **bank_page_map,
-                    clem_clocks_duration_t mega2_clocks_step, void *slot_expansion_rom,
+                    struct ClemensMemoryPageMap **bank_page_map, void *slot_expansion_rom,
                     unsigned int fpi_ram_bank_count) {
     int idx;
     //  Memory map starts out without shadowing, but our call to
@@ -1666,7 +1665,6 @@ void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
     mmio->dev_debug = dev_debug;
     mmio->new_video_c029 = CLEM_MMIO_NEWVIDEO_BANKLATCH_INHIBIT;
     //  TODO: ROM 01 will not use bit 6 and expect it to be cleared
-    mmio->clocks_step_mega2 = mega2_clocks_step;
     mmio->speed_c036 = CLEM_MMIO_SPEED_FAST_ENABLED | CLEM_MMIO_SPEED_POWERED_ON;
     mmio->mega2_cycles = 0;
     mmio->last_data_address = 0xffffffff;
@@ -1684,5 +1682,5 @@ void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
     _clem_mmio_init_page_maps(mmio, CLEM_MEM_IO_MMAP_NSHADOW_SHGR | CLEM_MEM_IO_MMAP_WRLCRAM |
                                         CLEM_MEM_IO_MMAP_LCBANK2);
 
-    clem_mmio_reset(mmio, mega2_clocks_step);
+    clem_mmio_reset(mmio);
 }
