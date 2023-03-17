@@ -42,10 +42,22 @@ struct ClemensTimeSpec {
     clem_clocks_duration_t clocks_step;
     /* clocks spent per cycle in fast mode */
     clem_clocks_duration_t clocks_step_fast;
+
+    /** clock timer - never change once system has been started */
+    clem_clocks_time_t clocks_spent;
+    /* this is used for synchronization to the phi0 clock */
+    clem_clocks_time_t clocks_next_phi0;
+    /** the clocks duration used for the final scanline cycle, which for NTSC is
+        the stretch cycle */
+    clem_clocks_duration_t phi0_clocks_stretch;
+    clem_clocks_duration_t phi0_current_step;
+    /** used for calculating the next clock edge for PHI0, and when 0 is at the
+    stretch cycle */
+    unsigned mega2_scanline_ctr;
+
+    //  TODO: remove
     /* typically FPI speed mhz * clocks_step_fast */
     clem_clocks_duration_t clocks_step_mega2;
-    /* clock timer - never change once system has been started */
-    clem_clocks_time_t clocks_spent;
 };
 
 /* Note that in emulation mode, the EmulatedBrk flag should be

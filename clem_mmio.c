@@ -246,7 +246,7 @@ static void _clem_mmio_speed_c036_set(ClemensMMIO *mmio, struct ClemensTimeSpec 
             tspec->clocks_step = tspec->clocks_step_fast;
         } else {
             //    CLEM_LOG("C036: Slow Mode");
-            tspec->clocks_step = tspec->clocks_step_mega2;
+            tspec->clocks_step = CLEM_CLOCKS_PHI0_CYCLE;
         }
     }
     if (setflags & CLEM_MMIO_SPEED_POWERED_ON) {

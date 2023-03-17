@@ -17,14 +17,16 @@ typedef uint8_t *(*ClemensSerializerAllocateCb)(unsigned, void *);
  *  Yet since most time calculations in the emulator are done with fixed point-like
  *  math, the aim is to keep the clocks count per cycle high enough for fixed
  *  math to work with unsigned 32-bit numbers.
- *  
+ *
  *  Based on this, care should be taken when attempting to emulate a 8mhz machine
  *  in the future - though most I/O is performed using PHI0 cycles.
- * 
+ *
  *  If you divide the CLEM_CLOCKS_PHI0_CYCLE by the CLEM_CLOCKS_PHI2_FAST_CYCLE
  *  the value will be the effective maximum clock speed in Mhz of the CPU.
  */
+
 #define CLEM_CLOCKS_14MHZ_CYCLE     200U                           // 14.318 Mhz
+#define CLEM_CLOCKS_7MHZ_CYCLE      400U                           // 7.159 Mhz
 #define CLEM_CLOCKS_PHI2_FAST_CYCLE (CLEM_CLOCKS_14MHZ_CYCLE * 5)  // 2.864  Mhz
 #define CLEM_CLOCKS_PHI0_CYCLE      (CLEM_CLOCKS_14MHZ_CYCLE * 14) // 1.023  Mhz
 

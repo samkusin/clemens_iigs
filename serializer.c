@@ -311,8 +311,12 @@ struct ClemensSerializerRecord kMemory[] = {
 struct ClemensSerializerRecord kTimeSpec[] = {
     CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, clocks_step),
     CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, clocks_step_fast),
-    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, clocks_step_mega2),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensTimeSpec, clocks_spent),
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensTimeSpec, clocks_next_phi0),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, phi0_clocks_stretch),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, phi0_current_step),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensTimeSpec, mega2_scanline_ctr),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensTimeSpec, clocks_step_mega2),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 struct ClemensSerializerRecord kCPURegs[] = {

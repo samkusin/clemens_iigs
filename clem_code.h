@@ -1,6 +1,9 @@
 #include "clem_mem.h"
 #include "clem_types.h"
 
+//  inlined header
+#include "clem_cycle.h"
+
 static inline void _cpu_p_flags_n_data(struct Clemens65C816 *cpu, uint8_t data) {
     if (data & 0x80) {
         cpu->regs.P |= kClemensCPUStatus_Negative;
@@ -114,14 +117,7 @@ static inline void _cpu_sp_inc(struct Clemens65C816 *cpu) {
         Handle FPI access to ROM
         Handle FPI and MEGA2 fast and slow accesses to RAM
         Handle Access based on the Shadow Register
-
-
 */
-static inline void _clem_cycle(ClemensMachine *clem, uint32_t cycle_count) {
-    clem->tspec.clocks_spent += clem->tspec.clocks_step * cycle_count;
-    clem->cpu.cycles_spent += cycle_count;
-}
-
 static inline void _clem_io_read_cycle(ClemensMachine *clem, uint16_t addr, uint16_t idx,
                                        uint8_t bank) {
     /* special rules for IO cycles called out here but decision to call
@@ -211,14 +207,14 @@ static inline void _clem_read_data_indexed_816(ClemensMachine *clem, uint16_t *o
     }
     if (!is_index_8 || CLEM_UTIL_CROSSED_PAGE_BOUNDARY(addr, eff_addr)) {
         //  indexed address crossing a page boundary adds a cycle
-        _clem_cycle(clem, 1);
+        _clem_cycle(clem);
     }
     _clem_read_data_816(clem, out, eff_addr, dbr_actual, is_data_8);
 }
 
 static inline void _clem_opc_push_reg_816(ClemensMachine *clem, uint16_t data, bool is8) {
     struct Clemens65C816 *cpu = &clem->cpu;
-    _clem_cycle(clem, 1);
+    _clem_cycle(clem);
     if (!is8) {
         clem_write(clem, (uint8_t)(data >> 8), cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
         _cpu_sp_dec(cpu);
@@ -229,7 +225,7 @@ static inline void _clem_opc_push_reg_816(ClemensMachine *clem, uint16_t data, b
 
 static inline void _clem_opc_push_reg_8(ClemensMachine *clem, uint8_t data) {
     struct Clemens65C816 *cpu = &clem->cpu;
-    _clem_cycle(clem, 1);
+    _clem_cycle(clem);
     clem_write(clem, data, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
     _cpu_sp_dec(cpu);
 }
@@ -237,7 +233,7 @@ static inline void _clem_opc_push_reg_8(ClemensMachine *clem, uint8_t data) {
 static inline void _clem_opc_pull_reg_816(ClemensMachine *clem, uint16_t *data, bool is8) {
     struct Clemens65C816 *cpu = &clem->cpu;
     uint8_t data8;
-    _clem_cycle(clem, 2);
+    _clem_cycle_2(clem);
     _cpu_sp_inc(cpu);
     clem_read(clem, &data8, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
     *data = CLEM_UTIL_set16_lo(*data, data8);
@@ -250,7 +246,7 @@ static inline void _clem_opc_pull_reg_816(ClemensMachine *clem, uint16_t *data, 
 
 static inline void _clem_opc_pull_reg_8(ClemensMachine *clem, uint8_t *data) {
     struct Clemens65C816 *cpu = &clem->cpu;
-    _clem_cycle(clem, 2);
+    _clem_cycle_2(clem);
     _cpu_sp_inc(cpu);
     clem_read(clem, data, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
 }
@@ -324,7 +320,7 @@ static inline void _clem_read_pba_mode_dp(ClemensMachine *clem, uint16_t *eff_ad
         *eff_addr = D + offset_index;
     }
     if (D & 0x00ff) {
-        _clem_cycle(clem, 1);
+        _clem_cycle(clem);
     }
 }
 
@@ -353,7 +349,7 @@ static inline void _clem_read_pba_mode_dp_indirectl(ClemensMachine *clem, uint16
 static inline void _clem_read_pba_mode_stack_rel(ClemensMachine *clem, uint16_t *addr, uint16_t *pc,
                                                  uint8_t *offset) {
     _clem_read_pba(clem, offset, pc);
-    _clem_cycle(clem, 1); //  extra IO
+    _clem_cycle(clem); //  extra IO
     *addr = clem->cpu.regs.S + *offset;
 }
 
@@ -362,7 +358,7 @@ static inline void _clem_read_pba_mode_stack_rel_indirect(ClemensMachine *clem, 
     uint16_t tmp_addr;
     _clem_read_pba_mode_stack_rel(clem, &tmp_addr, pc, offset);
     _clem_read_16(clem, addr, tmp_addr, 0x00, CLEM_MEM_FLAG_DATA);
-    _clem_cycle(clem, 1); //  extra IO
+    _clem_cycle(clem); //  extra IO
 }
 
 static inline void _cpu_adc(struct Clemens65C816 *cpu, uint16_t value, bool is8) {
@@ -889,9 +885,9 @@ static inline void _clem_branch(ClemensMachine *clem, uint16_t *pc, int8_t offse
         return;
     uint16_t tmp_addr = *pc + offset;
     if (clem->cpu.pins.emulation && CLEM_UTIL_CROSSED_PAGE_BOUNDARY(*pc, tmp_addr)) {
-        _clem_cycle(clem, 1);
+        _clem_cycle(clem);
     }
-    _clem_cycle(clem, 1);
+    _clem_cycle(clem);
     *pc = tmp_addr;
 }
 
