@@ -9,6 +9,7 @@ This release contains the following changes:
 - Snapshot save/load fixes in some cases
 - Improved Keyboard shortcut support
 - Ensoniq emulation fixes
+- System timing fixes
 
 The following IIGS features are not yet supported:
                             
