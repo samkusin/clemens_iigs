@@ -11,7 +11,7 @@ void clem_mmio_reset(ClemensMMIO *mmio);
 
 void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
                     struct ClemensMemoryPageMap **bank_page_map, void *slot_expansion_rom,
-                    unsigned int fpi_ram_bank_count);
+                    unsigned int fpi_ram_bank_count, uint8_t *e0_bank, uint8_t *e1_bank);
 
 uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_t addr,
                        uint8_t flags, bool *mega2_access);

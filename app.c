@@ -45,7 +45,8 @@ int main(int argc, char *argv[]) {
     memset(&mmio, 0, sizeof(mmio));
     clemens_init(&machine, 1000, 1000, rom, 256 * 1024, malloc(CLEM_IIGS_BANK_SIZE),
                  malloc(CLEM_IIGS_BANK_SIZE), malloc(CLEM_IIGS_BANK_SIZE * 16), 16);
-    clem_mmio_init(&mmio, &machine.dev_debug, machine.mem.bank_page_map, malloc(2048 * 7), 16);
+    clem_mmio_init(&mmio, &machine.dev_debug, machine.mem.bank_page_map, malloc(2048 * 7), 16,
+                   machine.mem.mega2_bank_map[0],  machine.mem.mega2_bank_map[1);
 
     machine.cpu.pins.resbIn = false;
     machine.resb_counter = 3;

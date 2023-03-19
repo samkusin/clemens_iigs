@@ -175,6 +175,8 @@
 #define CLEM_MMIO_REG_ALTCHARSET_TEST 0x1E
 /** Bit 7: 80 column mode on */
 #define CLEM_MMIO_REG_80COLUMN_TEST 0x1F
+/** Cassette Port (floating bus use only) */
+#define CLEM_MMIO_REG_CASSETTE_PORT_NOP 0x20
 /** Write Bit 7: 1 = monochrome, 0 = color */
 #define CLEM_MMIO_REG_VGC_MONO 0x21
 /** Text: Bits 7-4, background: bits 3-0 color */
@@ -598,8 +600,6 @@
 #define CLEM_ADB_KEY_MOD_STATE_ESCAPE  0x00010000
 
 /** Emulated duration of every 'step' iwm_glu_sync runs. 1.023 / 2 ~ 0.511 */
-#define CLEM_IWM_SYNC_FRAME_NS           (CLEM_MEGA2_CYCLE_NS / 2)
-#define CLEM_IWM_SYNC_FRAME_NS_FAST      (CLEM_MEGA2_CYCLE_NS / 4)
 #define CLEM_IWM_SYNC_CLOCKS_FAST        CLEM_CLOCKS_4MHZ_CYCLE
 #define CLEM_IWM_SYNC_CLOCKS_NORMAL      CLEM_CLOCKS_2MHZ_CYCLE
 #define CLEM_IWM_SYNC_DISK_FRAME_NS      500

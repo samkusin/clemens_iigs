@@ -398,6 +398,12 @@ typedef struct ClemensMMIO {
     struct ClemensMemoryShadowMap fpi_mega2_main_shadow_map;
     struct ClemensMemoryShadowMap fpi_mega2_aux_shadow_map;
 
+    /* Reflected mega2 memory used for MMIO operations that require such access:
+       i.e. floating bus data retrieval
+    */
+    uint8_t *e0_bank;
+    uint8_t *e1_bank;
+
     /* All devices */
     struct ClemensDeviceDebugger *dev_debug;
     struct ClemensVGC vgc;

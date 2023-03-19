@@ -119,7 +119,7 @@ std::string_view extractInt(std::string_view &script) {
 
     expression_list := expression (',' expression_list)
 
-    command := action SPC expression_list
+    command := action (SPC expression_list)
 
     statement := command
               | expression
@@ -349,6 +349,12 @@ auto ClemensInterpreter::parseExpression(std::string_view script) -> ParseResult
     return parseNumberOperand(script);
 }
 
+auto ClemensInterpreter::parseCommand(std::string_view script) -> ParseResult {
+    // command := action (SPC expression_list)
+    ParseResult result(script);
+    return result;
+}
+
 auto ClemensInterpreter::parseAssignment(std::string_view script) -> ParseResult {
     //  assignment := identifier (':'|'=') expression
     ParseResult identifier = parseIdentifier(script);
@@ -360,7 +366,7 @@ auto ClemensInterpreter::parseAssignment(std::string_view script) -> ParseResult
         // destroyASTNode(identifier.node);
         return identifier.revert(script);
     }
-    ParseResult expression = parseExpression(righthand);
+    auto expression = parseExpression(righthand);
     if (!expression.ok()) {
         // destroyASTNode(identifier.node);
         return expression.revert(script);
@@ -374,11 +380,22 @@ auto ClemensInterpreter::parseAssignment(std::string_view script) -> ParseResult
 }
 
 auto ClemensInterpreter::parseStatement(std::string_view script) -> ParseResult {
-    auto assignment = parseAssignment(script);
-    if (!assignment.ok()) {
-        return assignment.revert(script);
+    //  statement := command
+    //            | expression
+    //            | assignment
+    auto statement = parseCommand(script);
+    if (statement.ok()) {
+        return statement;
     }
-    return assignment;
+    statement = parseExpression(script);
+    if (statement.ok()) {
+        return statement;
+    }
+    statement = parseAssignment(script);
+    if (statement.ok()) {
+        return statement;
+    }
+    return statement.revert(script);
 }
 
 auto ClemensInterpreter::parseStatementList(std::string_view script) -> ParseResult {
@@ -470,6 +487,7 @@ bool ClemensInterpreter::execute(ASTNode *node, ClemensBackend *backend) {
     case ASTNodeType::AnyIntegerValue:
     case ASTNodeType::HexIntegerValue:
     case ASTNodeType::IntegerValue:
+    case ASTNodeType::Command:
         break;
     }
     return true;
