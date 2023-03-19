@@ -118,7 +118,8 @@ struct ClemensBackendCommand {
         SaveMachine,
         LoadMachine,
         RunScript,
-        FastDiskEmulation
+        FastDiskEmulation,
+        DebugMessage
     };
     Type type = Undefined;
     std::string operand;

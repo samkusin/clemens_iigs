@@ -715,7 +715,8 @@ void ClemensBackend::initApple2GS() {
                      slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
                      slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount), kFPIBankCount);
     clem_mmio_init(&mmio_, &machine_.dev_debug, machine_.mem.bank_page_map,
-                   slabMemory_.allocate(2048 * 7), kFPIBankCount);
+                   slabMemory_.allocate(2048 * 7), kFPIBankCount, machine_.mem.mega2_bank_map[0],
+                   machine_.mem.mega2_bank_map[1]);
     if (result < 0) {
         fmt::print("Clemens library failed to initialize with err code (%d)\n", result);
         return;
@@ -1013,4 +1014,102 @@ bool ClemensBackend::onCommandRunScript(std::string command) {
 void ClemensBackend::onCommandFastDiskEmulation(bool enabled) {
     fmt::print("{} fast disk emulation when IWM is active\n", enabled ? "Enable" : "Disable");
     config_.enableFastEmulation = enabled;
+}
+
+//  TODO: remove when interpreter commands are supported!
+static std::string_view trimToken(const std::string_view &token, size_t off = 0,
+                                  size_t length = std::string_view::npos) {
+    auto tmp = token.substr(off, length);
+    auto left = tmp.begin();
+    for (; left != tmp.end(); ++left) {
+        if (!std::isspace(*left))
+            break;
+    }
+    tmp = tmp.substr(left - tmp.begin());
+    auto right = tmp.rbegin();
+    for (; right != tmp.rend(); ++right) {
+        if (!std::isspace(*right))
+            break;
+    }
+    tmp = tmp.substr(0, tmp.size() - (right - tmp.rbegin()));
+    return tmp;
+}
+static std::tuple<std::array<std::string_view, 8>, std::string_view, size_t>
+gatherMessageParams(std::string_view &message, bool with_cmd = false) {
+    std::array<std::string_view, 8> params;
+    size_t paramCount = 0;
+
+    size_t sepPos = std::string_view::npos;
+    std::string_view cmd;
+    if (with_cmd) {
+        sepPos = message.find(' ');
+        cmd = message.substr(0, sepPos);
+    }
+    if (sepPos != std::string_view::npos) {
+        message = message.substr(sepPos + 1);
+    }
+    while (!message.empty() && paramCount < params.size()) {
+        sepPos = message.find(',');
+        params[paramCount++] = trimToken(message.substr(0, sepPos));
+        if (sepPos != std::string_view::npos) {
+            message = message.substr(sepPos + 1);
+        } else {
+            message = "";
+        }
+    }
+    return {params, cmd, paramCount};
+}
+
+std::string ClemensBackend::onCommandDebugMessage(std::string msg) {
+    std::string_view debugmsg(msg);
+    auto [params, cmd, paramCount] = gatherMessageParams(debugmsg, true);
+    if (cmd != "dump") {
+        return fmt::format("UNK:{}", cmd);
+    }
+    unsigned startBank, endBank;
+    if (std::from_chars(params[0].data(), params[0].data() + params[0].size(), startBank, 16).ec !=
+        std::errc{}) {
+        return fmt::format("FAIL:{} {},{}", cmd, params[2], params[3]);
+    }
+    if (std::from_chars(params[1].data(), params[1].data() + params[1].size(), endBank, 16).ec !=
+        std::errc{}) {
+        return fmt::format("FAIL:{} {},{}", cmd, params[2], params[3]);
+    }
+    startBank &= 0xff;
+    endBank &= 0xff;
+
+    size_t dumpedMemorySize = ((endBank - startBank) + 1) << 16;
+    unsigned dumpedMemoryAddress = startBank << 16;
+    std::vector<uint8_t> dumpedMemory(dumpedMemorySize);
+    uint8_t *memoryOut = dumpedMemory.data();
+    for (; startBank <= endBank; ++startBank, memoryOut += 0x10000) {
+        clemens_out_bin_data(&machine_, memoryOut, 0x10000, startBank, 0);
+    }
+
+    auto outPath = std::filesystem::path(config_.traceRootPath) / params[2];
+    std::ios_base::openmode flags = std::ios_base::out | std::ios_base::binary;
+    std::ofstream outstream(outPath, flags);
+    if (outstream.is_open()) {
+        if (params[3] == "bin") {
+            outstream.write((char *)dumpedMemory.data(), dumpedMemorySize);
+            outstream.close();
+        } else {
+            constexpr unsigned kHexByteCountPerLine = 64;
+            char hexDump[kHexByteCountPerLine * 2 + 8 + 1];
+            unsigned adrBegin = dumpedMemoryAddress;
+            unsigned adrEnd = dumpedMemoryAddress + dumpedMemorySize;
+            uint8_t *memoryOut = dumpedMemory.data();
+            while (adrBegin < adrEnd) {
+                snprintf(hexDump, sizeof(hexDump), "%06X: ", adrBegin);
+                clemens_out_hex_data_from_memory(hexDump + 8, memoryOut, kHexByteCountPerLine * 2,
+                                                 adrBegin);
+                hexDump[sizeof(hexDump) - 1] = '\n';
+                outstream.write(hexDump, sizeof(hexDump));
+                adrBegin += 0x40;
+                memoryOut += 0x40;
+            }
+            outstream.close();
+        }
+    }
+    return fmt::format("OK:{} {},{}", cmd, params[2], params[3]);
 }

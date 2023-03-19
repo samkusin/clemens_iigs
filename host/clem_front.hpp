@@ -98,8 +98,6 @@ class ClemensFrontend : public ClemensHostView {
     void cmdLog(std::string_view operand);
     void cmdDump(std::string_view operand);
     void cmdTrace(std::string_view operand);
-    std::string cmdMessageFromBackend(std::string_view operand, const ClemensMachine *machine);
-    bool cmdMessageLocal(std::string_view operand);
     void cmdSave(std::string_view operand);
     void cmdLoad(std::string_view operand);
     void cmdGet(std::string_view operand);
@@ -248,9 +246,6 @@ class ClemensFrontend : public ClemensHostView {
         LogOutputNode *logNodeTail = nullptr;
         LogInstructionNode *logInstructionNode = nullptr;
         LogInstructionNode *logInstructionNodeTail = nullptr;
-        uint32_t memoryCaptureAddress = 0;
-        uint32_t memoryCaptureSize = 0;
-        uint8_t *memory = nullptr;
         cinek::ByteBuffer audioBuffer;
         bool isFastEmulationOn;
     };

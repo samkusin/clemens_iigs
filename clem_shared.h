@@ -39,7 +39,6 @@ typedef uint8_t *(*ClemensSerializerAllocateCb)(unsigned, void *);
 #define CLEM_14MHZ_CYCLE_NS 70U
 #define CLEM_PHI0_CYCLE_NS  980U
 
-#define CLEM_MEGA2_CYCLE_NS          978
 #define CLEM_MEGA2_CYCLES_PER_SECOND 1023000U
 
 //#define CLEM_CLOCKS_MEGA2_CYCLE 2864U
