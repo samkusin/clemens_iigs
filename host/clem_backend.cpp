@@ -1,5 +1,6 @@
 #include "clem_backend.hpp"
 #include "cinek/ckdefs.h"
+#include "clem_device.h"
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
 #include "clem_host_shared.hpp"
@@ -970,6 +971,11 @@ bool ClemensBackend::onCommandDebugProgramTrace(std::string_view op, std::string
         if (op == "iwm") {
             programTrace_->enableIWMLogging(!programTrace_->isIWMLoggingEnabled());
             fmt::print("{} tracing = {}\n", op, programTrace_->isIWMLoggingEnabled());
+            if (programTrace_->isIWMLoggingEnabled()) {
+                clem_iwm_debug_start(&mmio_.dev_iwm);
+            } else {
+                clem_iwm_debug_stop(&mmio_.dev_iwm);
+            }
         } else {
             fmt::print("{} tracing is not recognized.\n", op);
         }

@@ -310,6 +310,7 @@ struct ClemensDeviceIWM {
     unsigned lss_state;     /**< State of our custom LSS */
     unsigned lss_write_reg; /**< Used for detecting write underruns */
 
+    /** Not to be serialized - just for debugging. */
     bool enable_debug; /**< If True, activates file logging */
 };
 

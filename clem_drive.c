@@ -329,43 +329,44 @@ void clem_disk_read_and_position_head_525(struct ClemensDrive *drive, unsigned *
     }
 }
 
-void clem_disk_update_head(struct ClemensDrive *drive, unsigned *io_flags, unsigned dt_ns) {
+void clem_disk_write_head(struct ClemensDrive *drive, unsigned *io_flags) {
     bool write_pulse = (*io_flags & CLEM_IWM_FLAG_WRITE_HEAD_ON) == (CLEM_IWM_FLAG_WRITE_HEAD_ON);
     bool write_transition = write_pulse != drive->write_pulse;
 
+    *io_flags &= ~CLEM_IWM_FLAG_WRITE_ONE;
     if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
         return;
     }
     if (!drive->has_disk) {
         return;
     }
+    if (!(*io_flags & CLEM_IWM_FLAG_WRITE_REQUEST)) {
+        drive->write_pulse = false;
+        return;
+    }
 
     if (!drive->disk.is_write_protected) {
-        if (*io_flags & CLEM_IWM_FLAG_WRITE_REQUEST) {
-            if (drive->real_track_index != 0xff) {
-                if (!drive->disk.track_initialized[drive->real_track_index]) {
-                    if (write_transition) {
-                        /* first time write to an uninitialized track will start
-                        writes at the beginning of the data block.  most
-                        likely this occurs via formatting.
-                        The first genuine byte will have its high bit will
-                        always be on as defined by GCR 6-2 encoding
-                        */
-                        drive->disk.track_initialized[drive->real_track_index] = 1;
-                        drive->track_bit_shift = 7;
-                        drive->track_byte_index = 0;
-                    }
+        if (drive->real_track_index != 0xff) {
+            if (!drive->disk.track_initialized[drive->real_track_index]) {
+                if (write_transition) {
+                    /* first time write to an uninitialized track will start
+                    writes at the beginning of the data block.  most
+                    likely this occurs via formatting.
+                    The first genuine byte will have its high bit will
+                    always be on as defined by GCR 6-2 encoding
+                    */
+                    drive->disk.track_initialized[drive->real_track_index] = 1;
+                    drive->track_bit_shift = 7;
+                    drive->track_byte_index = 0;
                 }
-                if (drive->disk.track_initialized[drive->real_track_index]) {
-                    _clem_disk_write_bit(drive, write_transition);
-                }
+            }
+            if (drive->disk.track_initialized[drive->real_track_index]) {
+                _clem_disk_write_bit(drive, write_transition);
             }
         }
     }
 
     if (drive->pulse_ns >= drive->disk.bit_timing_ns) {
-        *io_flags |= CLEM_IWM_FLAG_PULSE_HIGH;
-
         /*
         if (*io_flags & CLEM_IWM_FLAG_WRITE_REQUEST &&
             drive->data->track_initialized[drive->real_track_index]
@@ -375,26 +376,34 @@ void clem_disk_update_head(struct ClemensDrive *drive, unsigned *io_flags, unsig
         drive->track_bit_shift, write_transition ? '1': '0');
         }
         */
-
         drive->write_pulse = write_pulse;
+        if (!drive->disk.is_write_protected) {
+            if (write_transition) {
+                *io_flags |= CLEM_IWM_FLAG_WRITE_ONE;
+            }
+        }
+    }
+}
+
+void clem_disk_update_head(struct ClemensDrive *drive, unsigned *io_flags) {
+    if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
+        return;
+    }
+    if (!drive->has_disk) {
+        return;
+    }
+
+    if (drive->pulse_ns >= drive->disk.bit_timing_ns) {
+        *io_flags |= CLEM_IWM_FLAG_PULSE_HIGH;
 
         if (drive->track_bit_shift == 0) {
             drive->track_bit_shift = 7;
-            /*
-            if (*io_flags & CLEM_IWM_FLAG_WRITE_REQUEST) {
-                CLEM_LOG("diskwr(%u:%u): %02X",
-                    drive->real_track_index, drive->track_byte_index,
-                    *(drive->data->bits_data + (
-                        drive->data->track_byte_offset[drive->real_track_index] +
-            drive->track_byte_index)));
-            }
-            */
             ++drive->track_byte_index;
         } else {
             --drive->track_bit_shift;
         }
         drive->pulse_ns = 0;
-        /*drive->pulse_ns = drive->pulse_ns - drive->disk.bit_timing_ns; */
+        // drive->pulse_ns = drive->pulse_ns - drive->disk.bit_timing_ns;
     } else {
         *io_flags &= ~CLEM_IWM_FLAG_PULSE_HIGH;
     }
