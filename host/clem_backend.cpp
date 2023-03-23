@@ -453,6 +453,8 @@ ClemensBackend::main(ClemensBackendState &backendState,
         while (emulatorVblCounter > 0 && isRunning()) {
             clemens_emulate_cpu(&machine_);
             clemens_emulate_mmio(&machine_, &mmio_);
+            if (clemens_is_resetting(&machine_))
+                lastClocksSpent = machine_.tspec.clocks_spent; // clocks being reset
             if (vblActive && !mmio_.vgc.vbl_started) {
                 emulatorVblCounter--;
             }

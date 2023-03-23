@@ -282,8 +282,14 @@ struct ClemensDeviceIWM {
     clem_clocks_time_t cur_clocks_ts;
     /** Used for async write timing */
     clem_clocks_time_t last_write_clocks_ts;
-    /** 8 2mhz periods slow, 4 2mhz periods fast */
-    clem_clocks_duration_t bit_cell_clocks_dt;
+    /** Q3 clock accounting for PHI0 stretch cycle */
+    clem_clocks_time_t clocks_at_next_scanline;
+
+    /** Budget for a cycle from the prior frame */
+    clem_clocks_duration_t clocks_used_this_step;
+    clem_clocks_duration_t clocks_this_step;
+    unsigned scanline_phase_ctr; // 0 = non stretch, 1 = stretch
+
     /** Used for determining if applications are actually using the IWM for RW disk access*/
     uint32_t data_access_time_ns;
 
@@ -303,7 +309,7 @@ struct ClemensDeviceIWM {
     bool timer_1sec_disabled; /**< Turn motor off immediately */
     bool async_mode;          /**< Asynchronous handshake mode */
     bool latch_mode;          /**< If True, latch value lasts for full 8 xfer */
-    bool clock_8mhz;          /**< If True, 8mhz clock - never used? */
+    bool fast_mode;           /**< If True, 2us bit cells */
 
     unsigned drive_hold_ns; /**< Time until drive motor off */
     unsigned state;         /**< The current IWM register state */
@@ -337,8 +343,7 @@ struct ClemensDrive {
     unsigned track_byte_index;              /**< byte index into track */
     unsigned track_bit_shift;               /**< bit offset into current byte */
     unsigned track_bit_length;              /**< current track bit length */
-    clem_clocks_duration_t pulse_clocks_dt; /**< current clock count timer to a drive tick */
-    clem_clocks_duration_t cell_clocks_dt;  /**< clock count resulting in a drive tick */
+    clem_clocks_duration_t pulse_clocks_dt; /**< clocks per drive tick */
     unsigned read_buffer;                   /**< Used for MC3470 emulation */
 
     /**

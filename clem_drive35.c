@@ -142,7 +142,6 @@ void clem_disk_read_and_position_head_35(struct ClemensDrive *drive, unsigned *i
             case CLEM_IWM_DISK35_CTL_MOTOR_ON:
                 if (!drive->is_spindle_on) {
                     drive->is_spindle_on = true;
-                    drive->pulse_clocks_dt = 0;
                     drive->read_buffer = 0;
                 }
                 CLEM_DEBUG("clem_drive35: drive motor on");

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "clem_types.h"
 #include "emulator.h"
 
 #include "clem_code.h"
@@ -688,6 +689,10 @@ bool clemens_is_initialized(const ClemensMachine *machine) {
         return false;
     }
     return true;
+}
+
+bool clemens_is_resetting(const ClemensMachine *clem) {
+    return (!clem->cpu.pins.resbIn) || clem->cpu.state_type == kClemensCPUStateType_Reset;
 }
 
 void clemens_host_setup(ClemensMachine *clem, LoggerFn logger, void *debug_user_ptr) {
@@ -3104,6 +3109,10 @@ void clemens_emulate_cpu(ClemensMachine *clem) {
         uint16_t tmp_value;
         uint8_t tmp_data;
         uint8_t tmp_datahi;
+
+        // Clocks_spent set to ZERO!  All MMIO should follow suit now that reset cycle
+        // is complete.  Applications should account for this change in timestamp
+        _clem_timespec_reset(&clem->tspec);
 
         clem_read(clem, &tmp_data, cpu->regs.S, 0x00, CLEM_MEM_FLAG_DATA);
         tmp_addr = cpu->regs.S - 1;

@@ -357,6 +357,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     unsigned i;
 
     if (!cpu->pins.resbIn) {
+        //  don't actually process MMIO until reset cycle has completed (resbIn==true)
         mmio->state_type = kClemensMMIOStateType_Reset;
         return;
     }

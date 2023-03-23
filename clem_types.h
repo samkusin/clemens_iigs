@@ -43,7 +43,7 @@ struct ClemensTimeSpec {
     /* clocks spent per cycle in fast mode */
     clem_clocks_duration_t clocks_step_fast;
 
-    /** clock timer - never change once system has been started */
+    /** clock timer - never change once system has been reset */
     clem_clocks_time_t clocks_spent;
     /* this is used for synchronization to the phi0 clock */
     clem_clocks_time_t clocks_next_phi0;

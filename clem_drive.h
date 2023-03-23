@@ -24,9 +24,6 @@ extern "C" {
 void clem_disk_reset_drives(struct ClemensDriveBay *drives);
 void clem_disk_start_drive(struct ClemensDrive *drive);
 
-void clem_disk_frame_head(struct ClemensDrive *drive, unsigned *io_flags,
-                          clem_clocks_duration_t clocks_dt);
-
 void clem_disk_read_and_position_head_35(struct ClemensDrive *drive, unsigned *io_flags,
                                          unsigned in_phase, clem_clocks_duration_t clocks_dt);
 

@@ -279,16 +279,13 @@ unsigned clem_drive_step(struct ClemensDrive *drive, unsigned *io_flags, int qtr
 
     drive->current_byte = (drive->current_byte & 0xfe) | (drive->read_buffer & 0x01);
 
-    if (drive->pulse_clocks_dt + clocks_dt >= drive->cell_clocks_dt) {
-        /* read a pulse from the bitstream, following WOZ emulation suggestions
-            to emulate errors - this is effectively a copypasta from
-            https://applesaucefdc.com/woz/reference2/
-           here we pulse the read head, meaning we need a new bit from the buffer */
-        drive->read_buffer <<= 1;
-        if (*io_flags & CLEM_IWM_FLAG_READ_DATA_FAKE) {
-            drive->random_bit_index =
-                (drive->random_bit_index + 1) % CLEM_IWM_DRIVE_MAX_RANDOM_BITS;
-        }
+    /* read a pulse from the bitstream, following WOZ emulation suggestions
+        to emulate errors - this is effectively a copypasta from
+        https://applesaucefdc.com/woz/reference2/
+       here we pulse the read head, meaning we need a new bit from the buffer */
+    drive->read_buffer <<= 1;
+    if (*io_flags & CLEM_IWM_FLAG_READ_DATA_FAKE) {
+        drive->random_bit_index = (drive->random_bit_index + 1) % CLEM_IWM_DRIVE_MAX_RANDOM_BITS;
     }
     return track_cur_pos;
 }
@@ -381,33 +378,7 @@ void clem_disk_write_head(struct ClemensDrive *drive, unsigned *io_flags,
             }
         }
     }
-
-    if (drive->pulse_clocks_dt + clocks_dt >= drive->cell_clocks_dt) {
-        /*
-        if (*io_flags & CLEM_IWM_FLAG_WRITE_REQUEST &&
-            drive->data->track_initialized[drive->real_track_index]
-        ) {
-             CLEM_LOG("diskwr(%u:%u:%u): %c",
-                        drive->real_track_index, drive->track_byte_index,
-        drive->track_bit_shift, write_transition ? '1': '0');
-        }
-        */
-        drive->write_pulse = write_pulse;
-    }
-}
-
-void clem_disk_frame_head(struct ClemensDrive *drive, unsigned *io_flags,
-                          clem_clocks_duration_t clocks_dt) {
-    *io_flags &= ~CLEM_IWM_FLAG_PULSE_HIGH;
-    if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
-        return;
-    }
-    if (!drive->has_disk) {
-        return;
-    }
-    if (drive->pulse_clocks_dt + clocks_dt >= drive->cell_clocks_dt) {
-        *io_flags |= CLEM_IWM_FLAG_PULSE_HIGH;
-    }
+    drive->write_pulse = write_pulse;
 }
 
 void clem_disk_update_head(struct ClemensDrive *drive, unsigned *io_flags,
@@ -415,19 +386,11 @@ void clem_disk_update_head(struct ClemensDrive *drive, unsigned *io_flags,
     if (!(*io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
         return;
     }
-    if (!drive->has_disk) {
-        return;
-    }
-    drive->pulse_clocks_dt += bit_cell_clocks_dt;
-    if (drive->pulse_clocks_dt >= drive->cell_clocks_dt) {
-        drive->current_byte <<= 1;
-        if (drive->track_bit_shift == 0) {
-            drive->track_bit_shift = 7;
-            ++drive->track_byte_index;
-        } else {
-            --drive->track_bit_shift;
-        }
-        // drive->pulse_clocks_dt = 0;
-        drive->pulse_clocks_dt = drive->pulse_clocks_dt - drive->cell_clocks_dt;
+    drive->current_byte <<= 1;
+    if (drive->track_bit_shift == 0) {
+        drive->track_bit_shift = 7;
+        ++drive->track_byte_index;
+    } else {
+        --drive->track_bit_shift;
     }
 }
