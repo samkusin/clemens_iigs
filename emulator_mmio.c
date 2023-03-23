@@ -366,7 +366,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
         clem->mem.mmio_read = _clem_mmio_read_hook;
         clem->mem.mmio_niolc = _clem_mmio_niolc;
         clem_disk_reset_drives(&mmio->active_drives);
-        clem_mmio_reset(mmio);
+        clem_mmio_reset(mmio, &clem->tspec);
         /* extension cards reset handling */
         clem_iwm_speed_disk_gate(mmio, &clem->tspec);
         clock.ts = clem->tspec.clocks_spent;
@@ -421,7 +421,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     }
 
     clem_vgc_sync(&mmio->vgc, &clock, clem->mem.mega2_bank_map[0], clem->mem.mega2_bank_map[1]);
-    clem_iwm_glu_sync(&mmio->dev_iwm, &mmio->active_drives, &clock);
+    clem_iwm_glu_sync(&mmio->dev_iwm, &mmio->active_drives, &clem->tspec);
     clem_scc_glu_sync(&mmio->dev_scc, &clock);
     clem_sound_glu_sync(&mmio->dev_audio, &clock);
     clem_gameport_sync(&mmio->dev_adb.gameport, &clock);

@@ -1,6 +1,7 @@
 #ifndef CLEM_MMIO_TYPES_H
 #define CLEM_MMIO_TYPES_H
 
+#include "clem_shared.h"
 #include "clem_types.h"
 
 #include "clem_disk.h"
@@ -274,39 +275,42 @@ struct ClemensVGC {
  * IWM emulation of c0x0-c0xf for IWM devices.   Note that the IWM can only
  * access one drive at a time (in tandem with the disk interface register)
  *
+ * 1 Q3 period = 7 clock ticks (2mhz)
  */
 struct ClemensDeviceIWM {
     /** A reference clocks value at the last disk update. */
-    clem_clocks_time_t last_clocks_ts;
+    clem_clocks_time_t cur_clocks_ts;
     /** Used for async write timing */
     clem_clocks_time_t last_write_clocks_ts;
+    /** 8 2mhz periods slow, 4 2mhz periods fast */
+    clem_clocks_duration_t bit_cell_clocks_dt;
     /** Used for determining if applications are actually using the IWM for RW disk access*/
     uint32_t data_access_time_ns;
 
-    /** Clocks delta per update, has two modes - fast and slow, 4mhz/2mhz */
-    clem_clocks_duration_t state_update_clocks_dt;
-
     /** Drive I/O */
-    unsigned io_flags;  /**< Disk port I/O flags */
-    unsigned out_phase; /**< PH0-PH3 bits sent to drive */
-    bool enable2;       /**< Disk II disabled (enable2 high) */
+    unsigned io_flags;     /**< Disk port I/O flags */
+    unsigned out_phase;    /**< PH0-PH3 bits sent to drive */
+    bool smartport_active; /**< SmartPort bus is active */
 
     /** Internal Registers */
-    uint8_t data;          /**< IO switch data (D0-D7) */
+    uint8_t data_r;        /**< Read data register */
+    uint8_t data_w;        /**< Write data register */
     uint8_t latch;         /**< data latch (work register for IWM) */
-    uint8_t write_out;     /**< TODO: Remove.. written byte out */
     uint8_t disk_motor_on; /**< bits 0-3 represent ports 4-7 */
 
     bool q6_switch;           /**< Q6 state switch */
     bool q7_switch;           /**< Q7 stage switch */
     bool timer_1sec_disabled; /**< Turn motor off immediately */
-    bool async_write_mode;    /**< If True, IWM delays writes until ready */
+    bool async_mode;          /**< Asynchronous handshake mode */
     bool latch_mode;          /**< If True, latch value lasts for full 8 xfer */
     bool clock_8mhz;          /**< If True, 8mhz clock - never used? */
 
+    unsigned drive_hold_ns; /**< Time until drive motor off */
     unsigned state;         /**< The current IWM register state */
+    unsigned write_state;   /**< Defines the state of the data_w and latch */
+    unsigned read_state;    /**< Defines the state of the data_r and latch */
+
     unsigned ns_latch_hold; /**< The latch value expiration timer */
-    unsigned ns_drive_hold; /**< Time until drive motor off */
     unsigned lss_state;     /**< State of our custom LSS */
     unsigned lss_write_reg; /**< Used for detecting write underruns */
 
@@ -329,30 +333,34 @@ struct ClemensDrive {
 
     //  TODO: Move the below to the host - we only care about nibblized data
     //  here
-    int qtr_track_index;       /**< Current track position of the head */
-    unsigned track_byte_index; /**< byte index into track */
-    unsigned track_bit_shift;  /**< bit offset into current byte */
-    unsigned track_bit_length; /**< current track bit length */
-    unsigned pulse_ns;         /**< nanosecond timer for pulse input */
-    unsigned read_buffer;      /**< Used for MC3470 emulation */
+    int qtr_track_index;                    /**< Current track position of the head */
+    unsigned track_byte_index;              /**< byte index into track */
+    unsigned track_bit_shift;               /**< bit offset into current byte */
+    unsigned track_bit_length;              /**< current track bit length */
+    clem_clocks_duration_t pulse_clocks_dt; /**< current clock count timer to a drive tick */
+    clem_clocks_duration_t cell_clocks_dt;  /**< clock count resulting in a drive tick */
+    unsigned read_buffer;                   /**< Used for MC3470 emulation */
 
     /**
      * 4-bit Q0-3 entry 5.25" = stepper control
      * Control/Status/Strobe bits for 3.5"
      */
     unsigned ctl_switch;
-    unsigned cog_orient;       /**< emulated orientation of stepper cog */
-    unsigned step_timer_35_ns; /**< 3.5" track step timer */
-    uint16_t status_mask_35;   /**< 3.5" status mask */
-    bool write_pulse;          /**< Changes in the write field translate as pulses */
-    bool is_spindle_on;        /**< Drive spindle running */
-    bool has_disk;             /**< Has a disk in the drive */
+    unsigned cog_orient;                     /**< emulated orientation of stepper cog */
+    clem_clocks_duration_t step_timer_35_dt; /**< 3.5" track step timer */
+    uint16_t status_mask_35;                 /**< 3.5" status mask */
+    bool write_pulse;                        /**< Changes in the write field translate as pulses */
+    bool is_spindle_on;                      /**< Drive spindle running */
+    bool has_disk;                           /**< Has a disk in the drive */
 
     uint8_t real_track_index; /**< the index into the raw woz track data */
 
     /** used for random pulse generation */
     uint8_t random_bits[CLEM_IWM_DRIVE_RANDOM_BYTES];
     unsigned random_bit_index;
+
+    /** debug only */
+    uint8_t current_byte;
 };
 
 struct ClemensDriveBay {

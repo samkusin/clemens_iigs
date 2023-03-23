@@ -6,6 +6,7 @@
 
 #include "clem_debug.h"
 #include "clem_drive.h"
+#include "clem_shared.h"
 #include "clem_util.h"
 
 /*  Follows the status and control values from https://llx.com/Neil/a2/disk
@@ -32,8 +33,9 @@
 #define CLEM_IWM_DISK35_CTL_MOTOR_OFF     0x09
 #define CLEM_IWM_DISK35_CTL_EJECT         0x0D
 
-#define CLEM_IWM_DISK35_STEP_TIME_NS  (12 * 1000)
-#define CLEM_IWM_DISK35_EJECT_TIME_NS (500 * 1000000)
+#define CLEM_IWM_DISK35_STEP_TIME_CLOCKS (12 * CLEM_CLOCKS_PHI0_CYCLE)
+#define CLEM_IWM_DISK35_EJECT_TIME_CLOCKS                                                          \
+    (CLEM_CLOCKS_PHI0_CYCLE * (CLEM_MEGA2_CYCLES_PER_SECOND >> 1))
 
 #include <assert.h>
 #include <stdio.h>
@@ -61,15 +63,15 @@ void clem_disk_35_start_eject(struct ClemensDrive *drive) {
         return;
     drive->is_spindle_on = false;
     drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_EJECTING;
-    drive->step_timer_35_ns = CLEM_IWM_DISK35_EJECT_TIME_NS;
+    drive->step_timer_35_dt = CLEM_IWM_DISK35_EJECT_TIME_CLOCKS;
     CLEM_LOG("clem_drive35: ejecting disk");
 }
 
 void clem_disk_read_and_position_head_35(struct ClemensDrive *drive, unsigned *io_flags,
-                                         unsigned in_phase, unsigned dt_ns) {
+                                         unsigned in_phase, clem_clocks_duration_t clocks_dt) {
     bool sense_out = false;
     bool ctl_strobe = (in_phase & 0x8) != 0;
-    unsigned cur_step_timer_ns = drive->step_timer_35_ns;
+    clem_clocks_duration_t cur_step_timer_dt = drive->step_timer_35_dt;
     unsigned ctl_switch;
     unsigned track_cur_pos;
     int qtr_track_index = drive->qtr_track_index;
@@ -81,10 +83,10 @@ void clem_disk_read_and_position_head_35(struct ClemensDrive *drive, unsigned *i
         return;
     }
 
-    drive->step_timer_35_ns = clem_util_timer_decrement(cur_step_timer_ns, dt_ns);
+    drive->step_timer_35_dt = clem_util_timer_decrement(cur_step_timer_dt, clocks_dt);
 
-    if (drive->has_disk && !drive->step_timer_35_ns &&
-        drive->step_timer_35_ns < cur_step_timer_ns) {
+    if (drive->has_disk && !drive->step_timer_35_dt &&
+        drive->step_timer_35_dt < cur_step_timer_dt) {
         /* step or eject completed */
         if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING) {
             drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_EJECTING;
@@ -131,7 +133,7 @@ void clem_disk_read_and_position_head_35(struct ClemensDrive *drive, unsigned *i
                 break;
             case CLEM_IWM_DISK35_CTL_STEP_ONE:
                 if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {
-                    drive->step_timer_35_ns = CLEM_IWM_DISK35_STEP_TIME_NS;
+                    drive->step_timer_35_dt = CLEM_IWM_DISK35_STEP_TIME_CLOCKS;
                     CLEM_DEBUG("clem_drive35: step from track %u", qtr_track_index);
                 } else {
                     CLEM_LOG("clem_drive35: attempt to step while ejecting");
@@ -140,7 +142,7 @@ void clem_disk_read_and_position_head_35(struct ClemensDrive *drive, unsigned *i
             case CLEM_IWM_DISK35_CTL_MOTOR_ON:
                 if (!drive->is_spindle_on) {
                     drive->is_spindle_on = true;
-                    drive->pulse_ns = 0;
+                    drive->pulse_clocks_dt = 0;
                     drive->read_buffer = 0;
                 }
                 CLEM_DEBUG("clem_drive35: drive motor on");
@@ -170,7 +172,7 @@ void clem_disk_read_and_position_head_35(struct ClemensDrive *drive, unsigned *i
                 sense_out = !drive->has_disk;
                 break;
             case CLEM_IWM_DISK35_QUERY_IS_STEPPING:
-                sense_out = (drive->step_timer_35_ns == 0);
+                sense_out = (drive->step_timer_35_dt == 0);
                 break;
             case CLEM_IWM_DISK35_QUERY_WRITE_PROTECT:
                 if (drive->has_disk) {
@@ -213,7 +215,7 @@ void clem_disk_read_and_position_head_35(struct ClemensDrive *drive, unsigned *i
                 sense_out = drive->disk.is_double_sided;
                 break;
             case CLEM_IWM_DISK35_QUERY_READ_READY:
-                sense_out = (drive->step_timer_35_ns > 0);
+                sense_out = (drive->step_timer_35_dt > 0);
                 break;
             case CLEM_IWM_DISK35_QUERY_ENABLED:
                 /* TODO, can this drive be disabled? */
@@ -233,7 +235,7 @@ void clem_disk_read_and_position_head_35(struct ClemensDrive *drive, unsigned *i
     }
     drive->ctl_switch = ctl_switch;
 
-    track_cur_pos = clem_drive_step(drive, io_flags, qtr_track_index, track_cur_pos, dt_ns);
+    track_cur_pos = clem_drive_step(drive, io_flags, qtr_track_index, track_cur_pos, clocks_dt);
 
     if (sense_out) {
         *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;

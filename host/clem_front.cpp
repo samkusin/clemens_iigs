@@ -839,7 +839,7 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     frameWriteState_.iwm.track_byte_index = iwmDrive->track_byte_index;
     frameWriteState_.iwm.track_bit_shift = iwmDrive->track_bit_shift;
     frameWriteState_.iwm.track_bit_length = iwmDrive->track_bit_length;
-    frameWriteState_.iwm.data = iwm.data;
+    frameWriteState_.iwm.data = iwm.data_r;
     frameWriteState_.iwm.latch = iwm.latch;
     frameWriteState_.iwm.ph03 = (uint8_t)(iwm.out_phase & 0xff);
 

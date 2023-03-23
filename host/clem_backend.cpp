@@ -509,7 +509,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
             //   TODO: detect SmartPort drive status - enable2 only detects if the
             //         whole bus is active - which may be fine for now since we just support
             //         one SmartPort drive!
-            diskDrive.isSpinning = mmio_.dev_iwm.enable2;
+            diskDrive.isSpinning = mmio_.dev_iwm.smartport_active;
             diskDrive.isWriteProtected = false;
             diskDrive.saveFailed = false;
             if (diskDrive.isEjecting) {
@@ -717,7 +717,7 @@ void ClemensBackend::initApple2GS() {
                      slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount), kFPIBankCount);
     clem_mmio_init(&mmio_, &machine_.dev_debug, machine_.mem.bank_page_map,
                    slabMemory_.allocate(2048 * 7), kFPIBankCount, machine_.mem.mega2_bank_map[0],
-                   machine_.mem.mega2_bank_map[1]);
+                   machine_.mem.mega2_bank_map[1], &machine_.tspec);
     if (result < 0) {
         fmt::print("Clemens library failed to initialize with err code (%d)\n", result);
         return;
@@ -965,6 +965,10 @@ bool ClemensBackend::onCommandDebugProgramTrace(std::string_view op, std::string
     }
     if (programTrace_ != nullptr && op == "off") {
         fmt::print("Program trace disabled\n");
+        if (programTrace_->isIWMLoggingEnabled()) {
+            clem_iwm_debug_stop(&mmio_.dev_iwm);
+            programTrace_->enableIWMLogging(false);
+        }
         programTrace_ = nullptr;
     }
     if (programTrace_) {

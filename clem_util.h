@@ -64,21 +64,21 @@ static inline uint32_t _clem_calc_cycles_diff(uint32_t cycles_a, uint32_t cycles
     }
 }
 
-static inline unsigned clem_util_timer_decrement(unsigned timer_ns, unsigned dt_ns) {
-    return (timer_ns - dt_ns < timer_ns) ? (timer_ns - dt_ns) : 0;
+static inline unsigned clem_util_timer_decrement(unsigned timer_cnt, unsigned dt) {
+    return (timer_cnt - dt < timer_cnt) ? (timer_cnt - dt) : 0;
 }
 
-static inline unsigned clem_util_timer_increment(unsigned timer_ns, unsigned timer_max_ns,
-                                                 unsigned dt_ns) {
-    if (timer_ns + dt_ns > timer_ns) {
-        timer_ns += dt_ns;
+static inline unsigned clem_util_timer_increment(unsigned timer_cnt, unsigned timer_max,
+                                                 unsigned dt) {
+    if (timer_cnt + dt > timer_cnt) {
+        timer_cnt += dt;
     } else {
-        timer_ns = UINT32_MAX;
+        timer_cnt = UINT32_MAX;
     }
-    if (timer_ns > timer_max_ns) {
-        timer_ns = timer_max_ns;
+    if (timer_cnt > timer_max) {
+        timer_cnt = timer_max;
     }
-    return timer_ns;
+    return timer_cnt;
 }
 
 static bool _clem_util_hex_value(uint32_t *value, const char *start, const char *end) {

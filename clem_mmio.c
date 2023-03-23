@@ -6,6 +6,7 @@
 
 #include "clem_device.h"
 #include "clem_mmio_types.h"
+#include "clem_types.h"
 #include "clem_util.h"
 #include "clem_vgc.h"
 
@@ -726,8 +727,7 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         result = _clem_mmio_floating_bus(mmio, tspec);
         break;
     case CLEM_MMIO_REG_DISK_INTERFACE:
-        result =
-            clem_iwm_read_switch(&mmio->dev_iwm, &mmio->active_drives, &ref_clock, ioreg, flags);
+        result = clem_iwm_read_switch(&mmio->dev_iwm, &mmio->active_drives, tspec, ioreg, flags);
         break;
     case CLEM_MMIO_REG_RTC_VGC_SCANINT:
         result = clem_vgc_read_switch(&mmio->vgc, &ref_clock, ioreg, flags);
@@ -914,8 +914,7 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     case CLEM_MMIO_REG_IWM_Q6_HI:
     case CLEM_MMIO_REG_IWM_Q7_LO:
     case CLEM_MMIO_REG_IWM_Q7_HI:
-        result =
-            clem_iwm_read_switch(&mmio->dev_iwm, &mmio->active_drives, &ref_clock, ioreg, flags);
+        result = clem_iwm_read_switch(&mmio->dev_iwm, &mmio->active_drives, tspec, ioreg, flags);
         break;
     default:
         if (ioreg >= 0x90) {
@@ -1043,7 +1042,7 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
         clem_sound_write_switch(&mmio->dev_audio, ioreg, data);
         break;
     case CLEM_MMIO_REG_DISK_INTERFACE:
-        clem_iwm_write_switch(&mmio->dev_iwm, &mmio->active_drives, &ref_clock, ioreg, data);
+        clem_iwm_write_switch(&mmio->dev_iwm, &mmio->active_drives, tspec, ioreg, data);
         break;
     case CLEM_MMIO_REG_RTC_VGC_SCANINT:
         if (!(data & 0x40)) {
@@ -1194,7 +1193,7 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
     case CLEM_MMIO_REG_IWM_Q6_HI:
     case CLEM_MMIO_REG_IWM_Q7_LO:
     case CLEM_MMIO_REG_IWM_Q7_HI:
-        clem_iwm_write_switch(&mmio->dev_iwm, &mmio->active_drives, &ref_clock, ioreg, data);
+        clem_iwm_write_switch(&mmio->dev_iwm, &mmio->active_drives, tspec, ioreg, data);
         break;
     default:
         if (ioreg >= 0x80) {
@@ -1715,13 +1714,13 @@ void _clem_mmio_init_page_maps(ClemensMMIO *mmio, uint32_t memory_flags) {
     clem_mmio_restore(mmio);
 }
 
-void clem_mmio_reset(ClemensMMIO *mmio) {
+void clem_mmio_reset(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) {
     clem_timer_reset(&mmio->dev_timer);
     clem_rtc_reset(&mmio->dev_rtc, CLEM_CLOCKS_PHI0_CYCLE);
     clem_adb_reset(&mmio->dev_adb);
     clem_sound_reset(&mmio->dev_audio);
     clem_vgc_reset(&mmio->vgc);
-    clem_iwm_reset(&mmio->dev_iwm);
+    clem_iwm_reset(&mmio->dev_iwm, tspec);
     clem_scc_reset(&mmio->dev_scc);
 }
 
@@ -1734,7 +1733,8 @@ void clem_mmio_restore(ClemensMMIO *mmio) {
 
 void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
                     struct ClemensMemoryPageMap **bank_page_map, void *slot_expansion_rom,
-                    unsigned int fpi_ram_bank_count, uint8_t *e0_bank, uint8_t *e1_bank) {
+                    unsigned int fpi_ram_bank_count, uint8_t *e0_bank, uint8_t *e1_bank,
+                    struct ClemensTimeSpec *tspec) {
     int idx;
     //  Memory map starts out without shadowing, but our call to
     //  init_page_maps will initialize the memory map on IIgs reset
@@ -1765,5 +1765,5 @@ void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
     _clem_mmio_init_page_maps(mmio, CLEM_MEM_IO_MMAP_NSHADOW_SHGR | CLEM_MEM_IO_MMAP_WRLCRAM |
                                         CLEM_MEM_IO_MMAP_LCBANK2);
 
-    clem_mmio_reset(mmio);
+    clem_mmio_reset(mmio, tspec);
 }
