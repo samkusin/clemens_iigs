@@ -23,7 +23,6 @@ struct ClemensConfiguration {
     std::string romFilename;
     unsigned majorVersion;
     unsigned minorVersion;
-
     unsigned ramSizeKB;
 
     bool hybridInterfaceEnabled;

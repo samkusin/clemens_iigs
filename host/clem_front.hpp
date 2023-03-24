@@ -115,6 +115,7 @@ class ClemensFrontend : public ClemensHostView {
     ClemensAudioDevice audio_;
 
     std::unique_ptr<ClemensBackend> backend_;
+    int logLevel_;
 
     //  Handles synchronization between the emulator and the UI(main) thread
     //  The backendQueue is filled by the UI.  It will "stage" these commands

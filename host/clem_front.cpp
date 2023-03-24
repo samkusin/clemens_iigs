@@ -610,8 +610,8 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
                                  const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
     : config_(config), displayProvider_(systemFontLoBuffer, systemFontHiBuffer),
-      display_(displayProvider_), audio_(), uiFrameTimeDelta_(0.0), frameSeqNo_(kFrameSeqNoInvalid),
-      frameLastSeqNo_(kFrameSeqNoInvalid),
+      display_(displayProvider_), audio_(), logLevel_(CLEM_DEBUG_LOG_INFO), uiFrameTimeDelta_(0.0),
+      frameSeqNo_(kFrameSeqNoInvalid), frameLastSeqNo_(kFrameSeqNoInvalid),
       frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameMemory_(kLogMemorySize, malloc(kLogMemorySize)), lastFrameCPUPins_{},
@@ -702,6 +702,7 @@ void ClemensFrontend::createBackend() {
     backendConfig_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
     backendConfig_.ramSizeKB = config_.ramSizeKB;
     backendConfig_.enableFastEmulation = config_.fastEmulationEnabled;
+    backendConfig_.logLevel = logLevel_;
 
     auto backend = std::make_unique<ClemensBackend>(romPath.string(), backendConfig_);
 
@@ -1124,6 +1125,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
                 consoleChanged_ = true;
             }
             lastCommandState_.logNode = lastCommandState_.logNodeTail = nullptr;
+            logLevel_ = frameReadState_.logLevel;
             //  display last few log instructions
             LogInstructionNode *logInstructionNode = lastCommandState_.logInstructionNode;
 

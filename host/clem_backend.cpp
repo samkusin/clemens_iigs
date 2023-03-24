@@ -166,7 +166,7 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config &config)
     : config_(config), slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
       mockingboard_(nullptr),
       interpreter_(cinek::FixedStack(kInterpreterMemorySize, malloc(kInterpreterMemorySize))),
-      breakpoints_(std::move(config_.breakpoints)), logLevel_(CLEM_DEBUG_LOG_INFO),
+      breakpoints_(std::move(config_.breakpoints)), logLevel_(config_.logLevel),
       debugMemoryPage_(0x00), areInstructionsLogged_(false) {
 
     diskContainers_.fill(ClemensWOZDisk{});
