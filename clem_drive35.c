@@ -67,21 +67,13 @@ void clem_disk_35_start_eject(struct ClemensDrive *drive) {
     CLEM_LOG("clem_drive35: ejecting disk");
 }
 
-void clem_disk_read_and_position_head_35(struct ClemensDrive *drive, unsigned *io_flags,
-                                         unsigned in_phase, clem_clocks_duration_t clocks_dt) {
+int clem_disk_control_35(struct ClemensDrive *drive, unsigned *io_flags, unsigned in_phase,
+                         clem_clocks_duration_t clocks_dt) {
     bool sense_out = false;
     bool ctl_strobe = (in_phase & 0x8) != 0;
     clem_clocks_duration_t cur_step_timer_dt = drive->step_timer_35_dt;
     unsigned ctl_switch;
-    unsigned track_cur_pos;
     int qtr_track_index = drive->qtr_track_index;
-
-    track_cur_pos = clem_drive_pre_step(drive, io_flags);
-    if (track_cur_pos == CLEM_IWM_DRIVE_INVALID_TRACK_POS) {
-        /* should we clear state ? */
-
-        return;
-    }
 
     drive->step_timer_35_dt = clem_util_timer_decrement(cur_step_timer_dt, clocks_dt);
 
@@ -234,11 +226,12 @@ void clem_disk_read_and_position_head_35(struct ClemensDrive *drive, unsigned *i
     }
     drive->ctl_switch = ctl_switch;
 
-    track_cur_pos = clem_drive_step(drive, io_flags, qtr_track_index, track_cur_pos, clocks_dt);
-
+    //  Apple 3.5" drives reuse the write protect as a "sense" flag
     if (sense_out) {
         *io_flags |= CLEM_IWM_FLAG_WRPROTECT_SENSE;
     } else {
         *io_flags &= ~CLEM_IWM_FLAG_WRPROTECT_SENSE;
     }
+
+    return qtr_track_index;
 }

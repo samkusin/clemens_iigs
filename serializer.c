@@ -153,6 +153,10 @@ struct ClemensSerializerRecord kSCC[] = {
 struct ClemensSerializerRecord kIWM[] = {
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, cur_clocks_ts),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, last_write_clocks_ts),
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, clocks_at_next_scanline),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceIWM, clocks_used_this_step),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceIWM, clocks_this_step),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, scanline_phase_ctr),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, data_access_time_ns),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, io_flags),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, out_phase),
@@ -229,6 +233,7 @@ struct ClemensSerializerRecord kDrive[] = {
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDrive, kClemensSerializerTypeUInt8, random_bits,
                                  CLEM_IWM_DRIVE_RANDOM_BYTES, 0),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDrive, random_bit_index),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDrive, current_byte),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 struct ClemensSerializerRecord kSmartPortPacket[] = {

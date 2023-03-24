@@ -363,8 +363,6 @@ struct ClemensDrive {
     /** used for random pulse generation */
     uint8_t random_bits[CLEM_IWM_DRIVE_RANDOM_BYTES];
     unsigned random_bit_index;
-
-    /** debug only */
     uint8_t current_byte;
 };
 

@@ -24,23 +24,16 @@ extern "C" {
 void clem_disk_reset_drives(struct ClemensDriveBay *drives);
 void clem_disk_start_drive(struct ClemensDrive *drive);
 
-void clem_disk_read_and_position_head_35(struct ClemensDrive *drive, unsigned *io_flags,
-                                         unsigned in_phase, clem_clocks_duration_t clocks_dt);
-
 void clem_disk_35_start_eject(struct ClemensDrive *drive);
 
-void clem_disk_read_and_position_head_525(struct ClemensDrive *drive, unsigned *io_flags,
-                                          unsigned in_phase, clem_clocks_duration_t clocks_dt);
-unsigned clem_drive_pre_step(struct ClemensDrive *drive, unsigned *io_flags);
+void clem_disk_control(struct ClemensDrive *drive, unsigned *io_flags, unsigned in_phase,
+                       clem_clocks_duration_t clocks_dt);
 
-unsigned clem_drive_step(struct ClemensDrive *drive, unsigned *io_flags, int qtr_track_index,
-                         unsigned track_cur_pos, clem_clocks_duration_t clocks_dt);
+void clem_disk_step(struct ClemensDrive *drive, unsigned *io_flags);
 
-void clem_disk_write_head(struct ClemensDrive *drive, unsigned *io_flags,
-                          clem_clocks_duration_t clocks_dt);
+void clem_disk_write_head(struct ClemensDrive *drive, unsigned *io_flags);
 
-void clem_disk_update_head(struct ClemensDrive *drive, unsigned *io_flags,
-                           clem_clocks_duration_t clocks_dt);
+void clem_disk_update_head(struct ClemensDrive *drive, unsigned *io_flags);
 
 #ifdef __cplusplus
 } // extern "C"
