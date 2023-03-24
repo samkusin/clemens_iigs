@@ -243,13 +243,13 @@ static void _clem_iwm_debug_event(struct ClemensDeviceIWM *iwm, struct ClemensDr
     }
 }
 
-#define CLEM_IWM_DEBUG_EVENT(_iwm_, _drives_, _prefix_, _t_)                                       \
-    if ((_iwm_)->enable_debug) {                                                                   \
+#define CLEM_IWM_DEBUG_EVENT(_iwm_, _drives_, _prefix_, _t_, _lvl_)                                \
+    if ((_iwm_)->enable_debug && (_lvl_) <= (_iwm_)->debug_level) {                                \
         _clem_iwm_debug_event(_iwm_, _drives_, _prefix_, _t_);                                     \
     }
 
 #else
-#define CLEM_IWM_DEBUG_EVENT(_iwm_, _drives_, _prefix_, _t_)
+#define CLEM_IWM_DEBUG_EVENT(_iwm_, _drives_, _prefix_, _t_, _lvl_)
 #endif
 
 void clem_iwm_debug_start(struct ClemensDeviceIWM *iwm) {
@@ -282,6 +282,7 @@ void clem_iwm_reset(struct ClemensDeviceIWM *iwm, struct ClemensTimeSpec *tspec)
     iwm->clocks_at_next_scanline = CLEM_VGC_HORIZ_SCAN_PHI0_CYCLES * CLEM_CLOCKS_PHI0_CYCLE;
     iwm->scanline_phase_ctr = 0;
     iwm->state = CLEM_IWM_STATE_UNKNOWN;
+    iwm->debug_level = 1;
 }
 
 void clem_iwm_insert_disk(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
@@ -471,7 +472,7 @@ static void _clem_iwm_write_step(struct ClemensDeviceIWM *iwm) {
 }
 
 #define CLEM_IWM_READ_REG_STATE_MASK  0xffff0000
-#define CLEM_IWM_READ_REG_STATE_CTR   0x0000ffff
+#define CLEM_IWM_READ_REG_STATE_LATCH 0x0000ffff
 #define CLEM_IWM_READ_REG_STATE_START 0x00000000
 #define CLEM_IWM_READ_REG_STATE_QA0   0x00010000
 #define CLEM_IWM_READ_REG_STATE_QA1   0x00020000
@@ -492,7 +493,7 @@ static bool _clem_iwm_read_step(struct ClemensDeviceIWM *iwm) {
     //  state_qa1: wait until read pulse, then shift onto latch, goto state_qa1_1
     //  state_qa1_1: shift 0 or 1 based on read pulse, goto state_qa0
     //      note - if a read_switch() occurs while in state_qa0, copy latch to data
-    unsigned counter = iwm->read_state & CLEM_IWM_READ_REG_STATE_CTR;
+    unsigned read_latch_hold = iwm->read_state & CLEM_IWM_READ_REG_STATE_LATCH;
     if (iwm->state == CLEM_IWM_STATE_READ_STATUS) {
         //  If in read status (Write Protect Sense) mode, the original LSS shifts the latch
         //  right every Q3 cycle.  Since this step runs in 8 Q3 cycles (5.25" mode), we
@@ -502,7 +503,7 @@ static bool _clem_iwm_read_step(struct ClemensDeviceIWM *iwm) {
             iwm->latch |= 0x80;
         }
         iwm->data_r = iwm->latch;
-        return true;
+        read_latch_hold = 0; // no read latching when reading status
     }
     switch (iwm->read_state & CLEM_IWM_READ_REG_STATE_MASK) {
     case CLEM_IWM_READ_REG_STATE_START:
@@ -510,7 +511,6 @@ static bool _clem_iwm_read_step(struct ClemensDeviceIWM *iwm) {
             iwm->latch <<= 1;
             iwm->latch |= 0x1;
             iwm->data_r = iwm->latch;
-            counter++;
             iwm->read_state =
                 (iwm->read_state & ~CLEM_IWM_READ_REG_STATE_MASK) | CLEM_IWM_READ_REG_STATE_QA0;
         }
@@ -520,25 +520,29 @@ static bool _clem_iwm_read_step(struct ClemensDeviceIWM *iwm) {
         if (iwm->io_flags & CLEM_IWM_FLAG_READ_DATA) {
             iwm->latch |= 0x1;
         }
-        iwm->data_r = iwm->latch;
-        counter++;
+        if (!read_latch_hold) {
+            //  no read latch hold enabled, update the data register
+            iwm->data_r = iwm->latch;
+        }
         if (iwm->latch & 0x80) {
+            if (iwm->latch_mode) {
+                //  latch the byte until the next data access
+                iwm->data_r = iwm->latch;
+                read_latch_hold = 1;
+            }
             iwm->read_state =
                 (iwm->read_state & ~CLEM_IWM_READ_REG_STATE_MASK) | CLEM_IWM_READ_REG_STATE_QA1;
-            return true;
         }
         break;
     case CLEM_IWM_READ_REG_STATE_QA1:
         if (iwm->io_flags & CLEM_IWM_FLAG_READ_DATA) {
             iwm->latch = 0x01;
-            counter = 0; // new byte
             iwm->read_state =
                 (iwm->read_state & ~CLEM_IWM_READ_REG_STATE_MASK) | CLEM_IWM_READ_REG_STATE_QA1_1;
         }
         break;
     case CLEM_IWM_READ_REG_STATE_QA1_1:
         iwm->latch <<= 1;
-        counter++;
         if (iwm->io_flags & CLEM_IWM_FLAG_READ_DATA) {
             iwm->latch |= 0x1;
         }
@@ -547,8 +551,8 @@ static bool _clem_iwm_read_step(struct ClemensDeviceIWM *iwm) {
         break;
     }
     iwm->read_state &= CLEM_IWM_READ_REG_STATE_MASK;
-    iwm->read_state |= (counter & 0xffff);
-    return false;
+    iwm->read_state |= (read_latch_hold & 0xffff);
+    return (iwm->data_r & 0x80) != 0;
 }
 
 static bool _clem_iwm_step_current_clocks_ts(struct ClemensDeviceIWM *iwm,
@@ -561,7 +565,8 @@ static bool _clem_iwm_step_current_clocks_ts(struct ClemensDeviceIWM *iwm,
         iwm->scanline_phase_ctr++;
         if (iwm->scanline_phase_ctr & 1) {
             iwm->clocks_at_next_scanline += CLEM_CLOCKS_7MHZ_CYCLE;
-            if (!iwm->fast_mode) {
+            if (!iwm->async_mode) {
+                //  use stretch clock cycles only in synchronous mode per spec
                 iwm->clocks_this_step += CLEM_CLOCKS_7MHZ_CYCLE;
             }
         } else {
@@ -644,7 +649,7 @@ static void _clem_iwm_step(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
         if (!(iwm->state & CLEM_IWM_STATE_WRITE_MASK)) {
             _clem_iwm_read_step(iwm);
         }
-        // CLEM_IWM_DEBUG_EVENT(iwm, drives, "STEP_D", iwm->cur_clocks_ts);
+        CLEM_IWM_DEBUG_EVENT(iwm, drives, "STEP_D", iwm->cur_clocks_ts, 2);
         if (drive) {
             //  update the head's position
             clem_disk_update_head(drive, &iwm->io_flags);
@@ -844,7 +849,7 @@ void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
                     iwm->write_state |= CLEM_IWM_WRITE_REG_DATA;
                     iwm->data_access_time_ns = CLEM_IWM_DATA_ACCESS_NS_EXPIRATION;
                     iwm->io_flags |= CLEM_IWM_FLAG_WRITE_REQUEST;
-                    CLEM_IWM_DEBUG_EVENT(iwm, drives, "DATA_W", tspec->clocks_spent);
+                    CLEM_IWM_DEBUG_EVENT(iwm, drives, "DATA_W", tspec->clocks_spent, 1);
                 } else {
                     _clem_iwm_write_mode(iwm, value);
                 }
@@ -913,15 +918,26 @@ uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBa
                     /* all ones, IWM spec p.7 */
                     result = 0xff;
                 } else {
-                    if ((iwm->read_state & CLEM_IWM_READ_REG_STATE_MASK) ==
-                        CLEM_IWM_READ_REG_STATE_QA0) {
-                        //  exceptional case, when reading before the next bit cell is processed
-                        //  in sync()
-                        iwm->data_r = iwm->latch;
+                    if (!is_noop) {
+                        if ((iwm->read_state & CLEM_IWM_READ_REG_STATE_MASK) ==
+                            CLEM_IWM_READ_REG_STATE_QA0) {
+                            //  exceptional case, when reading before the next bit cell is processed
+                            //  in sync()
+                            if (!(iwm->read_state & CLEM_IWM_READ_REG_STATE_LATCH)) {
+                                //  but don't reset the data register if we're latch hold is
+                                //  enabled
+                                iwm->data_r = iwm->latch;
+                            }
+                        }
+                        //  a data read will release the latch hold
+                        iwm->read_state &= ~CLEM_IWM_READ_REG_STATE_LATCH;
+                        if (iwm->data_r & 0x80) {
+                            CLEM_IWM_DEBUG_EVENT(iwm, drives, "DATA_R", tspec->clocks_spent, 1);
+                        } else {
+                            CLEM_IWM_DEBUG_EVENT(iwm, drives, "POLL_R", tspec->clocks_spent, 2);
+                        }
                     }
-                    if (!is_noop && (iwm->data_r & 0x80)) {
-                        CLEM_IWM_DEBUG_EVENT(iwm, drives, "DATA_R", tspec->clocks_spent);
-                    }
+
                     result = iwm->data_r;
                 }
                 break;

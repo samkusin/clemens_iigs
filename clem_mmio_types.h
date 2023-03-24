@@ -322,6 +322,7 @@ struct ClemensDeviceIWM {
 
     /** Not to be serialized - just for debugging. */
     bool enable_debug; /**< If True, activates file logging */
+    int debug_level;   /**< 3 = the most/debug, 2 is detailed */
 };
 
 /*  ClemensDrive Data
