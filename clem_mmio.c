@@ -1322,22 +1322,30 @@ static void _clem_mmio_memory_map(ClemensMMIO *mmio, uint32_t memory_flags) {
     //      here should automatically be shdaowed to the appropriate e0/e1
     //      area for display.
     if (remap_flags & CLEM_MEM_IO_MMAP_OLDVIDEO) {
-        for (page_idx = 0x04; page_idx < 0x08; ++page_idx) {
-            page_B00 = &page_map_B00->pages[page_idx];
-            if (memory_flags & CLEM_MEM_IO_MMAP_80COLSTORE) {
+        if (memory_flags & CLEM_MEM_IO_MMAP_80COLSTORE) {
+            for (page_idx = 0x04; page_idx < 0x08; ++page_idx) {
+                page_B00 = &page_map_B00->pages[page_idx];
                 page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x01 : 00);
                 page_B00->bank_write = ((memory_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x01 : 00);
-            } else {
+            }
+            for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
+                page_B00 = &page_map_B00->pages[page_idx];
+                if (memory_flags & CLEM_MEM_IO_MMAP_HIRES) {
+                    page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x01 : 00);
+                    page_B00->bank_write = ((memory_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x01 : 00);
+                } else {
+                    page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_RAMRD) ? 0x01 : 00);
+                    page_B00->bank_write = ((memory_flags & CLEM_MEM_IO_MMAP_RAMWRT) ? 0x01 : 00);
+                }
+            }
+        } else {
+            for (page_idx = 0x04; page_idx < 0x08; ++page_idx) {
+                page_B00 = &page_map_B00->pages[page_idx];
                 page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_RAMRD) ? 0x01 : 00);
                 page_B00->bank_write = ((memory_flags & CLEM_MEM_IO_MMAP_RAMWRT) ? 0x01 : 00);
             }
-        }
-        for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
-            page_B00 = &page_map_B00->pages[page_idx];
-            if (memory_flags & (CLEM_MEM_IO_MMAP_80COLSTORE + CLEM_MEM_IO_MMAP_HIRES)) {
-                page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x01 : 00);
-                page_B00->bank_write = ((memory_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x01 : 00);
-            } else {
+            for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
+                page_B00 = &page_map_B00->pages[page_idx];
                 page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_RAMRD) ? 0x01 : 00);
                 page_B00->bank_write = ((memory_flags & CLEM_MEM_IO_MMAP_RAMWRT) ? 0x01 : 00);
             }
