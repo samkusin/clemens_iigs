@@ -159,9 +159,6 @@ static const char *s_state_names[] = {"READ", "STAT", "HAND", "WRIT"};
 
 static void _clem_iwm_debug_print(FILE *fp, struct ClemensIWMDebugRecord *record) {
     bool is_write_mode = (record->mode & 0x80) != 0;
-    if (!strncmp(record->code, "DATA_W", sizeof(record->code))) {
-        fputc('\n', fp);
-    }
     fprintf(fp, "[%20" PRIu64 "] %c, %s, %s, %s, D%u, Q%d, %u, %u, %u, %02X, ", record->t,
             record->mode & 0x08 ? 'F' : 'S', record->code, s_state_names[record->iwm_state & 0x03],
             (record->mode & 0x20)   ? "SMAR"
@@ -623,6 +620,7 @@ static void _clem_iwm_step(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
             if (iwm->async_mode && (is_drive_35_sel || iwm->smartport_active)) {
                 _clem_iwm_async_write_step(iwm, iwm->cur_clocks_ts);
             } else {
+                CLEM_IWM_DEBUG_EVENT(iwm, drives, "DATA_W", iwm->cur_clocks_ts, 1);
                 _clem_iwm_write_step(iwm);
             }
         }
@@ -849,7 +847,7 @@ void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
                     iwm->write_state |= CLEM_IWM_WRITE_REG_DATA;
                     iwm->data_access_time_ns = CLEM_IWM_DATA_ACCESS_NS_EXPIRATION;
                     iwm->io_flags |= CLEM_IWM_FLAG_WRITE_REQUEST;
-                    CLEM_IWM_DEBUG_EVENT(iwm, drives, "DATA_W", tspec->clocks_spent, 1);
+                    CLEM_IWM_DEBUG_EVENT(iwm, drives, "MPU_W", tspec->clocks_spent, 2);
                 } else {
                     _clem_iwm_write_mode(iwm, value);
                 }
@@ -932,7 +930,7 @@ uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBa
                         //  a data read will release the latch hold
                         iwm->read_state &= ~CLEM_IWM_READ_REG_STATE_LATCH;
                         if (iwm->data_r & 0x80) {
-                            CLEM_IWM_DEBUG_EVENT(iwm, drives, "DATA_R", tspec->clocks_spent, 1);
+                            CLEM_IWM_DEBUG_EVENT(iwm, drives, "MPU_R", tspec->clocks_spent, 1);
                         } else {
                             CLEM_IWM_DEBUG_EVENT(iwm, drives, "POLL_R", tspec->clocks_spent, 2);
                         }
