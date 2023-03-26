@@ -1,5 +1,6 @@
 #include "clem_backend.hpp"
 #include "cinek/ckdefs.h"
+#include "clem_device.h"
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
 #include "clem_host_shared.hpp"
@@ -165,7 +166,7 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config &config)
     : config_(config), slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
       mockingboard_(nullptr),
       interpreter_(cinek::FixedStack(kInterpreterMemorySize, malloc(kInterpreterMemorySize))),
-      breakpoints_(std::move(config_.breakpoints)), logLevel_(CLEM_DEBUG_LOG_INFO),
+      breakpoints_(std::move(config_.breakpoints)), logLevel_(config_.logLevel),
       debugMemoryPage_(0x00), areInstructionsLogged_(false) {
 
     diskContainers_.fill(ClemensWOZDisk{});
@@ -452,6 +453,8 @@ ClemensBackend::main(ClemensBackendState &backendState,
         while (emulatorVblCounter > 0 && isRunning()) {
             clemens_emulate_cpu(&machine_);
             clemens_emulate_mmio(&machine_, &mmio_);
+            if (clemens_is_resetting(&machine_))
+                lastClocksSpent = machine_.tspec.clocks_spent; // clocks being reset
             if (vblActive && !mmio_.vgc.vbl_started) {
                 emulatorVblCounter--;
             }
@@ -508,7 +511,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
             //   TODO: detect SmartPort drive status - enable2 only detects if the
             //         whole bus is active - which may be fine for now since we just support
             //         one SmartPort drive!
-            diskDrive.isSpinning = mmio_.dev_iwm.enable2;
+            diskDrive.isSpinning = mmio_.dev_iwm.smartport_active;
             diskDrive.isWriteProtected = false;
             diskDrive.saveFailed = false;
             if (diskDrive.isEjecting) {
@@ -716,7 +719,7 @@ void ClemensBackend::initApple2GS() {
                      slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount), kFPIBankCount);
     clem_mmio_init(&mmio_, &machine_.dev_debug, machine_.mem.bank_page_map,
                    slabMemory_.allocate(2048 * 7), kFPIBankCount, machine_.mem.mega2_bank_map[0],
-                   machine_.mem.mega2_bank_map[1]);
+                   machine_.mem.mega2_bank_map[1], &machine_.tspec);
     if (result < 0) {
         fmt::print("Clemens library failed to initialize with err code (%d)\n", result);
         return;
@@ -964,12 +967,21 @@ bool ClemensBackend::onCommandDebugProgramTrace(std::string_view op, std::string
     }
     if (programTrace_ != nullptr && op == "off") {
         fmt::print("Program trace disabled\n");
+        if (programTrace_->isIWMLoggingEnabled()) {
+            clem_iwm_debug_stop(&mmio_.dev_iwm);
+            programTrace_->enableIWMLogging(false);
+        }
         programTrace_ = nullptr;
     }
     if (programTrace_) {
         if (op == "iwm") {
             programTrace_->enableIWMLogging(!programTrace_->isIWMLoggingEnabled());
             fmt::print("{} tracing = {}\n", op, programTrace_->isIWMLoggingEnabled());
+            if (programTrace_->isIWMLoggingEnabled()) {
+                clem_iwm_debug_start(&mmio_.dev_iwm);
+            } else {
+                clem_iwm_debug_stop(&mmio_.dev_iwm);
+            }
         } else {
             fmt::print("{} tracing is not recognized.\n", op);
         }

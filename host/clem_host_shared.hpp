@@ -51,6 +51,7 @@ struct ClemensBackendConfig {
     std::vector<ClemensBackendBreakpoint> breakpoints;
     unsigned audioSamplesPerSecond;
     unsigned ramSizeKB;
+    int logLevel;
     bool enableFastEmulation;
     Type type;
 };

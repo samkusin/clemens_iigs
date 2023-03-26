@@ -607,12 +607,9 @@ bool clem_smartport_bus(struct ClemensSmartPortUnit *unit, unsigned unit_count, 
 
         *io_flags &= ~CLEM_IWM_FLAG_READ_DATA;
         if (bus_state & CLEM_SMARTPORT_BUS_READ) {
-            *io_flags |= CLEM_IWM_FLAG_PULSE_HIGH;
             if (bus_state & CLEM_SMARTPORT_BUS_DATA) {
                 *io_flags |= CLEM_IWM_FLAG_READ_DATA;
             }
-        } else {
-            *io_flags &= ~CLEM_IWM_FLAG_PULSE_HIGH;
         }
 
         //    printf("SmartPort: REQ: %u,  ACK: %u\n", (select_bits & 1) != 0, is_ack_hi);

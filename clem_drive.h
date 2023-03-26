@@ -2,10 +2,11 @@
 #define CLEM_DRIVE_H
 
 #include "clem_mmio_types.h"
+#include "clem_shared.h"
 
 #define CLEM_IWM_FLAG_MASK_PRE_STEP_CLEARED                                                        \
     (CLEM_IWM_FLAG_WRPROTECT_SENSE + CLEM_IWM_FLAG_READ_DATA + CLEM_IWM_FLAG_READ_DATA_FAKE +      \
-     CLEM_IWM_FLAG_PULSE_HIGH)
+     CLEM_IWM_FLAG_WRITE_HI)
 
 #define CLEM_IWM_FLAG_WRITE_HEAD_ON (CLEM_IWM_FLAG_WRITE_DATA + CLEM_IWM_FLAG_WRITE_REQUEST)
 
@@ -24,22 +25,16 @@ extern "C" {
 void clem_disk_reset_drives(struct ClemensDriveBay *drives);
 void clem_disk_start_drive(struct ClemensDrive *drive);
 
-void clem_disk_read_and_position_head_35(struct ClemensDrive *drive, unsigned *io_flags,
-                                         unsigned in_phase, unsigned delta_ns);
-
-void clem_disk_update_head_35(struct ClemensDrive *drive, unsigned *io_flags, unsigned delta_ns);
-
 void clem_disk_35_start_eject(struct ClemensDrive *drive);
 
-void clem_disk_read_and_position_head_525(struct ClemensDrive *drive, unsigned *io_flags,
-                                          unsigned in_phase, unsigned delta_ns);
+void clem_disk_control(struct ClemensDrive *drive, unsigned *io_flags, unsigned in_phase,
+                       clem_clocks_duration_t clocks_dt);
 
-void clem_disk_update_head(struct ClemensDrive *drive, unsigned *io_flags, unsigned delta_ns);
+void clem_disk_step(struct ClemensDrive *drive, unsigned *io_flags);
 
-unsigned clem_drive_pre_step(struct ClemensDrive *drive, unsigned *io_flags);
+void clem_disk_write_head(struct ClemensDrive *drive, unsigned *io_flags);
 
-unsigned clem_drive_step(struct ClemensDrive *drive, unsigned *io_flags, int qtr_track_index,
-                         unsigned track_cur_pos, unsigned dt_ns);
+void clem_disk_update_head(struct ClemensDrive *drive, unsigned *io_flags);
 
 #ifdef __cplusplus
 } // extern "C"
