@@ -386,6 +386,9 @@ void clem_disk_write_head(struct ClemensDrive *drive, unsigned *io_flags) {
             }
         }
     }
+    if (write_transition) {
+        *io_flags |= CLEM_IWM_FLAG_WRITE_HI;
+    }
     drive->write_pulse = write_pulse;
 }
 

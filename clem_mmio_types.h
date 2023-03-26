@@ -280,8 +280,6 @@ struct ClemensVGC {
 struct ClemensDeviceIWM {
     /** A reference clocks value at the last disk update. */
     clem_clocks_time_t cur_clocks_ts;
-    /** Used for async write timing */
-    clem_clocks_time_t last_write_clocks_ts;
     /** Q3 clock accounting for PHI0 stretch cycle */
     clem_clocks_time_t clocks_at_next_scanline;
 

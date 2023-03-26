@@ -152,7 +152,6 @@ struct ClemensSerializerRecord kSCC[] = {
 
 struct ClemensSerializerRecord kIWM[] = {
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, cur_clocks_ts),
-    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, last_write_clocks_ts),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceIWM, clocks_at_next_scanline),
     CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceIWM, clocks_used_this_step),
     CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceIWM, clocks_this_step),

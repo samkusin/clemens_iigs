@@ -84,7 +84,7 @@
 #define CLEM_IWM_DATA_ACCESS_NS_EXPIRATION (500000000);
 
 //  Only for debugging.
-#define CLEM_IWM_FILE_LOGGING 1
+// #define CLEM_IWM_FILE_LOGGING 1
 
 /* Cribbed this convenient table from
    https://github.com/whscullin/apple2js/blob/f4b0100c98c2c12988f64ffe44426fcdd5ae901b/js/cards/disk2.ts#L107
@@ -204,13 +204,11 @@ static void _clem_iwm_debug_record(struct ClemensIWMDebugRecord *record,
     if (iwm->fast_mode)
         record->mode |= 0x08;
     if (iwm->io_flags & CLEM_IWM_FLAG_WRITE_REQUEST) {
-        bool write_pulse =
-            (iwm->io_flags & CLEM_IWM_FLAG_WRITE_HEAD_ON) == (CLEM_IWM_FLAG_WRITE_HEAD_ON);
         record->lss_state = iwm->write_state;
         record->mode |= 0x80;
         if (iwm->io_flags & CLEM_IWM_FLAG_WRITE_DATA)
             record->mode |= 0x40;
-        if (drive->write_pulse != write_pulse)
+        if (iwm->io_flags & CLEM_IWM_FLAG_WRITE_HI)
             record->mode |= 0x10;
     } else {
         record->lss_state = iwm->read_state;
@@ -354,18 +352,13 @@ static void _clem_iwm_reset_drive(struct ClemensDeviceIWM *iwm, struct ClemensDr
 #define CLEM_IWM_WRITE_REG_COUNTER_MASK   0x0000ffff
 #define CLEM_IWM_WRITE_REG_DATA           0x00010000
 #define CLEM_IWM_WRITE_REG_LATCH          0x00100000
+#define CLEM_IWM_WRITE_REG_LATCH_UNDERRUN 0x01000000
 #define CLEM_IWM_WRITE_REG_LATCH_QA       0x80000000
-#define CLEM_IWM_WRITE_REG_ASYNC_UNDERRUN 0x02000000
-#define CLEM_IWM_WRITE_REG_ASYNC_ACTIVE   0x04000000
 
-static void _clem_iwm_lss_write_log(struct ClemensDeviceIWM *iwm, clem_clocks_time_t ts,
-                                    const char *prefix) {
-    unsigned ns_write = clem_calc_ns_step_from_clocks(ts - iwm->last_write_clocks_ts);
-    CLEM_LOG("IWM: [%s] write latch %08X, duration dt = %.3f us, flags=%08X, "
-             "counter=%u",
-             prefix, iwm->latch, ns_write * 0.001f,
-             iwm->lss_write_reg & CLEM_IWM_WRITE_REG_STATUS_MASK,
-             iwm->lss_write_reg & ~CLEM_IWM_WRITE_REG_STATUS_MASK);
+static void _clem_iwm_async_write_log(struct ClemensDeviceIWM *iwm, const char *prefix) {
+    CLEM_LOG("IWM: [%s] write latch %08X, flags=%08X, counter=%u", prefix, iwm->latch,
+             iwm->write_state & CLEM_IWM_WRITE_REG_STATUS_MASK,
+             iwm->write_state & CLEM_IWM_WRITE_REG_COUNTER_MASK);
 }
 
 static void _clem_iwm_drive_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
@@ -435,8 +428,6 @@ static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM *iwm) {
  *      speed (fast vs slow)
  */
 
-static void _clem_iwm_async_write_step(struct ClemensDeviceIWM *iwm, clem_clocks_time_t ts) {}
-
 static void _clem_iwm_write_step(struct ClemensDeviceIWM *iwm) {
     //  This procedure covers a whole bit cell cycle
     //  CLEM_IWM_WRITE_REG_LATCH_QA will oscillate if the the MSB of the latch is HI.
@@ -445,22 +436,40 @@ static void _clem_iwm_write_step(struct ClemensDeviceIWM *iwm) {
     //
     //  writes to drives occur when the signal transitions from lo to hi and vice-versa.
     //  no flux if the signal remains at the same level
+    bool is_drive_35_sel = (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35) != 0;
+    bool async_mode = iwm->async_mode && (is_drive_35_sel || iwm->smartport_active);
     unsigned counter = iwm->write_state & CLEM_IWM_WRITE_REG_COUNTER_MASK;
+    bool latch_loaded = false;
+
+    if (async_mode && (iwm->write_state & CLEM_IWM_WRITE_REG_LATCH) && counter == 7) {
+        //  an underrun will occur unless the latch is loaded this frame
+        iwm->write_state |= CLEM_IWM_WRITE_REG_LATCH_UNDERRUN;
+    }
     if (iwm->write_state & CLEM_IWM_WRITE_REG_DATA) {
-        iwm->latch = iwm->data_w;
-        iwm->write_state &= ~CLEM_IWM_WRITE_REG_DATA;
-        iwm->write_state |= CLEM_IWM_WRITE_REG_LATCH;
-        counter = 0;
-    } else {
+        //  if async mode, load latch only if no latch is active or will be an underrun if not
+        //  loaded right now.
+        //  if sync mode, always load latch
+        if (!async_mode || (!(iwm->write_state & CLEM_IWM_WRITE_REG_LATCH) ||
+                            (iwm->write_state & CLEM_IWM_WRITE_REG_LATCH_UNDERRUN))) {
+            iwm->latch = iwm->data_w;
+            iwm->write_state &= ~(CLEM_IWM_WRITE_REG_DATA + CLEM_IWM_WRITE_REG_LATCH_UNDERRUN);
+            iwm->write_state |= CLEM_IWM_WRITE_REG_LATCH;
+            counter = 0;
+            latch_loaded = true;
+        }
+    }
+    if (iwm->write_state & CLEM_IWM_WRITE_REG_LATCH && !latch_loaded) {
         counter++;
         iwm->latch <<= 1;
+        if (counter >= 8 && iwm->async_mode) {
+            iwm->write_state |= CLEM_IWM_WRITE_REG_LATCH_UNDERRUN;
+        }
     }
     iwm->write_state &= CLEM_IWM_WRITE_REG_STATUS_MASK;
     iwm->write_state |= (counter & 0xffff);
     if (iwm->latch & 0x80) {
         iwm->write_state ^= CLEM_IWM_WRITE_REG_LATCH_QA;
     }
-
     if (iwm->write_state & CLEM_IWM_WRITE_REG_LATCH_QA) {
         iwm->io_flags |= CLEM_IWM_FLAG_WRITE_DATA;
     } else {
@@ -617,16 +626,12 @@ static void _clem_iwm_step(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
             // force 5.25" drives to use synchronous mode (IWM doesn't support this mode for Disk II
             // devices)
 
-            if (iwm->async_mode && (is_drive_35_sel || iwm->smartport_active)) {
-                _clem_iwm_async_write_step(iwm, iwm->cur_clocks_ts);
-            } else {
-                CLEM_IWM_DEBUG_EVENT(iwm, drives, "DATA_W", iwm->cur_clocks_ts, 1);
-                _clem_iwm_write_step(iwm);
-            }
+            CLEM_IWM_DEBUG_EVENT(iwm, drives, "DATA_W", iwm->cur_clocks_ts, 1);
+            _clem_iwm_write_step(iwm);
         }
         if (!is_drive_35_sel) {
-            iwm->smartport_active = clem_smartport_bus(drives->smartport, 1, &iwm->io_flags,
-                                                       &iwm->out_phase, bit_cell_clocks_dt);
+            // iwm->smartport_active = clem_smartport_bus(drives->smartport, 1, &iwm->io_flags,
+            //                                            &iwm->out_phase, bit_cell_clocks_dt);
             if (iwm->smartport_active) {
                 /*
                 if (iwm->state == CLEM_IWM_STATE_WRITE_DATA &&
@@ -767,6 +772,9 @@ void _clem_iwm_io_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *d
         }
         if ((current_state & CLEM_IWM_STATE_WRITE_MASK) &&
             !(iwm->state & CLEM_IWM_STATE_WRITE_MASK)) {
+            // latch persistance is important while in write mode for
+            // asynchronous writes to work, so only clear it when switching into
+            // one of the Q7 modes
             iwm->io_flags &= ~CLEM_IWM_FLAG_WRITE_REQUEST;
             iwm->read_state = 0;
             iwm->data_r = iwm->latch;
@@ -857,24 +865,23 @@ void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
     }
 }
 
-static uint8_t _clem_iwm_write_handshake(struct ClemensDeviceIWM *iwm, clem_clocks_time_t ts,
-                                         bool is_noop) {
-    uint8_t result = 0x80;
-    result |= 0x1f; /* SWIM ref p.11 bits 0-5 are always 1 */
-    if (iwm->lss_write_reg & CLEM_IWM_WRITE_REG_ASYNC_ACTIVE) {
-        if (iwm->lss_write_reg & CLEM_IWM_WRITE_REG_DATA) {
+static uint8_t _clem_iwm_read_handshake_for_writes(struct ClemensDeviceIWM *iwm, bool is_noop) {
+    uint8_t result = 0xff; /* SWIM ref p.11 bits 0-5 are always 1, the rest are cleared
+                            */
+    if (iwm->async_mode) {
+        if (iwm->write_state & CLEM_IWM_WRITE_REG_DATA) {
             result &= ~0x80; /* data register is full - not latched yet */
         }
-        if (iwm->lss_write_reg & CLEM_IWM_WRITE_REG_ASYNC_UNDERRUN) {
+        if (iwm->write_state & CLEM_IWM_WRITE_REG_LATCH_UNDERRUN) {
             if (!is_noop) {
-                _clem_iwm_lss_write_log(iwm, ts, "async-under");
+                _clem_iwm_async_write_log(iwm, "async-under");
+                iwm->write_state &= ~(CLEM_IWM_WRITE_REG_LATCH_UNDERRUN + CLEM_IWM_WRITE_REG_LATCH);
             }
-        } else {
-            result |= 0x40;
+            result &= ~0x40;
         }
     }
-    /* TODO: read handshake read ready?  latch mode and holding the latch
-             for a fixed period of time?
+    /* TODO: read handshake read ready?  Not according to IWM spec page 9, (but implied
+             in Hardware Reference - I'll trust the IWM spec until proven otherwise)
     */
     return result;
 }
@@ -908,7 +915,7 @@ uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBa
                 result = _clem_iwm_read_status(iwm);
                 break;
             case CLEM_IWM_STATE_WRITE_HANDSHAKE:
-                result = _clem_iwm_write_handshake(iwm, tspec->clocks_spent, is_noop);
+                result = _clem_iwm_read_handshake_for_writes(iwm, is_noop);
                 break;
             default:
                 iwm->data_access_time_ns = CLEM_IWM_DATA_ACCESS_NS_EXPIRATION;
