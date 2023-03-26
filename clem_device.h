@@ -2,6 +2,7 @@
 #define CLEM_DEVICE_H
 
 #include "clem_mmio_types.h"
+#include "clem_types.h"
 
 /**
  * Device Interface
@@ -169,7 +170,7 @@ void clem_disk_reset_drives(struct ClemensDriveBay *drives);
  *
  * @param iwm Device data
  */
-void clem_iwm_reset(struct ClemensDeviceIWM *iwm);
+void clem_iwm_reset(struct ClemensDeviceIWM *iwm, struct ClemensTimeSpec *tspec);
 
 /**
  * @brief
@@ -215,7 +216,7 @@ bool clem_iwm_eject_disk_async(struct ClemensDeviceIWM *iwm, struct ClemensDrive
  * @param clock Current clock referemce time
  */
 void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
-                       struct ClemensClock *clock);
+                       struct ClemensTimeSpec *tspec);
 
 /**
  * @brief Returns if the IWM is actively in read or write mode to a specific drive
@@ -237,7 +238,7 @@ bool clem_iwm_is_active(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *dr
  * @param value The value written to the MMIO register
  */
 void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
-                           struct ClemensClock *clock, uint8_t ioreg, uint8_t value);
+                           struct ClemensTimeSpec *tspec, uint8_t ioreg, uint8_t value);
 
 /**
  * @brief Executed from the memory subsystem for MMIO
@@ -250,7 +251,7 @@ void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
  * @return uint8_t The value read from the MMIO register
  */
 uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
-                             struct ClemensClock *clock, uint8_t ioreg, uint8_t flags);
+                             struct ClemensTimeSpec *tspec, uint8_t ioreg, uint8_t flags);
 
 /**
  * @brief

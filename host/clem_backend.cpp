@@ -1,5 +1,6 @@
 #include "clem_backend.hpp"
 #include "cinek/ckdefs.h"
+#include "clem_device.h"
 #include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
 #include "clem_host_shared.hpp"
@@ -165,7 +166,7 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config &config)
     : config_(config), slabMemory_(kSlabMemorySize, malloc(kSlabMemorySize)),
       mockingboard_(nullptr),
       interpreter_(cinek::FixedStack(kInterpreterMemorySize, malloc(kInterpreterMemorySize))),
-      breakpoints_(std::move(config_.breakpoints)), logLevel_(CLEM_DEBUG_LOG_INFO),
+      breakpoints_(std::move(config_.breakpoints)), logLevel_(config_.logLevel),
       debugMemoryPage_(0x00), areInstructionsLogged_(false) {
 
     diskContainers_.fill(ClemensWOZDisk{});
@@ -452,6 +453,8 @@ ClemensBackend::main(ClemensBackendState &backendState,
         while (emulatorVblCounter > 0 && isRunning()) {
             clemens_emulate_cpu(&machine_);
             clemens_emulate_mmio(&machine_, &mmio_);
+            if (clemens_is_resetting(&machine_))
+                lastClocksSpent = machine_.tspec.clocks_spent; // clocks being reset
             if (vblActive && !mmio_.vgc.vbl_started) {
                 emulatorVblCounter--;
             }
@@ -508,7 +511,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
             //   TODO: detect SmartPort drive status - enable2 only detects if the
             //         whole bus is active - which may be fine for now since we just support
             //         one SmartPort drive!
-            diskDrive.isSpinning = mmio_.dev_iwm.enable2;
+            diskDrive.isSpinning = mmio_.dev_iwm.smartport_active;
             diskDrive.isWriteProtected = false;
             diskDrive.saveFailed = false;
             if (diskDrive.isEjecting) {
@@ -715,7 +718,8 @@ void ClemensBackend::initApple2GS() {
                      slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
                      slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount), kFPIBankCount);
     clem_mmio_init(&mmio_, &machine_.dev_debug, machine_.mem.bank_page_map,
-                   slabMemory_.allocate(2048 * 7), kFPIBankCount);
+                   slabMemory_.allocate(2048 * 7), kFPIBankCount, machine_.mem.mega2_bank_map[0],
+                   machine_.mem.mega2_bank_map[1], &machine_.tspec);
     if (result < 0) {
         fmt::print("Clemens library failed to initialize with err code (%d)\n", result);
         return;
@@ -963,12 +967,21 @@ bool ClemensBackend::onCommandDebugProgramTrace(std::string_view op, std::string
     }
     if (programTrace_ != nullptr && op == "off") {
         fmt::print("Program trace disabled\n");
+        if (programTrace_->isIWMLoggingEnabled()) {
+            clem_iwm_debug_stop(&mmio_.dev_iwm);
+            programTrace_->enableIWMLogging(false);
+        }
         programTrace_ = nullptr;
     }
     if (programTrace_) {
         if (op == "iwm") {
             programTrace_->enableIWMLogging(!programTrace_->isIWMLoggingEnabled());
             fmt::print("{} tracing = {}\n", op, programTrace_->isIWMLoggingEnabled());
+            if (programTrace_->isIWMLoggingEnabled()) {
+                clem_iwm_debug_start(&mmio_.dev_iwm);
+            } else {
+                clem_iwm_debug_stop(&mmio_.dev_iwm);
+            }
         } else {
             fmt::print("{} tracing is not recognized.\n", op);
         }
@@ -1013,4 +1026,102 @@ bool ClemensBackend::onCommandRunScript(std::string command) {
 void ClemensBackend::onCommandFastDiskEmulation(bool enabled) {
     fmt::print("{} fast disk emulation when IWM is active\n", enabled ? "Enable" : "Disable");
     config_.enableFastEmulation = enabled;
+}
+
+//  TODO: remove when interpreter commands are supported!
+static std::string_view trimToken(const std::string_view &token, size_t off = 0,
+                                  size_t length = std::string_view::npos) {
+    auto tmp = token.substr(off, length);
+    auto left = tmp.begin();
+    for (; left != tmp.end(); ++left) {
+        if (!std::isspace(*left))
+            break;
+    }
+    tmp = tmp.substr(left - tmp.begin());
+    auto right = tmp.rbegin();
+    for (; right != tmp.rend(); ++right) {
+        if (!std::isspace(*right))
+            break;
+    }
+    tmp = tmp.substr(0, tmp.size() - (right - tmp.rbegin()));
+    return tmp;
+}
+static std::tuple<std::array<std::string_view, 8>, std::string_view, size_t>
+gatherMessageParams(std::string_view &message, bool with_cmd = false) {
+    std::array<std::string_view, 8> params;
+    size_t paramCount = 0;
+
+    size_t sepPos = std::string_view::npos;
+    std::string_view cmd;
+    if (with_cmd) {
+        sepPos = message.find(' ');
+        cmd = message.substr(0, sepPos);
+    }
+    if (sepPos != std::string_view::npos) {
+        message = message.substr(sepPos + 1);
+    }
+    while (!message.empty() && paramCount < params.size()) {
+        sepPos = message.find(',');
+        params[paramCount++] = trimToken(message.substr(0, sepPos));
+        if (sepPos != std::string_view::npos) {
+            message = message.substr(sepPos + 1);
+        } else {
+            message = "";
+        }
+    }
+    return {params, cmd, paramCount};
+}
+
+std::string ClemensBackend::onCommandDebugMessage(std::string msg) {
+    std::string_view debugmsg(msg);
+    auto [params, cmd, paramCount] = gatherMessageParams(debugmsg, true);
+    if (cmd != "dump") {
+        return fmt::format("UNK:{}", cmd);
+    }
+    unsigned startBank, endBank;
+    if (std::from_chars(params[0].data(), params[0].data() + params[0].size(), startBank, 16).ec !=
+        std::errc{}) {
+        return fmt::format("FAIL:{} {},{}", cmd, params[2], params[3]);
+    }
+    if (std::from_chars(params[1].data(), params[1].data() + params[1].size(), endBank, 16).ec !=
+        std::errc{}) {
+        return fmt::format("FAIL:{} {},{}", cmd, params[2], params[3]);
+    }
+    startBank &= 0xff;
+    endBank &= 0xff;
+
+    size_t dumpedMemorySize = ((endBank - startBank) + 1) << 16;
+    unsigned dumpedMemoryAddress = startBank << 16;
+    std::vector<uint8_t> dumpedMemory(dumpedMemorySize);
+    uint8_t *memoryOut = dumpedMemory.data();
+    for (; startBank <= endBank; ++startBank, memoryOut += 0x10000) {
+        clemens_out_bin_data(&machine_, memoryOut, 0x10000, startBank, 0);
+    }
+
+    auto outPath = std::filesystem::path(config_.traceRootPath) / params[2];
+    std::ios_base::openmode flags = std::ios_base::out | std::ios_base::binary;
+    std::ofstream outstream(outPath, flags);
+    if (outstream.is_open()) {
+        if (params[3] == "bin") {
+            outstream.write((char *)dumpedMemory.data(), dumpedMemorySize);
+            outstream.close();
+        } else {
+            constexpr unsigned kHexByteCountPerLine = 64;
+            char hexDump[kHexByteCountPerLine * 2 + 8 + 1];
+            unsigned adrBegin = dumpedMemoryAddress;
+            unsigned adrEnd = dumpedMemoryAddress + dumpedMemorySize;
+            uint8_t *memoryOut = dumpedMemory.data();
+            while (adrBegin < adrEnd) {
+                snprintf(hexDump, sizeof(hexDump), "%06X: ", adrBegin);
+                clemens_out_hex_data_from_memory(hexDump + 8, memoryOut, kHexByteCountPerLine * 2,
+                                                 adrBegin);
+                hexDump[sizeof(hexDump) - 1] = '\n';
+                outstream.write(hexDump, sizeof(hexDump));
+                adrBegin += 0x40;
+                memoryOut += 0x40;
+            }
+            outstream.close();
+        }
+    }
+    return fmt::format("OK:{} {},{}", cmd, params[2], params[3]);
 }

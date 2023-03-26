@@ -175,6 +175,8 @@
 #define CLEM_MMIO_REG_ALTCHARSET_TEST 0x1E
 /** Bit 7: 80 column mode on */
 #define CLEM_MMIO_REG_80COLUMN_TEST 0x1F
+/** Cassette Port (floating bus use only) */
+#define CLEM_MMIO_REG_CASSETTE_PORT_NOP 0x20
 /** Write Bit 7: 1 = monochrome, 0 = color */
 #define CLEM_MMIO_REG_VGC_MONO 0x21
 /** Text: Bits 7-4, background: bits 3-0 color */
@@ -598,10 +600,8 @@
 #define CLEM_ADB_KEY_MOD_STATE_ESCAPE  0x00010000
 
 /** Emulated duration of every 'step' iwm_glu_sync runs. 1.023 / 2 ~ 0.511 */
-#define CLEM_IWM_SYNC_FRAME_NS           (CLEM_MEGA2_CYCLE_NS / 2)
-#define CLEM_IWM_SYNC_FRAME_NS_FAST      (CLEM_MEGA2_CYCLE_NS / 4)
-#define CLEM_IWM_SYNC_CLOCKS_FAST        CLEM_CLOCKS_4MHZ_CYCLE
-#define CLEM_IWM_SYNC_CLOCKS_NORMAL      CLEM_CLOCKS_2MHZ_CYCLE
+#define CLEM_IWM_SYNC_CLOCKS_FAST        (CLEM_CLOCKS_2MHZ_CYCLE * 4)
+#define CLEM_IWM_SYNC_CLOCKS_NORMAL      (CLEM_CLOCKS_2MHZ_CYCLE * 8)
 #define CLEM_IWM_SYNC_DISK_FRAME_NS      500
 #define CLEM_IWM_SYNC_DISK_FRAME_NS_FAST 250
 #define CLEM_IWM_DRIVE_RANDOM_BYTES      16
@@ -631,9 +631,11 @@
 #define CLEM_IWM_FLAG_READ_DATA 0x00000100
 /*  Write pulse input to drive */
 #define CLEM_IWM_FLAG_WRITE_DATA 0x00000200
+/*  Bit cell interval has passed */
+#define CLEM_IWM_FLAG_PULSE_HIGH 0x00001000
 /*  For debugging only */
 #define CLEM_IWM_FLAG_READ_DATA_FAKE 0x00004000
-#define CLEM_IWM_FLAG_PULSE_HIGH     0x00008000
+#define CLEM_IWM_FLAG_WRITE_HI       0x00008000
 
 #define CLEM_MONITOR_SIGNAL_NTSC 0
 #define CLEM_MONITOR_SIGNAL_PAL  1
@@ -645,13 +647,17 @@
    VBL begins at 199 (scanline 192)
    see technote 39, 40 and clem_vgc.c for links
 */
-#define CLEM_VGC_HORIZ_SCAN_TIME_NS   63700
-#define CLEM_VGC_NTSC_SCANLINE_COUNT  262
-#define CLEM_VGC_NTSC_SCAN_TIME_NS    (CLEM_VGC_HORIZ_SCAN_TIME_NS * CLEM_VGC_NTSC_SCANLINE_COUNT)
-#define CLEM_VGC_VBL_NTSC_LOWER_BOUND 199
-#define CLEM_VGC_VBL_NTSC_UPPER_BOUND (CLEM_VGC_NTSC_SCANLINE_COUNT - 1)
-#define CLEM_VGC_PAL_SCANLINE_COUNT   312
-#define CLEM_VGC_PAL_SCAN_TIME_NS     (CLEM_VGC_HORIZ_SCAN_TIME_NS * CLEM_VGC_PAL_SCAN_TIME_NS)
+/* Cycle count for horizontal scan in 1.023mhz cycles without stretch.
+   Use ClemensTimespec for stretch calculations
+*/
+#define CLEM_VGC_HORIZ_SCAN_PHI0_CYCLES 65
+#define CLEM_VGC_HORIZ_SCAN_TIME_NS     63700 /* this is with the stretch PHI0 cycle */
+#define CLEM_VGC_NTSC_SCANLINE_COUNT    262
+#define CLEM_VGC_NTSC_SCAN_TIME_NS      (CLEM_VGC_HORIZ_SCAN_TIME_NS * CLEM_VGC_NTSC_SCANLINE_COUNT)
+#define CLEM_VGC_VBL_NTSC_LOWER_BOUND   199
+#define CLEM_VGC_VBL_NTSC_UPPER_BOUND   (CLEM_VGC_NTSC_SCANLINE_COUNT - 1)
+#define CLEM_VGC_PAL_SCANLINE_COUNT     312
+#define CLEM_VGC_PAL_SCAN_TIME_NS       (CLEM_VGC_HORIZ_SCAN_TIME_NS * CLEM_VGC_PAL_SCAN_TIME_NS)
 
 #define CLEM_VGC_FIRST_VISIBLE_SCANLINE_CNTR 7
 

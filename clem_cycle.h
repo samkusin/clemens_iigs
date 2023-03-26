@@ -9,18 +9,23 @@
 //          advance one PHI0 or PHI0 stretch
 //
 
-static inline void _clem_timespec_init(struct ClemensTimeSpec *tspec,
-                                       clem_clocks_duration_t clocks_step) {
-    tspec->clocks_step = clocks_step;
-    tspec->clocks_step_fast = clocks_step;
+static inline void _clem_timespec_reset(struct ClemensTimeSpec *tspec) {
+    tspec->clocks_step = tspec->clocks_step_fast;
     tspec->clocks_spent = 0;
 
     //  Initialize the PHI0 synchronization value
-    //  TODO: change when supporting PAL
+    //  TODO: change when supporting PAL... if ever given the insanity this
+    //        necessary change to our timing code has brought
     tspec->phi0_clocks_stretch = CLEM_CLOCKS_7MHZ_CYCLE;
     tspec->phi0_current_step = CLEM_CLOCKS_PHI0_CYCLE;
     tspec->clocks_next_phi0 = CLEM_CLOCKS_PHI0_CYCLE;
     tspec->mega2_scanline_ctr = 0;
+}
+
+static inline void _clem_timespec_init(struct ClemensTimeSpec *tspec,
+                                       clem_clocks_duration_t clocks_step) {
+    tspec->clocks_step_fast = clocks_step;
+    _clem_timespec_reset(tspec);
 }
 
 static inline void _clem_timespec_next_step(struct ClemensTimeSpec *tspec,

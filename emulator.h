@@ -77,6 +77,15 @@ bool clemens_is_initialized(const ClemensMachine *clem);
 bool clemens_is_initialized_simple(const ClemensMachine *clem);
 
 /**
+ * @brief Is the CPU in reset mode (resbIn is false and first cycle when true)
+ *
+ * @param clem
+ * @return true
+ * @return false
+ */
+bool clemens_is_resetting(const ClemensMachine *clem);
+
+/**
  * @brief Emulate the 65816 CPU only
  *
  * Usually this call is paired with another API to handle memory-mapped I/O (MMIO).

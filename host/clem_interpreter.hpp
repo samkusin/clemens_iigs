@@ -34,6 +34,8 @@ class ClemensInterpreter {
         Chain,
         // assignment(identifier, value)
         Assignment,
+        // command
+        Command,
         // identifies a variable or attribute
         Identifier,
         //  always regard as a decimal value
@@ -93,6 +95,7 @@ class ClemensInterpreter {
     ParseResult parseStatement(std::string_view script);
     ParseResult parseAssignment(std::string_view script);
     ParseResult parseExpression(std::string_view script);
+    ParseResult parseCommand(std::string_view script);
     ParseResult parseNumberOperand(std::string_view script);
     ParseResult parseIdentifier(std::string_view script);
     ParseResult parseNumber(std::string_view script);

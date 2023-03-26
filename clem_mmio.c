@@ -5,6 +5,8 @@
 #include "clem_mmio_defs.h"
 
 #include "clem_device.h"
+#include "clem_mmio_types.h"
+#include "clem_types.h"
 #include "clem_util.h"
 #include "clem_vgc.h"
 
@@ -438,7 +440,7 @@ static uint8_t _clem_mmio_statereg_c068_set(ClemensMMIO *mmio, uint8_t value) {
     return 0;
 }
 
-static uint8_t _clem_mmio_rw_bank_select(ClemensMMIO *mmio, uint16_t address) {
+static void _clem_mmio_rw_bank_select(ClemensMMIO *mmio, uint16_t address) {
     uint32_t memory_flags = mmio->mmap_register;
     uint16_t last_data_address = mmio->last_data_address & 0xffff;
     uint8_t ioreg = (address & 0xff);
@@ -513,7 +515,6 @@ static uint8_t _clem_mmio_rw_bank_select(ClemensMMIO *mmio, uint16_t address) {
     if (memory_flags != mmio->mmap_register) {
         _clem_mmio_memory_map(mmio, memory_flags);
     }
-    return 0;
 }
 
 static uint8_t _clem_mmio_card_io_read(ClemensCard *card, struct ClemensClock *clock, uint8_t addr,
@@ -526,6 +527,72 @@ static uint8_t _clem_mmio_card_io_read(ClemensCard *card, struct ClemensClock *c
         (*card->io_read)(clock, &result, addr, flags, card->context);
     }
     return result;
+}
+
+static uint8_t _clem_mmio_floating_bus(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) {
+    //  The floating bus is basically data that is read from video memory given no other
+    //  source (I/O, FPI RAM).   This occurs on the 2nd half of a 1mhz cycle in hardware.
+    //  Here, the clem_mmio_read() function will selectively pick up this data if reading
+    //  an I/O register that acts as a switch but doesn't return data.
+    //
+    //  Its unknown if Super-hires counts as the floating bus feature was emulated to work
+    //  like it did on the Apple II.
+    //
+    //  http://www.deater.net/weave/vmwprod/megademo/vapor_lock.html
+    //
+
+    struct ClemensClock clock;
+    struct ClemensScanline *scanline;
+    enum ClemensVideoFormat video_type;
+    unsigned h_counter, v_counter;
+
+    clock.ts = tspec->clocks_spent;
+    clock.ref_step = CLEM_CLOCKS_PHI0_CYCLE;
+    clem_vgc_calc_counters(&mmio->vgc, &clock, &v_counter, &h_counter);
+
+    if (v_counter >= CLEM_VGC_HGR_SCANLINE_COUNT) {
+        // bus has no values during a blank - no real way to illustrate this beyond
+        // returning 0
+        return 0;
+    }
+    if (h_counter < 25) {
+        //  HBLANK no video data
+        return 0;
+    }
+    h_counter -= 25; // point to start of visible data on line
+    //  video_type will direct us to scanline type where:
+    //      lores or text use text scanlines
+    //      hires uses hires scanlines
+    if (mmio->vgc.mode_flags & CLEM_VGC_HIRES) {
+        video_type = kClemensVideoFormat_Hires;
+        if (mmio->vgc.mode_flags & CLEM_VGC_MIXED_TEXT) {
+            if (v_counter >= 160) {
+                video_type = kClemensVideoFormat_Text;
+            }
+        }
+    } else {
+        video_type = kClemensVideoFormat_Text;
+    }
+    //  read from PAGE1, PAGE2?
+    if (video_type == kClemensVideoFormat_Text) {
+        // 80 column only supports page 1
+        // TODO: re-read from main memory?  or point to aux if in 80-column mode?
+        v_counter >>= 3;
+        if ((mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
+            !(mmio->mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE)) {
+            scanline = mmio->vgc.text_2_scanlines;
+        } else {
+            scanline = mmio->vgc.text_1_scanlines;
+        }
+    } else {
+        if (mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) {
+            scanline = mmio->vgc.hgr_2_scanlines;
+        } else {
+            scanline = mmio->vgc.hgr_1_scanlines;
+        }
+    }
+    scanline = &scanline[v_counter];
+    return mmio->e0_bank[scanline->offset + h_counter];
 }
 
 uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_t addr,
@@ -636,6 +703,9 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     case CLEM_MMIO_REG_80COLUMN_TEST:
         result = (mmio->vgc.mode_flags & CLEM_VGC_80COLUMN_TEXT) ? 0x80 : 0x00;
         break;
+    case CLEM_MMIO_REG_CASSETTE_PORT_NOP:
+        result = _clem_mmio_floating_bus(mmio, tspec);
+        break;
     case CLEM_MMIO_REG_VGC_TEXT_COLOR:
         result = (uint8_t)((mmio->vgc.text_fg_color << 4) | mmio->vgc.text_bg_color);
         break;
@@ -653,11 +723,11 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         *mega2_access = false;
         break;
     case CLEM_MMIO_REG_SPKR:
-        result = clem_sound_read_switch(&mmio->dev_audio, ioreg, flags);
+        clem_sound_read_switch(&mmio->dev_audio, ioreg, flags);
+        result = _clem_mmio_floating_bus(mmio, tspec);
         break;
     case CLEM_MMIO_REG_DISK_INTERFACE:
-        result =
-            clem_iwm_read_switch(&mmio->dev_iwm, &mmio->active_drives, &ref_clock, ioreg, flags);
+        result = clem_iwm_read_switch(&mmio->dev_iwm, &mmio->active_drives, tspec, ioreg, flags);
         break;
     case CLEM_MMIO_REG_RTC_VGC_SCANINT:
         result = clem_vgc_read_switch(&mmio->vgc, &ref_clock, ioreg, flags);
@@ -726,43 +796,51 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         if (!(flags & CLEM_OP_IO_NO_OP)) {
             clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_GRAPHICS_MODE);
         }
+        result = _clem_mmio_floating_bus(mmio, tspec);
         break;
     case CLEM_MMIO_REG_TXTSET:
         if (!(flags & CLEM_OP_IO_NO_OP)) {
             clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_GRAPHICS_MODE);
         }
+        result = _clem_mmio_floating_bus(mmio, tspec);
         break;
     case CLEM_MMIO_REG_MIXCLR:
         if (!(flags & CLEM_OP_IO_NO_OP)) {
             clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_MIXED_TEXT);
         }
+        result = _clem_mmio_floating_bus(mmio, tspec);
         break;
     case CLEM_MMIO_REG_MIXSET:
         if (!(flags & CLEM_OP_IO_NO_OP)) {
             clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_MIXED_TEXT);
         }
+        result = _clem_mmio_floating_bus(mmio, tspec);
         break;
     case CLEM_MMIO_REG_TXTPAGE1:
         if (!(flags & CLEM_OP_IO_NO_OP)) {
             _clem_mmio_memory_map(mmio, mmio->mmap_register & ~CLEM_MEM_IO_MMAP_TXTPAGE2);
         }
+        result = _clem_mmio_floating_bus(mmio, tspec);
         break;
     case CLEM_MMIO_REG_TXTPAGE2:
         if (!(flags & CLEM_OP_IO_NO_OP)) {
             _clem_mmio_memory_map(mmio, mmio->mmap_register | CLEM_MEM_IO_MMAP_TXTPAGE2);
         }
+        result = _clem_mmio_floating_bus(mmio, tspec);
         break;
     case CLEM_MMIO_REG_LORES:
         /* implicitly clears hires */
         if (!(flags & CLEM_OP_IO_NO_OP)) {
             clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_LORES);
         }
+        result = _clem_mmio_floating_bus(mmio, tspec);
         break;
     case CLEM_MMIO_REG_HIRES:
         /* implicitly clears lores */
         if (!(flags & CLEM_OP_IO_NO_OP)) {
             clem_vgc_set_mode(&mmio->vgc, CLEM_VGC_HIRES);
         }
+        result = _clem_mmio_floating_bus(mmio, tspec);
         break;
     case CLEM_MMIO_REG_AN0_OFF:
     case CLEM_MMIO_REG_AN0_ON:
@@ -816,8 +894,9 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     case CLEM_MMIO_REG_LC1_RAM_WE:
     case CLEM_MMIO_REG_LC1_RAM_WE2:
         if (!(flags & CLEM_OP_IO_NO_OP)) {
-            result = _clem_mmio_rw_bank_select(mmio, addr);
+            _clem_mmio_rw_bank_select(mmio, addr);
         }
+        result = _clem_mmio_floating_bus(mmio, tspec);
         break;
     case CLEM_MMIO_REG_IWM_PHASE0_LO:
     case CLEM_MMIO_REG_IWM_PHASE0_HI:
@@ -835,8 +914,7 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     case CLEM_MMIO_REG_IWM_Q6_HI:
     case CLEM_MMIO_REG_IWM_Q7_LO:
     case CLEM_MMIO_REG_IWM_Q7_HI:
-        result =
-            clem_iwm_read_switch(&mmio->dev_iwm, &mmio->active_drives, &ref_clock, ioreg, flags);
+        result = clem_iwm_read_switch(&mmio->dev_iwm, &mmio->active_drives, tspec, ioreg, flags);
         break;
     default:
         if (ioreg >= 0x90) {
@@ -964,7 +1042,7 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
         clem_sound_write_switch(&mmio->dev_audio, ioreg, data);
         break;
     case CLEM_MMIO_REG_DISK_INTERFACE:
-        clem_iwm_write_switch(&mmio->dev_iwm, &mmio->active_drives, &ref_clock, ioreg, data);
+        clem_iwm_write_switch(&mmio->dev_iwm, &mmio->active_drives, tspec, ioreg, data);
         break;
     case CLEM_MMIO_REG_RTC_VGC_SCANINT:
         if (!(data & 0x40)) {
@@ -1115,7 +1193,7 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
     case CLEM_MMIO_REG_IWM_Q6_HI:
     case CLEM_MMIO_REG_IWM_Q7_LO:
     case CLEM_MMIO_REG_IWM_Q7_HI:
-        clem_iwm_write_switch(&mmio->dev_iwm, &mmio->active_drives, &ref_clock, ioreg, data);
+        clem_iwm_write_switch(&mmio->dev_iwm, &mmio->active_drives, tspec, ioreg, data);
         break;
     default:
         if (ioreg >= 0x80) {
@@ -1244,22 +1322,30 @@ static void _clem_mmio_memory_map(ClemensMMIO *mmio, uint32_t memory_flags) {
     //      here should automatically be shdaowed to the appropriate e0/e1
     //      area for display.
     if (remap_flags & CLEM_MEM_IO_MMAP_OLDVIDEO) {
-        for (page_idx = 0x04; page_idx < 0x08; ++page_idx) {
-            page_B00 = &page_map_B00->pages[page_idx];
-            if (memory_flags & CLEM_MEM_IO_MMAP_80COLSTORE) {
+        if (memory_flags & CLEM_MEM_IO_MMAP_80COLSTORE) {
+            for (page_idx = 0x04; page_idx < 0x08; ++page_idx) {
+                page_B00 = &page_map_B00->pages[page_idx];
                 page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x01 : 00);
                 page_B00->bank_write = ((memory_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x01 : 00);
-            } else {
+            }
+            for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
+                page_B00 = &page_map_B00->pages[page_idx];
+                if (memory_flags & CLEM_MEM_IO_MMAP_HIRES) {
+                    page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x01 : 00);
+                    page_B00->bank_write = ((memory_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x01 : 00);
+                } else {
+                    page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_RAMRD) ? 0x01 : 00);
+                    page_B00->bank_write = ((memory_flags & CLEM_MEM_IO_MMAP_RAMWRT) ? 0x01 : 00);
+                }
+            }
+        } else {
+            for (page_idx = 0x04; page_idx < 0x08; ++page_idx) {
+                page_B00 = &page_map_B00->pages[page_idx];
                 page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_RAMRD) ? 0x01 : 00);
                 page_B00->bank_write = ((memory_flags & CLEM_MEM_IO_MMAP_RAMWRT) ? 0x01 : 00);
             }
-        }
-        for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
-            page_B00 = &page_map_B00->pages[page_idx];
-            if (memory_flags & (CLEM_MEM_IO_MMAP_80COLSTORE + CLEM_MEM_IO_MMAP_HIRES)) {
-                page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x01 : 00);
-                page_B00->bank_write = ((memory_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x01 : 00);
-            } else {
+            for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
+                page_B00 = &page_map_B00->pages[page_idx];
                 page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_RAMRD) ? 0x01 : 00);
                 page_B00->bank_write = ((memory_flags & CLEM_MEM_IO_MMAP_RAMWRT) ? 0x01 : 00);
             }
@@ -1636,13 +1722,13 @@ void _clem_mmio_init_page_maps(ClemensMMIO *mmio, uint32_t memory_flags) {
     clem_mmio_restore(mmio);
 }
 
-void clem_mmio_reset(ClemensMMIO *mmio) {
+void clem_mmio_reset(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) {
     clem_timer_reset(&mmio->dev_timer);
     clem_rtc_reset(&mmio->dev_rtc, CLEM_CLOCKS_PHI0_CYCLE);
     clem_adb_reset(&mmio->dev_adb);
     clem_sound_reset(&mmio->dev_audio);
     clem_vgc_reset(&mmio->vgc);
-    clem_iwm_reset(&mmio->dev_iwm);
+    clem_iwm_reset(&mmio->dev_iwm, tspec);
     clem_scc_reset(&mmio->dev_scc);
 }
 
@@ -1655,7 +1741,8 @@ void clem_mmio_restore(ClemensMMIO *mmio) {
 
 void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
                     struct ClemensMemoryPageMap **bank_page_map, void *slot_expansion_rom,
-                    unsigned int fpi_ram_bank_count) {
+                    unsigned int fpi_ram_bank_count, uint8_t *e0_bank, uint8_t *e1_bank,
+                    struct ClemensTimeSpec *tspec) {
     int idx;
     //  Memory map starts out without shadowing, but our call to
     //  init_page_maps will initialize the memory map on IIgs reset
@@ -1672,6 +1759,10 @@ void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
     mmio->emulator_detect = CLEM_MMIO_EMULATOR_DETECT_IDLE;
     mmio->fpi_ram_bank_count = fpi_ram_bank_count;
     mmio->card_expansion_rom_index = -1;
+    //  TODO: look into making mega2 memory solely reside inside mmio to avoid this
+    //        external dependency.
+    mmio->e0_bank = e0_bank;
+    mmio->e1_bank = e1_bank;
 
     for (idx = 0; idx < CLEM_CARD_SLOT_COUNT; ++idx) {
         mmio->card_slot[idx] = NULL;
@@ -1682,5 +1773,5 @@ void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
     _clem_mmio_init_page_maps(mmio, CLEM_MEM_IO_MMAP_NSHADOW_SHGR | CLEM_MEM_IO_MMAP_WRLCRAM |
                                         CLEM_MEM_IO_MMAP_LCBANK2);
 
-    clem_mmio_reset(mmio);
+    clem_mmio_reset(mmio, tspec);
 }

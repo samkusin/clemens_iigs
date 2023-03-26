@@ -27,6 +27,8 @@ static inline unsigned _clem_vgc_calc_h_counter(clem_clocks_duration_t duration,
                                                 clem_clocks_duration_t ref_step) {
     // TODO: this uses avg ns per cycle over a scanline vs 0-63 = 978 and 64 = 1108ns
     //       if this is ever needed, a reminder here.
+    // TODO: Look at CLEM_VGC_SCANLINE_CLOCKS_DURATION and see if we can use that somehow instead
+    //
     return (duration / clem_calc_clocks_step_from_ns(CLEM_PHI0_CYCLE_NS)) & 0x7f; /* 7 bits */
 }
 

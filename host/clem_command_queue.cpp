@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <charconv>
+#include <utility>
 
 //  State affected to translate from the old main() to the new main()
 //  bool isRunning = !stepsRemaining.has_value() || *stepsRemaining > 0;
@@ -116,6 +117,14 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
             } else {
                 listener.onCommandFastDiskEmulation(value == 1);
             }
+            break;
+        }
+        case Command::DebugMessage: {
+            auto msgResponse = listener.onCommandDebugMessage(cmd.operand);
+            if (msgResponse.substr(0, 2) != "OK") {
+                commandFailed = true;
+            }
+            cmd.operand = msgResponse;
             break;
         }
         case Command::Undefined:
@@ -383,6 +392,10 @@ void ClemensCommandQueue::inputMachine(ClemensCommandQueueListener &listener,
 
 void ClemensCommandQueue::enableFastDiskEmulation(bool enable) {
     queue(Command{Command::FastDiskEmulation, fmt::format("{}", enable ? 1 : 0)});
+}
+
+void ClemensCommandQueue::debugMessage(std::string msg) {
+    queue(Command{Command::DebugMessage, std::move(msg)});
 }
 
 void ClemensCommandQueue::queue(const Command &cmd) { queue_.push(cmd); }

@@ -100,6 +100,7 @@ class ClemensBackend : public ClemensCommandQueueListener {
     bool onCommandLoadMachine(std::string path) final;
     bool onCommandRunScript(std::string command) final;
     void onCommandFastDiskEmulation(bool enabled) final;
+    std::string onCommandDebugMessage(std::string msg) final;
 
     std::optional<unsigned> checkHitBreakpoint();
     bool isRunning() const;

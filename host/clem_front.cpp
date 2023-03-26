@@ -610,8 +610,8 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
                                  const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
     : config_(config), displayProvider_(systemFontLoBuffer, systemFontHiBuffer),
-      display_(displayProvider_), audio_(), uiFrameTimeDelta_(0.0), frameSeqNo_(kFrameSeqNoInvalid),
-      frameLastSeqNo_(kFrameSeqNoInvalid),
+      display_(displayProvider_), audio_(), logLevel_(CLEM_DEBUG_LOG_INFO), uiFrameTimeDelta_(0.0),
+      frameSeqNo_(kFrameSeqNoInvalid), frameLastSeqNo_(kFrameSeqNoInvalid),
       frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameMemory_(kLogMemorySize, malloc(kLogMemorySize)), lastFrameCPUPins_{},
@@ -702,6 +702,7 @@ void ClemensFrontend::createBackend() {
     backendConfig_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
     backendConfig_.ramSizeKB = config_.ramSizeKB;
     backendConfig_.enableFastEmulation = config_.fastEmulationEnabled;
+    backendConfig_.logLevel = logLevel_;
 
     auto backend = std::make_unique<ClemensBackend>(romPath.string(), backendConfig_);
 
@@ -839,7 +840,7 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
     frameWriteState_.iwm.track_byte_index = iwmDrive->track_byte_index;
     frameWriteState_.iwm.track_bit_shift = iwmDrive->track_bit_shift;
     frameWriteState_.iwm.track_bit_length = iwmDrive->track_bit_length;
-    frameWriteState_.iwm.data = iwm.data;
+    frameWriteState_.iwm.data = iwm.data_r;
     frameWriteState_.iwm.latch = iwm.latch;
     frameWriteState_.iwm.ph03 = (uint8_t)(iwm.out_phase & 0xff);
 
@@ -951,10 +952,6 @@ void ClemensFrontend::copyState(const ClemensBackendState &state) {
                 lastCommandState_.hitBreakpoint = *state.bpHitIndex;
             }
         }
-    }
-
-    if (!lastCommandState_.message.has_value() && state.message.has_value()) {
-        lastCommandState_.message = cmdMessageFromBackend(*state.message, state.machine);
     }
 
     if (state.audio.data) {
@@ -1128,6 +1125,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
                 consoleChanged_ = true;
             }
             lastCommandState_.logNode = lastCommandState_.logNodeTail = nullptr;
+            logLevel_ = frameReadState_.logLevel;
             //  display last few log instructions
             LogInstructionNode *logInstructionNode = lastCommandState_.logInstructionNode;
 
@@ -1167,10 +1165,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
                                       breakpoints_[bpIndex].address & 0xffff);
                 emulatorHasMouseFocus_ = false;
                 lastCommandState_.hitBreakpoint = std::nullopt;
-            }
-            if (lastCommandState_.message.has_value()) {
-                cmdMessageLocal(*lastCommandState_.message);
-                lastCommandState_.message = std::nullopt;
             }
 
             for (size_t driveIndex = 0; driveIndex < frameReadState_.diskDrives.size();
@@ -3519,7 +3513,7 @@ void ClemensFrontend::cmdDump(std::string_view operand) {
     }
     message.pop_back();
     // CK_TODO(DebugMessage : Send Message to thread so it can fill in the data)
-    //  backendQueue_.debugMessage(std::move(message));
+    backendQueue_.debugMessage(std::move(message));
 }
 
 void ClemensFrontend::cmdTrace(std::string_view operand) {
@@ -3579,104 +3573,6 @@ void ClemensFrontend::cmdTrace(std::string_view operand) {
                              "Operation only allowed while tracing is active.");
     }
     backendQueue_.debugProgramTrace(std::string(params[0]), path);
-}
-
-std::string ClemensFrontend::cmdMessageFromBackend(std::string_view message,
-                                                   const ClemensMachine *machine) {
-    auto [params, cmd, paramCount] = gatherMessageParams(message, true);
-    if (cmd == "dump") {
-        unsigned startBank, endBank;
-        if (std::from_chars(params[0].data(), params[0].data() + params[0].size(), startBank, 16)
-                .ec != std::errc{}) {
-            return fmt::format("FAIL:{} {},{}", cmd, params[2], params[3]);
-        }
-        if (std::from_chars(params[1].data(), params[1].data() + params[1].size(), endBank, 16)
-                .ec != std::errc{}) {
-            return fmt::format("FAIL:{} {},{}", cmd, params[2], params[3]);
-        }
-        startBank &= 0xff;
-        endBank &= 0xff;
-        lastCommandState_.memoryCaptureAddress = startBank << 16;
-        lastCommandState_.memoryCaptureSize = (endBank - startBank) + 1;
-        lastCommandState_.memoryCaptureSize <<= 16;
-        lastCommandState_.memory = new uint8_t[lastCommandState_.memoryCaptureSize];
-        uint8_t *memoryOut = lastCommandState_.memory;
-        for (; startBank <= endBank; ++startBank, memoryOut += 0x10000) {
-            clemens_out_bin_data(machine, memoryOut, 0x10000, startBank, 0);
-        }
-        return fmt::format("OK:{} {},{}", cmd, params[2], params[3]);
-    }
-
-    return fmt::format("UNK:{}", cmd);
-}
-
-bool ClemensFrontend::cmdMessageLocal(std::string_view message) {
-    auto [params, cmd, paramCount] = gatherMessageParams(message, true);
-    auto setPos = cmd.find(':');
-    std::string_view status;
-    if (setPos != std::string_view::npos) {
-        status = cmd.substr(0, setPos);
-        cmd = cmd.substr(setPos + 1);
-    }
-    if (status == "UNK") {
-        CLEM_TERM_COUT.format(TerminalLine::Error, "Message command '{}' failure.", cmd);
-        return false;
-    } else if (status == "FAIL") {
-        std::string paramLine;
-        for (auto &param : params) {
-            paramLine += param;
-            paramLine.push_back(',');
-        }
-        paramLine.pop_back();
-        CLEM_TERM_COUT.format(TerminalLine::Error, "Message '{}' error with params {}.", cmd,
-                              paramLine);
-        return false;
-    } else if (cmd == "dump") {
-        bool isOk = true;
-        auto outPath = std::filesystem::path(diskTracesRootPath_) / params[0];
-        std::ios_base::openmode flags = std::ios_base::out | std::ios_base::binary;
-        std::ofstream outstream(outPath, flags);
-        if (outstream.is_open()) {
-            if (params[1] == "bin") {
-                outstream.write((char *)lastCommandState_.memory,
-                                lastCommandState_.memoryCaptureSize);
-                outstream.close();
-            } else {
-                constexpr unsigned kHexByteCountPerLine = 64;
-                char hexDump[kHexByteCountPerLine * 2 + 8 + 1];
-                unsigned adrBegin = lastCommandState_.memoryCaptureAddress;
-                unsigned adrEnd =
-                    lastCommandState_.memoryCaptureAddress + lastCommandState_.memoryCaptureSize;
-                uint8_t *memoryOut = lastCommandState_.memory;
-                while (adrBegin < adrEnd) {
-                    snprintf(hexDump, sizeof(hexDump), "%06X: ", adrBegin);
-                    clemens_out_hex_data_from_memory(hexDump + 8, memoryOut,
-                                                     kHexByteCountPerLine * 2, adrBegin);
-                    hexDump[sizeof(hexDump) - 1] = '\n';
-                    outstream.write(hexDump, sizeof(hexDump));
-                    adrBegin += 0x40;
-                    memoryOut += 0x40;
-                }
-                outstream.close();
-            }
-        }
-        if (outstream.fail()) {
-            CLEM_TERM_COUT.format(TerminalLine::Error, "Dump memory failed to open output file {}",
-                                  outPath.string());
-            isOk = false;
-        } else {
-            CLEM_TERM_COUT.format(TerminalLine::Info, "Dump memory to file {}", outPath.string());
-        }
-        delete[] lastCommandState_.memory;
-        lastCommandState_.memory = nullptr;
-        lastCommandState_.memoryCaptureAddress = 0;
-        lastCommandState_.memoryCaptureSize = 0;
-        return isOk;
-    } else {
-        CLEM_TERM_COUT.format(TerminalLine::Error, "Message command '{}' unrecogized.", cmd);
-        return false;
-    }
-    return false;
 }
 
 void ClemensFrontend::cmdSave(std::string_view operand) {

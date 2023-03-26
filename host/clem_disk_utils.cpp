@@ -127,11 +127,13 @@ struct ClemensWOZDisk *createWOZ(struct ClemensWOZDisk *woz, const struct Clemen
     return woz;
 }
 
+//  TODO: creating a ClemensNibbleDisk should be a clem_disk.h utility instead
+//        of the placing the code here.
 void createEmptyDisk(ClemensDriveType driveType, ClemensNibbleDisk &nib) {
     unsigned max_track_size_bytes = 0, track_byte_offset = 0;
 
     auto trackDataSize = nib.bits_data_end - nib.bits_data;
-    memset(nib.bits_data, 0, trackDataSize);
+    memset(nib.bits_data, 0x96, trackDataSize);
     nib.is_write_protected = false;
     nib.is_double_sided = false;
 

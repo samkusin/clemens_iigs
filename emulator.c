@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "clem_types.h"
 #include "emulator.h"
 
 #include "clem_code.h"
@@ -688,6 +689,10 @@ bool clemens_is_initialized(const ClemensMachine *machine) {
         return false;
     }
     return true;
+}
+
+bool clemens_is_resetting(const ClemensMachine *clem) {
+    return (!clem->cpu.pins.resbIn) || clem->cpu.state_type == kClemensCPUStateType_Reset;
 }
 
 void clemens_host_setup(ClemensMachine *clem, LoggerFn logger, void *debug_user_ptr) {
@@ -3091,6 +3096,9 @@ void clemens_emulate_cpu(ClemensMachine *clem) {
                 cpu->pins.resbIn = true;
             }
         }
+        // Clocks_spent set to ZERO!  All MMIO should follow suit now that reset cycle
+        // is complete.  Applications should account for this change in timestamp
+        _clem_timespec_reset(&clem->tspec);
         return;
     }
     //  RESB high during reset invokes our interrupt microcode
