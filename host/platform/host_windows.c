@@ -48,7 +48,7 @@ void clem_host_uuid_gen(ClemensHostUUID *uuid) {
     uuid->data[15] = guid.Data4[7];
 }
 
-char *get_process_executable_path(char *outpath, size_t* outpath_size) {
+char *get_process_executable_path(char *outpath, size_t *outpath_size) {
     DWORD path_size = (DWORD)(*outpath_size) - 1;
     DWORD actual_path_size = GetModuleFileName(NULL, outpath, path_size);
     if (actual_path_size == 0) {
@@ -103,6 +103,16 @@ char *get_local_user_data_directory(char *outpath, size_t outpath_size, const ch
         return NULL;
 
     return outpath;
+}
+
+void open_system_folder_view(const char *folder_path) {
+    PIDLIST_ABSOLUTE folder = ILCreateFromPath(folder_path);
+    HRESULT hr = SHOpenFolderAndSelectItems(folder, 0, NULL, 0);
+    ILFree(folder);
+    if (FAILED(hr)) {
+        MessageBox(NULL, "Unable to open the requested system folder.", "Error", MB_OK);
+        return;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

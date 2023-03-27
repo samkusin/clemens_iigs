@@ -1786,6 +1786,15 @@ void ClemensFrontend::doDebuggerQuickbar(float /*width */) {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
             ImGui::SetTooltip("Enter debugger mode");
         }
+        ImGui::SameLine();
+        if (ClemensHostImGui::IconButton(
+                "Home Folder", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kFolder),
+                kIconSize)) {
+            open_system_folder_view(config_.dataDirectory.c_str());
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+            ImGui::SetTooltip("Open Assets Folder on Desktop");
+        }
         ImGui::PopStyleColor(3);
     }
 }

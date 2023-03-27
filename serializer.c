@@ -160,7 +160,7 @@ struct ClemensSerializerRecord kIWM[] = {
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, io_flags),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, out_phase),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, smartport_active),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceIWM, data_r),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceIWM, data_r),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceIWM, data_w),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceIWM, latch),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceIWM, disk_motor_on),

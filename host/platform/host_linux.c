@@ -86,6 +86,8 @@ char *get_local_user_data_directory(char *outpath, size_t outpath_size, const ch
     return outpath;
 }
 
+void open_system_folder_view(const char *folder_path) {}
+
 //  evdev implementation
 //  using https://fossies.org/linux/stella/src/tools/evdev-joystick/evdev-joystick.c
 //  as an education of evdev and joystick input.

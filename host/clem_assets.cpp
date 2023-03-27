@@ -10,6 +10,7 @@ namespace ClemensHostAssets {
 #include "images/card_png.h"
 #include "images/debugger_png.h"
 #include "images/fast_emulate_png.h"
+#include "images/folder_solid_png.h"
 #include "images/help_png.h"
 #include "images/joystick_png.h"
 #include "images/load_png.h"
@@ -72,6 +73,7 @@ void initialize() {
     g_allImages[kHelp] = loadImageFromPNG(help_png, help_png_len);
     g_allImages[kCard] = loadImageFromPNG(card_icon_png, card_icon_png_len);
     g_allImages[kFastEmulate] = loadImageFromPNG(fast_emulate_png, fast_emulate_png_len);
+    g_allImages[kFolder] = loadImageFromPNG(folder_solid_png, folder_solid_png_len);
 
     int lastNamedImageId = kFirstNamedImage;
     // g_allImages[lastNamedImageId] = loadImageFromPNG()

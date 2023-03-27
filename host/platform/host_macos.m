@@ -10,7 +10,7 @@
 
 //  Objective-C note - These functions are called from the sokol application framework
 //                     and otherwise are wrapped already in an autoreleasepool there.
-//                     It is the caller's responsibility to ensure that in other 
+//                     It is the caller's responsibility to ensure that in other
 //                     situations, these calls are wrapped in @autoreleasepool { }
 
 unsigned clem_host_get_processor_number() {
@@ -37,7 +37,7 @@ char *get_process_executable_path(char *outpath, size_t* outpath_size) {
 
 char *get_local_user_data_directory(char *outpath, size_t outpath_size, const char *company_name,
                                     const char *app_name) {
-    NSArray* paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, 
+    NSArray* paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory,
                                                          NSUserDomainMask, YES);
     NSString* application_support_dir = [paths firstObject];
     NSLog(@"User data directory: %@", application_support_dir);
@@ -49,6 +49,8 @@ char *get_local_user_data_directory(char *outpath, size_t outpath_size, const ch
 }
 
 
+void open_system_folder_view(const char *folder_path) {}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 void clem_host_platform_init() {}
@@ -56,7 +58,7 @@ void clem_host_platform_init() {}
 void clem_host_platform_terminate() {}
 
 @interface ClemensGameControllerDispatch: NSObject {
-    NSPointerArray* controllers; 
+    NSPointerArray* controllers;
 }
 
 @property (readonly) unsigned controllerCount;
@@ -92,8 +94,8 @@ void clem_host_platform_terminate() {}
     GCExtendedGamepad* gamepad = [controller extendedGamepad];
     GCMicroGamepad* micro = [controller microGamepad];
     if (gamepad != nil && micro != nil) {
-        NSLog(@"[%u] ATTACHED: %s and has extendedGamepad=%s, microGamepad=%s", 
-              index, controller.vendorName.UTF8String, 
+        NSLog(@"[%u] ATTACHED: %s and has extendedGamepad=%s, microGamepad=%s",
+              index, controller.vendorName.UTF8String,
               gamepad != nil ? "YES" : "NO", micro != nil ? "YES" : "NO");
     } else {
         NSLog(@"[%u] ATTACHED: %s with unknown profile", index, controller.vendorName.UTF8String );
@@ -105,7 +107,7 @@ void clem_host_platform_terminate() {}
     unsigned index;
     for (index = 0; index < controllers.count; ++index) {
         if ([controllers pointerAtIndex: index] == controller) {
-            NSLog(@"[%u] DISCONNECTED: %s", index, controller.vendorName.UTF8String );    
+            NSLog(@"[%u] DISCONNECTED: %s", index, controller.vendorName.UTF8String );
             [controllers replacePointerAtIndex: index withPointer: nil];
             break;
         }
@@ -121,7 +123,7 @@ void clem_host_platform_terminate() {}
         return NO;
     }
     //  Apple Joysticks are at most two axis and two button - but check for all supported
-    //  apple gamepad types by complexity order (extended first, then fallback to microGamepad) 
+    //  apple gamepad types by complexity order (extended first, then fallback to microGamepad)
     //  gamepad profile.
     GCExtendedGamepad* gamepad = [controller extendedGamepad];
     GCMicroGamepad* micro = [controller microGamepad];
