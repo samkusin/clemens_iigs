@@ -175,8 +175,6 @@ struct ClemensSerializerRecord kIWM[] = {
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, write_state),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, read_state),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, ns_latch_hold),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, lss_state),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceIWM, lss_write_reg),
     /* skip enable_debug and all debug options */
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
@@ -260,7 +258,6 @@ struct ClemensSerializerRecord kSmartPort[] = {
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, unit_id),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, ack_hi),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensSmartPortUnit, command_id),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, data_pulse_count),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, data_bit_count),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, packet_state),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensSmartPortUnit, packet_state_byte_cnt),

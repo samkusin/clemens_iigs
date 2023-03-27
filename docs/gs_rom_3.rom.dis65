@@ -1688,10 +1688,10 @@
 "218774":"Drive 0 motor on",
 "218787":"slow speed",
 "218793":"q7 off",
-"218796":"verify write protect?",
 "218801":"got here, there\u0027s a writable disk?",
-"218821":"writing a byte to the drive (write protected though)",
-"218823":"q7 = on",
+"218821":"Start writing sync bytes to the smartport bus",
+"218823":"Write Mode",
+"218826":"sync bytes are located in the C500 rom",
 "218829":"q6 = off - initiate write and check handshake",
 "218834":"write data and q6 = on",
 "219992":"writing IWM mode",
@@ -2120,7 +2120,7 @@
 "BackgroundColor":0},
 
 "218801":{
-"Text":"TODO: figure out what\u0027s going on when we hit this case...",
+"Text":"Bus not ready?",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},
@@ -2132,7 +2132,7 @@
 "BackgroundColor":0},
 
 "218746":{
-"Text":"We\u0027re in 5.25 mode but still enable async writes?  Long latch?  What\u0027s going on?",
+"Text":"We\u0027re in 5.25 mode but still enable async writes?  Long latch?  What\u0027s going on?\r\n\r\nOh, yeah - SMARTPORT Check Here",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0},
@@ -2667,6 +2667,12 @@
 
 "212182":{
 "Text":"End GCR 6n2 xlate table",
+"BoxMode":false,
+"MaxWidth":80,
+"BackgroundColor":0},
+
+"218793":{
+"Text":"wait until write register is ready to send data to the bus",
 "BoxMode":false,
 "MaxWidth":80,
 "BackgroundColor":0}},
@@ -4538,11 +4544,11 @@
 "LabelAnno":"None"},
 
 "218811":{
-"Label":"write_prot_525",
+"Label":"smartport_ready",
 "Value":16733883,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
-"LabelAnno":"Uncertain"},
+"LabelAnno":"None"},
 
 "218829":{
 "Label":"query_handshake",
@@ -5884,6 +5890,13 @@
 "245014":{
 "Label":"is_brk",
 "Value":16760086,
+"Source":"User",
+"Type":"NonUniqueLocalAddr",
+"LabelAnno":"None"},
+
+"218793":{
+"Label":"poll_write_ready",
+"Value":16733865,
 "Source":"User",
 "Type":"NonUniqueLocalAddr",
 "LabelAnno":"None"}},

@@ -282,12 +282,12 @@ void clem_iwm_debug_stop(struct ClemensDeviceIWM *iwm);
  * @param unit_count
  * @param io_flags
  * @param out_phase
- * @param delta_ns
+ * @param delta_ns  pass 0 for bus control, non 0 for bus + packet (IWM step)
  * @return true
  * @return false
  */
 bool clem_smartport_bus(struct ClemensSmartPortUnit *unit, unsigned unit_count, unsigned *io_flags,
-                        unsigned *out_phase, unsigned delta_ns);
+                        unsigned *out_phase, clem_clocks_time_t ts, unsigned delta_ns);
 
 /**
  * @brief
