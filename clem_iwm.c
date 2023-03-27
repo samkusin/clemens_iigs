@@ -83,34 +83,6 @@
 // optimizations like fast disk emulation.
 #define CLEM_IWM_DATA_ACCESS_NS_EXPIRATION (500000000);
 
-//  Only for debugging.
-// #define CLEM_IWM_FILE_LOGGING 1
-
-/* Cribbed this convenient table from
-   https://github.com/whscullin/apple2js/blob/f4b0100c98c2c12988f64ffe44426fcdd5ae901b/js/cards/disk2.ts#L107
-
-   The below is a combination of read and write lss commands compiled originally from Jim Sather's
-   Understanding the Apple IIe.  In fact much of the IWM implementation relies on Sather's book, the
-   IIgs Hardware Reference, the IWM specification and later books like the SWIM chip reference.
-*/
-static uint8_t s_lss_rom[256] = {
-    0x18, 0x18, 0x18, 0x18, 0x0A, 0x0A, 0x0A, 0x0A, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18,
-    0x2D, 0x2D, 0x38, 0x38, 0x0A, 0x0A, 0x0A, 0x0A, 0x28, 0x28, 0x28, 0x28, 0x28, 0x28, 0x28, 0x28,
-    0xD8, 0x38, 0x08, 0x28, 0x0A, 0x0A, 0x0A, 0x0A, 0x39, 0x39, 0x39, 0x39, 0x3B, 0x3B, 0x3B, 0x3B,
-    0xD8, 0x48, 0x48, 0x48, 0x0A, 0x0A, 0x0A, 0x0A, 0x48, 0x48, 0x48, 0x48, 0x48, 0x48, 0x48, 0x48,
-    0xD8, 0x58, 0xD8, 0x58, 0x0A, 0x0A, 0x0A, 0x0A, 0x58, 0x58, 0x58, 0x58, 0x58, 0x58, 0x58, 0x58,
-    0xD8, 0x68, 0xD8, 0x68, 0x0A, 0x0A, 0x0A, 0x0A, 0x68, 0x68, 0x68, 0x68, 0x68, 0x68, 0x68, 0x68,
-    0xD8, 0x78, 0xD8, 0x78, 0x0A, 0x0A, 0x0A, 0x0A, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78,
-    0xD8, 0x88, 0xD8, 0x88, 0x0A, 0x0A, 0x0A, 0x0A, 0x08, 0x08, 0x88, 0x88, 0x08, 0x08, 0x88, 0x88,
-    0xD8, 0x98, 0xD8, 0x98, 0x0A, 0x0A, 0x0A, 0x0A, 0x98, 0x98, 0x98, 0x98, 0x98, 0x98, 0x98, 0x98,
-    0xD8, 0x29, 0xD8, 0xA8, 0x0A, 0x0A, 0x0A, 0x0A, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8, 0xA8,
-    0xCD, 0xBD, 0xD8, 0xB8, 0x0A, 0x0A, 0x0A, 0x0A, 0xB9, 0xB9, 0xB9, 0xB9, 0xBB, 0xBB, 0xBB, 0xBB,
-    0xD9, 0x59, 0xD8, 0xC8, 0x0A, 0x0A, 0x0A, 0x0A, 0xC8, 0xC8, 0xC8, 0xC8, 0xC8, 0xC8, 0xC8, 0xC8,
-    0xD9, 0xD9, 0xD8, 0xA0, 0x0A, 0x0A, 0x0A, 0x0A, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8,
-    0xD8, 0x08, 0xE8, 0xE8, 0x0A, 0x0A, 0x0A, 0x0A, 0xE8, 0xE8, 0xE8, 0xE8, 0xE8, 0xE8, 0xE8, 0xE8,
-    0xFD, 0xFD, 0xF8, 0xF8, 0x0A, 0x0A, 0x0A, 0x0A, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8,
-    0xDD, 0x4D, 0xE0, 0xE0, 0x0A, 0x0A, 0x0A, 0x0A, 0x88, 0x88, 0x08, 0x08, 0x88, 0x88, 0x08, 0x08};
-
 static struct ClemensDrive *_clem_iwm_select_drive(struct ClemensDeviceIWM *iwm,
                                                    struct ClemensDriveBay *drive_bay) {
     // TODO: nit optimization, could cache the current drive pointer and alter
@@ -134,6 +106,11 @@ static clem_clocks_duration_t _clem_iwm_select_clocks_step(struct ClemensDeviceI
     return iwm->fast_mode ? CLEM_IWM_SYNC_CLOCKS_FAST : CLEM_IWM_SYNC_CLOCKS_NORMAL;
 }
 
+static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM *iwm);
+
+//  Only for debugging.
+// #define CLEM_IWM_FILE_LOGGING 1
+
 #if CLEM_IWM_FILE_LOGGING
 #define CLEM_IWM_DEBUG_RECORD_LIMIT 4096
 static FILE *s_clem_iwm_log_f = NULL;
@@ -146,21 +123,22 @@ struct ClemensIWMDebugRecord {
     uint8_t mode; // over-used miscellaneous state covering multiple properties
     uint8_t drive_byte;
     uint8_t iwm_state;
+    uint8_t status;
     int qtr_track_index;
     unsigned track_byte_index;
     unsigned track_bit_shift;
     unsigned track_bit_length;
     unsigned lss_state;
 };
-struct ClemensIWMDebugRecord s_clem_iwm_debug_records[CLEM_IWM_DEBUG_RECORD_LIMIT];
-unsigned s_clem_iwm_debug_count;
+static struct ClemensIWMDebugRecord s_clem_iwm_debug_records[CLEM_IWM_DEBUG_RECORD_LIMIT];
+static unsigned s_clem_iwm_debug_count;
 
 static const char *s_state_names[] = {"READ", "STAT", "HAND", "WRIT"};
 
 static void _clem_iwm_debug_print(FILE *fp, struct ClemensIWMDebugRecord *record) {
     bool is_write_mode = (record->mode & 0x80) != 0;
-    fprintf(fp, "[%20" PRIu64 "] %c, %s, %s, %s, D%u, Q%d, %u, %u, %u, %02X, ", record->t,
-            record->mode & 0x08 ? 'F' : 'S', record->code, s_state_names[record->iwm_state & 0x03],
+    fprintf(fp, "[%20" PRIu64 "] %02X, %s, %s, %s, D%u, Q%d, %u, %u, %u, %02X, ", record->t,
+            record->status, record->code, s_state_names[record->iwm_state & 0x03],
             (record->mode & 0x20)   ? "SMAR"
             : (record->mode & 0x04) ? " 3.5"
                                     : "5.25",
@@ -196,13 +174,12 @@ static void _clem_iwm_debug_record(struct ClemensIWMDebugRecord *record,
     record->data_w = iwm->data_w;
     record->latch = iwm->latch;
     record->iwm_state = iwm->state;
+    record->status = _clem_iwm_read_status(iwm);
     record->mode = (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_1)   ? 1
                    : (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2
                                                              : 0;
     if (iwm->io_flags & CLEM_IWM_FLAG_DRIVE_35)
         record->mode |= 0x04;
-    if (iwm->fast_mode)
-        record->mode |= 0x08;
     if (iwm->io_flags & CLEM_IWM_FLAG_WRITE_REQUEST) {
         record->lss_state = iwm->write_state;
         record->mode |= 0x80;
@@ -606,6 +583,13 @@ static void _clem_iwm_step(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
             bit_cell_clocks_dt = (end_clocks_ts - iwm->cur_clocks_ts);
         }
 
+        //  THIS CALL ONLY ALTERS THE SMARTPORT BUS TOGGLE.  PACKETS ARE DEALT
+        //  WITH LATER IN THIS LOOP (why I pass 0 for delta_ns - so state changes
+        //  aren't missed if programs toggle the bus in rapid succession aren't miss)
+        iwm->smartport_active =
+            !is_drive_35_sel && clem_smartport_bus(drives->smartport, 1, &iwm->io_flags,
+                                                   &iwm->out_phase, iwm->cur_clocks_ts, 0);
+
         if (!_clem_iwm_step_current_clocks_ts(iwm, bit_cell_clocks_dt)) {
             assert(iwm->cur_clocks_ts <= end_clocks_ts);
             continue;
@@ -626,12 +610,19 @@ static void _clem_iwm_step(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
             // force 5.25" drives to use synchronous mode (IWM doesn't support this mode for Disk II
             // devices)
 
-            CLEM_IWM_DEBUG_EVENT(iwm, drives, "DATA_W", iwm->cur_clocks_ts, 1);
+            CLEM_IWM_DEBUG_EVENT(iwm, drives, "DATA_W", iwm->cur_clocks_ts, 2);
             _clem_iwm_write_step(iwm);
         }
-        if (!is_drive_35_sel) {
-            // iwm->smartport_active = clem_smartport_bus(drives->smartport, 1, &iwm->io_flags,
-            //                                            &iwm->out_phase, bit_cell_clocks_dt);
+        if (iwm->smartport_active) {
+            // IWM Spec: /ENBL1 or /ENBL2 are active = (DRIVE_ON && (DRIVE_1 || DRIVE_2))
+            //           the _clem_iwm_step() function will check for an available drive
+            //           and if both DRIVE_1 and DRIVE_2 are disabled - and smartport -
+            //           then return immediately.
+            drives->smartport->debug_level = iwm->debug_level;
+            drives->smartport->enable_debug = iwm->enable_debug;
+            iwm->smartport_active =
+                clem_smartport_bus(drives->smartport, 1, &iwm->io_flags, &iwm->out_phase,
+                                   iwm->cur_clocks_ts, bit_cell_clocks_dt);
             if (iwm->smartport_active) {
                 /*
                 if (iwm->state == CLEM_IWM_STATE_WRITE_DATA &&
@@ -641,8 +632,6 @@ static void _clem_iwm_step(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
                 */
                 drive = NULL;
             }
-        } else {
-            iwm->smartport_active = false;
         }
         if (drive) {
             clem_disk_control(drive, &iwm->io_flags, iwm->out_phase, bit_cell_clocks_dt);
@@ -670,10 +659,6 @@ static void _clem_iwm_step(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
 
 void clem_iwm_glu_sync(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
                        struct ClemensTimeSpec *tspec) {
-    // IWM Spec: /ENBL1 or /ENBL2 are active = (DRIVE_ON && (DRIVE_1 || DRIVE_2))
-    //           the _clem_iwm_step() function will check for an available drive
-    //           and if both DRIVE_1 and DRIVE_2 are disabled - and smartport -
-    //           then return immediately.
     _clem_iwm_step(iwm, drives, tspec->clocks_spent);
 }
 
@@ -855,7 +840,7 @@ void clem_iwm_write_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
                     iwm->write_state |= CLEM_IWM_WRITE_REG_DATA;
                     iwm->data_access_time_ns = CLEM_IWM_DATA_ACCESS_NS_EXPIRATION;
                     iwm->io_flags |= CLEM_IWM_FLAG_WRITE_REQUEST;
-                    CLEM_IWM_DEBUG_EVENT(iwm, drives, "MPU_W", tspec->clocks_spent, 2);
+                    CLEM_IWM_DEBUG_EVENT(iwm, drives, "MPU_W", tspec->clocks_spent, 1);
                 } else {
                     _clem_iwm_write_mode(iwm, value);
                 }
@@ -939,7 +924,7 @@ uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBa
                         if (iwm->data_r & 0x80) {
                             CLEM_IWM_DEBUG_EVENT(iwm, drives, "MPU_R", tspec->clocks_spent, 1);
                         } else {
-                            CLEM_IWM_DEBUG_EVENT(iwm, drives, "POLL_R", tspec->clocks_spent, 2);
+                            CLEM_IWM_DEBUG_EVENT(iwm, drives, "POLL_R", tspec->clocks_spent, 3);
                         }
                     }
 

@@ -2,6 +2,7 @@
 #include "clem_debug.h"
 #include "clem_mmio_defs.h"
 
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -28,10 +29,109 @@
 #define CLEM_SMARTPORT_UNIT_STATE_COMPLETE        0x000f0000
 #define CLEM_SMARTPORT_UNIT_STATE_ABORT_COMMAND   0x80000000
 
-#define CLEM_SMARTPORT_BUS_WRITE 1
-#define CLEM_SMARTPORT_BUS_READ  2
-#define CLEM_SMARTPORT_BUS_DATA  4
-#define CLEM_SMARTPORT_BUS_REQ   8
+#define CLEM_SMARTPORT_BUS_WRITE    1
+#define CLEM_SMARTPORT_BUS_READ     2
+#define CLEM_SMARTPORT_BUS_DATA     4
+#define CLEM_SMARTPORT_BUS_REQ      8
+#define CLEM_SMARTPORT_BUS_WRITE_HI 16
+
+//  Only for debugging.
+// #define CLEM_SMARTPORT_FILE_LOGGING 1
+
+#if CLEM_SMARTPORT_FILE_LOGGING
+#define CLEM_SMARTPORT_DEBUG_RECORD_LIMIT 128
+static FILE *s_clem_log_f = NULL;
+struct ClemensSmartPortDebugRecord {
+    uint64_t t;
+    char code[8];
+    unsigned unit;
+    unsigned state;
+    enum ClemensSmartPortPacketType packet_type;
+    uint16_t packet_contents_length;
+    uint8_t source_id;
+    uint8_t dest_id;
+    uint8_t data_reg;
+    bool packet_is_extended;
+    bool ack;
+};
+static struct ClemensSmartPortDebugRecord s_clem_debug_records[CLEM_SMARTPORT_DEBUG_RECORD_LIMIT];
+static unsigned s_clem_debug_count;
+
+static const char *s_packet_types[] = {"unk", "cmd", "stat", "data"};
+
+static void _clem_debug_print(FILE *fp, struct ClemensSmartPortDebugRecord *record) {
+    fprintf(fp, "[%20" PRIu64 "] [%u] %6s %04X %04X %3s: %02X", record->t, record->unit,
+            record->code, (uint16_t)(record->state >> 16), (uint16_t)(record->state & 0xffff),
+            record->ack ? "ACK" : "   ", record->data_reg);
+    if ((record->state & 0xffff0000) == CLEM_SMARTPORT_UNIT_STATE_PACKET) {
+        fprintf(fp, " , %4s (%02X->%02X) %d bytes (%s)", s_packet_types[record->packet_type],
+                record->source_id, record->dest_id, record->packet_contents_length,
+                record->packet_is_extended ? "ext" : "std");
+    }
+    fprintf(fp, "\n");
+}
+
+static void _clem_debug_flush(struct ClemensSmartPortUnit *unit) {
+    unsigned i;
+    for (i = 0; i < s_clem_debug_count; ++i) {
+        struct ClemensSmartPortDebugRecord *record = &s_clem_debug_records[i];
+        _clem_debug_print(s_clem_log_f, record);
+    }
+    fflush(s_clem_log_f);
+    s_clem_debug_count = 0;
+}
+
+static void _clem_debug_record(struct ClemensSmartPortDebugRecord *record,
+                               struct ClemensSmartPortUnit *unit, const char *prefix,
+                               clem_clocks_time_t t) {
+    record->t = t / CLEM_CLOCKS_14MHZ_CYCLE;
+    strncpy(record->code, prefix, sizeof(record->code) - 1);
+    record->unit = unit->unit_id;
+    record->code[sizeof(record->code) - 1] = '\0';
+    record->state = unit->packet_state;
+    record->ack = unit->ack_hi;
+    record->data_reg = unit->data_reg;
+    record->packet_type = unit->packet.type;
+    record->packet_contents_length = unit->packet.contents_length;
+    record->source_id = unit->packet.source_unit_id;
+    record->dest_id = unit->packet.dest_unit_id;
+    record->packet_is_extended = unit->packet.is_extended;
+    //_clem_iwm_debug_print(stdout, record);
+}
+
+static void _clem_debug_event(struct ClemensSmartPortUnit *unit, const char *prefix,
+                              clem_clocks_time_t t) {
+    struct ClemensSmartPortDebugRecord *record = &s_clem_debug_records[s_clem_debug_count];
+    _clem_debug_record(record, unit, prefix, t);
+
+    if (++s_clem_debug_count >= CLEM_SMARTPORT_DEBUG_RECORD_LIMIT) {
+        _clem_debug_flush(unit);
+    }
+}
+
+#define CLEM_SMARTPORT_DEBUG_EVENT(_unit_, _prefix_, _lvl_)                                        \
+    if ((_unit_)->enable_debug && (_lvl_) <= (_unit_)->debug_level) {                              \
+        _clem_debug_event(_unit_, _prefix_, (_unit_)->debug_ts);                                   \
+    }
+
+#else
+#define CLEM_SMARTPORT_DEBUG_EVENT(_unit_, _prefix_, _lvl_)
+#endif
+
+static void _clem_debug_gate(struct ClemensSmartPortUnit *unit, clem_clocks_time_t ts) {
+    unit->enable_debug = unit->enable_debug;
+    unit->debug_ts = ts;
+#if CLEM_SMARTPORT_FILE_LOGGING
+    if (s_clem_log_f == NULL && unit->enable_debug) {
+        s_clem_log_f = fopen("smartport.log", "wt");
+        s_clem_debug_count = 0;
+    } else if (s_clem_log_f != NULL && !unit->enable_debug) {
+        _clem_debug_flush(unit);
+        fclose(s_clem_log_f);
+        s_clem_log_f = NULL;
+    }
+#endif
+}
 
 static inline void _clem_smartport_packet_state(struct ClemensSmartPortUnit *unit,
                                                 unsigned packet_state) {
@@ -40,6 +140,10 @@ static inline void _clem_smartport_packet_state(struct ClemensSmartPortUnit *uni
 
     switch (packet_state) {
     case CLEM_SMARTPORT_UNIT_STATE_READY:
+        unit->data_bit_count = 0;
+        unit->data_reg = 0x00;
+        unit->data_size = 0;
+        unit->write_signal = 0;
         unit->command_id = 0xff;
         unit->ack_hi = true;
         break;
@@ -47,12 +151,10 @@ static inline void _clem_smartport_packet_state(struct ClemensSmartPortUnit *uni
         unit->ack_hi = false;
         break;
     case CLEM_SMARTPORT_UNIT_STATE_RESPONSE:
-        unit->data_pulse_count = 0;
         unit->data_bit_count = 0;
         unit->ack_hi = true;
         break;
     case CLEM_SMARTPORT_UNIT_STATE_EXPECT_DATA:
-        unit->data_pulse_count = 0;
         unit->data_bit_count = 0;
         unit->ack_hi = true;
         break;
@@ -66,6 +168,7 @@ static inline void _clem_smartport_packet_state(struct ClemensSmartPortUnit *uni
 
     unit->packet_state = packet_state;
     unit->packet_state_byte_cnt = 0;
+    CLEM_SMARTPORT_DEBUG_EVENT(unit, "STATE", 1);
 }
 
 static inline uint8_t _clem_smartport_encode_byte(uint8_t data, uint8_t *chksum) {
@@ -368,51 +471,49 @@ static unsigned _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit,
         bool data_signal = (bus_state & CLEM_SMARTPORT_BUS_DATA) != 0;
         if (data_signal != unit->write_signal) {
             unit->data_reg |= 1;
+            bus_state |= CLEM_SMARTPORT_BUS_WRITE_HI;
         } else {
             unit->data_reg &= ~1;
         }
-        unit->data_pulse_count++;
-        if ((unit->data_pulse_count % 8) == 0) {
-            unit->write_signal = data_signal;
-            if (unit->data_bit_count > 0 || (unit->data_reg & 0x01)) {
-                unit->data_bit_count++;
-                if (unit->data_bit_count >= 8) {
-                    if (unit->data_size < CLEM_SMARTPORT_DATA_BUFFER_LIMIT) {
-                        // printf("SmartPort => %02X\n", unit->data_reg);
-                        unit->data[unit->data_size++] = unit->data_reg;
-                        unit->packet_state_byte_cnt++;
-                    } else {
-                        CLEM_LOG("SmartPort: Data overrun at unit %u, device %u", unit->unit_id,
-                                 unit->device.device_id);
-                    }
-                    unit->data_reg = 0;
-                    unit->data_bit_count = 0;
+        unit->write_signal = data_signal;
+        CLEM_SMARTPORT_DEBUG_EVENT(unit, "INBIT", 3)
+
+        if (unit->data_bit_count > 0 || (unit->data_reg & 0x01)) {
+            unit->data_bit_count++;
+            if (unit->data_bit_count >= 8) {
+                if (unit->data_size < CLEM_SMARTPORT_DATA_BUFFER_LIMIT) {
+                    // printf("SmartPort => %02X\n", unit->data_reg);
+                    unit->data[unit->data_size++] = unit->data_reg;
+                    unit->packet_state_byte_cnt++;
+                    CLEM_SMARTPORT_DEBUG_EVENT(unit, "INBYTE", 2)
                 } else {
-                    unit->data_reg <<= 1;
+                    CLEM_LOG("SmartPort: Data overrun at unit %u, device %u", unit->unit_id,
+                             unit->device.device_id);
                 }
+                unit->data_reg = 0;
+                unit->data_bit_count = 0;
+            } else {
+                unit->data_reg <<= 1;
             }
         }
     } else if (unit->packet_state == CLEM_SMARTPORT_UNIT_STATE_RESPONSE) {
         bus_state &= ~CLEM_SMARTPORT_BUS_DATA;
-        unit->data_pulse_count++;
-        if ((unit->data_pulse_count % 8) == 0) {
-            bus_state |= CLEM_SMARTPORT_BUS_READ;
-            if (unit->data_bit_count == 0) {
-                if (unit->packet_state_byte_cnt >= unit->data_size) {
-                    _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_COMPLETE);
-                    return bus_state;
-                } else {
-                    unit->data_reg = unit->data[unit->packet_state_byte_cnt++];
-                    // printf("SmartPort <= %02X\n", unit->data_reg);
-                    unit->data_bit_count = 8;
-                }
+        bus_state |= CLEM_SMARTPORT_BUS_READ;
+        if (unit->data_bit_count == 0) {
+            if (unit->packet_state_byte_cnt >= unit->data_size) {
+                _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_COMPLETE);
+                return bus_state;
+            } else {
+                unit->data_reg = unit->data[unit->packet_state_byte_cnt++];
+                // printf("SmartPort <= %02X\n", unit->data_reg);
+                unit->data_bit_count = 8;
             }
-            --unit->data_bit_count;
-            if (unit->data_reg & 0x80) {
-                bus_state |= CLEM_SMARTPORT_BUS_DATA;
-            }
-            unit->data_reg <<= 1;
         }
+        --unit->data_bit_count;
+        if (unit->data_reg & 0x80) {
+            bus_state |= CLEM_SMARTPORT_BUS_DATA;
+        }
+        unit->data_reg <<= 1;
         return bus_state;
     }
 
@@ -539,14 +640,15 @@ static unsigned _clem_smartport_bus_handshake(struct ClemensSmartPortUnit *unit,
   Each device may have its own command handler.  They share common bus
   negotation logic with the host, which is provided below.
 */
-
 bool clem_smartport_bus(struct ClemensSmartPortUnit *unit, unsigned unit_count, unsigned *io_flags,
-                        unsigned *out_phase, unsigned delta_ns) {
+                        unsigned *out_phase, clem_clocks_time_t ts, unsigned delta_ns) {
     struct ClemensSmartPortUnit *unit_end = unit + unit_count;
     unsigned select_bits = *out_phase;
     unsigned bus_state = 0;
     bool is_bus_enabled = false;
     bool is_ack_hi = false;
+
+    _clem_debug_gate(unit, ts);
 
     for (; unit < unit_end; unit++) {
         if (unit->device.device_id == 0)
@@ -558,14 +660,7 @@ bool clem_smartport_bus(struct ClemensSmartPortUnit *unit, unsigned unit_count, 
         } else if ((select_bits & CLEM_SMARTPORT_BUS_ENABLE_PHASE) ==
                    CLEM_SMARTPORT_BUS_ENABLE_PHASE) {
             if (!unit->bus_enabled) {
-                unit->data_pulse_count = 0;
-                unit->data_bit_count = 0;
-                unit->data_reg = 0x00;
-                unit->data_size = 0;
-                unit->write_signal = 0;
-                unit->ack_hi = true;
                 unit->bus_enabled = true;
-                unit->command_id = 0xff;
                 _clem_smartport_packet_state(unit, CLEM_SMARTPORT_UNIT_STATE_READY);
             }
             if ((select_bits & 1) != 0) {
@@ -577,7 +672,9 @@ bool clem_smartport_bus(struct ClemensSmartPortUnit *unit, unsigned unit_count, 
                     bus_state |= CLEM_SMARTPORT_BUS_DATA;
                 }
             }
-            bus_state = _clem_smartport_bus_handshake(unit, bus_state, delta_ns);
+            if (delta_ns > 0) {
+                bus_state = _clem_smartport_bus_handshake(unit, bus_state, delta_ns);
+            }
         } else {
             unit->bus_enabled = false;
         }
@@ -610,6 +707,9 @@ bool clem_smartport_bus(struct ClemensSmartPortUnit *unit, unsigned unit_count, 
             if (bus_state & CLEM_SMARTPORT_BUS_DATA) {
                 *io_flags |= CLEM_IWM_FLAG_READ_DATA;
             }
+        }
+        if (bus_state & CLEM_SMARTPORT_BUS_WRITE_HI) {
+            *io_flags |= CLEM_IWM_FLAG_WRITE_HI;
         }
 
         //    printf("SmartPort: REQ: %u,  ACK: %u\n", (select_bits & 1) != 0, is_ack_hi);

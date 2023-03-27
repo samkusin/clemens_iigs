@@ -1,7 +1,7 @@
 #ifndef CLEM_SMARTPORT_H
 #define CLEM_SMARTPORT_H
 
-#include <stdint.h>
+#include "clem_shared.h"
 
 /** Number of drives supported at one time on the system */
 #define CLEM_SMARTPORT_DRIVE_LIMIT 1
@@ -130,7 +130,6 @@ struct ClemensSmartPortUnit {
     uint8_t command_id;
 
     /** Used to accumulate bytes to be serialized/unserliazed to bus */
-    unsigned data_pulse_count;
     unsigned data_bit_count;
 
     /** Packet processor state */
@@ -144,6 +143,11 @@ struct ClemensSmartPortUnit {
 
     /** Decoded packet */
     struct ClemensSmartPortPacket packet;
+
+    /** Debug only */
+    int enable_debug;
+    int debug_level;
+    clem_clocks_time_t debug_ts;
 };
 
 #ifdef __cplusplus

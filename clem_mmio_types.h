@@ -313,10 +313,7 @@ struct ClemensDeviceIWM {
     unsigned state;         /**< The current IWM register state */
     unsigned write_state;   /**< Defines the state of the data_w and latch */
     unsigned read_state;    /**< Defines the state of the data_r and latch */
-
     unsigned ns_latch_hold; /**< The latch value expiration timer */
-    unsigned lss_state;     /**< State of our custom LSS */
-    unsigned lss_write_reg; /**< Used for detecting write underruns */
 
     /** Not to be serialized - just for debugging. */
     bool enable_debug; /**< If True, activates file logging */
