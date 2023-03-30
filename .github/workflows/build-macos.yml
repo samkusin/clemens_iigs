@@ -7,6 +7,8 @@ on:
     branches: [ 'main' ]
     tags: ['v*']
     paths: [ ".github/workflows/build-macos.yml" ]
+  pull_request:
+    paths: [ ".github/workflows/build-macos.yml" ]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
