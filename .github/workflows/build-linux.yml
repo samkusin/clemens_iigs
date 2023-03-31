@@ -3,7 +3,11 @@ name: CMake
 on:
   push:
     branches: [ "main" ]
-    paths: [ ".github/workflows/build-linux.yml" ]
+    tags: ['v*']
+    paths: 
+      - "**"
+      - "!.github/**" 
+      - ".github/workflows/build-linux.yml"
   pull_request:
     branches: [ 'main' ]
 
