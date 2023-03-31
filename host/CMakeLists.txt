@@ -126,7 +126,7 @@ elseif(APPLE)
         OUTPUT_NAME "Clemens IIGS"
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "Clemens IIGS"
-        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOT}.${PROJECT_VERSION_PATCH}"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${CLEM_HOST_VERSION_MAJOR}.${CLEM_HOST_VERSION_MINOR}.${CLEM_HOST_VERSION_PATCH}"
         MACOSX_BUNDLE_COPYRIGHT "Copyright ${CLEM_HOST_COPYRIGHT_YEAR} Samir Sinha DBA Cinekine"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/macos_bundle_info_plist.in"
@@ -192,6 +192,7 @@ set(CPACK_PACKAGE_CHECKSUM SHA256)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(CPACK_GENERATOR "STGZ;ZIP")
+    set(CPACK_PACKAGE_FILE_NAME "Clemens_IIGS-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}-windows-x64")
 elseif(APPLE)
     #--------------------------------------------------------------------------
     # Apple specific
@@ -203,10 +204,12 @@ elseif(APPLE)
     set(CPACK_DMG_VOLUME_NAME "ClemensIIGS")
     #set(CPACK_DMG_DS_STORE_SETUP_SCRIPT "${PROJECT_SOURCE_DIR}/packaging/DS_Store.scpt") 
     set(CPACK_OSX_PACKAGE_VERSION "10.15") #min package version
+    set(CPACK_PACKAGE_FILE_NAME "Clemens_IIGS-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}-macOS-universal")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     #-----------------------------------------------------------------------------
     # Linux specific
     set(CPACK_GENERATOR "DEB;TBZ2;TXZ")
+    set(CPACK_PACKAGE_FILE_NAME "Clemens_IIGS-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}-linux-x64")
     message(STATUS "Package generation - UNIX")
     message(STATUS "   + DEB                                  YES ")
     message(STATUS "   + TBZ2                                 YES ")
@@ -242,8 +245,6 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CLEMENS_HOMEPAGE}")
     # set(CPACK_DEBIAN_COMPRESSION_TYPE "xz")
     # set(CPACK_DEBIAN_PACKAGE_DEPENDS "libgtkmm-3.0")
-
-
 
     # Icon and app shortcut for Linux systems
     # Note: .desktop file must have same name as executable
