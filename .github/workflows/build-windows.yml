@@ -38,21 +38,22 @@ jobs:
       # Build your program with the given configuration
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
+    # - name: Test
+    #   working-directory: ${{github.workspace}}/build
+    #   run: ctest -C ${{env.BUILD_TYPE}}
+
     - name: Package
-      #if: ${{ github.ref_type == 'tag'}}
+      if: ${{ github.ref_type == 'tag'}}
       run: |
         cd ${{github.workspace}}/build
         cpack --config CPackConfig.cmake
 
     - name: Archive production artifacts
-      #if: ${{ github.ref_type == 'tag'}}
+      if: ${{ github.ref_type == 'tag'}}
       uses: actions/upload-artifact@v3
       with:
-        name: clemens-${{github.ref_name}}-${{runner.os}}-${{runner.arch}}.zip
-        path: ${{github.workspace}}/build/out/*.*
+        name: clemens_iigs-${{github.ref_name}}-${{runner.os}}
+        path: |
+          ${{github.workspace}}/build/out/*.zip
+          ${{github.workspace}}/build/out/*.sha256
 
-    # - name: Test
-    #  working-directory: ${{github.workspace}}/build
-      # Execute tests defined by the CMake configuration.
-      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-    #  run: ctest -C ${{env.BUILD_TYPE}}
