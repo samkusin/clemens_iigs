@@ -119,6 +119,8 @@ void clem_ensoniq_reset(struct ClemensDeviceEnsoniq *doc) {
     memset(doc->acc, 0, sizeof(doc->acc));
     memset(doc->ptr, 0, sizeof(doc->ptr));
     memset(doc->osc_flags, 0, sizeof(doc->osc_flags));
+    memset(doc->osc_stack, 0, sizeof(doc->osc_stack));
+
     // ensures no interrupt triggered
     doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] = 0xff;
     // 1 oscillator x 2 at minimum enabled
@@ -128,22 +130,58 @@ void clem_ensoniq_reset(struct ClemensDeviceEnsoniq *doc) {
 }
 
 static void _clem_ensoniq_set_irq(struct ClemensDeviceEnsoniq *doc, unsigned osc_index) {
+    unsigned stack_index;
+    //  Add to stack and populate OIR with bottom of stack (in most cases the oscillator
+    //  passed here will be the only one to populate the OIR, so the queue may seem
+    //  inefficient.)
+    //  Edge cases include oscillators already on the stack, which will be a no-op.
+    //
+    doc->osc_flags[osc_index] &= ~CLEM_ENSONIQ_OSC_FLAG_CYCLE;
+    if (!(doc->osc_flags[osc_index] & CLEM_ENSONIQ_OSC_FLAG_OIR)) {
+        doc->osc_flags[osc_index] |= CLEM_ENSONIQ_OSC_FLAG_OIR;
+        for (stack_index = 0; stack_index < 32; ++stack_index) {
+            if (doc->osc_stack[stack_index] & 0x80)
+                continue;
+            break;
+        }
+        doc->osc_stack[stack_index] = osc_index | 0x80;
+    }
     if (doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] & 0x80) {
+        osc_index = doc->osc_stack[0] & 0x7f;
         doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] &= ~CLEM_ENSONIQ_REG_OSC_OIR_MASK;
         doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] |= ((uint8_t)(osc_index << 1) & 0x3e);
     }
-    doc->osc_flags[osc_index] |= CLEM_ENSONIQ_OSC_FLAG_IRQ;
 }
 
-static void _clem_ensoniq_clear_irq(struct ClemensDeviceEnsoniq *doc) {
-    unsigned osc_index = (doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] >> 1) & 0x1f;
-    doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] |= 0x80;
-    doc->osc_flags[osc_index] &= ~CLEM_ENSONIQ_OSC_FLAG_IRQ;
+static void _clem_ensoniq_next_irq(struct ClemensDeviceEnsoniq *doc) {
+    //  called when OIR is read by the application
+    unsigned osc_index;
+    unsigned stack_index;
+    // bottom of stack is the current IRQ
+    osc_index = doc->osc_stack[0];
+    if (osc_index & 0x80) {
+        //  clear out its OIR status
+        osc_index &= 0x7f;
+        doc->osc_flags[osc_index] &= ~CLEM_ENSONIQ_OSC_FLAG_OIR;
+    }
+    for (stack_index = 0; (doc->osc_stack[stack_index] & 0x80) && (stack_index < 31);
+         ++stack_index) {
+        doc->osc_stack[stack_index] = doc->osc_stack[stack_index + 1];
+    }
+    osc_index = doc->osc_stack[0];
+    if (osc_index & 0x80) {
+        osc_index &= 0x7f;
+        doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] &= ~CLEM_ENSONIQ_REG_OSC_OIR_MASK;
+        doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] |= ((uint8_t)(osc_index << 1) & 0x3e);
+    } else {
+        doc->reg[CLEM_ENSONIQ_REG_OSC_OIR] = 0x80 | ~CLEM_ENSONIQ_REG_OSC_OIR_MASK;
+    }
 }
 
 void _clem_ensoniq_reset_osc(struct ClemensDeviceEnsoniq *doc, unsigned osc_index) {
     doc->acc[osc_index] = 0;
     doc->ptr[osc_index] = 0;
+    doc->osc_flags[osc_index] &= ~CLEM_ENSONIQ_OSC_FLAG_CYCLE;
 }
 
 uint8_t clem_ensoniq_oscillator_cycle(struct ClemensDeviceEnsoniq *doc, unsigned osc_index,
@@ -178,9 +216,7 @@ uint8_t clem_ensoniq_oscillator_cycle(struct ClemensDeviceEnsoniq *doc, unsigned
     //  handle wraparound to start of wavetable, which triggers interrupts and
     //  changes oscillator state based on control mode (one-shot, sync, swap)
     if (ptr < doc->ptr[osc_index]) {
-        if (ctl & CLEM_ENSONIQ_OSC_CTL_IE) {
-            doc->osc_flags[osc_index] |= CLEM_ENSONIQ_OSC_FLAG_IRQ;
-        }
+        doc->osc_flags[osc_index] |= CLEM_ENSONIQ_OSC_FLAG_CYCLE;
         if (ctl & CLEM_ENSONIQ_OSC_CTL_M0) {
             if (ctl & CLEM_ENSONIQ_OSC_CTL_SYNC) {
                 // swap
@@ -222,12 +258,16 @@ uint32_t clem_ensoniq_sync(struct ClemensDeviceEnsoniq *doc, clem_clocks_duratio
             uint8_t ctl = doc->reg[CLEM_ENSONIQ_REG_OSC_CTRL + osc_cycle];
             if (ctl & CLEM_ENSONIQ_OSC_CTL_HALT) {
                 if (ctl & CLEM_ENSONIQ_OSC_CTL_M0) {
+                    //  Pg. 7 Cortland spec (M0 = HALT = 1)
                     _clem_ensoniq_reset_osc(doc, osc_cycle);
                 }
             } else {
                 ctl = clem_ensoniq_oscillator_cycle(doc, osc_cycle, osc_cnt, ctl);
-                if (doc->osc_flags[osc_cycle] & CLEM_ENSONIQ_OSC_FLAG_IRQ) {
-                    _clem_ensoniq_set_irq(doc, osc_cycle);
+                //  Pg. 6 Cortland spec (IE = 1, CYCLE DONE)
+                if (ctl & CLEM_ENSONIQ_OSC_CTL_IE) {
+                    if (doc->osc_flags[osc_cycle] & CLEM_ENSONIQ_OSC_FLAG_CYCLE) {
+                        _clem_ensoniq_set_irq(doc, osc_cycle);
+                    }
                 }
             }
             doc->reg[CLEM_ENSONIQ_REG_OSC_CTRL + osc_cycle] = ctl;
@@ -255,6 +295,9 @@ unsigned clem_ensoniq_voices(struct ClemensDeviceEnsoniq *doc) {
         bool sync_mode = (ctl & CLEM_ENSONIQ_OSC_CTL_SWAP) == CLEM_ENSONIQ_OSC_CTL_SYNC;
         float level = (2.0f * data / 255.0f) - 1.0f;
 
+        //  HALT indicates an inactive oscillator, or if the oscillator had finished its
+        //  waveform (which was mixed in the last frame - so just skip mixing this frame
+        //  until reenabled.)
         if (ctl & CLEM_ENSONIQ_OSC_CTL_HALT)
             continue;
 
@@ -362,9 +405,6 @@ uint8_t clem_ensoniq_read_ctl(struct ClemensDeviceEnsoniq *doc, uint8_t flags) {
 
 uint8_t clem_ensoniq_read_data(struct ClemensDeviceEnsoniq *doc, uint8_t flags) {
     uint8_t result = 0x00;
-    if (CLEM_IS_IO_NO_OP(flags))
-        return result;
-
     /* refer to HW Ref Chapter 5 - p 107, Read operation,
         first time read operations upon changing the address
         require double reads - likely for some kind of switch
@@ -378,11 +418,15 @@ uint8_t clem_ensoniq_read_data(struct ClemensDeviceEnsoniq *doc, uint8_t flags) 
     } else {
         result = doc->reg[doc->address & 0xff];
     }
+    if (CLEM_IS_IO_NO_OP(flags))
+        return result;
+
     if (doc->ram_read_cntr > 0) {
         if (!doc->is_access_ram) {
             switch (doc->address & 0xff) {
             case CLEM_ENSONIQ_REG_OSC_OIR:
-                _clem_ensoniq_clear_irq(doc);
+                //  retrieve next IRQ or clear OIR
+                _clem_ensoniq_next_irq(doc);
                 break;
             default:
                 break;

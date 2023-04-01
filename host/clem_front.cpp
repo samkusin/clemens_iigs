@@ -2281,7 +2281,7 @@ void ClemensFrontend::doMachineDebugDOCDisplay() {
             ImGui::TableNextColumn();
             ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_IE) ? '1' : '0');
             ImGui::TableNextColumn();
-            ImGui::TextColored(col, "%c", (flags & CLEM_ENSONIQ_OSC_FLAG_IRQ) ? 'I' : ' ');
+            ImGui::TextColored(col, "%c", (flags & CLEM_ENSONIQ_OSC_FLAG_CYCLE) ? 'C' : ' ');
             ImGui::TableNextColumn();
             ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_SYNC) ? '1' : '0');
             ImGui::TableNextColumn();
