@@ -3035,9 +3035,7 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
         tmp_pc = _clem_irq_brk_return(clem);
         break;
     case CLEM_OPC_WAI:
-        //  the calling application should interpret ReadyOut
-        //  TODO: should we guard against emulate() running cpu_execute()
-        //        if readyOut is false?
+        //  the calling application could interpret ReadyOut
         _clem_cycle_2(clem);
         cpu->pins.readyOut = false;
         break;
@@ -3149,14 +3147,21 @@ void clemens_emulate_cpu(ClemensMachine *clem) {
            +3/4 cycles for stack operations
             2 cycles vector pull to PC
         */
+        if (!cpu->pins.readyOut) {
+            CLEM_LOG("IRQ triggered after a likely WAI");
+            cpu->pins.readyOut = true;
+        }
         _clem_cycle_2(clem);
         _clem_irq_brk_setup(clem, &cpu->regs.PBR, &cpu->regs.PC, vlo, vhi, false);
         cpu->state_type = kClemensCPUStateType_Execute;
+
         return;
     }
-
+    if (!cpu->pins.readyOut) {
+        _clem_wait(clem);
+        return;
+    }
     clem->dev_debug.pc = cpu->regs.PC;
     clem->dev_debug.pbr = cpu->regs.PBR;
-
     cpu_execute(cpu, clem);
 }
