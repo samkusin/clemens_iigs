@@ -54,10 +54,16 @@ static inline void _clem_timespec_cycle(struct ClemensTimeSpec *tspec, bool m2se
     }
 }
 
+static inline void _clem_wait(struct ClemensMachine *clem) {
+    //  for WAI
+    _clem_timespec_cycle(&clem->tspec, clem->tspec.clocks_step == CLEM_CLOCKS_PHI0_CYCLE);
+}
+
 static inline void _clem_cycle(struct ClemensMachine *clem) {
     _clem_timespec_cycle(&clem->tspec, clem->tspec.clocks_step == CLEM_CLOCKS_PHI0_CYCLE);
     ++clem->cpu.cycles_spent;
 }
+
 static inline void _clem_cycle_2(struct ClemensMachine *clem) {
     _clem_timespec_cycle(&clem->tspec, clem->tspec.clocks_step == CLEM_CLOCKS_PHI0_CYCLE);
     _clem_timespec_cycle(&clem->tspec, clem->tspec.clocks_step == CLEM_CLOCKS_PHI0_CYCLE);

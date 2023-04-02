@@ -126,6 +126,13 @@ char *get_local_user_data_directory(char *outpath, size_t outpath_size, const ch
                                     const char *app_name);
 
 /**
+ * @brief Attempts to open a folder view on the host machine
+ *
+ * @param folder_path
+ */
+void open_system_folder_view(const char *folder_path);
+
+/**
  * @brief Initializes the joystick system
  *
  * @param provider OS specific (see CLEM_HOST_JOYSTICK_PROVIDER_xxx IDs)

@@ -23,11 +23,8 @@ ClemensConfiguration createConfiguration(const std::filesystem::path defaultData
     return ClemensConfiguration(configPath.string(), defaultDataDirectory.string());
 }
 
-ClemensConfiguration findConfiguration(const std::string &rootDirectoryOverride) {
-    //  find the config file on the system, or using the directory override
-    if (!rootDirectoryOverride.empty()) {
-        return createConfiguration(std::filesystem::path(rootDirectoryOverride));
-    }
+ClemensConfiguration findConfiguration() {
+    //  find the config file on the system
 
     //  local directory configuration check
     char localpath[CLEMENS_PATH_MAX];
@@ -92,8 +89,7 @@ ClemensConfiguration findConfiguration(const std::string &rootDirectoryOverride)
  *  - MacOS
  *    - Supports only User installs and store in ~/Library/Application or equivalent
  */
-ClemensStartupView::ClemensStartupView(std::string rootDirectoryOverride)
-    : mode_(Mode::Initial), config_(findConfiguration(rootDirectoryOverride)) {}
+ClemensStartupView::ClemensStartupView() : mode_(Mode::Initial), config_(findConfiguration()) {}
 
 auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
                                FrameAppInterop &interop) -> ViewType {

@@ -1786,6 +1786,15 @@ void ClemensFrontend::doDebuggerQuickbar(float /*width */) {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
             ImGui::SetTooltip("Enter debugger mode");
         }
+        ImGui::SameLine();
+        if (ClemensHostImGui::IconButton(
+                "Home Folder", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kFolder),
+                kIconSize)) {
+            open_system_folder_view(config_.dataDirectory.c_str());
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+            ImGui::SetTooltip("Open Assets Folder on Desktop");
+        }
         ImGui::PopStyleColor(3);
     }
 }
@@ -2272,7 +2281,7 @@ void ClemensFrontend::doMachineDebugDOCDisplay() {
             ImGui::TableNextColumn();
             ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_IE) ? '1' : '0');
             ImGui::TableNextColumn();
-            ImGui::TextColored(col, "%c", (flags & CLEM_ENSONIQ_OSC_FLAG_IRQ) ? 'I' : ' ');
+            ImGui::TextColored(col, "%c", (flags & CLEM_ENSONIQ_OSC_FLAG_CYCLE) ? 'C' : ' ');
             ImGui::TableNextColumn();
             ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_SYNC) ? '1' : '0');
             ImGui::TableNextColumn();

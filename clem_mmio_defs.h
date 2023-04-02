@@ -731,7 +731,8 @@
 #define CLEM_ENSONIQ_REG_OSC_ADC    0xe2
 
 //  see doc->osc_flags
-#define CLEM_ENSONIQ_OSC_FLAG_IRQ 0x01
+#define CLEM_ENSONIQ_OSC_FLAG_CYCLE 0x01
+#define CLEM_ENSONIQ_OSC_FLAG_OIR   0x02
 
 /* enable/disable certain compile time diagnostics */
 

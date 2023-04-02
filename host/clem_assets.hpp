@@ -20,6 +20,7 @@ enum ImageId {
     kJoystick,
     kCard,
     kFastEmulate,
+    kFolder,
     kFirstNamedImage,
     kLastNamedImage = kFirstNamedImage + 64,
     kImageCount
