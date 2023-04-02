@@ -376,11 +376,10 @@ static void onInit(void *userdata) {
                                 g_systemFontHiBuffer);
     ClemensHostAssets::initialize();
 
-    g_Host = new ClemensStartupView(appdata->rootPathOverride);
+    g_Host = new ClemensStartupView();
 }
 
-static void onFrame(void *userdata) {
-    auto *appdata = reinterpret_cast<SharedAppData *>(userdata);
+static void onFrame(void *) {
     const int frameWidth = sapp_width();
     const int frameHeight = sapp_height();
 
@@ -408,7 +407,7 @@ static void onFrame(void *userdata) {
             auto *oldHost = g_Host;
             switch (nextViewType) {
             case ClemensHostView::ViewType::Startup:
-                g_Host = new ClemensStartupView(appdata->rootPathOverride);
+                g_Host = new ClemensStartupView();
                 break;
             case ClemensHostView::ViewType::Main: {
                 ClemensConfiguration config;

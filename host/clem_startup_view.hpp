@@ -10,7 +10,7 @@ class ClemensPreamble;
 
 class ClemensStartupView : public ClemensHostView {
   public:
-    ClemensStartupView(std::string rootDirectoryOverride);
+    ClemensStartupView();
 
     const ClemensConfiguration &getConfiguration() const { return config_; }
 
