@@ -167,7 +167,7 @@ cp build/host/clemens_iigs <your_selected_install_directory>
 #### Commands
 
 # For debug builds
-cmake -B build -DBUILD_TESTING=OFF
+cmake -B build -DBUILD_TESTING=ON
 cmake --build build --config=Debug
 
 # For Release Build
