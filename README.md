@@ -77,8 +77,9 @@ An alternative to installing the binary is to build the project locally.
 
 ### macOS
 
-1. Copy build/host/Clemens IIGS.app to /Applications/ folder
-2. Double click /Applications/Clemens IIGS.app
+1. Build from the source (Check the build instrunction under macOS below)
+2. Copy build/host/Clemens IIGS.app to /Applications/ folder
+3. Double click /Applications/Clemens IIGS.app
 
 ### Linux
 
@@ -164,15 +165,19 @@ cp build/host/clemens_iigs <your_selected_install_directory>
 ```
 ### macOS
 
+#### Prerequisites
+
+TBC
+
 #### Commands
 
-# For debug builds
-cmake -B build -DBUILD_TESTING=ON
-cmake --build build --config=Debug
+##### For debug builds
+cmake -B build -DBUILD_TESTING=ON  
+cmake --build build --config=Debug  
 
-# For Release Build
-cmake -B build -DBUILD_TESTING=OFF
-cmake --build build --config=Release
+##### For Release Build
+cmake -B build -DBUILD_TESTING=OFF  
+cmake --build build --config=Release  
 
 ### Windows
 
