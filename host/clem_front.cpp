@@ -628,7 +628,8 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       guiPrevMode_(GUIMode::RebootEmulator), diskUnit_{{diskLibrary_, kClemensDrive_3_5_D1},
                                                        {diskLibrary_, kClemensDrive_3_5_D2},
                                                        {diskLibrary_, kClemensDrive_5_25_D1},
-                                                       {diskLibrary_, kClemensDrive_5_25_D2}} {
+                                                       {diskLibrary_, kClemensDrive_5_25_D2}},
+      smartportUnit_(diskLibrary_.getLibraryRootPath()) {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -1930,6 +1931,7 @@ static const char *sDriveDescriptionShort[] = {"3.5\" disk", "3.5\" disk", "5.25
                                                "5.25\" disk"};
 static const char *sDriveDescription[] = {"3.5 inch 800K", "3.5 inch 800K", "5.25 inch 140K",
                                           "5.25 inch 140K"};
+static const char *sSmartDriveName[] = {"Smart,D1"};
 
 void ClemensFrontend::doMachineDiskDisplay(float width) {
     ImGui::Spacing();
@@ -2026,28 +2028,22 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
     ImGui::PushID("SmartPort");
     ImGui::BeginGroup();
     {
-        ImGui::Text("Smartport D%u", driveIndex + 1);
 
         ImGuiStyle &style = ImGui::GetStyle();
         const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
-        ImGui::SameLine(width - (circleRadius + style.ItemSpacing.x) * 2);
-
-        doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
-
-        //  smartport disk drive image
-        const char *imageName;
-        if (drive.isEjecting) {
-            imageName = "Ejecting...";
-        } else if (drive.imagePath.empty()) {
-            imageName = "- Empty";
+        const float motorStatusWidth = (circleRadius + style.ItemSpacing.x) * 2;
+        ImVec2 columnPos = ImGui::GetCursorPos();
+        if (width < ClemensHostStyle::kDiskStatusLongMinWidth) {
+            ImGui::Text("SmartD%d", driveIndex + 1);
+            ImGui::SameLine(width - motorStatusWidth);
+            doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
+            smartportUnit_.frame(width, 0, backendQueue_, frameReadState_.smartDrives[0],
+                                 sSmartDriveName[driveIndex], false);
         } else {
-            imageName = drive.imagePath.c_str();
-        }
-        char comboName[32];
-        snprintf(comboName, sizeof(comboName), "##Smart D%u", driveIndex + 1);
-        if (ImGui::BeginCombo(comboName, imageName, ImGuiComboFlags_NoArrowButton)) {
-            ImGui::Selectable(imageName);
-            ImGui::EndCombo();
+            smartportUnit_.frame(width - columnPos.x - motorStatusWidth, 0, backendQueue_,
+                                 frameReadState_.smartDrives[0], sSmartDriveName[0], true);
+            ImGui::SameLine(width - motorStatusWidth);
+            doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
         }
     }
     ImGui::EndGroup();
@@ -2056,7 +2052,7 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
         if (!drive.imagePath.empty()) {
             ImGui::SetTooltip("Smartport (%s)", drive.imagePath.c_str());
         } else {
-            ImGui::SetTooltip("Smartport");
+            ImGui::SetTooltip("Smartport (No Drive)");
         }
     }
 }

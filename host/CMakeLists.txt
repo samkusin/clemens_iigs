@@ -54,7 +54,7 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.mm")
 endif()
 
-set(PROJECT_SOURCES 
+set(PROJECT_SOURCES
     ${PLATFORM_SOURCES}
     ${CINEK_SOURCES}
     ${EXT_SOURCES}
@@ -78,6 +78,7 @@ set(PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_preamble.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_program_trace.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_disk_unit.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_smartport_unit.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_load_snapshot.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_save_snapshot.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_settings.cpp"
@@ -115,14 +116,14 @@ elseif(APPLE)
     find_library(OPENGL_LIB OpenGL)
     find_library(GAME_CONTROLLER_LIB GameController)
     target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_GL)
-    target_link_libraries(clemens_iigs PRIVATE ${FOUNDATION_LIB} 
+    target_link_libraries(clemens_iigs PRIVATE ${FOUNDATION_LIB}
                                                ${APPKIT_LIB}
                                                ${CORE_AUDIO_LIB}
                                                ${AUDIO_TOOLBOX_LIB}
                                                ${CORE_GRAPHICS_LIB}
                                                ${OPENGL_LIB}
                                                ${GAME_CONTROLLER_LIB})
-    set_target_properties(clemens_iigs PROPERTIES 
+    set_target_properties(clemens_iigs PROPERTIES
         OUTPUT_NAME "Clemens IIGS"
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "Clemens IIGS"
@@ -198,11 +199,11 @@ elseif(APPLE)
     # Apple specific
     set(CPACK_GENERATOR "DragNDrop")
     set(CPACK_PACKAGING_INSTALL_PREFIX "/")
-    
+
     #set_source_files_properties(${PROJECT_SOURCE_DIR}/packaging/exampleApp.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
-    
+
     set(CPACK_DMG_VOLUME_NAME "ClemensIIGS")
-    #set(CPACK_DMG_DS_STORE_SETUP_SCRIPT "${PROJECT_SOURCE_DIR}/packaging/DS_Store.scpt") 
+    #set(CPACK_DMG_DS_STORE_SETUP_SCRIPT "${PROJECT_SOURCE_DIR}/packaging/DS_Store.scpt")
     set(CPACK_OSX_PACKAGE_VERSION "10.15") #min package version
     set(CPACK_PACKAGE_FILE_NAME "Clemens_IIGS-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}-macOS-universal")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
