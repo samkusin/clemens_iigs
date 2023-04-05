@@ -535,11 +535,17 @@ static uint8_t _clem_mmio_floating_bus(ClemensMMIO *mmio, struct ClemensTimeSpec
     //  Here, the clem_mmio_read() function will selectively pick up this data if reading
     //  an I/O register that acts as a switch but doesn't return data.
     //
-    //  Its unknown if Super-hires counts as the floating bus feature was emulated to work
-    //  like it did on the Apple II.
+    //  Its unknown if Super-hires counts. (edit) The floating bus  emulation here
+    //  works like it did on the Apple II
     //
     //  http://www.deater.net/weave/vmwprod/megademo/vapor_lock.html
     //
+    //  TODO: The implementation here likely isn't accurate as pointed out on
+    //        the Apple 2 slack channel for the Mega II (i.e. what happens with SHR mode
+    //        as I believe that mode overrides any Apple II video mode switches.)
+    //        A good test would be to try the vapor lock tests on a real GS and
+    //        witness if they work.  That still doesn't answer the SHR mode
+    //        question.
 
     struct ClemensClock clock;
     struct ClemensScanline *scanline;
