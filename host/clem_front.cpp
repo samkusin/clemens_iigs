@@ -629,7 +629,7 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
                                                        {diskLibrary_, kClemensDrive_3_5_D2},
                                                        {diskLibrary_, kClemensDrive_5_25_D1},
                                                        {diskLibrary_, kClemensDrive_5_25_D2}},
-      smartportUnit_(diskLibrary_.getLibraryRootPath()) {
+      smartportUnit_(0, diskLibrary_.getLibraryRootPath()) {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -650,11 +650,6 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
     backendConfig_.traceRootPath = diskTracesRootPath_;
     backendConfig_.snapshotRootPath =
         (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_SNAPSHOT_DIR).string();
-
-    // TODO: This should be selectable like regular drives - this will require some
-    //       UI to make it happen
-    backendConfig_.smartPortDriveStates[0].imagePath =
-        std::filesystem::path("smartport.2mg").string();
 
     debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;
     debugMemoryEditor_.WriteFn = &ClemensFrontend::imguiMemoryEditorWrite;

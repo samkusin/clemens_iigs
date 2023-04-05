@@ -10,9 +10,10 @@
 
 #include <filesystem>
 
-ClemensSmartPortUnitUI::ClemensSmartPortUnitUI(std::filesystem::path diskLibraryPath)
+ClemensSmartPortUnitUI::ClemensSmartPortUnitUI(unsigned driveIndex,
+                                               std::filesystem::path diskLibraryPath)
     : diskRootPath_(diskLibraryPath), mode_(Mode::None), finishedMode_(Mode::None),
-      generatingDiskList_(false), libraryRootIterator_(diskRootPath_) {}
+      driveIndex_(driveIndex), generatingDiskList_(false), libraryRootIterator_(diskRootPath_) {}
 
 bool ClemensSmartPortUnitUI::frame(float width, float height, ClemensCommandQueue &backend,
                                    const ClemensBackendDiskDriveState &diskDrive,
@@ -44,9 +45,12 @@ bool ClemensSmartPortUnitUI::frame(float width, float height, ClemensCommandQueu
             discoverNextLocalDiskPath();
         }
         if (!diskDrive.imagePath.empty() && !diskDrive.isEjecting && ImGui::Selectable("<eject>")) {
-            // TODO:    backendQueue.ejectDisk(diskDriveType_);
+            backend.ejectSmartPortDisk(driveIndex_);
         }
         if (diskDrive.imagePath.empty()) {
+            if (ImGui::Selectable("<insert blank disk>")) {
+                startFlow(Mode::InsertBlankDisk);
+            }
             if (ImGui::Selectable("<...>")) {
                 startFlow(Mode::ImportDisks);
             }
@@ -59,13 +63,27 @@ bool ClemensSmartPortUnitUI::frame(float width, float height, ClemensCommandQueu
                 }
             }
             if (!selectedPath.empty()) {
-                // TODO:    backendQueue.insertDisk(diskDriveType_, selectedPath.string());
+                backend.insertSmartPortDisk(driveIndex_, selectedPath.string());
             }
             ImGui::Separator();
         }
         ImGui::EndCombo();
     } else {
         generatingDiskList_ = false;
+    }
+
+    const ImVec2 &viewportSize = ImGui::GetMainViewport()->Size;
+    switch (mode_) {
+    case Mode::ImportDisks:
+        doImportDiskFlow(viewportSize.x, viewportSize.y);
+        break;
+    case Mode::InsertBlankDisk:
+        doBlankDiskFlow(viewportSize.x, viewportSize.y);
+        break;
+    case Mode::Exit:
+        break;
+    case Mode::None:
+        break;
     }
 
     return true;

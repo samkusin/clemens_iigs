@@ -216,9 +216,13 @@ ClemensBackend::ClemensBackend(std::string romPathname, const Config &config)
     for (size_t driveIndex = 0; driveIndex < smartPortDrives_.size(); ++driveIndex) {
         if (smartPortDrives_[driveIndex].imagePath.empty())
             continue;
-        loadSmartPortDisk(driveIndex);
-        fmt::print("Loaded SmartPort image '{}' into drive {}\n",
-                   smartPortDrives_[driveIndex].imagePath, driveIndex);
+        if (loadSmartPortDisk(driveIndex)) {
+            fmt::print("Loaded SmartPort image '{}' into drive {}\n",
+                       smartPortDrives_[driveIndex].imagePath, driveIndex);
+        } else {
+            fmt::print("Failed to load  SmartPort image '{}' into drive {}\n",
+                       smartPortDrives_[driveIndex].imagePath, driveIndex);
+        }
     }
 
     clocksRemainingInTimeslice_ = 0;
@@ -247,11 +251,7 @@ ClemensBackend::~ClemensBackend() {
         if (drive.imagePath.empty())
             continue;
         auto driveIndex = unsigned(hardDriveIt - smartPortDrives_.begin());
-        ClemensSmartPortDevice device;
-        clemens_remove_smartport_disk(&mmio_, driveIndex, &device);
-        smartPortDisks_[driveIndex].destroySmartPortDevice(&device);
-        saveSmartPortDisk(driveIndex);
-        localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", drive.imagePath);
+        removeSmartPortDisk(driveIndex);
     }
 
     saveBRAM();
@@ -264,6 +264,23 @@ ClemensBackend::~ClemensBackend() {
     }
 
     free(slabMemory_.getHead());
+}
+
+bool ClemensBackend::removeSmartPortDisk(unsigned driveIndex) {
+    ClemensSmartPortDevice device;
+    clemens_remove_smartport_disk(&mmio_, driveIndex, &device);
+
+    smartPortDisks_[driveIndex].destroySmartPortDevice(&device);
+    smartPortDrives_[driveIndex].isSpinning = false;
+    smartPortDrives_[driveIndex].saveFailed = false;
+
+    if (!saveSmartPortDisk(driveIndex)) {
+        localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", smartPortDrives_[driveIndex].imagePath);
+        smartPortDrives_[driveIndex].saveFailed = true;
+        return false;
+    }
+    localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", smartPortDrives_[driveIndex].imagePath);
+    return true;
 }
 
 //  TODO: Move into Clemens API clemens_mmio_find_card_name()
@@ -346,24 +363,31 @@ bool ClemensBackend::saveDisk(ClemensDriveType driveType) {
     return true;
 }
 
-void ClemensBackend::loadSmartPortDisk(unsigned driveIndex) {
+void ClemensBackend::createSmartPortDisk(unsigned driveIndex) {
+    auto diskData = ClemensSmartPortDisk::createData(kSmartPortDiskBlockCount);
+    smartPortDisks_[driveIndex] = ClemensSmartPortDisk(std::move(diskData));
+    ClemensSmartPortDevice device;
+    clemens_assign_smartport_disk(&mmio_, driveIndex,
+                                  smartPortDisks_[driveIndex].createSmartPortDevice(&device));
+}
+
+bool ClemensBackend::loadSmartPortDisk(unsigned driveIndex) {
     //  load into our HDD slot
     auto imagePath =
         std::filesystem::path(config_.diskLibraryRootPath) / smartPortDrives_[driveIndex].imagePath;
     std::ifstream input(imagePath, std::ios_base::in | std::ios_base::binary);
-    if (input.is_open()) {
-        auto sz = input.seekg(0, std::ios_base::end).tellg();
-        std::vector<uint8_t> buffer(sz);
-        input.seekg(0);
-        input.read((char *)buffer.data(), sz);
-        smartPortDisks_[driveIndex] = ClemensSmartPortDisk(std::move(buffer));
-    } else {
-        auto diskData = ClemensSmartPortDisk::createData(kSmartPortDiskBlockCount);
-        smartPortDisks_[driveIndex] = ClemensSmartPortDisk(std::move(diskData));
+    if (!input.is_open()) {
+        return false;
     }
+    auto sz = input.seekg(0, std::ios_base::end).tellg();
+    std::vector<uint8_t> buffer(sz);
+    input.seekg(0);
+    input.read((char *)buffer.data(), sz);
+    smartPortDisks_[driveIndex] = ClemensSmartPortDisk(std::move(buffer));
     ClemensSmartPortDevice device;
     clemens_assign_smartport_disk(&mmio_, driveIndex,
                                   smartPortDisks_[driveIndex].createSmartPortDevice(&device));
+    return true;
 }
 
 bool ClemensBackend::saveSmartPortDisk(unsigned driveIndex) {
@@ -484,6 +508,9 @@ ClemensBackend::main(ClemensBackendState &backendState,
         runSampler_.update((clem_clocks_duration_t)(machine_.tspec.clocks_spent - lastClocksSpent),
                            machine_.cpu.cycles_spent);
 
+        //  TODO: this is ugly - state changes should be consolidated into helper
+        //        methods as it seems both the helps and this body are responsible for
+        //        setting drive/disk states - which is bug prone
         for (auto diskDriveIt = diskDrives_.begin(); diskDriveIt != diskDrives_.end();
              ++diskDriveIt) {
             auto &diskDrive = *diskDriveIt;
@@ -496,8 +523,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
             if (diskDrive.isEjecting) {
                 if (clemens_eject_disk_async(&mmio_, driveType, &disks_[driveIndex])) {
                     diskDrive.isEjecting = false;
-                    if (!saveDisk(driveType))
-                        diskDrive.saveFailed = true;
+                    diskDrive.saveFailed = !saveDisk(driveType);
                     diskDrive.imagePath.clear();
                     ClemensDiskUtilities::createEmptyDisk(driveType, disks_[driveType]);
                 }
@@ -506,6 +532,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
         for (auto diskDriveIt = smartPortDrives_.begin(); diskDriveIt != smartPortDrives_.end();
              ++diskDriveIt) {
             auto &diskDrive = *diskDriveIt;
+            auto driveIndex = unsigned(diskDriveIt - smartPortDrives_.begin());
             // auto driveIndex = unsigned(diskDriveIt - smartPortDrives_.begin());
             //  auto *clemensUnit = clemens_smartport_unit_get(&mmio_, driveIndex);
             //   TODO: detect SmartPort drive status - enable2 only detects if the
@@ -515,7 +542,8 @@ ClemensBackend::main(ClemensBackendState &backendState,
             diskDrive.isWriteProtected = false;
             diskDrive.saveFailed = false;
             if (diskDrive.isEjecting) {
-                //  TODO: SmartPort drive ejection
+                diskDrive.saveFailed = !removeSmartPortDisk(driveIndex);
+                diskDrive.isEjecting = false;
             }
         }
     }
@@ -934,6 +962,22 @@ bool ClemensBackend::onCommandWriteProtectDisk(ClemensDriveType driveType, bool 
         return false;
     drive->disk.is_write_protected = wp;
     return true;
+}
+
+bool ClemensBackend::onCommandInsertSmartPortDisk(unsigned driveIndex, std::string diskPath) {
+    smartPortDrives_[driveIndex].imagePath = diskPath;
+    return loadSmartPortDisk(driveIndex);
+}
+
+bool ClemensBackend::onCommandInsertBlankSmartPortDisk(unsigned driveIndex, std::string diskPath) {
+    smartPortDrives_[driveIndex].imagePath = diskPath;
+    createSmartPortDisk(driveIndex);
+    return true;
+}
+
+void ClemensBackend::onCommandEjectSmartPortDisk(unsigned driveIndex) {
+    smartPortDrives_[driveIndex].isEjecting = true;
+    //  TODO: handle this in the main loop like we do for regular drives
 }
 
 void ClemensBackend::onCommandDebugMemoryPage(uint8_t pageIndex) { debugMemoryPage_ = pageIndex; }

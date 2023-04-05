@@ -20,12 +20,11 @@ struct ClemensBackendDiskDriveState;
  * - Displays the relative path of the 2iMG device (one level up + the file image
  *   name.)
  * - Select a 2IMG image using a file browser
- * - Display the default smartport.2mg image (located in the Disk Library Root Path
- *   in the combo as well
+ * - Allow creation of new images
  */
 class ClemensSmartPortUnitUI {
   public:
-    ClemensSmartPortUnitUI(std::filesystem::path diskLibraryPath);
+    ClemensSmartPortUnitUI(unsigned driveIndex, std::filesystem::path diskLibraryPath);
 
     bool frame(float width, float height, ClemensCommandQueue &backend,
                const ClemensBackendDiskDriveState &diskDrive, const char *driveName,
@@ -35,7 +34,7 @@ class ClemensSmartPortUnitUI {
     void doImportDiskFlow(float width, float height);
     void doExit(float width, float height);
 
-    enum class Mode { None, ImportDisks, Exit };
+    enum class Mode { None, ImportDisks, InsertBlankDisk, Exit };
     enum class ErrorMode { None, ImportFailed };
 
     void startFlow(Mode mode);
@@ -48,6 +47,7 @@ class ClemensSmartPortUnitUI {
     Mode mode_;
     Mode finishedMode_;
     std::string errorString_;
+    unsigned driveIndex_;
     bool generatingDiskList_;
 
     std::vector<std::filesystem::path> localDiskPaths_;

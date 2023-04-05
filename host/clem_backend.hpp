@@ -92,6 +92,9 @@ class ClemensBackend : public ClemensCommandQueueListener {
     bool onCommandInsertBlankDisk(ClemensDriveType driveType, std::string diskPath) final;
     void onCommandEjectDisk(ClemensDriveType driveType) final;
     bool onCommandWriteProtectDisk(ClemensDriveType driveType, bool wp) final;
+    bool onCommandInsertSmartPortDisk(unsigned driveIndex, std::string diskPath) final;
+    bool onCommandInsertBlankSmartPortDisk(unsigned driveIndex, std::string diskPath) final;
+    void onCommandEjectSmartPortDisk(unsigned driveIndex) final;
     void onCommandDebugMemoryPage(uint8_t pageIndex) final;
     void onCommandDebugMemoryWrite(uint16_t addr, uint8_t value) final;
     void onCommandDebugLogLevel(int logLevel) final;
@@ -109,8 +112,10 @@ class ClemensBackend : public ClemensCommandQueueListener {
     bool loadDisk(ClemensDriveType driveType, bool allowBlank);
     bool saveDisk(ClemensDriveType driveType);
 
-    void loadSmartPortDisk(unsigned driveIndex);
+    void createSmartPortDisk(unsigned driveindex);
+    bool loadSmartPortDisk(unsigned driveIndex);
     bool saveSmartPortDisk(unsigned driveIndex);
+    bool removeSmartPortDisk(unsigned driveIndex);
 
     cinek::ByteBuffer loadROM(const char *romPathname);
 
