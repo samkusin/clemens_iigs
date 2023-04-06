@@ -30,14 +30,20 @@ class ClemensSmartPortUnitUI {
                const ClemensBackendDiskDriveState &diskDrive, const char *driveName,
                bool showLabel);
 
+    //  called on signals from backend
+    void succeeded();
+    void fail();
+
   private:
-    void doImportDiskFlow(float width, float height);
+    void doImportDiskFlow(float width, float height, ClemensCommandQueue &backend);
+    void doBlankDiskFlow(float width, float height, ClemensCommandQueue &backend);
     void doExit(float width, float height);
 
     enum class Mode { None, ImportDisks, InsertBlankDisk, Exit };
     enum class ErrorMode { None, ImportFailed };
 
     void startFlow(Mode mode);
+    void cancel();
     void finish(std::string errorString = "");
 
     void discoverNextLocalDiskPath();

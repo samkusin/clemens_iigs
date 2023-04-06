@@ -10,6 +10,16 @@
 
 #include <filesystem>
 
+namespace {
+const ImVec2 guiDialogSizeLarge(float viewWidth, float viewHeight) {
+    return ImVec2(std::max(800.0f, viewWidth * 0.80f), std::max(480.0f, viewHeight * 0.60f));
+}
+
+const ImVec2 guiDialogSizeSmall(float viewWidth, float viewHeight) {
+    return ImVec2(std::max(640.0f, viewWidth * 0.50f), std::max(200.0f, viewHeight * 0.25f));
+}
+} // namespace
+
 ClemensSmartPortUnitUI::ClemensSmartPortUnitUI(unsigned driveIndex,
                                                std::filesystem::path diskLibraryPath)
     : diskRootPath_(diskLibraryPath), mode_(Mode::None), finishedMode_(Mode::None),
@@ -75,12 +85,13 @@ bool ClemensSmartPortUnitUI::frame(float width, float height, ClemensCommandQueu
     const ImVec2 &viewportSize = ImGui::GetMainViewport()->Size;
     switch (mode_) {
     case Mode::ImportDisks:
-        doImportDiskFlow(viewportSize.x, viewportSize.y);
+        doImportDiskFlow(viewportSize.x, viewportSize.y, backend);
         break;
     case Mode::InsertBlankDisk:
-        doBlankDiskFlow(viewportSize.x, viewportSize.y);
+        doBlankDiskFlow(viewportSize.x, viewportSize.y, backend);
         break;
     case Mode::Exit:
+        doExit(viewportSize.x, viewportSize.y);
         break;
     case Mode::None:
         break;
@@ -107,16 +118,75 @@ void ClemensSmartPortUnitUI::discoverNextLocalDiskPath() {
     if (dskFile.read((char *)header, sizeof(header)).fail())
         return;
 
-    Clemens2IMGDisk disk;
-    if (!clem_2img_parse_header(&disk, header, header + sizeof(header)))
+    //  PO and 2MG images are supported
+    Clemens2IMGDisk disk{};
+    if (clem_2img_parse_header(&disk, header, header + sizeof(header))) {
+        localDiskPaths_.emplace_back(entry.path());
         return;
-    localDiskPaths_.emplace_back(entry.path());
+    }
+    //  PO images are not validated at this point.  Extension checks are good
+    //  enough (the user will be informed of a problem when mounting)
+    if (entry.path().has_extension() && entry.path().extension() == ".po" ||
+        entry.path().extension() == ".PO") {
+        localDiskPaths_.emplace_back(entry.path());
+        return;
+    }
 }
 
-void ClemensSmartPortUnitUI::doImportDiskFlow(float width, float height) {}
+void ClemensSmartPortUnitUI::doImportDiskFlow(float width, float height,
+                                              ClemensCommandQueue &backend) {
+    if (!ImGuiFileDialog::Instance()->IsOpened("choose_disk_images")) {
+        const char *filters = "ProDOS disk image files (*.2mg *.po){.2mg,.po}";
+        ImGuiFileDialog::Instance()->OpenDialog("choose_disk_images", "Choose Disk Image", filters,
+                                                ".", "", 1, nullptr, ImGuiFileDialogFlags_Modal);
+    }
+    if (ImGuiFileDialog::Instance()->Display("choose_disk_images", ImGuiWindowFlags_NoCollapse,
+                                             guiDialogSizeLarge(width, height),
+                                             ImVec2(width, height))) {
+        if (ImGuiFileDialog::Instance()->IsOk()) {
+            auto selection = ImGuiFileDialog::Instance()->GetFilePathName();
+            backend.insertBlankSmartPortDisk(driveIndex_, selection);
+        } else {
+            cancel();
+        }
+        ImGuiFileDialog::Instance()->Close();
+    }
+}
+
+void ClemensSmartPortUnitUI::doBlankDiskFlow(float width, float height,
+                                             ClemensCommandQueue &backend) {
+    //  file browser for save as... (.2mg)
+    //  if it already exists, prompt that this operation will overwriting the
+    //  existing:
+    //      - yes, then proceed
+    //      - no, then cancel
+    //  else:
+    //      - proceed
+    //      - backend command to mount disk
+    //      - wait for confirmation from backend (using a new event succeeded or failed)
+    //  succeeded:
+    //      - end
+    //  failed:
+    //      - end with error
+    //  end:
+    //      message that operation completed or an error occurred
+}
 
 void ClemensSmartPortUnitUI::doExit(float width, float height) {}
 
-void ClemensSmartPortUnitUI::startFlow(Mode mode) {}
+void ClemensSmartPortUnitUI::startFlow(Mode mode) {
+    mode_ = mode;
+    finishedMode_ = Mode::None;
+    errorString_.clear();
+}
 
-void ClemensSmartPortUnitUI::finish(std::string errorString) {}
+void ClemensSmartPortUnitUI::cancel() {
+    finishedMode_ = mode_;
+    mode_ = Mode::None;
+}
+
+void ClemensSmartPortUnitUI::finish(std::string errorString) {
+    errorString_ = std::move(errorString);
+    finishedMode_ = mode_;
+    mode_ = Mode::Exit;
+}

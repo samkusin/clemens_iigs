@@ -10,6 +10,9 @@
 
 class ClemensSmartPortDisk {
   public:
+    // DO NOT CHANGE THE ORDERING OF THESE ENUM VALUES (Serialization Note)
+    enum ImageType { ImageUndefined, ImageProDOS, Image2IMG };
+
     static std::vector<uint8_t> createData(unsigned block_count);
 
     ClemensSmartPortDisk();
@@ -19,10 +22,12 @@ class ClemensSmartPortDisk {
 
     ClemensSmartPortDisk &operator=(ClemensSmartPortDisk &&other);
 
+    bool hasImage() const { return imageType_ != ImageUndefined; }
+
     void write(unsigned block_index, const uint8_t *data);
     void read(unsigned block_index, uint8_t *data);
 
-    //  the underlying container
+    //  the underlying container as a 2IMG
     Clemens2IMGDisk &getDisk() { return disk_; }
     const Clemens2IMGDisk &getDisk() const { return disk_; }
 
@@ -42,10 +47,13 @@ class ClemensSmartPortDisk {
                                 const uint8_t *buffer);
     static uint8_t doFlush(void *userCcontext, unsigned driveIndex);
 
+    ClemensSmartPortDisk &moveFrom(ClemensSmartPortDisk &other);
+    ImageType initializeContainer();
+
   private:
     Clemens2IMGDisk disk_;
-    std::string path_;
     std::vector<uint8_t> image_;
+    ImageType imageType_;
     ClemensProdosHDD32 clemensHDD_;
 };
 

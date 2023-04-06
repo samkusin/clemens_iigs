@@ -204,7 +204,6 @@ void ClemensDiskUnitUI::doImportDiskFlow(float width, float height) {
             }
             if (importDiskFiles_.empty()) {
                 cancel();
-                return;
             }
             ImGuiFileDialog::Instance()->Close();
         }
