@@ -60,6 +60,7 @@ static uint8_t _do_status(struct ClemensSmartPortDevice *context,
         break;
     case 0x01: /* Control Information Block */
         result = CLEM_SMARTPORT_STATUS_CODE_BAD_CTL;
+        break;
     case 0x03: /* DIB */
         packet->contents[clen++] = 0xf8;
         packet->contents[clen++] = (uint8_t)((hdd->block_limit) & 0xff);
@@ -82,13 +83,21 @@ static uint8_t _do_status(struct ClemensSmartPortDevice *context,
         packet->contents[clen++] = ' ';
         packet->contents[clen++] = ' ';
         packet->contents[clen++] = ' ';
-        packet->contents[clen++] = 0x02;
-        packet->contents[clen++] = 0x20; /* this is a very basic hard drive?*/
+        packet->contents[clen++] = 0x02; /* Pro-File Hard Disk? */
+        packet->contents[clen++] = 0x00; /* that supports ejecting? */
         packet->contents[clen++] = 0x01; /* firmware version */
         packet->contents[clen++] = 0x00;
         packet->contents_length = clen;
         break;
     }
+    return result;
+}
+
+static uint8_t _do_control(struct ClemensSmartPortDevice *context,
+                           struct ClemensSmartPortPacket *packet, unsigned delta_ns) {
+    struct ClemensProdosHDD32 *hdd = (struct ClemensProdosHDD32 *)context->device_data;
+    uint8_t result = CLEM_SMARTPORT_STATUS_CODE_OK;
+
     return result;
 }
 
@@ -109,6 +118,7 @@ void clem_smartport_prodos_hdd32_initialize(struct ClemensSmartPortDevice *devic
     device->do_read_block = &_do_read_block;
     device->do_write_block = &_do_write_block;
     device->do_status = &_do_status;
+    device->do_control = &_do_control;
     device->do_format = NULL;
 }
 

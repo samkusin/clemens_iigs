@@ -290,8 +290,8 @@ void clem_iwm_eject_disk(struct ClemensDeviceIWM *iwm, struct ClemensDrive *driv
 bool clem_iwm_eject_disk_async(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
                                struct ClemensNibbleDisk *disk) {
 
-    if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
-        if (drive->has_disk) {
+    if (drive->has_disk) {
+        if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
             if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {
                 clem_disk_35_start_eject(drive);
                 return false;

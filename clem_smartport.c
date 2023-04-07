@@ -422,6 +422,13 @@ static unsigned _clem_smartport_handle_packet(struct ClemensSmartPortUnit *unit,
                                                                 call_status);
             break;
         case CLEM_SMARTPORT_COMMAND_CONTROL:
+            if (unit->device.do_control) {
+                call_status = (*unit->device.do_control)(&unit->device, &unit->packet, delta_ns);
+            } else {
+                call_status = CLEM_SMARTPORT_STATUS_CODE_BAD_CTL;
+            }
+            next_state = _clem_smartport_packet_encode_response(unit, unit->packet.source_unit_id,
+                                                                call_status);
             break;
         default:
             CLEM_WARN("SmartPort: [%02X] Unhandled command %02X", unit->unit_id, unit->command_id);
