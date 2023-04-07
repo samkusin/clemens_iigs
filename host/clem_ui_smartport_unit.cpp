@@ -69,7 +69,7 @@ bool ClemensSmartPortUnitUI::frame(float width, float height, ClemensCommandQueu
             for (auto &diskPath : localDiskPaths_) {
                 auto relativePath = diskPath.parent_path().filename() / diskPath.stem();
                 if (ImGui::Selectable(relativePath.string().c_str())) {
-                    selectedPath = diskPath.parent_path().filename() / diskPath.filename();
+                    selectedPath = diskPath;
                 }
             }
             if (!selectedPath.empty()) {
@@ -145,7 +145,8 @@ void ClemensSmartPortUnitUI::doImportDiskFlow(float width, float height,
                                              ImVec2(width, height))) {
         if (ImGuiFileDialog::Instance()->IsOk()) {
             auto selection = ImGuiFileDialog::Instance()->GetFilePathName();
-            backend.insertBlankSmartPortDisk(driveIndex_, selection);
+            backend.insertSmartPortDisk(driveIndex_, selection);
+            finish();
         } else {
             cancel();
         }

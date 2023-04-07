@@ -1167,6 +1167,11 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
                  ++driveIndex) {
                 backendConfig_.diskDriveStates[driveIndex] = frameReadState_.diskDrives[driveIndex];
             }
+            for (size_t driveIndex = 0; driveIndex < frameReadState_.smartDrives.size();
+                 ++driveIndex) {
+                backendConfig_.smartPortDriveStates[driveIndex] =
+                    frameReadState_.smartDrives[driveIndex];
+            }
 
             frameMemory_.reset();
 

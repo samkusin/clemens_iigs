@@ -375,7 +375,7 @@ bool ClemensBackend::mountSmartPortDisk(unsigned driveIndex, bool blankDisk) {
         return true;
     }
     auto imagePath =
-        std::filesystem::path(config_.diskLibraryRootPath) / smartPortDrives_[driveIndex].imagePath;
+         smartPortDrives_[driveIndex].imagePath;
     std::ifstream input(imagePath, std::ios_base::in | std::ios_base::binary);
     if (input.is_open()) {
 
@@ -408,6 +408,8 @@ bool ClemensBackend::unmountSmartPortDisk(unsigned driveIndex) {
     } else {
         localLog(CLEM_DEBUG_LOG_INFO, "Saved {}", diskDrive.imagePath);
     }
+
+    diskDrive.imagePath.clear();
 
     smartPortDisks_[driveIndex].destroySmartPortDevice(&device);
     smartPortDisks_[driveIndex] = ClemensSmartPortDisk();

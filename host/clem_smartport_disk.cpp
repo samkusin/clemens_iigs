@@ -40,21 +40,23 @@ ClemensSmartPortDisk::ClemensSmartPortDisk(std::vector<uint8_t> data) : image_(s
 auto ClemensSmartPortDisk::initializeContainer() -> ImageType {
     ImageType imageType = ImageUndefined;
     memset(&disk_, 0, sizeof(disk_));
-    if (clem_2img_parse_header(&disk_, image_.data(), image_.data() + image_.size())) {
-        imageType = Image2IMG;
-    } else {
-        //  This could be a plain ProDOS image - which is the only other image
-        //  type we'll support for now on SmartPort disks
-        //  validate that the image size is block aligned
-        if ((image_.size() % 512) == 0) {
-            clem_2img_generate_header(&disk_, CLEM_2IMG_FORMAT_PRODOS, image_.data(),
-                                      image_.data() + image_.size(), 0);
+    if (image_.size() > 0) {
+        if (clem_2img_parse_header(&disk_, image_.data(), image_.data() + image_.size())) {
+            imageType = Image2IMG;
+        } else {
+            //  This could be a plain ProDOS image - which is the only other image
+            //  type we'll support for now on SmartPort disks
+            //  validate that the image size is block aligned
+            if ((image_.size() % 512) == 0) {
+                clem_2img_generate_header(&disk_, CLEM_2IMG_FORMAT_PRODOS, image_.data(),
+                                          image_.data() + image_.size(), 0);
+            }
         }
-    }
-    if (imageType != ImageUndefined) {
-        //  TODO: SmartPort disks don't have a write-protect enable/disable
-        //        GUI currently - when they do, then reevaluate this setter
-        disk_.is_write_protected = false;
+        if (imageType != ImageUndefined) {
+            //  TODO: SmartPort disks don't have a write-protect enable/disable
+            //        GUI currently - when they do, then reevaluate this setter
+            disk_.is_write_protected = false;
+        }
     }
     return imageType;
 }
