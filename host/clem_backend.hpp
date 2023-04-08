@@ -92,6 +92,9 @@ class ClemensBackend : public ClemensCommandQueueListener {
     bool onCommandInsertBlankDisk(ClemensDriveType driveType, std::string diskPath) final;
     void onCommandEjectDisk(ClemensDriveType driveType) final;
     bool onCommandWriteProtectDisk(ClemensDriveType driveType, bool wp) final;
+    bool onCommandInsertSmartPortDisk(unsigned driveIndex, std::string diskPath) final;
+    bool onCommandInsertBlankSmartPortDisk(unsigned driveIndex, std::string diskPath) final;
+    void onCommandEjectSmartPortDisk(unsigned driveIndex) final;
     void onCommandDebugMemoryPage(uint8_t pageIndex) final;
     void onCommandDebugMemoryWrite(uint16_t addr, uint8_t value) final;
     void onCommandDebugLogLevel(int logLevel) final;
@@ -106,17 +109,21 @@ class ClemensBackend : public ClemensCommandQueueListener {
     bool isRunning() const;
 
     void initEmulatedDiskLocalStorage();
-    bool loadDisk(ClemensDriveType driveType, bool allowBlank);
-    bool saveDisk(ClemensDriveType driveType);
 
-    void loadSmartPortDisk(unsigned driveIndex);
+    bool mountDisk(ClemensDriveType driveType, bool blankDisk);
+    bool saveDisk(ClemensDriveType driveType);
+    bool unmountDisk(ClemensDriveType driveType);
+
+    bool mountSmartPortDisk(unsigned driveindex, bool blankDisk);
     bool saveSmartPortDisk(unsigned driveIndex);
+    bool unmountSmartPortDisk(unsigned driveIndex);
+    void ejectAllDisks();
 
     cinek::ByteBuffer loadROM(const char *romPathname);
 
     //  TODO: These methods could be moved into a subclass as they are specific
     //        to machine type
-    void initApple2GS();
+    void initApple2GS(const std::string &romPathname);
     void loadBRAM();
     void saveBRAM();
 
@@ -130,25 +137,31 @@ class ClemensBackend : public ClemensCommandQueueListener {
   private:
     Config config_;
 
+    //  TODO: Move into an actual "AppleIIGS" object to separate the machine
+    //        from the emulator backend.  THis way, we can load a machine
+    //        without trampling on the existing machine state (which we'd want
+    //        in case loading a snapshot fails.)
+    //  {
     //  memory allocated once for the machine
     cinek::FixedStack slabMemory_;
     //  the actual machine object
-    cinek::ByteBuffer romBuffer_;
     cinek::ByteBuffer diskBuffer_;
     ClemensMachine machine_;
     ClemensMMIO mmio_;
     ClemensCard *mockingboard_;
 
-    ClemensInterpreter interpreter_;
-
-    std::vector<ClemensBackendOutputText> logOutput_;
-    std::vector<ClemensBackendBreakpoint> breakpoints_;
-    std::vector<ClemensBackendExecutedInstruction> loggedInstructions_;
     std::array<ClemensWOZDisk, kClemensDrive_Count> diskContainers_;
     std::array<ClemensNibbleDisk, kClemensDrive_Count> disks_;
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives_;
-    std::array<ClemensBackendDiskDriveState, 1> smartPortDrives_;
-    std::array<ClemensSmartPortDisk, 1> smartPortDisks_;
+    std::array<ClemensBackendDiskDriveState, CLEM_SMARTPORT_DRIVE_LIMIT> smartPortDrives_;
+    std::array<ClemensSmartPortDisk, CLEM_SMARTPORT_DRIVE_LIMIT> smartPortDisks_;
+    // }
+
+    //  Actual Emulator Backend State vs machine state
+    ClemensInterpreter interpreter_;
+    std::vector<ClemensBackendOutputText> logOutput_;
+    std::vector<ClemensBackendBreakpoint> breakpoints_;
+    std::vector<ClemensBackendExecutedInstruction> loggedInstructions_;
 
     uint64_t nextTraceSeq_;
     std::unique_ptr<ClemensProgramTrace> programTrace_;

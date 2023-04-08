@@ -92,6 +92,9 @@ struct ClemensSmartPortDevice {
     /** Retrieve a status block from the device */
     uint8_t (*do_format)(struct ClemensSmartPortDevice *context,
                          struct ClemensSmartPortPacket *packet, unsigned delta_ns);
+    /** Retrieve a status block from the device */
+    uint8_t (*do_control)(struct ClemensSmartPortDevice *context,
+                          struct ClemensSmartPortPacket *packet, unsigned delta_ns);
 };
 
 /**

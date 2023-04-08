@@ -95,8 +95,11 @@ void saveSmartPortMetadata(mpack_writer_t *writer, ClemensSmartPortDevice *devic
     saveBackendDiskDriveState(writer, state);
 
     mpack_write_cstr(writer, "disk");
-    disk.serialize(writer, device);
-
+    if (disk.hasImage()) {
+        disk.serialize(writer, device);
+    } else {
+        mpack_write_nil(writer);
+    }
     mpack_complete_map(writer);
 }
 
@@ -108,8 +111,14 @@ bool loadSmartPortMetadata(mpack_reader_t *reader, ClemensSmartPortDevice *devic
     loadBackendDiskDriveState(reader, state);
 
     mpack_expect_cstr_match(reader, "disk");
-    disk.unserialize(reader, device, alloc_cb, context);
-
+    if (mpack_peek_tag(reader).type == mpack_type_nil) {
+        mpack_expect_nil(reader);
+    } else {
+        //  creating the device is important so that all callbacks and bindings
+        //  to the emulator are ready before unserializing the device data.
+        disk.createSmartPortDevice(device);
+        disk.unserialize(reader, device, alloc_cb, context);
+    }
     mpack_done_map(reader);
 
     return true;

@@ -38,6 +38,8 @@
 #define CLEM_AUDIO_CTL_AUTO_ADDRESS 0x20
 #define CLEM_AUDIO_CTL_VOLUME_MASK  0x07
 
+#define CLEM_AUDIO_SAMPLE_AMPLITUDE_SCALAR 0.75f
+
 /* integer only multiply by the ratio of 102300/89489 (1023khz/894.886khz) */
 #define CLEM_ENSONIQ_CLOCKS_PER_CYCLE (CLEM_CLOCKS_PHI0_CYCLE * 1023000U / 894886U)
 
@@ -293,7 +295,7 @@ unsigned clem_ensoniq_voices(struct ClemensDeviceEnsoniq *doc) {
         uint8_t channel = (ctl >> 4);
         uint8_t data = doc->reg[CLEM_ENSONIQ_REG_OSC_DATA + osc_idx];
         bool sync_mode = (ctl & CLEM_ENSONIQ_OSC_CTL_SWAP) == CLEM_ENSONIQ_OSC_CTL_SYNC;
-        float level = (2.0f * data / 255.0f) - 1.0f;
+        float level;
 
         //  HALT indicates an inactive oscillator, or if the oscillator had finished its
         //  waveform (which was mixed in the last frame - so just skip mixing this frame
@@ -325,6 +327,7 @@ unsigned clem_ensoniq_voices(struct ClemensDeviceEnsoniq *doc) {
             }
         }
 
+        level = (2.0f * data / 255.0f) - 1.0f;
         doc->voice[channel] += level * (volume / 255.0f);
     }
 
@@ -538,12 +541,14 @@ void clem_sound_glu_sync(struct ClemensDeviceAudio *glu, struct ClemensClock *cl
                     glu->a2_speaker = false;
                 }
                 // TODO: stereo DOC
-                samples[0] = doc_out[0] + glu->a2_speaker_level * glu->volume / 15.0f;
+                samples[0] = CLEM_AUDIO_SAMPLE_AMPLITUDE_SCALAR *
+                             ((doc_out[0] + glu->a2_speaker_level) * glu->volume / 15.0f);
                 if (samples[0] > 1.0f)
                     samples[0] = 1.0f;
                 else if (samples[0] < -1.0f)
                     samples[0] = -1.0f;
-                samples[1] = doc_out[1] + glu->a2_speaker_level * glu->volume / 15.0f;
+                samples[1] = CLEM_AUDIO_SAMPLE_AMPLITUDE_SCALAR *
+                             ((doc_out[1] + glu->a2_speaker_level) * glu->volume / 15.0f);
                 if (samples[1] > 1.0f)
                     samples[1] = 1.0f;
                 else if (samples[1] < -1.0f)

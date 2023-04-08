@@ -23,6 +23,9 @@ class ClemensCommandQueueListener {
     virtual bool onCommandInsertBlankDisk(ClemensDriveType driveType, std::string diskPath) = 0;
     virtual void onCommandEjectDisk(ClemensDriveType driveType) = 0;
     virtual bool onCommandWriteProtectDisk(ClemensDriveType driveType, bool wp) = 0;
+    virtual bool onCommandInsertSmartPortDisk(unsigned driveIndex, std::string diskPath) = 0;
+    virtual bool onCommandInsertBlankSmartPortDisk(unsigned driveIndex, std::string diskPath) = 0;
+    virtual void onCommandEjectSmartPortDisk(unsigned driveIndex) = 0;
     virtual void onCommandDebugMemoryPage(uint8_t pageIndex) = 0;
     virtual void onCommandDebugMemoryWrite(uint16_t addr, uint8_t value) = 0;
     virtual void onCommandDebugLogLevel(int logLevel) = 0;
@@ -65,14 +68,20 @@ class ClemensCommandQueue {
     void insertBlankDisk(ClemensDriveType driveType, std::string diskPath);
     //  Eject disk
     void ejectDisk(ClemensDriveType driveType);
+    //  Sets the write protect status on a disk in a drive
+    void writeProtectDisk(ClemensDriveType driveType, bool wp);
+    //  Insert SmartPort device
+    void insertSmartPortDisk(unsigned driveIndex, std::string diskPath);
+    //  Insert SmartPort device
+    void insertBlankSmartPortDisk(unsigned driveIndex, std::string diskPath);
+    //  Eject SmartPort device
+    void ejectSmartPortDisk(unsigned driveIndex);
     //  Break
     void breakExecution();
     //  Add a breakpoint
     void addBreakpoint(const ClemensBackendBreakpoint &breakpoint);
     //  Remove a breakpoint
     void removeBreakpoint(unsigned index);
-    //  Sets the write protect status on a disk in a drive
-    void writeProtectDisk(ClemensDriveType driveType, bool wp);
     //  Sets the active debug memory page that can be read from or written to by
     //  the front end (this value is communicated on publish)
     void debugMemoryPage(uint8_t pageIndex);
@@ -96,6 +105,10 @@ class ClemensCommandQueue {
     bool insertDisk(ClemensCommandQueueListener &listener, const std::string_view &inputParam,
                     bool allowBlank);
     void ejectDisk(ClemensCommandQueueListener &listener, const std::string_view &inputParam);
+    bool insertSmartPortDisk(ClemensCommandQueueListener &listener,
+                             const std::string_view &inputParam, bool allowBlank);
+    void ejectSmartPortDisk(ClemensCommandQueueListener &listener,
+                            const std::string_view &inputParam);
     bool writeProtectDisk(ClemensCommandQueueListener &listener,
                           const std::string_view &inputParam);
     void writeMemory(ClemensCommandQueueListener &listener, const std::string_view &inputParam);
