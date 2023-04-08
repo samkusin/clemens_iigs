@@ -15,9 +15,11 @@ const ImVec2 guiDialogSizeLarge(float viewWidth, float viewHeight) {
     return ImVec2(std::max(800.0f, viewWidth * 0.80f), std::max(480.0f, viewHeight * 0.60f));
 }
 
+/*
 const ImVec2 guiDialogSizeSmall(float viewWidth, float viewHeight) {
     return ImVec2(std::max(640.0f, viewWidth * 0.50f), std::max(200.0f, viewHeight * 0.25f));
 }
+*/
 } // namespace
 
 ClemensSmartPortUnitUI::ClemensSmartPortUnitUI(unsigned driveIndex,
@@ -25,7 +27,7 @@ ClemensSmartPortUnitUI::ClemensSmartPortUnitUI(unsigned driveIndex,
     : diskRootPath_(diskLibraryPath), mode_(Mode::None), finishedMode_(Mode::None),
       driveIndex_(driveIndex), generatingDiskList_(false), libraryRootIterator_(diskRootPath_) {}
 
-bool ClemensSmartPortUnitUI::frame(float width, float height, ClemensCommandQueue &backend,
+bool ClemensSmartPortUnitUI::frame(float width, float /* height */, ClemensCommandQueue &backend,
                                    const ClemensBackendDiskDriveState &diskDrive,
                                    const char *driveName, bool showLabel) {
     char tempPath[CLEMENS_PATH_MAX];
@@ -58,9 +60,9 @@ bool ClemensSmartPortUnitUI::frame(float width, float height, ClemensCommandQueu
             backend.ejectSmartPortDisk(driveIndex_);
         }
         if (diskDrive.imagePath.empty()) {
-            if (ImGui::Selectable("<insert blank disk>")) {
-                startFlow(Mode::InsertBlankDisk);
-            }
+            // if (ImGui::Selectable("<insert blank disk>")) {
+            //     startFlow(Mode::InsertBlankDisk);
+            // }
             if (ImGui::Selectable("<...>")) {
                 startFlow(Mode::ImportDisks);
             }
@@ -106,7 +108,7 @@ void ClemensSmartPortUnitUI::discoverNextLocalDiskPath() {
     if (libraryRootIterator_ == std::filesystem::directory_iterator())
         return;
 
-    auto &entry = *(libraryRootIterator_++);
+    auto entry = *(libraryRootIterator_++);
     if (!entry.is_regular_file())
         return;
     std::ifstream dskFile(entry.path(), std::ios_base::in | std::ios_base::binary);
@@ -126,8 +128,8 @@ void ClemensSmartPortUnitUI::discoverNextLocalDiskPath() {
     }
     //  PO images are not validated at this point.  Extension checks are good
     //  enough (the user will be informed of a problem when mounting)
-    if (entry.path().has_extension() && entry.path().extension() == ".po" ||
-        entry.path().extension() == ".PO") {
+    if (entry.path().has_extension() &&
+        (entry.path().extension() == ".po" || entry.path().extension() == ".PO")) {
         localDiskPaths_.emplace_back(entry.path());
         return;
     }
@@ -173,7 +175,7 @@ void ClemensSmartPortUnitUI::doBlankDiskFlow(float width, float height,
     //      message that operation completed or an error occurred
 }
 
-void ClemensSmartPortUnitUI::doExit(float width, float height) {}
+void ClemensSmartPortUnitUI::doExit(float, float) {}
 
 void ClemensSmartPortUnitUI::startFlow(Mode mode) {
     mode_ = mode;
