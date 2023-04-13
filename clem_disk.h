@@ -8,6 +8,13 @@
 #define CLEM_DISK_TYPE_5_25 1
 #define CLEM_DISK_TYPE_3_5  2
 
+#define CLEM_DISK_5_25_BIT_TIMING_NS 4000
+#define CLEM_DISK_3_5_BIT_TIMING_NS  2000
+
+#define CLEM_DISK_525_PRODOS_BLOCK_COUNT       280
+#define CLEM_DISK_35_PRODOS_BLOCK_COUNT        800
+#define CLEM_DISK_35_DOUBLE_PRODOS_BLOCK_COUNT 1600
+
 /* value from woz spec - evaluate if this can be used for blank disks */
 #define CLEM_DISK_DEFAULT_TRACK_BIT_LENGTH_525 51200
 /* value from dsk2woz2 */
@@ -17,6 +24,8 @@
 #define CLEM_DISK_LIMIT_QTR_TRACKS 160
 /*  Always 16 sectors per track on DOS/ProDOS 5.25" disks */
 #define CLEM_DISK_525_NUM_SECTORS_PER_TRACK 16
+/*  Number of tracks on a Disk II (5.25) disk */
+#define CLEM_DISK_LIMIT_525_DISK_TRACKS 35
 
 /*  3.5" drives have variable spin speed to maximize space - and these speeds
     are divided into regions, where outer regions have more sectors vs inner
@@ -82,11 +91,27 @@ extern unsigned g_clem_track_start_per_region_35[CLEM_DISK_35_NUM_REGIONS + 1];
 }
 #endif
 
-/** Note, these values are for nibbilized data that are most useful for WOZ images. */
+/* Note, these values are for nibbilized data that are most useful for WOZ images.
+
+   Gaps are derived from Beneath Apple DOS/ProDOS - evaluate if DOS values
+   should reflect those from Beneath Apple DOS. - anyway these are taken
+   from Ciderpress and ROM 03 ProDOS block formatting disassembly
+
+   5.25" Disks
+    1: (64) somewhere between 12-85
+    2: (6)  somewhere between  5-10
+    3: (24) somewhere between 16-28
+
+   3.5" Disks are documented earlier in this header.
+*/
 #define CLEM_DISK_525_BYTES_PER_TRACK      (13 * 512)
+#define CLEM_DISK_525_BYTES_TRACK_GAP_1    64
+#define CLEM_DISK_525_BYTES_TRACK_GAP_2    6
+#define CLEM_DISK_525_BYTES_TRACK_GAP_3    24
 #define CLEM_DISK_35_BYTES_TRACK_GAP_1     500
 #define CLEM_DISK_35_BYTES_TRACK_GAP_3     53
 #define CLEM_DISK_35_BYTES_PER_SECTOR_BASE 728
+
 #define CLEM_DISK_35_BYTES_PER_SECTOR                                                              \
     (CLEM_DISK_35_BYTES_PER_SECTOR_BASE + CLEM_DISK_35_BYTES_TRACK_GAP_3)
 #define CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(_sectors_)                                            \
@@ -147,6 +172,8 @@ struct ClemensNibbleDisk {
     uint8_t *bits_data;
     uint8_t *bits_data_end;
 };
+
+unsigned clem_disk_calculate_nib_storage_size(unsigned disk_type);
 
 #ifdef __cplusplus
 }

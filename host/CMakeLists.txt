@@ -54,12 +54,17 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.mm")
 endif()
 
+set(DISKLIB_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_disk_browser.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_disk_asset.cpp")
+
 set(PROJECT_SOURCES
     ${PLATFORM_SOURCES}
     ${CINEK_SOURCES}
     ${EXT_SOURCES}
     ${FMT_SOURCES}
     ${SOKOL_SOURCES}
+    ${DISKLIB_SOURCES}
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_assets.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_display.cpp"

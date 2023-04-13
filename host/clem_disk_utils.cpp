@@ -142,7 +142,7 @@ void createEmptyDisk(ClemensDriveType driveType, ClemensNibbleDisk &nib) {
     case kClemensDrive_3_5_D2:
         nib.disk_type = CLEM_DISK_TYPE_3_5;
         nib.is_double_sided = true; // TODO: an option?
-        nib.bit_timing_ns = 2000;
+        nib.bit_timing_ns = CLEM_DISK_3_5_BIT_TIMING_NS;
         nib.track_count = nib.is_double_sided ? 160 : 80;
         for (unsigned i = 0; i < CLEM_DISK_LIMIT_QTR_TRACKS; ++i) {
             if (nib.is_double_sided) {
@@ -184,7 +184,7 @@ void createEmptyDisk(ClemensDriveType driveType, ClemensNibbleDisk &nib) {
     case kClemensDrive_5_25_D1:
     case kClemensDrive_5_25_D2:
         nib.disk_type = CLEM_DISK_TYPE_5_25;
-        nib.bit_timing_ns = 4000;
+        nib.bit_timing_ns = CLEM_DISK_5_25_BIT_TIMING_NS;
         nib.track_count = 35;
         max_track_size_bytes = CLEM_DISK_525_BYTES_PER_TRACK;
         for (unsigned i = 0; i < CLEM_DISK_LIMIT_QTR_TRACKS; ++i) {

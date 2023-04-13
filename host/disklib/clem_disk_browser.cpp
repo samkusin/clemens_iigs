@@ -1,0 +1,328 @@
+#include "clem_disk_browser.hpp"
+#include "imgui.h"
+
+#include <algorithm>
+#include <cassert>
+#include <chrono>
+#include <ctime>
+#include <filesystem>
+#include <fstream>
+#include <future>
+#include <ios>
+#include <system_error>
+
+#include "fmt/format.h"
+
+#include "clem_2img.h"
+#include "clem_disk.h"
+#include "clem_woz.h"
+
+#if defined(_WIN32)
+#include <fileapi.h>
+static unsigned win32GetDriveLettersBitmask() { return ::GetLogicalDrives(); }
+#else
+static unsigned win32GetDriveLettersBitmask() { return 0; }
+static struct tm *getTimeSpecFromTime(struct tm *tspec, std::time_t timet) {
+    return localtime_r(&timet, tspec);
+}
+#endif
+
+//  Working around the ugly fact that C++17 cannot convert std::filesystem::file_time_type
+//  to an actual string representation!  Taken from https://stackoverflow.com/a/58237530
+template <typename TP> std::time_t to_time_t(TP tp) {
+    using namespace std::chrono;
+    auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+        tp - TP::clock::now() + std::chrono::system_clock::now());
+    return std::chrono::system_clock::to_time_t(sctp);
+}
+
+static unsigned readDiskImageHeaderBytes(const std::filesystem::path &path, uint8_t *data,
+                                         unsigned dataSizeLimit) {
+    std::ifstream is(path, std::ios_base::binary);
+    if (!is.is_open())
+        return 0;
+    is.read((char *)data, dataSizeLimit);
+    if (is.fail()) {
+        if (is.eof()) {
+            return is.gcount();
+        } else {
+            return 0;
+        }
+    }
+    return dataSizeLimit;
+}
+
+auto getRecordsFromDirectory(std::string directoryPathname, ClemensDiskAsset::DiskType diskType)
+    -> ClemensDiskBrowser::Records {
+    ClemensDiskBrowser::Records records;
+    uint8_t headerData[128];
+
+    //  cwdName_ identifies the directory to introspect
+    //  flat structure (do not descent into directories)
+    auto directoryPath = std::filesystem::path(directoryPathname);
+    assert(directoryPath.is_absolute());
+
+    //  directories on top
+    for (auto &entry : std::filesystem::directory_iterator(directoryPath)) {
+        ClemensDiskBrowser::Record record;
+        record.fileTime = to_time_t(std::filesystem::last_write_time(entry.path()));
+        if (entry.path().stem().string().front() == '.')
+            continue;
+        if (entry.is_directory()) {
+            record.asset.path = entry.path().string();
+            records.emplace_back(std::move(record));
+            continue;
+        }
+    }
+    for (auto &entry : std::filesystem::directory_iterator(directoryPath)) {
+        if (entry.is_directory())
+            continue;
+        ClemensDiskBrowser::Record record;
+        //  is this a supported disk image?
+        auto extension = entry.path().extension().string();
+        std::transform(extension.begin(), extension.end(), extension.begin(),
+                       [](char c) { return std::tolower(c); });
+        record.size = std::filesystem::file_size(entry.path());
+        if (extension == ".dsk") {
+            record.asset.imageType = ClemensDiskAsset::ImageDSK;
+            if (record.size == 140 * 1024) {
+                record.asset.diskType = ClemensDiskAsset::Disk525;
+            } else if (record.size == 800 * 1024) {
+                record.asset.diskType = ClemensDiskAsset::Disk35;
+            }
+        } else if (extension == ".do") {
+            record.asset.imageType = ClemensDiskAsset::ImageDOS;
+            if (record.size == 140 * 1024) {
+                record.asset.diskType = ClemensDiskAsset::Disk525;
+            }
+        } else if (extension == ".po") {
+            record.asset.imageType = ClemensDiskAsset::ImageProDOS;
+            if (record.size == 140 * 1024) {
+                record.asset.diskType = ClemensDiskAsset::Disk525;
+            } else if (record.size == 800 * 1024) {
+                record.asset.diskType = ClemensDiskAsset::Disk35;
+            } else {
+                record.asset.diskType = ClemensDiskAsset::DiskHDD;
+            }
+        } else if (extension == ".2mg") {
+            record.asset.imageType = ClemensDiskAsset::Image2IMG;
+            auto cnt =
+                readDiskImageHeaderBytes(entry.path(), headerData, CLEM_2IMG_HEADER_BYTE_SIZE);
+            if (cnt >= CLEM_2IMG_HEADER_BYTE_SIZE) {
+                Clemens2IMGDisk disk;
+                if (clem_2img_parse_header(&disk, headerData, headerData + cnt)) {
+                    if (disk.block_count > 0) {
+                        if (disk.block_count == CLEM_DISK_525_PRODOS_BLOCK_COUNT) {
+                            record.asset.diskType = ClemensDiskAsset::Disk525;
+                        } else if (disk.block_count == CLEM_DISK_35_PRODOS_BLOCK_COUNT ||
+                                   disk.block_count == CLEM_DISK_35_DOUBLE_PRODOS_BLOCK_COUNT) {
+                            record.asset.diskType = ClemensDiskAsset::Disk35;
+                        } else {
+                            record.asset.diskType = ClemensDiskAsset::DiskHDD;
+                        }
+                    } else {
+                        //  DOS 140K disk assumed
+                        record.asset.diskType = ClemensDiskAsset::Disk525;
+                    }
+                }
+            }
+        } else if (extension == ".woz") {
+            record.asset.imageType = ClemensDiskAsset::ImageWOZ;
+            auto cnt = readDiskImageHeaderBytes(entry.path(), headerData, sizeof(headerData));
+            const uint8_t *wozCurrent = clem_woz_check_header(headerData, cnt);
+            if (wozCurrent) {
+                const uint8_t *wozEnd = headerData + cnt;
+                ClemensWOZChunkHeader wozChunk;
+                ClemensWOZDisk disk{};
+                wozCurrent =
+                    clem_woz_parse_chunk_header(&wozChunk, wozCurrent, wozEnd - wozCurrent);
+                //  INFO chunk is always first.
+                if (wozChunk.type == CLEM_WOZ_CHUNK_INFO && wozCurrent != nullptr) {
+                    if (clem_woz_parse_info_chunk(&disk, &wozChunk, wozCurrent,
+                                                  wozEnd - wozCurrent) != nullptr) {
+                        if (disk.disk_type == CLEM_WOZ_DISK_5_25 &&
+                            (disk.boot_type != CLEM_WOZ_BOOT_5_25_13)) {
+                            record.asset.diskType = ClemensDiskAsset::Disk525;
+                        } else if (disk.disk_type == CLEM_WOZ_DISK_3_5) {
+                            record.asset.diskType = ClemensDiskAsset::Disk35;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (record.asset.imageType != ClemensDiskAsset::ImageNone &&
+            record.asset.diskType != ClemensDiskAsset::DiskNone &&
+            (record.asset.diskType == diskType || diskType == ClemensDiskAsset::DiskNone)) {
+            record.asset.path = entry.path().string();
+            records.emplace_back(record);
+        }
+    }
+
+    return records;
+}
+
+bool ClemensDiskBrowser::Record::isDirectory() const {
+    return size == 0 && asset.diskType == ClemensDiskAsset::DiskNone &&
+           asset.imageType == ClemensDiskAsset::ImageNone;
+}
+
+bool ClemensDiskBrowser::isOpen() const { return ImGui::IsPopupOpen(idName_.c_str()); }
+
+void ClemensDiskBrowser::open(ClemensDiskAsset::DiskType diskType, const std::string &browsePath) {
+
+    ImGui::OpenPopup(idName_.c_str());
+    diskType_ = diskType;
+    selectedRecord_ = Record();
+    finishedStatus_ = BrowserFinishedStatus::Active;
+    cwdName_ = browsePath;
+}
+
+bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
+    if (!ImGui::IsPopupOpen(idName_.c_str()))
+        return false;
+    ImGui::SetNextWindowSize(maxSize);
+    if (!ImGui::BeginPopupModal(idName_.c_str(), NULL,
+                                ImGuiWindowFlags_Modal | ImGuiWindowFlags_NoScrollbar))
+        return false;
+
+    auto cwdPath = std::filesystem::path(cwdName_).make_preferred();
+    if (!cwdPath.is_absolute()) {
+        cwdPath = std::filesystem::absolute(cwdPath);
+        cwdPath = std::filesystem::canonical(cwdPath);
+    }
+
+    if (!getRecordsResult_.valid()) {
+        getRecordsResult_ =
+            std::async(std::launch::async, &getRecordsFromDirectory, cwdPath, diskType_);
+    }
+    if (getRecordsResult_.valid()) {
+        if (getRecordsResult_.wait_for(std::chrono::milliseconds(1)) == std::future_status::ready) {
+            records_ = getRecordsResult_.get();
+        }
+    }
+
+    //  UI for the directory listing.
+    bool selectionMade = false;
+    bool selectionFound = false;
+
+    //  Current Volume Combo (Win32 Only)
+    //  Current Path Edit Box
+    auto cwdIter = cwdPath.begin();
+    unsigned driveLetterMask = win32GetDriveLettersBitmask();
+    if (driveLetterMask) {
+        //  "C:" combo
+        ++cwdIter;
+    }
+    for (; cwdIter != cwdPath.end(); ++cwdIter) {
+        auto name = (*cwdIter).string();
+        auto nextX = ImGui::GetCursorPosX() + ImGui::GetStyle().FramePadding.x +
+                     ImGui::CalcTextSize(name.c_str()).x;
+        if (nextX >= ImGui::GetContentRegionMax().x) {
+            ImGui::NewLine();
+        }
+        if (ImGui::Button(name.c_str())) {
+            auto it = cwdPath.begin();
+            std::filesystem::path selectedWorkingDirectory;
+            for (auto itEnd = cwdIter; it != itEnd; ++it) {
+                selectedWorkingDirectory /= *it;
+            }
+            selectedWorkingDirectory /= *it;
+            cwdName_ = selectedWorkingDirectory.string();
+        }
+        ImGui::SameLine();
+    }
+    ImGui::NewLine();
+    //  Listbox
+    ImVec2 cursorPos = ImGui::GetCursorPos();
+    // account for bottom separator plus one row of buttons
+    ImVec2 listSize(-FLT_MIN,
+                    6 * (ImGui::GetStyle().FrameBorderSize + ImGui::GetStyle().FramePadding.y) +
+                        ImGui::GetTextLineHeightWithSpacing());
+    listSize.y = ImGui::GetWindowHeight() - listSize.y - cursorPos.y;
+    if (ImGui::BeginTable("##FileList", 4, 0, listSize)) {
+
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
+                                ImGui::CalcTextSize("5.25").x);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
+                                ImGui::CalcTextSize("9999 Kb").x);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
+                                ImGui::CalcTextSize("XXXX-XX-XX XX:XX").x);
+        for (auto const &record : records_) {
+            //      icon (5.25, 3.5, HDD), filename, date
+            auto filename = std::filesystem::path(record.asset.path).filename().string();
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            if (record.asset.diskType == ClemensDiskAsset::Disk35) {
+                ImGui::TextUnformatted("3.5");
+            } else if (record.asset.diskType == ClemensDiskAsset::Disk525) {
+                ImGui::TextUnformatted("5.25");
+            } else if (record.asset.diskType == ClemensDiskAsset::DiskHDD) {
+                ImGui::TextUnformatted("HDD");
+            } else {
+                ImGui::TextUnformatted(" ");
+            }
+            ImGui::TableSetColumnIndex(1);
+            bool isSelected = ImGui::Selectable(
+                filename.c_str(), record.asset.path == selectedRecord_.asset.path,
+                ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_SpanAllColumns |
+                    ImGuiSelectableFlags_DontClosePopups);
+            if (!selectionMade && isSelected) {
+                selectionFound = true;
+                selectedRecord_ = record;
+                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                    selectionMade = true;
+                }
+            }
+            ImGui::TableSetColumnIndex(2);
+            if (!record.isDirectory()) {
+                if (record.size >= 1024 * 1000) {
+                    ImGui::Text("%.1f MB", record.size / (1024 * 1000.0));
+                } else {
+                    ImGui::Text("%zu KB", record.size / 1024);
+                }
+            } else {
+                ImGui::Text(" ");
+            }
+            ImGui::TableSetColumnIndex(3);
+            struct tm tspec;
+            char timeFormatted[64];
+            getTimeSpecFromTime(&tspec, record.fileTime);
+            std::strftime(timeFormatted, sizeof(timeFormatted), "%F %R", &tspec);
+            ImGui::TextUnformatted(timeFormatted);
+        }
+        ImGui::EndTable();
+    }
+    if (!selectionFound) {
+        //  might have been cleared by a directory change, or if the file was deleted
+        selectedRecord_ = Record();
+    }
+
+    ImGui::Spacing();
+    if (ImGui::Button("Select") || selectionMade || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+        if (selectedRecord_.isDirectory()) {
+            cwdName_ = selectedRecord_.asset.path;
+        } else {
+            finishedStatus_ = BrowserFinishedStatus::Selected;
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        finishedStatus_ = BrowserFinishedStatus::Cancelled;
+    }
+
+    if (finishedStatus_ != BrowserFinishedStatus::Active) {
+        ImGui::CloseCurrentPopup();
+    }
+
+    ImGui::EndPopup();
+
+    return finishedStatus_ == BrowserFinishedStatus::Selected ||
+           finishedStatus_ == BrowserFinishedStatus::Cancelled;
+}
+
+void ClemensDiskBrowser::close() {
+    diskType_ = ClemensDiskAsset::DiskNone;
+    finishedStatus_ = BrowserFinishedStatus::None;
+}
