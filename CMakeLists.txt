@@ -16,10 +16,17 @@ add_library(clemens_65816 STATIC
 target_include_directories(clemens_65816
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
+add_library(clemens_65816_disktypes STATIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_2img.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_woz.c")
+
+target_include_directories(clemens_65816_disktypes
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+
 add_library(clemens_65816_mmio STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_adb.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/clem_2img.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_drive.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_drive35.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_iwm.c"
@@ -29,13 +36,12 @@ add_library(clemens_65816_mmio STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_smartport.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_timer.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_vgc.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/clem_woz.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/emulator_mmio.c")
 
 target_include_directories(clemens_65816_mmio
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
-target_link_libraries(clemens_65816_mmio PUBLIC clemens_65816)
+target_link_libraries(clemens_65816_mmio PUBLIC clemens_65816 clemens_65816_disktypes)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(clemens_65816_mmio PUBLIC m)

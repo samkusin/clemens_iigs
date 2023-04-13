@@ -220,7 +220,7 @@ const uint8_t *clem_woz_parse_info_chunk(struct ClemensWOZDisk *disk,
             disk->nib->is_write_protected = true;
         }
     }
-    _clem_woz_read_bytes(&woz_iter, (uint8_t*)disk->creator, sizeof(disk->creator));
+    _clem_woz_read_bytes(&woz_iter, (uint8_t *)disk->creator, sizeof(disk->creator));
     if (disk->version > 1) {
         if (_clem_woz_read_u8(&woz_iter) == 2) {
             disk->flags |= CLEM_WOZ_IMAGE_DOUBLE_SIDED;
@@ -243,6 +243,10 @@ const uint8_t *clem_woz_parse_info_chunk(struct ClemensWOZDisk *disk,
         disk->flags |= _clem_woz_read_u16(&woz_iter);
         disk->required_ram_kb = _clem_woz_read_u16(&woz_iter);
         disk->max_track_size_bytes = _clem_woz_read_u16(&woz_iter) * 512;
+        if (disk->version > 2) {
+            disk->flux_block = _clem_woz_read_u16(&woz_iter);
+            disk->largest_flux_track = _clem_woz_read_u16(&woz_iter);
+        }
     } else {
         if (disk->disk_type == CLEM_WOZ_DISK_5_25) {
             if (disk->nib)
@@ -257,6 +261,8 @@ const uint8_t *clem_woz_parse_info_chunk(struct ClemensWOZDisk *disk,
             disk->max_track_size_bytes = 19 * 512;
         }
         disk->boot_type = CLEM_WOZ_BOOT_UNDEFINED;
+        disk->flux_block = 0;
+        disk->largest_flux_track = 0;
     }
 
     if (disk->disk_type == CLEM_WOZ_DISK_5_25) {
@@ -375,11 +381,9 @@ const uint8_t *clem_woz_parse_trks_chunk(struct ClemensWOZDisk *disk,
     return woz_iter.end;
 }
 
-// uint8_t* clem_woz_parse_writ_chunk(uint8_t* data, size_t data_sz);
-
-const uint8_t *clem_woz_parse_meta_chunk(struct ClemensWOZDisk *disk,
-                                         const struct ClemensWOZChunkHeader *header,
-                                         const uint8_t *data, size_t data_sz) {
+const uint8_t *clem_woz_parse_optional_chunk(struct ClemensWOZDisk *disk,
+                                             const struct ClemensWOZChunkHeader *header,
+                                             const uint8_t *data, size_t data_sz) {
     struct _ClemBufferIterator woz_iter;
     unsigned param;
 
@@ -390,6 +394,55 @@ const uint8_t *clem_woz_parse_meta_chunk(struct ClemensWOZDisk *disk,
     woz_iter.end = data + header->data_size;
 
     return woz_iter.end;
+}
+
+const uint8_t *clem_woz_unserialize(struct ClemensWOZDisk *disk, const uint8_t *inp,
+                                    size_t inp_size, unsigned max_version, int *errc) {
+    const uint8_t *bits_data_current = clem_woz_check_header(inp, inp_size);
+    const uint8_t *bits_data_end;
+    const uint8_t *bits_mandatory_end;
+    struct ClemensWOZChunkHeader chunkHeader;
+
+    *errc = 0;
+
+    if (!bits_data_current) {
+        return NULL;
+    }
+    bits_mandatory_end = NULL;
+    bits_data_end = inp + inp_size;
+
+    while ((bits_data_current = clem_woz_parse_chunk_header(
+                &chunkHeader, bits_data_current, bits_data_end - bits_data_current)) != NULL) {
+        switch (chunkHeader.type) {
+        case CLEM_WOZ_CHUNK_INFO:
+            bits_data_current = clem_woz_parse_info_chunk(disk, &chunkHeader, bits_data_current,
+                                                          chunkHeader.data_size);
+            if (disk->version > max_version) {
+                *errc = CLEM_WOZ_UNSUPPORTED_VERSION;
+            }
+            break;
+        case CLEM_WOZ_CHUNK_TMAP:
+            bits_data_current = clem_woz_parse_tmap_chunk(disk, &chunkHeader, bits_data_current,
+                                                          chunkHeader.data_size);
+            break;
+        case CLEM_WOZ_CHUNK_TRKS:
+            bits_data_current = clem_woz_parse_trks_chunk(disk, &chunkHeader, bits_data_current,
+                                                          chunkHeader.data_size);
+            /* TRKS is the last chunk we care about for now - the host application
+               can use this point as a marker for mandatory vs optional data */
+            bits_mandatory_end = bits_data_current;
+        default:
+            /* Parse out optional chunks for now */
+            bits_data_current = clem_woz_parse_optional_chunk(disk, &chunkHeader, bits_data_current,
+                                                              chunkHeader.data_size);
+            break;
+        }
+        if (bits_data_current == NULL)
+            *errc = CLEM_WOZ_INVALID_DATA;
+        if (*errc)
+            break;
+    }
+    return bits_mandatory_end;
 }
 
 static uint8_t kWOZ2[4] = {0x57, 0x4F, 0x5A, 0x32};
@@ -473,7 +526,7 @@ _clem_woz_write_chunk_finish(struct _ClemBufferWriteIterator *iter,
     return sz;
 }
 
-const uint8_t *clem_woz_serialize(struct ClemensWOZDisk *disk, uint8_t *out, size_t *out_size) {
+uint8_t *clem_woz_serialize(struct ClemensWOZDisk *disk, uint8_t *out, size_t *out_size) {
     size_t out_limit = *out_size;
     unsigned block_cnt, write_cnt, i;
     uint16_t track_idx, block_idx;
@@ -493,24 +546,27 @@ const uint8_t *clem_woz_serialize(struct ClemensWOZDisk *disk, uint8_t *out, siz
     /* skip crc32 until we can calculate it */
     _clem_woz_write_iter_inc(&iter, 4);
 
-    /* INFO */
+    /* INFO min version 2, otherwise maintain 2.1 or later */
     _clem_woz_write_chunk_start(&iter, &iter_chunk_start, kChunkINFO);
-    _clem_woz_write_u8(&iter, 3); /* version 3 (2.1) */
+    _clem_woz_write_u8(&iter, disk->version < 2 ? 2 : disk->version);
     _clem_woz_write_u8(&iter, (uint8_t)(disk->disk_type));
     _clem_woz_write_u8(&iter, (disk->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) ? 1 : 0);
     _clem_woz_write_u8(&iter, (disk->flags & CLEM_WOZ_IMAGE_SYNCHRONIZED) ? 1 : 0);
     _clem_woz_write_u8(&iter, (disk->flags & CLEM_WOZ_IMAGE_CLEANED) ? 1 : 0);
-    _clem_woz_write_bytes(&iter, (uint8_t*)disk->creator, sizeof(disk->creator));
+    _clem_woz_write_bytes(&iter, (uint8_t *)disk->creator, sizeof(disk->creator));
     _clem_woz_write_u8(&iter, (disk->flags & CLEM_WOZ_IMAGE_DOUBLE_SIDED) ? 2 : 1);
     _clem_woz_write_u8(&iter, (uint8_t)(disk->boot_type));
     _clem_woz_write_u8(&iter, (uint8_t)(disk->nib->bit_timing_ns / 125));
     _clem_woz_write_u16(&iter, (uint16_t)(disk->flags & 0xffff));
     _clem_woz_write_u16(&iter, (uint16_t)(disk->required_ram_kb));
     _clem_woz_write_u16(&iter, (uint16_t)((disk->max_track_size_bytes + 511) / 512));
-    /* TODO: No FLUX for now... */
-    _clem_woz_write_u16(&iter, 0);
-    _clem_woz_write_u16(&iter, 0);
-    _clem_woz_write_zero(&iter, 10); /* should be 10 bytes as of 2.1 */
+    if (disk->version > 2) {
+        _clem_woz_write_u16(&iter, disk->flux_block);
+        _clem_woz_write_u16(&iter, disk->largest_flux_track);
+        _clem_woz_write_zero(&iter, 10); /* should be 10 bytes as of 2.1 */
+    } else {
+        _clem_woz_write_zero(&iter, 14); /* should be 14 bytes as of 2.0 */
+    }
     if (_clem_woz_write_chunk_finish(&iter, &iter_chunk_start) != 60) {
         *out_size = iter.cur - out;
         return NULL;
@@ -560,10 +616,9 @@ const uint8_t *clem_woz_serialize(struct ClemensWOZDisk *disk, uint8_t *out, siz
     }
     _clem_woz_write_chunk_finish(&iter, &iter_chunk_start);
 
-    /* TODO: META */
-
-    /* TODO: WRIT and FLUX when available */
-
+    /* Up to this point is the minimal WOZ compliant file.  Other data can be
+       serialized after this point (META/WRIT/FLUX) all TODOs
+    */
     *out_size = iter.cur - out;
     return iter.cur;
 }
