@@ -38,9 +38,9 @@ struct ClemensWOZDisk *parseWOZ(struct ClemensWOZDisk *woz, cinek::ConstRange<ui
         case CLEM_WOZ_CHUNK_WRIT:
             break;
         case CLEM_WOZ_CHUNK_META:
-            bits_data_current = clem_woz_parse_meta_chunk(woz, &chunkHeader, bits_data_current,
-                                                          chunkHeader.data_size);
-            // skip for now
+            // bits_data_current = clem_woz_parse_meta_chunk(woz, &chunkHeader, bits_data_current,
+            //                                               chunkHeader.data_size);
+            //  skip for now
             break;
         default:
             break;

@@ -200,6 +200,7 @@ std::pair<size_t, bool> ClemensDiskAsset::encode(uint8_t *out, uint8_t *outEnd,
         break;
     case Image2IMG:
         if (std::holds_alternative<Clemens2IMGDisk>(metadata_)) {
+            bool corrupted = false;
             auto disk = std::get<Clemens2IMGDisk>(metadata_);
             //  write encoded data first
             disk.creator_data = (const char *)data_.data() + (size_t)disk.creator_data;
@@ -209,8 +210,8 @@ std::pair<size_t, bool> ClemensDiskAsset::encode(uint8_t *out, uint8_t *outEnd,
             //  the encodedBuffer here is guaranteed to be larger than what's actually needed
             std::vector<uint8_t> encodedBuffer(nib.bits_data_end - nib.bits_data);
             if (clem_2img_encode_nibblized_disk(&disk, encodedBuffer.data(),
-                                                encodedBuffer.data() + encodedBuffer.size(),
-                                                &nib)) {
+                                                encodedBuffer.data() + encodedBuffer.size(), &nib,
+                                                &corrupted)) {
                 clem_2img_build_image(&disk, out, outEnd);
             } else {
                 out = nullptr;

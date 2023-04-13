@@ -3,14 +3,14 @@
 #include "external/mpack.h"
 
 #include <cassert>
+#include <cstring>
 
 std::vector<uint8_t> ClemensSmartPortDisk::createData(unsigned block_count) {
     std::vector<uint8_t> data(block_count * 512 + CLEM_2IMG_HEADER_BYTE_SIZE);
     Clemens2IMGDisk disk;
     if (clem_2img_generate_header(&disk, CLEM_2IMG_FORMAT_PRODOS, data.data(),
                                   data.data() + data.size(), CLEM_2IMG_HEADER_BYTE_SIZE)) {
-        if (clem_2img_build_image(&disk, disk.image_buffer,
-                                  disk.image_buffer + disk.image_buffer_length)) {
+        if (clem_2img_build_image(&disk, data.data(), data.data() + disk.image_buffer_length)) {
             return data;
         }
         data.clear();
@@ -69,7 +69,7 @@ void ClemensSmartPortDisk::write(unsigned block_index, const uint8_t *data) {
     if (disk_.format != CLEM_2IMG_FORMAT_PRODOS)
         return;
 
-    memcpy(disk_.data + block_index * 512, data, 512);
+    memcpy((uint8_t *)disk_.data + block_index * 512, data, 512);
 }
 
 void ClemensSmartPortDisk::read(unsigned block_index, uint8_t *data) {
@@ -94,7 +94,7 @@ uint8_t ClemensSmartPortDisk::doReadBlock(void *userContext, unsigned /*driveInd
 uint8_t ClemensSmartPortDisk::doWriteBlock(void *userContext, unsigned /*driveIndex*/,
                                            unsigned blockIndex, const uint8_t *buffer) {
     auto *self = reinterpret_cast<ClemensSmartPortDisk *>(userContext);
-    uint8_t *data_head = self->disk_.data;
+    uint8_t *data_head = (uint8_t *)self->disk_.data;
     if (blockIndex >= self->disk_.block_count)
         return CLEM_SMARTPORT_STATUS_CODE_INVALID_BLOCK;
     memcpy(data_head + blockIndex * 512, buffer, 512);
