@@ -59,13 +59,6 @@ struct Clemens2IMGDisk {
     struct ClemensNibbleDisk *nib;
 };
 
-struct ClemensNibEncoder {
-    uint8_t *begin;
-    uint8_t *end;
-    unsigned bit_index;
-    unsigned bit_index_end;
-};
-
 /**
  * @brief Obtains information from a 2IMG disk image used for processing
  *
@@ -142,7 +135,7 @@ bool clem_2img_nibblize_data(struct Clemens2IMGDisk *disk);
  * @param corrupted
  * @return unsigned Amount of bytes encoded or 0 on error
  */
-unsigned clem_2img_encode_nibblized_disk(struct Clemens2IMGDisk *disk, uint8_t *data_start,
+unsigned clem_2img_decode_nibblized_disk(struct Clemens2IMGDisk *disk, uint8_t *data_start,
                                          uint8_t *data_end, const struct ClemensNibbleDisk *nib,
                                          bool *corrupted);
 

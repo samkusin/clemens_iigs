@@ -454,12 +454,12 @@ static void _clem_iwm_write_step(struct ClemensDeviceIWM *iwm) {
     }
 }
 
-#define CLEM_IWM_READ_REG_STATE_MASK  0xffff0000
 #define CLEM_IWM_READ_REG_STATE_LATCH 0x0000ffff
-#define CLEM_IWM_READ_REG_STATE_START 0x00000000
-#define CLEM_IWM_READ_REG_STATE_QA0   0x00010000
-#define CLEM_IWM_READ_REG_STATE_QA1   0x00020000
-#define CLEM_IWM_READ_REG_STATE_QA1_1 0x00030000
+#define CLEM_IWM_READ_REG_STATE_MASK  CLEM_DISK_READ_STATE_MASK
+#define CLEM_IWM_READ_REG_STATE_START CLEM_DISK_READ_STATE_START
+#define CLEM_IWM_READ_REG_STATE_QA0   CLEM_DISK_READ_STATE_QA0
+#define CLEM_IWM_READ_REG_STATE_QA1   CLEM_DISK_READ_STATE_QA1
+#define CLEM_IWM_READ_REG_STATE_QA1_1 CLEM_DISK_READ_STATE_QA1_1
 
 static bool _clem_iwm_read_step(struct ClemensDeviceIWM *iwm) {
     //  This procedure covers a whole bit cell cycle
@@ -488,6 +488,7 @@ static bool _clem_iwm_read_step(struct ClemensDeviceIWM *iwm) {
         iwm->data_r = iwm->latch;
         read_latch_hold = 0; // no read latching when reading status
     }
+    //  TODO: see if we can leverage clem_disk_read_latch
     switch (iwm->read_state & CLEM_IWM_READ_REG_STATE_MASK) {
     case CLEM_IWM_READ_REG_STATE_START:
         if (iwm->io_flags & CLEM_IWM_FLAG_READ_DATA) {

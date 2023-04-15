@@ -40,17 +40,6 @@ struct Clemens2IMGDisk {
         consistent between DOS and ProDOS images.
     Note for 3.5" drives, the 'sector' size is 512 bytes
 */
-// clang-format off
-static const uint8_t gcr_6_2_byte[64] = {
-    0x96, 0x97, 0x9a, 0x9b, 0x9d, 0x9e, 0x9f, 0xa6,
-    0xa7, 0xab, 0xac, 0xad, 0xae, 0xaf, 0xb2, 0xb3,
-    0xb4, 0xb5, 0xb6, 0xb7, 0xb9, 0xba, 0xbb, 0xbc,
-    0xbd, 0xbe, 0xbf, 0xcb, 0xcd, 0xce, 0xcf, 0xd3,
-    0xd6, 0xd7, 0xd9, 0xda, 0xdb, 0xdc, 0xdd, 0xde,
-    0xdf, 0xe5, 0xe6, 0xe7, 0xe9, 0xea, 0xeb, 0xec,
-    0xed, 0xee, 0xef, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6,
-    0xf7, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff};
-// clang-format on
 
 static const unsigned prodos_to_logical_sector_map_525[1][16] = {
     {0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15}};
@@ -400,224 +389,6 @@ bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, co
     return true;
 }
 
-static void _clem_nib_init_encoder(struct ClemensNibEncoder *encoder, struct ClemensNibbleDisk *nib,
-                                   unsigned offset, unsigned size) {
-
-    encoder->begin = nib->bits_data + offset;
-    encoder->end = nib->bits_data + offset + size;
-    encoder->bit_index = 0;
-    encoder->bit_index_end = size * 8;
-}
-
-static bool _clem_nib_begin_track_encoder(struct ClemensNibEncoder *encoder,
-                                          struct ClemensNibbleDisk *nib, unsigned nib_track_index,
-                                          unsigned bits_data_offset, unsigned bits_data_size) {
-
-    if (nib->bits_data + bits_data_offset + bits_data_size > nib->bits_data_end) {
-        //  Out of space to write - this shouldn't happen.
-        assert(false);
-        return false;
-    }
-
-    encoder->begin = nib->bits_data + bits_data_offset;
-    encoder->end = encoder->begin + bits_data_size;
-    encoder->bit_index = 0;
-    encoder->bit_index_end = bits_data_size * 8;
-    nib->track_byte_offset[nib_track_index] = bits_data_offset;
-    nib->track_byte_count[nib_track_index] = bits_data_size;
-}
-
-static void _clem_nib_end_track_encoder(struct ClemensNibEncoder *encoder,
-                                        struct ClemensNibbleDisk *nib, unsigned nib_track_index) {
-    //  TODO: use actual bits/bytes encoded vs the fixed amount per track
-    //        (use encoder->bit_index at end of track)
-    nib->track_bits_count[nib_track_index] = encoder->bit_index_end;
-    nib->track_initialized[nib_track_index] = 1;
-}
-
-static void _clem_nib_write_bytes(struct ClemensNibEncoder *encoder, unsigned cnt, unsigned bit_cnt,
-                                  uint8_t value) {
-    uint8_t *nib_cur = encoder->begin + (encoder->bit_index / 8);
-    unsigned bit_count = bit_cnt * cnt;
-    unsigned nib_bit_index_end = encoder->bit_index + bit_count;
-    unsigned bit_cnt_minus_1 = bit_cnt - 1;
-    unsigned out_shift = 7 - (encoder->bit_index % 8);
-    unsigned in_shift = 0;
-
-    nib_bit_index_end %= encoder->bit_index_end;
-
-    while (encoder->bit_index != nib_bit_index_end) {
-        if (value & (1 << (bit_cnt_minus_1 - in_shift))) {
-            nib_cur[0] |= (1 << out_shift);
-        } else {
-            nib_cur[0] &= ~(1 << out_shift);
-        }
-        encoder->bit_index = (encoder->bit_index + 1) % encoder->bit_index_end;
-        in_shift = (in_shift + 1) % bit_cnt;
-        out_shift = 7 - (encoder->bit_index % 8);
-        nib_cur = encoder->begin + (encoder->bit_index / 8);
-    }
-}
-
-static void _clem_nib_encode_self_sync_ff(struct ClemensNibEncoder *encoder, unsigned cnt) {
-    _clem_nib_write_bytes(encoder, cnt, 10, 0xff);
-}
-
-static void _clem_nib_write_one(struct ClemensNibEncoder *encoder, uint8_t value) {
-    _clem_nib_write_bytes(encoder, 1, 8, value);
-}
-
-static void _clem_nib_encode_one_6_2(struct ClemensNibEncoder *encoder, uint8_t value) {
-    _clem_nib_write_one(encoder, gcr_6_2_byte[value & 0x3f]);
-}
-
-static void _clem_nib_encode_one_4_4(struct ClemensNibEncoder *encoder, uint8_t value) {
-    /* all unused bits are set to '1', so 4x4 encoding to preserve odd bits
-       requires shifting the bits to the right  */
-    _clem_nib_write_one(encoder, (value >> 1) | 0xaa);
-    /* even bits */
-    _clem_nib_write_one(encoder, value | 0xaa);
-}
-
-static void _clem_nib_encode_prologue(struct ClemensNibEncoder *encoder) {
-    _clem_nib_write_one(encoder, 0xd5);
-    _clem_nib_write_one(encoder, 0xaa);
-    _clem_nib_write_one(encoder, 0x96);
-}
-
-static void _clem_nib_encode_data_35(struct ClemensNibEncoder *encoder, const uint8_t *buf,
-                                     unsigned cnt) {
-    /* decoded bytes are encoded to GCR 6-2 8-bit bytes*/
-    uint8_t scratch0[175], scratch1[175], scratch2[175];
-    uint8_t data[524];
-    unsigned chksum[3];
-    unsigned data_idx = 0, scratch_idx = 0;
-    uint8_t v;
-
-    assert(cnt == 512);
-    /* IIgs - 12 byte tag header is blank, but....
-       TODO: what if it isn't??  */
-    data_idx = 12;
-    memset(data, 0, 12);
-    memcpy(data + data_idx, buf, 512);
-
-    data_idx = 0;
-
-    /* split incoming decoded nibble data into parts for encoding into the
-       final encoded buffer
-
-       shamelessly translated from Ciderpress Nibble35.cpp as the encoding
-       scheme is quite involved - you stand on the shoulders of giants.
-    */
-    chksum[0] = chksum[1] = chksum[2] = 0;
-    while (data_idx < 524) {
-        chksum[0] = (chksum[0] & 0xff) << 1;
-        if (chksum[0] & 0x100) {
-            ++chksum[0];
-        }
-        v = data[data_idx++];
-        chksum[2] += v;
-        if (chksum[0] > 0xff) {
-            ++chksum[2];
-            chksum[0] &= 0xff;
-        }
-        scratch0[scratch_idx] = (v ^ chksum[0]) & 0xff;
-        v = data[data_idx++];
-        chksum[1] += v;
-        if (chksum[2] > 0xff) {
-            ++chksum[1];
-            chksum[2] &= 0xff;
-        }
-        scratch1[scratch_idx] = (v ^ chksum[2]) & 0xff;
-
-        if (data_idx < 524) {
-            v = data[data_idx++];
-            chksum[0] += v;
-            if (chksum[1] > 0xff) {
-                ++chksum[0];
-                chksum[1] &= 0xff;
-            }
-            scratch2[scratch_idx] = (v ^ chksum[1]) & 0xff;
-            ++scratch_idx;
-        }
-    }
-    scratch2[scratch_idx++] = 0;
-
-    for (data_idx = 0; data_idx < scratch_idx; ++data_idx) {
-        v = (scratch0[data_idx] & 0xc0) >> 2;
-        v |= (scratch1[data_idx] & 0xc0) >> 4;
-        v |= (scratch2[data_idx] & 0xc0) >> 6;
-        _clem_nib_encode_one_6_2(encoder, v);
-        _clem_nib_encode_one_6_2(encoder, scratch0[data_idx]);
-        _clem_nib_encode_one_6_2(encoder, scratch1[data_idx]);
-        if (data_idx < scratch_idx - 1) {
-            _clem_nib_encode_one_6_2(encoder, scratch2[data_idx]);
-        }
-    }
-
-    /* checksum */
-    v = (chksum[0] & 0xc0) >> 6;
-    v |= (chksum[1] & 0xc0) >> 4;
-    v |= (chksum[2] & 0xc0) >> 2;
-    _clem_nib_encode_one_6_2(encoder, v);
-    _clem_nib_encode_one_6_2(encoder, chksum[2]);
-    _clem_nib_encode_one_6_2(encoder, chksum[1]);
-    _clem_nib_encode_one_6_2(encoder, chksum[0]);
-}
-
-#define CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE 86
-
-static void _clem_nib_encode_data_525(struct ClemensNibEncoder *encoder, const uint8_t *buf,
-                                      unsigned cnt) {
-    /* cannot support anything by cnt = 256 bytes,  with 86 bytes to
-       contain the 2 bits nibble = 324 bytes, which is the specified data chunk
-       size of the sector on disk */
-    uint8_t enc6[256];
-    uint8_t enc2[86];
-    uint8_t right;
-    uint8_t chksum = 0;
-
-    unsigned i6, i2;
-    i6 = 0;
-    for (i2 = CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE; i2 > 0;) { /* 256 */
-        --i2;
-        enc6[i6] = buf[i6] >> 2;    /* 6 bits */
-        right = (buf[i6] & 1) << 1; /* lower 2 bits flipped */
-        right |= (buf[i6] & 2) >> 1;
-        enc2[i2] = right;
-        ++i6;
-    }
-    for (i2 = CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE; i2 > 0;) { /* 170 */
-        --i2;
-        enc6[i6] = buf[i6] >> 2;    /* 6 bits */
-        right = (buf[i6] & 1) << 1; /* lower 2 bits flipped */
-        right |= (buf[i6] & 2) >> 1;
-        enc2[i2] |= (right << 2);
-        ++i6;
-    }
-    for (i2 = CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE; i2 > 2;) { /* 84 */
-        --i2;
-        enc6[i6] = buf[i6] >> 2;    /* 6 bits */
-        right = (buf[i6] & 1) << 1; /* lower 2 bits flipped */
-        right |= (buf[i6] & 2) >> 1;
-        enc2[i2] |= (right << 4);
-        ++i6;
-    }
-    assert(i6 == 256);
-
-    for (i2 = CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE; i2 > 0;) {
-        --i2;
-        _clem_nib_encode_one_6_2(encoder, enc2[i2] ^ chksum);
-        chksum = enc2[i2];
-    }
-    for (i6 = 0; i6 < 256; ++i6) {
-        _clem_nib_encode_one_6_2(encoder, enc6[i6] ^ chksum);
-        chksum = enc6[i6];
-    }
-
-    _clem_nib_encode_one_6_2(encoder, chksum);
-}
-
 /* Much of this implementation derives from the formatting section detailed in
    Beneath Apple DOS and Beneath Apple ProDOS, Chapter 3
 
@@ -715,58 +486,13 @@ static bool _clem_2img_nibblize_data_35(struct Clemens2IMGDisk *disk) {
 
         struct ClemensNibEncoder nib_encoder;
 
-        if (!_clem_nib_begin_track_encoder(&nib_encoder, disk->nib, nib_track_index,
-                                           track_byte_offset, track_bytes_count))
+        if (!clem_nib_begin_track_encoder(&nib_encoder, disk->nib, nib_track_index,
+                                          track_byte_offset, track_bytes_count))
             return false;
-
-        _clem_nib_write_one(&nib_encoder, 0xff);
-        _clem_nib_encode_self_sync_ff(&nib_encoder, (CLEM_DISK_35_BYTES_TRACK_GAP_1 * 8) / 10);
-
-        //  populate track with sectors in OS order,
-        //  3.5" disk sector data is by definition 512 bytes
-
-        for (sector = 0; sector < track_sector_count; sector++) {
-            unsigned logical_sector = to_logical_sector_map[disk_region][sector];
-            const uint8_t *source_data = disk->data + (logical_sector_index + logical_sector) * 512;
-            _clem_nib_write_one(&nib_encoder, 0xff);
-            //  ADDRESS (prologue, header, epilogue) note the combined address
-            //  segment differs from the 5.25" version
-            //  track, sector, side, format (0x12 or 0x22 or 0x14 or 0x24)
-            //      format = sides | interleave where interleave should always be 2
-            //
-            _clem_nib_write_one(&nib_encoder, 0xd5);
-            _clem_nib_write_one(&nib_encoder, 0xaa);
-            _clem_nib_write_one(&nib_encoder, 0x96);
-            _clem_nib_encode_one_6_2(&nib_encoder, (uint8_t)(logical_track_index & 0xff));
-            _clem_nib_encode_one_6_2(&nib_encoder, (uint8_t)(logical_sector & 0xff));
-            _clem_nib_encode_one_6_2(&nib_encoder, (uint8_t)(side_index_and_track_64 & 0xff));
-            _clem_nib_encode_one_6_2(&nib_encoder, sector_format);
-            temp = (logical_track_index ^ logical_sector ^ side_index_and_track_64 ^ 0x24);
-            _clem_nib_encode_one_6_2(&nib_encoder, (uint8_t)(temp));
-            _clem_nib_write_one(&nib_encoder, 0xde);
-            _clem_nib_write_one(&nib_encoder, 0xaa);
-            _clem_nib_write_one(&nib_encoder, 0xff);
-            //  SELF-SYNC
-            _clem_nib_encode_self_sync_ff(&nib_encoder, 4);
-            _clem_nib_write_one(&nib_encoder, 0xff);
-            //  DATA
-            _clem_nib_write_one(&nib_encoder, 0xd5);
-            _clem_nib_write_one(&nib_encoder, 0xaa);
-            _clem_nib_write_one(&nib_encoder, 0xad);
-            _clem_nib_encode_one_6_2(&nib_encoder, (uint8_t)logical_sector);
-            _clem_nib_encode_data_35(&nib_encoder, source_data, 512);
-            _clem_nib_write_one(&nib_encoder, 0xde);
-            _clem_nib_write_one(&nib_encoder, 0xaa);
-            if (sector + 1 < track_sector_count) {
-                //  all but the last sector of this track
-                _clem_nib_write_one(&nib_encoder, 0xff);
-                _clem_nib_write_one(&nib_encoder, 0xff);
-                _clem_nib_write_one(&nib_encoder, 0xff);
-                _clem_nib_encode_self_sync_ff(&nib_encoder,
-                                              (CLEM_DISK_35_BYTES_TRACK_GAP_3 * 8) / 10);
-            }
-        }
-        _clem_nib_end_track_encoder(&nib_encoder, disk->nib, nib_track_index);
+        clem_disk_nib_encode_track_35(&nib_encoder, logical_track_index, logical_side_index,
+                                      sector_format, logical_sector_index, track_sector_count,
+                                      to_logical_sector_map[disk_region], disk->data);
+        clem_nib_end_track_encoder(&nib_encoder, disk->nib, nib_track_index);
 
         disk->nib->meta_track_map[qtr_track_index] = nib_track_index;
         if (qtr_tracks_per_track == 2) {
@@ -811,44 +537,15 @@ static bool _clem_2img_nibblize_data_525(struct Clemens2IMGDisk *disk) {
         unsigned sector;
 
         struct ClemensNibEncoder nib_encoder;
-        if (!_clem_nib_begin_track_encoder(&nib_encoder, disk->nib, track_index, track_byte_offset,
-                                           CLEM_DISK_525_BYTES_PER_TRACK))
+        if (!clem_nib_begin_track_encoder(&nib_encoder, disk->nib, track_index, track_byte_offset,
+                                          CLEM_DISK_525_BYTES_PER_TRACK))
             return false;
 
-        _clem_nib_encode_self_sync_ff(&nib_encoder, CLEM_DISK_525_BYTES_TRACK_GAP_1);
+        clem_disk_nib_encode_track_525(&nib_encoder, disk->dos_volume, track_index,
+                                       logical_sector_index, CLEM_DISK_525_NUM_SECTORS_PER_TRACK,
+                                       to_logical_sector_map[0], disk->data);
 
-        for (sector = 0; sector < CLEM_DISK_525_NUM_SECTORS_PER_TRACK; sector++) {
-            unsigned logical_sector = to_logical_sector_map[0][sector];
-            const uint8_t *source_data = disk->data + (logical_sector_index + logical_sector) * 256;
-            // Sector Address Prologue + Body + Epilogue
-            //  - The sector written here is the physical sector vs logical?  Ciderpress
-            //    AppleWin, etc seem to imply this.  This differs from the 3.5" address
-            _clem_nib_write_one(&nib_encoder, 0xd5);
-            _clem_nib_write_one(&nib_encoder, 0xaa);
-            _clem_nib_write_one(&nib_encoder, 0x96);
-            _clem_nib_encode_one_4_4(&nib_encoder, (uint8_t)(disk->dos_volume & 0xff));
-            _clem_nib_encode_one_4_4(&nib_encoder, track_index);
-            _clem_nib_encode_one_4_4(&nib_encoder, sector);
-            _clem_nib_encode_one_4_4(&nib_encoder,
-                                     (uint8_t)(disk->dos_volume ^ track_index ^ sector));
-            _clem_nib_write_one(&nib_encoder, 0xde);
-            _clem_nib_write_one(&nib_encoder, 0xaa);
-            _clem_nib_write_one(&nib_encoder, 0xeb);
-            // GAP 2
-            _clem_nib_encode_self_sync_ff(&nib_encoder, CLEM_DISK_525_BYTES_TRACK_GAP_2);
-            // Sector Data Prologue + Body + Epilogue
-            _clem_nib_write_one(&nib_encoder, 0xd5);
-            _clem_nib_write_one(&nib_encoder, 0xaa);
-            _clem_nib_write_one(&nib_encoder, 0xad);
-            _clem_nib_encode_data_525(&nib_encoder, source_data, 256);
-            _clem_nib_write_one(&nib_encoder, 0xde);
-            _clem_nib_write_one(&nib_encoder, 0xaa);
-            _clem_nib_write_one(&nib_encoder, 0xeb);
-            if (sector + 1 < CLEM_DISK_525_NUM_SECTORS_PER_TRACK) {
-                _clem_nib_encode_self_sync_ff(&nib_encoder, CLEM_DISK_525_BYTES_TRACK_GAP_3);
-            }
-        }
-        _clem_nib_end_track_encoder(&nib_encoder, disk->nib, track_index);
+        clem_nib_end_track_encoder(&nib_encoder, disk->nib, track_index);
 
         if (track_index != 0) {
             disk->nib->meta_track_map[track_index * 4 - 1] = track_index;
@@ -878,60 +575,88 @@ bool clem_2img_nibblize_data(struct Clemens2IMGDisk *disk) {
     return false;
 }
 
-unsigned clem_2img_encode_nibblized_disk(struct Clemens2IMGDisk *disk, uint8_t *data_start,
+unsigned _clem_2img_decode_nibblized_disk_35(struct Clemens2IMGDisk *disk, uint8_t *data_start,
+                                             uint8_t *data_end, const struct ClemensNibbleDisk *nib,
+                                             bool *corrupted) {
+    unsigned data_size = 0;
+    unsigned track_index, bits_track_index;
+    unsigned logical_sector_index;
+    unsigned disk_bytes_cnt;
+    unsigned disk_region;
+    uint8_t disk_bytes[640];
+
+    logical_sector_index = 0;
+    disk_region = 0;
+    for (track_index = 0, bits_track_index = 0xff; track_index < CLEM_DISK_LIMIT_QTR_TRACKS;
+         ++track_index) {
+
+        // next available track? (if single sided, meta_track_map will alternate between
+        // available and unavailable track mappings.)
+        if (bits_track_index == nib->meta_track_map[track_index])
+            continue;
+        bits_track_index = nib->meta_track_map[track_index];
+
+        if (!clem_disk_nib_decode_nibblized_track_35(nib, bits_track_index, data_start, data_end)) {
+            return 0; // ERROR!
+        }
+
+        //  scan the track, to find the next complete sector
+        //  for 3.5" tracks, the logical sector is encoded
+        //  convert the data into the 512 byte sector
+        //
+
+        logical_sector_index += g_clem_max_sectors_per_region_35[disk_region];
+    }
+
+    return data_size;
+}
+
+unsigned _clem_2img_decode_nibblized_disk_525(struct Clemens2IMGDisk *disk, uint8_t *data_start,
+                                              uint8_t *data_end,
+                                              const struct ClemensNibbleDisk *nib,
+                                              bool *corrupted) {
+    return 0;
+}
+
+unsigned clem_2img_decode_nibblized_disk(struct Clemens2IMGDisk *disk, uint8_t *data_start,
                                          uint8_t *data_end, const struct ClemensNibbleDisk *nib,
                                          bool *corrupted) {
-    // from the input nibbles,
-    // write out the encoded bytes track by track to [data_start, data_end]
-    // set disk->data and disk->data_end to data_start + encoded_size
 
-    // sector ordering is important for DOS vs ProDOS images and we'll use the
-    // 2IMG disk format to decide on the output format.
+    // The nibblized data is converted back to practical bytes for storage into
+    // DOS or ProDOS images, removing the sync bytes, headers, and data is
+    // converted from GCR to real bytes.
 
-    // errors may occur because the nibbles have been corrupted (somehow)
-    // and as mentioned in the documentation, should be saved out as a WOZ file
+    // Iterate through each track in the map.  Sectors are serialized into the
+    // the supplied buffer in the defined order (DOS or ProDOS) and in track
+    // + side order.  All 3.5 disks have 512 byte sectors - 5.25 disks have 256
+    // byte sectors.
 
-    // different regions have different sector counts
-    unsigned num_track_regions = 0;
-    unsigned clem_max_sectors_per_region[CLEM_DISK_35_NUM_REGIONS];
-    unsigned clem_track_start_per_region[CLEM_DISK_35_NUM_REGIONS + 1];
-    unsigned i, qtr_track_index;
+    // For each nibblized track:
+    //  If any scan error occurs, flag `corrupted` as TRUE
+    //  Scan track bit by bit for the address prologue
+    //  Decode track number, sector number, etc and validate with the decoded chksum
+    //  From this we can calculate the sector offset into a disk
+    //      - a bit more complicated for 3.5 disks as they need to account for region
+    //  Scan for data prologue and body
+    //      - read the whole data chunk so it can be decoded from GCR nibbles
+    //  Continue until the we reach the point where we started the scan for the
+    //      track
+    //  Advance to next track and continue until we are at the end of all tracks
+    //
+    unsigned cnt;
 
-    //  iterate through all of the tracks.
-    switch (nib->disk_type) {
+    *corrupted = true;
+
+    switch (disk->nib->disk_type) {
     case CLEM_DISK_TYPE_3_5:
-        num_track_regions = CLEM_DISK_35_NUM_REGIONS;
-        for (i = 0; i < num_track_regions; ++i) {
-            clem_max_sectors_per_region[i] = g_clem_max_sectors_per_region_35[i];
-            clem_track_start_per_region[i] = g_clem_track_start_per_region_35[i];
-        }
-        clem_track_start_per_region[num_track_regions] =
-            (g_clem_track_start_per_region_35[num_track_regions]);
+        cnt = _clem_2img_decode_nibblized_disk_35(disk, data_start, data_end, nib, corrupted);
         break;
     case CLEM_DISK_TYPE_5_25:
-        num_track_regions = 1;
-        clem_max_sectors_per_region[0] = CLEM_DISK_525_NUM_SECTORS_PER_TRACK;
-        clem_track_start_per_region[0] = 0;
-        clem_track_start_per_region[num_track_regions] = CLEM_DISK_LIMIT_QTR_TRACKS;
+        cnt = _clem_2img_decode_nibblized_disk_525(disk, data_start, data_end, nib, corrupted);
         break;
     }
 
-    //  Spin through each valid track and scan for bytes in the track's bitstream
-    //  Input sectors are in their physical order since the nibblized disk
-    //      represents the actual disk stream as bits are read from a head.
-    //  Output sectors in their logical order (i.e. DOS vs ProDOS ordering)
-    //
-    if (nib->disk_type == CLEM_DISK_TYPE_3_5) {
-        uint8_t actual_track_index = 0xff;
-        for (qtr_track_index = 0; qtr_track_index < CLEM_DISK_LIMIT_QTR_TRACKS; ++qtr_track_index) {
-            //  analagous with a Woz TMAP lookup
-            if (nib->meta_track_map[qtr_track_index] == actual_track_index)
-                continue;
-            //  index into the actual track table (i.e Woz TRKS)
-            actual_track_index = nib->meta_track_map[qtr_track_index];
-            //
-        }
-    }
-    // clem_2img_encoded_nibblized_track();
+    *corrupted = false;
+
     return 0;
 }
