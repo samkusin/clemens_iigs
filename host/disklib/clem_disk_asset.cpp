@@ -209,7 +209,7 @@ std::pair<size_t, bool> ClemensDiskAsset::encode(uint8_t *out, uint8_t *outEnd,
             disk.comment_end = (const char *)data_.data() + (size_t)disk.comment_end;
             //  the encodedBuffer here is guaranteed to be larger than what's actually needed
             std::vector<uint8_t> encodedBuffer(nib.bits_data_end - nib.bits_data);
-            if (clem_2img_encode_nibblized_disk(&disk, encodedBuffer.data(),
+            if (clem_2img_decode_nibblized_disk(&disk, encodedBuffer.data(),
                                                 encodedBuffer.data() + encodedBuffer.size(), &nib,
                                                 &corrupted)) {
                 clem_2img_build_image(&disk, out, outEnd);
