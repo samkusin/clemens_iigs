@@ -41,21 +41,6 @@ struct Clemens2IMGDisk {
     Note for 3.5" drives, the 'sector' size is 512 bytes
 */
 
-static const unsigned prodos_to_logical_sector_map_525[1][16] = {
-    {0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15}};
-
-/* only support 16 sector tracks */
-static const unsigned dos_to_logical_sector_map_525[1][16] = {
-    {0, 7, 14, 6, 13, 5, 12, 4, 11, 3, 10, 2, 9, 1, 8, 15}};
-
-/* 3.5" drives have 512 byte sectors (ProDOS assumed) */
-static const unsigned prodos_to_logical_sector_map_35[CLEM_DISK_35_NUM_REGIONS][16] = {
-    {0, 6, 1, 7, 2, 8, 3, 9, 4, 10, 5, 11, -1, -1, -1, -1},
-    {0, 6, 1, 7, 2, 8, 3, 9, 4, 10, 5, -1, -1, -1, -1, -1},
-    {0, 5, 1, 6, 2, 7, 3, 8, 4, 9, -1, -1, -1, -1, -1, -1},
-    {0, 5, 1, 6, 2, 7, 3, 8, 4, -1, -1, -1, -1, -1, -1, -1},
-    {0, 4, 1, 5, 2, 6, 3, 7, -1, -1, -1, -1, -1, -1, -1, -1}};
-
 static inline size_t _increment_data_ptr(const uint8_t *p, size_t amt, const uint8_t *end) {
     const uint8_t *n = p + amt;
     return n <= end ? amt : n - end;
@@ -156,7 +141,7 @@ bool clem_2img_parse_header(struct Clemens2IMGDisk *disk, const uint8_t *data,
                 if (param32 & 0x80000000) {
                     disk->is_write_protected = true;
                 }
-                if (disk->format == CLEM_2IMG_FORMAT_DOS) {
+                if (disk->format == CLEM_DISK_FORMAT_DOS) {
                     if (param32 & 0x100) {
                         disk->dos_volume = param32 & 0xff;
                     } else {
@@ -287,10 +272,10 @@ unsigned clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uin
 
     if (image_size < source_size + creator_size + comment_size + CLEM_2IMG_HEADER_BYTE_SIZE)
         return false;
-    if (disk->format == CLEM_2IMG_FORMAT_PRODOS) {
+    if (disk->format == CLEM_DISK_FORMAT_PRODOS) {
         if (disk->block_count * 512 != source_size)
             return false;
-    } else if (disk->format == CLEM_2IMG_FORMAT_DOS) {
+    } else if (disk->format == CLEM_DISK_FORMAT_DOS) {
         /* DOS 140K disks*/
         if (source_size != 280 * 512)
             return 0;
@@ -309,7 +294,7 @@ unsigned clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uin
     if (disk->dos_volume < 254)
         flags |= (0x0100 + (disk->dos_volume & 0xff));
     _encode_u32(&image_cur, flags);
-    if (disk->format == CLEM_2IMG_FORMAT_PRODOS) {
+    if (disk->format == CLEM_DISK_FORMAT_PRODOS) {
         _encode_u32(&image_cur, disk->block_count);
     } else {
         _encode_u32(&image_cur, 0);
@@ -352,12 +337,12 @@ bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, co
     strncpy(disk->creator, "CLEM", sizeof(disk->creator));
 
     /* validate that the input contains only sector data */
-    if (format == CLEM_2IMG_FORMAT_PRODOS) {
+    if (format == CLEM_DISK_FORMAT_PRODOS) {
         disk->block_count = disk_size / 512;
         if (disk_size % 512) {
             return false;
         }
-    } else if (format == CLEM_2IMG_FORMAT_DOS) {
+    } else if (format == CLEM_DISK_FORMAT_DOS) {
         disk->block_count = 0;
         if (disk_size % 256) {
             return false;
@@ -379,7 +364,7 @@ bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, co
 
     disk->version = 0x0001;
     disk->format = format;
-    if (format == CLEM_2IMG_FORMAT_DOS) {
+    if (format == CLEM_DISK_FORMAT_DOS) {
         disk->dos_volume = 0xfe;
     } else {
         disk->dos_volume = 0x00;
@@ -401,29 +386,6 @@ bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, co
       sequence
     - in general DOS and ProDOS formatting is interchangeable at this level
 */
-
-typedef const unsigned (*_ClemensPhysicalSectorMap)[16];
-
-static _ClemensPhysicalSectorMap get_logical_sector_map_for_disk(struct Clemens2IMGDisk *disk) {
-    switch (disk->format) {
-    case CLEM_2IMG_FORMAT_PRODOS:
-        if (disk->nib->disk_type == CLEM_DISK_TYPE_3_5) {
-            return prodos_to_logical_sector_map_35;
-        } else {
-            return prodos_to_logical_sector_map_525;
-        }
-        break;
-    case CLEM_2IMG_FORMAT_DOS:
-        assert(disk->nib->disk_type == CLEM_DISK_TYPE_5_25);
-        return dos_to_logical_sector_map_525;
-        break;
-    case CLEM_2IMG_FORMAT_RAW:
-    default:
-        assert(false);
-        break;
-    }
-    return NULL;
-}
 
 static bool _clem_2img_nibblize_data_35(struct Clemens2IMGDisk *disk) {
     _ClemensPhysicalSectorMap to_logical_sector_map;
@@ -469,7 +431,7 @@ static bool _clem_2img_nibblize_data_35(struct Clemens2IMGDisk *disk) {
     disk_region = 0;          // 3.5" disk tracks are divided into regions
     track_byte_offset = 0;    // Offset into nib bits data
     logical_sector_index = 0; // Sector from 0 to 800/1600 on disk
-    to_logical_sector_map = get_logical_sector_map_for_disk(disk);
+    to_logical_sector_map = get_physical_to_logical_sector_map(disk->nib->disk_type, disk->format);
     qtr_track_index = 0;
     while (qtr_track_index < CLEM_DISK_LIMIT_QTR_TRACKS) {
         unsigned track_sector_count = g_clem_max_sectors_per_region_35[disk_region];
@@ -525,7 +487,7 @@ static bool _clem_2img_nibblize_data_525(struct Clemens2IMGDisk *disk) {
 
     track_byte_offset = 0;    // offset into nib bits data
     logical_sector_index = 0; // 256 byte sector index from 0 to 559
-    to_logical_sector_map = get_logical_sector_map_for_disk(disk);
+    to_logical_sector_map = get_physical_to_logical_sector_map(disk->nib->disk_type, disk->format);
 
     track_index = 0;
     while (track_index < CLEM_DISK_LIMIT_525_DISK_TRACKS) {
@@ -562,10 +524,8 @@ static bool _clem_2img_nibblize_data_525(struct Clemens2IMGDisk *disk) {
 }
 
 bool clem_2img_nibblize_data(struct Clemens2IMGDisk *disk) {
-    memset(disk->nib->meta_track_map, 0xff, sizeof(disk->nib->meta_track_map));
-    memset(disk->nib->track_bits_count, 0x00, sizeof(disk->nib->track_bits_count));
-    memset(disk->nib->track_byte_count, 0x00, sizeof(disk->nib->track_byte_count));
-    memset(disk->nib->track_initialized, 0x00, sizeof(disk->nib->track_initialized));
+    clem_nib_reset_tracks(disk->nib, disk->nib->track_count, disk->nib->bits_data,
+                          disk->nib->bits_data_end);
     switch (disk->nib->disk_type) {
     case CLEM_DISK_TYPE_5_25:
         return _clem_2img_nibblize_data_35(disk);
@@ -615,6 +575,35 @@ unsigned _clem_2img_decode_nibblized_disk_525(struct Clemens2IMGDisk *disk, uint
                                               uint8_t *data_end,
                                               const struct ClemensNibbleDisk *nib,
                                               bool *corrupted) {
+    unsigned data_size = 0;
+    unsigned track_index, bits_track_index;
+    unsigned logical_sector_index;
+    unsigned disk_bytes_cnt;
+    unsigned disk_region;
+    uint8_t disk_bytes[640];
+
+    logical_sector_index = 0;
+    disk_region = 0;
+    for (track_index = 0, bits_track_index = 0xff; track_index < CLEM_DISK_LIMIT_QTR_TRACKS;
+         ++track_index) {
+
+        // next available track? (if single sided, meta_track_map will alternate between
+        // available and unavailable track mappings.)
+        if (bits_track_index == nib->meta_track_map[track_index])
+            continue;
+        bits_track_index = nib->meta_track_map[track_index];
+
+        if (!clem_disk_nib_decode_nibblized_track_35(nib, bits_track_index, data_start, data_end)) {
+            return 0; // ERROR!
+        }
+
+        //  scan the track, to find the next complete sector
+        //  for 3.5" tracks, the logical sector is encoded
+        //  convert the data into the 512 byte sector
+        //
+
+        logical_sector_index += g_clem_max_sectors_per_region_35[disk_region];
+    }
     return 0;
 }
 

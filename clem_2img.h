@@ -14,10 +14,6 @@
 
 #include "clem_disk.h"
 
-#define CLEM_2IMG_FORMAT_DOS    0U
-#define CLEM_2IMG_FORMAT_PRODOS 1U
-#define CLEM_2IMG_FORMAT_RAW    2U
-
 /** Per spec, the header size preceding the disk data must be this length.  This value can be used
  * to allocate a backing buffer for a custom 2img file. */
 #define CLEM_2IMG_HEADER_BYTE_SIZE 64
@@ -36,7 +32,7 @@ extern "C" {
 struct Clemens2IMGDisk {
     char creator[4];
     uint16_t version;
-    uint32_t format;      /**< See CLEM_2IMG_FORMAT_XXX */
+    uint32_t format;      /**< See CLEM_DISK_FORMAT_XXX */
     uint32_t dos_volume;  /**< DOS Volume */
     uint32_t block_count; /**< Block count (ProDOS only) */
     const uint8_t *data;  /**< The disk data within the 2IMG image */
@@ -85,7 +81,7 @@ bool clem_2img_parse_header(struct Clemens2IMGDisk *disk, const uint8_t *image,
  * data.
  *
  * @param disk
- * @param format See CLEM_2IMG_FORMAT_XXX
+ * @param format See CLEM_DISK_FORMAT_XXX
  * @param image Logical sectors based on the sector format
  * @param image_end End of the raw post-nibblized logical sector input buffer
  * @param image_data_offset Indicates where in the input image the disk data resides

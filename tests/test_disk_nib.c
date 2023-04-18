@@ -41,7 +41,9 @@ void suiteSetUp(void) {
     }
 }
 
-void test_clem_init(void) {}
+void test_clem_track_35_encode_decode(void) {}
+
+void test_clem_track_525_encode_decode(void) {}
 
 int main(void) {
     UNITY_BEGIN();

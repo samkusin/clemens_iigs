@@ -8,6 +8,10 @@
 #define CLEM_DISK_TYPE_5_25 1
 #define CLEM_DISK_TYPE_3_5  2
 
+#define CLEM_DISK_FORMAT_DOS    0U
+#define CLEM_DISK_FORMAT_PRODOS 1U
+#define CLEM_DISK_FORMAT_RAW    2U
+
 #define CLEM_DISK_5_25_BIT_TIMING_NS 4000
 #define CLEM_DISK_3_5_BIT_TIMING_NS  2000
 
@@ -83,9 +87,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-extern unsigned g_clem_max_sectors_per_region_35[CLEM_DISK_35_NUM_REGIONS];
-extern unsigned g_clem_track_start_per_region_35[CLEM_DISK_35_NUM_REGIONS + 1];
 
 #ifdef __cplusplus
 }
@@ -190,6 +191,32 @@ struct ClemensNibbleDiskHead {
     unsigned bits_limit; /**< Total number of available bits in the track */
 };
 
+typedef const unsigned (*_ClemensPhysicalSectorMap)[16];
+
+extern unsigned g_clem_max_sectors_per_region_35[CLEM_DISK_35_NUM_REGIONS];
+extern unsigned g_clem_track_start_per_region_35[CLEM_DISK_35_NUM_REGIONS + 1];
+
+/**
+ * @brief Get the logical sector map for the specified disk type and format
+ *
+ * @param nib
+ * @param format
+ * @return _ClemensPhysicalSectorMap
+ */
+_ClemensPhysicalSectorMap get_physical_to_logical_sector_map(unsigned disk_type, unsigned format);
+
+/**
+ * @brief Creates a reverse mapping of physical to logical sectors for the given disk type/format
+ * and region.
+ *
+ * @param disk_type
+ * @param format
+ * @param disk_region For 5.25 disks, always 0
+ * @return unsigned*
+ */
+unsigned *clem_disk_create_logical_to_physical_sector_map(unsigned *sectors, unsigned disk_type,
+                                                          unsigned format, unsigned disk_region);
+
 /**
  * @brief
  *
@@ -197,6 +224,14 @@ struct ClemensNibbleDiskHead {
  * @return unsigned
  */
 unsigned clem_disk_calculate_nib_storage_size(unsigned disk_type);
+
+/**
+ * @brief Rests all track points back to empty (keeping the disk type and raw data buffer intact.)
+ *
+ * @param nib
+ */
+void clem_nib_reset_tracks(struct ClemensNibbleDisk *nib, unsigned track_count, uint8_t *bits_data,
+                           uint8_t *bits_data_end);
 
 /**
  * @brief
@@ -309,9 +344,15 @@ void clem_disk_nib_encode_track_525(struct ClemensNibEncoder *nib_encoder, uint8
                                     unsigned track_sector_count,
                                     const unsigned *to_logical_sector_map, const uint8_t *data);
 
-bool clem_disk_nib_decode_nibblized_track_35(const struct ClemensNibbleDisk *nib,
-                                             unsigned bits_track_index, uint8_t *data_start,
-                                             uint8_t *data_end);
+unsigned clem_disk_nib_decode_nibblized_track_35(const struct ClemensNibbleDisk *nib,
+                                                 const unsigned *logical_sector_map,
+                                                 unsigned bits_track_index, uint8_t *data_start,
+                                                 uint8_t *data_end);
+
+unsigned clem_disk_nib_decode_nibblized_track_525(const struct ClemensNibbleDisk *nib,
+                                                  const unsigned *logical_sector_map,
+                                                  unsigned bits_track_index, uint8_t *data_start,
+                                                  uint8_t *data_end);
 
 #ifdef __cplusplus
 }
