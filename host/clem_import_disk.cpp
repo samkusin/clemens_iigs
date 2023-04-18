@@ -59,9 +59,9 @@ ClemensWOZDisk *ClemensDiskImporter::add(std::string path) {
     } else if (fsPathExtension == ".2mg") {
         record = parse2IMG(bits_start, bits_end);
     } else if (fsPathExtension == ".dsk" || fsPathExtension == ".do") {
-        record = parseImage(bits_start, bits_end, CLEM_2IMG_FORMAT_DOS);
+        record = parseImage(bits_start, bits_end, CLEM_DISK_FORMAT_DOS);
     } else if (fsPathExtension == ".po") {
-        record = parseImage(bits_start, bits_end, CLEM_2IMG_FORMAT_PRODOS);
+        record = parseImage(bits_start, bits_end, CLEM_DISK_FORMAT_PRODOS);
     }
     if (!record)
         return nullptr;

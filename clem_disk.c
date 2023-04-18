@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#define CLEM_DISK_NIB_SECTOR_DATA_TAG_35 12
+
 // clang-format off
 static const uint8_t gcr_6_2_byte[64] = {
     0x96, 0x97, 0x9a, 0x9b, 0x9d, 0x9e, 0x9f, 0xa6,
@@ -33,7 +35,41 @@ static const uint8_t from_gcr_6_2_byte[128] = {
     0x80, 0x80, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,     // 0xF0-0xF7
     0x80, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f      // 0xF8-0xFF
 };
+
+/* only support 16 sector tracks */
+/* all logical sectors are interleaved by 2 */
+static const unsigned physical_to_prodos_sector_map_525[1][16] = {
+    {0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15}};
+
+static const unsigned physical_to_dos_sector_map_525[1][16] = {
+    {0, 7, 14, 6, 13, 5, 12, 4, 11, 3, 10, 2, 9, 1, 8, 15}};
+
+/* 3.5" drives have 512 byte sectors (ProDOS assumed), interleaved by 2 */
+static const unsigned physical_to_prodos_sector_map_35[CLEM_DISK_35_NUM_REGIONS][16] = {
+    {0, 6, 1, 7, 2, 8, 3, 9, 4, 10, 5, 11, -1, -1, -1, -1},
+    {0, 6, 1, 7, 2, 8, 3, 9, 4, 10, 5, -1, -1, -1, -1, -1},
+    {0, 5, 1, 6, 2, 7, 3, 8, 4, 9, -1, -1, -1, -1, -1, -1},
+    {0, 5, 1, 6, 2, 7, 3, 8, 4, -1, -1, -1, -1, -1, -1, -1},
+    {0, 4, 1, 5, 2, 6, 3, 7, -1, -1, -1, -1, -1, -1, -1, -1}};
+
+unsigned g_clem_max_sectors_per_region_35[CLEM_DISK_35_NUM_REGIONS] = {12, 11, 10, 9, 8};
+unsigned g_clem_track_start_per_region_35[CLEM_DISK_35_NUM_REGIONS + 1] = {0, 32, 64, 96, 128, 160};
+
 // clang-format on
+
+static unsigned clem_disk_nib_get_region_from_track(unsigned disk_type, unsigned track_index) {
+    unsigned disk_region = 0;
+    if (disk_type == CLEM_DISK_TYPE_3_5) {
+        disk_region = 1;
+        for (; disk_region < CLEM_DISK_35_NUM_REGIONS + 1; ++disk_region) {
+            if (track_index < g_clem_track_start_per_region_35[disk_region]) {
+                disk_region--;
+                break;
+            }
+        }
+    }
+    return disk_region;
+}
 
 unsigned clem_disk_calculate_nib_storage_size(unsigned disk_type) {
     unsigned size = 0;
@@ -48,6 +84,53 @@ unsigned clem_disk_calculate_nib_storage_size(unsigned disk_type) {
         break;
     }
     return size;
+}
+
+_ClemensPhysicalSectorMap get_physical_to_logical_sector_map(unsigned disk_type, unsigned format) {
+    switch (format) {
+    case CLEM_DISK_FORMAT_PRODOS:
+        if (disk_type == CLEM_DISK_TYPE_3_5) {
+            return physical_to_prodos_sector_map_35;
+        } else {
+            return physical_to_prodos_sector_map_525;
+        }
+        break;
+    case CLEM_DISK_FORMAT_DOS:
+        assert(disk_type == CLEM_DISK_TYPE_5_25);
+        return physical_to_dos_sector_map_525;
+        break;
+    case CLEM_DISK_FORMAT_RAW:
+    default:
+        assert(false);
+        break;
+    }
+    return NULL;
+}
+
+unsigned *clem_disk_create_logical_to_physical_sector_map(unsigned *sectors, unsigned disk_type,
+                                                          unsigned format, unsigned disk_region) {
+    unsigned i;
+    _ClemensPhysicalSectorMap phys_to_logical =
+        get_physical_to_logical_sector_map(disk_type, format);
+    if (disk_type == CLEM_DISK_TYPE_5_25)
+        disk_region = 0;
+    for (i = 0; i < 16; ++i) {
+        if (phys_to_logical[disk_region][i] != -1) {
+            sectors[phys_to_logical[disk_region][i]] = i;
+        }
+    }
+    return sectors;
+}
+
+void clem_nib_reset_tracks(struct ClemensNibbleDisk *nib, unsigned track_count, uint8_t *bits_data,
+                           uint8_t *bits_data_end) {
+    nib->track_count = track_count;
+    nib->bits_data = bits_data;
+    nib->bits_data_end = bits_data_end;
+    memset(nib->meta_track_map, 0xff, sizeof(nib->meta_track_map));
+    memset(nib->track_bits_count, 0x00, sizeof(nib->track_bits_count));
+    memset(nib->track_byte_count, 0x00, sizeof(nib->track_byte_count));
+    memset(nib->track_initialized, 0x00, sizeof(nib->track_initialized));
 }
 
 struct ClemensNibbleDiskHead *clem_disk_nib_head_init(struct ClemensNibbleDiskHead *head,
@@ -317,9 +400,8 @@ static void clem_nib_encode_data_35(struct ClemensNibEncoder *encoder, const uin
     assert(cnt == 512);
     /* IIgs - 12 byte tag header is blank, but....
        TODO: what if it isn't??  */
-    data_idx = 12;
-    memset(data, 0, 12);
-    memcpy(data + data_idx, buf, 512);
+    memset(data, 0, CLEM_DISK_NIB_SECTOR_DATA_TAG_35);
+    memcpy(data + CLEM_DISK_NIB_SECTOR_DATA_TAG_35, buf, 512);
 
     data_idx = 0;
 
@@ -337,7 +419,7 @@ static void clem_nib_encode_data_35(struct ClemensNibEncoder *encoder, const uin
         }
         v = data[data_idx++];
         chksum[2] += v;
-        if (chksum[0] > 0xff) {
+        if (chksum[0] & 0x100) {
             ++chksum[2];
             chksum[0] &= 0xff;
         }
@@ -393,38 +475,29 @@ static void clem_nib_encode_data_525(struct ClemensNibEncoder *encoder, const ui
        contain the 2 bits nibble = 324 bytes, which is the specified data chunk
        size of the sector on disk */
     uint8_t enc6[256];
-    uint8_t enc2[86];
-    uint8_t right;
-    uint8_t chksum = 0;
+    uint8_t enc2[CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE];
+    unsigned enc2pos, enc2shift, chksum;
+    int i6, i2;
+    uint8_t rbyte;
+    uint8_t tmp;
 
-    unsigned i6, i2;
-    i6 = 0;
-    for (i2 = CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE; i2 > 0;) { /* 256 */
-        --i2;
-        enc6[i6] = buf[i6] >> 2;    /* 6 bits */
-        right = (buf[i6] & 1) << 1; /* lower 2 bits flipped */
-        right |= (buf[i6] & 2) >> 1;
-        enc2[i2] = right;
-        ++i6;
+    memset(enc2, 0, sizeof(enc2));
+    for (i2 = 0, enc2pos = CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE - 1, enc2shift = 0; i2 < 256;
+         i2++) {
+        rbyte = buf[i2];
+        enc6[i2] = rbyte >> 2;
+        tmp = enc2[enc2pos];
+        tmp |= (((rbyte & 1) << 1) | ((rbyte & 2) >> 1));
+        tmp <<= enc2shift;
+        enc2[enc2pos] = tmp;
+        if (enc2pos == 0) {
+            enc2pos = CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE;
+            enc2shift += 2;
+        }
+        enc2pos--;
     }
-    for (i2 = CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE; i2 > 0;) { /* 170 */
-        --i2;
-        enc6[i6] = buf[i6] >> 2;    /* 6 bits */
-        right = (buf[i6] & 1) << 1; /* lower 2 bits flipped */
-        right |= (buf[i6] & 2) >> 1;
-        enc2[i2] |= (right << 2);
-        ++i6;
-    }
-    for (i2 = CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE; i2 > 2;) { /* 84 */
-        --i2;
-        enc6[i6] = buf[i6] >> 2;    /* 6 bits */
-        right = (buf[i6] & 1) << 1; /* lower 2 bits flipped */
-        right |= (buf[i6] & 2) >> 1;
-        enc2[i2] |= (right << 4);
-        ++i6;
-    }
-    assert(i6 == 256);
 
+    chksum = 0;
     for (i2 = CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE; i2 > 0;) {
         --i2;
         clem_nib_encode_one_6_2(encoder, enc2[i2] ^ chksum);
@@ -536,9 +609,10 @@ void clem_disk_nib_encode_track_525(struct ClemensNibEncoder *nib_encoder, uint8
 }
 
 /******************************************************************************/
+#define CLEM_NIB_DECODE_BYTE(_out_, _byte_) *(_out_) = (from_gcr_6_2_byte[(_byte_)-0x80]);
 
 #define CLEM_2IMG_NIB_READER_DECODE_BYTE(_out_, _reader_, _index_)                                 \
-    *(_out_) = (from_gcr_6_2_byte[(_reader_)->disk_bytes[_index_] - 0x80]);                        \
+    CLEM_NIB_DECODE_BYTE(_out_, (_reader_)->disk_bytes[_index_])                                   \
     if (*(_out_) == 0x80)                                                                          \
         return;
 
@@ -546,7 +620,7 @@ void clem_disk_nib_encode_track_525(struct ClemensNibEncoder *nib_encoder, uint8
     *(_out_) = ((_reader_)->disk_bytes[_index_] & 0x55) << 1;                                      \
     *(_out_) |= ((_reader_)->disk_bytes[(_index_) + 1] & 0x55);
 
-static void clem_2img_nib_reader_address_35(struct ClemensNibbleDiskReader *reader, uint8_t *track,
+static void clem_disk_nib_reader_address_35(struct ClemensNibbleDiskReader *reader, uint8_t *track,
                                             uint8_t *sector, uint8_t *side, uint8_t *chksum) {
     uint8_t rbyte;
     if (reader->track_scan_state != CLEM_NIB_TRACK_SCAN_FIND_ADDRESS_35)
@@ -564,7 +638,7 @@ static void clem_2img_nib_reader_address_35(struct ClemensNibbleDiskReader *read
     *chksum = rbyte;
 }
 
-static void clem_2img_nib_reader_address_525(struct ClemensNibbleDiskReader *reader,
+static void clem_disk_nib_reader_address_525(struct ClemensNibbleDiskReader *reader,
                                              uint8_t *volume, uint8_t *track, uint8_t *sector,
                                              uint8_t *chksum) {
     uint8_t rbyte;
@@ -580,27 +654,348 @@ static void clem_2img_nib_reader_address_525(struct ClemensNibbleDiskReader *rea
     *chksum = rbyte;
 }
 
-bool clem_disk_nib_decode_nibblized_track_35(const struct ClemensNibbleDisk *nib,
-                                             unsigned bits_track_index, uint8_t *data_start,
-                                             uint8_t *data_end) {
+static bool clem_disk_nib_reader_data_35(struct ClemensNibbleDiskReader *reader,
+                                         uint8_t *data_start, uint8_t *data_end,
+                                         uint8_t *chksum_out, uint8_t *chksum_calc) {
+    // The data will be read serially and decoded to 524 bytes (one sector + 12 byte tag)
+    // Incoming data is organized in strings of 4 GCR 6-2 bytes (3 GCR 6-2 bytes for the
+    // last string).  Additional decoding involves a reversal of what was done in the
+    // encode version (again ported from the Ciderpress implementation.)
+
+    const uint8_t *disk_bytes = &reader->disk_bytes[0];
+    uint8_t *data_cur;
+    uint8_t scratch0[175], scratch1[175], scratch2[175];
+    unsigned chksum[3];
+    unsigned source_idx;
+    uint8_t rbyte6[3];
+    uint8_t rbyte;
+
+    source_idx = 0;
+    while (source_idx < sizeof(scratch0)) {
+        // bits 4,5 or rbyte are linked to rbyte6[0]
+        // bits 2,3 or rbyte are linked to rbyte6[1]
+        // bits 0,1 or rbyte are linked to rbyte6[2]
+        CLEM_NIB_DECODE_BYTE(&rbyte, *disk_bytes++);
+        if (rbyte == 0x80)
+            return false;
+        CLEM_NIB_DECODE_BYTE(&rbyte6[0], *disk_bytes++);
+        if (rbyte6[0] == 0x80)
+            return false;
+        CLEM_NIB_DECODE_BYTE(&rbyte6[1], *disk_bytes++);
+        if (rbyte6[1] == 0x80)
+            return false;
+        if (source_idx < 174) {
+            CLEM_NIB_DECODE_BYTE(&rbyte6[2], *disk_bytes++);
+            if (rbyte6[2] == 0x80)
+                return false;
+        } else {
+            rbyte6[2] = 0x00;
+        }
+        scratch0[source_idx] = ((rbyte << 2) & 0xc0) | rbyte6[0];
+        scratch1[source_idx] = ((rbyte << 4) & 0xc0) | rbyte6[1];
+        scratch2[source_idx] = ((rbyte << 6) & 0xc0) | rbyte6[2];
+        source_idx++;
+    }
+    if ((disk_bytes - &reader->disk_bytes[0]) > reader->disk_bytes_cnt) {
+        return false;
+    }
+    //  decode the scratch bytes using the calculated checksum
+    chksum[0] = chksum[1] = chksum[2] = 0;
+    source_idx = 0;
+    data_cur = data_start;
+    while (source_idx < sizeof(scratch0)) {
+        chksum[0] = (chksum[0] & 0xff) << 1;
+        if (chksum[0] & 0x100) {
+            ++chksum[0];
+        }
+        rbyte6[0] = scratch0[source_idx] ^ chksum[0];
+
+        chksum[2] += rbyte6[0];
+        if (chksum[0] & 0x100) {
+            ++chksum[2];
+            chksum[0] &= 0xff;
+        }
+        if (source_idx >= CLEM_DISK_NIB_SECTOR_DATA_TAG_35 / 3)
+            *data_cur++ = rbyte6[0];
+
+        rbyte6[1] = scratch1[source_idx] ^ chksum[2];
+        chksum[1] += rbyte6[1];
+        if (chksum[2] >= 0x100) {
+            ++chksum[1];
+            chksum[2] &= 0xff;
+        }
+        if (source_idx >= CLEM_DISK_NIB_SECTOR_DATA_TAG_35 / 3)
+            *data_cur++ = rbyte6[1];
+
+        if (data_cur - data_start == 512) {
+            assert(source_idx == sizeof(scratch0) - 1);
+            break;
+        }
+
+        rbyte6[2] = scratch2[source_idx] ^ chksum[1];
+        chksum[0] += rbyte6[2];
+        if (chksum[1] >= 0x100) {
+            ++chksum[0];
+            chksum[1] &= 0xff;
+        }
+        if (source_idx >= CLEM_DISK_NIB_SECTOR_DATA_TAG_35 / 3)
+            *data_cur++ = rbyte6[2];
+        ++source_idx;
+    }
+
+    chksum_calc[0] = chksum[0];
+    chksum_calc[1] = chksum[1];
+    chksum_calc[2] = chksum[2];
+
+    source_idx = (unsigned)(disk_bytes - &reader->disk_bytes[0]);
+    if (reader->disk_bytes_cnt <= source_idx)
+        return false;
+    if (reader->disk_bytes_cnt - source_idx < 4)
+        return false;
+
+    CLEM_NIB_DECODE_BYTE(&rbyte, *disk_bytes++);
+    CLEM_NIB_DECODE_BYTE(&chksum[2], *disk_bytes++);
+    CLEM_NIB_DECODE_BYTE(&chksum[1], *disk_bytes++);
+    CLEM_NIB_DECODE_BYTE(&chksum[0], *disk_bytes++);
+
+    if (rbyte == 0x80 || chksum[0] == 0x80 || chksum[1] == 0x80 || chksum[2] == 0x80)
+        return false;
+
+    chksum_out[0] = ((rbyte << 6) & 0xc0) | chksum[0];
+    chksum_out[1] = ((rbyte << 4) & 0xc0) | chksum[1];
+    chksum_out[2] = ((rbyte << 2) & 0xc0) | chksum[2];
+
+    return true;
+}
+
+unsigned clem_disk_nib_decode_nibblized_track_35(const struct ClemensNibbleDisk *nib,
+                                                 const unsigned *logical_sector_map,
+                                                 unsigned bits_track_index, uint8_t *data_start,
+                                                 uint8_t *data_end) {
     struct ClemensNibbleDiskReader disk_reader;
+    unsigned i, sz, disk_region;
     uint8_t track, sector, side, chksum;
     bool track_scan_finished;
+    uint8_t *sector_data_start;
+    uint8_t data_chksum_ondisk[3];
+    uint8_t data_chksum[3];
 
     clem_disk_nib_reader_init(&disk_reader, nib, bits_track_index);
+    sz = 0;
     track_scan_finished = false;
     while (!track_scan_finished) {
         if (!clem_disk_nib_reader_next(&disk_reader))
             continue;
-        switch (disk_reader.read_state) {
+        switch (disk_reader.track_scan_state) {
         case CLEM_NIB_TRACK_SCAN_AT_TRACK_END:
             track_scan_finished = true;
             break;
         case CLEM_NIB_TRACK_SCAN_FIND_ADDRESS_35:
-            clem_2img_nib_reader_address_35(&disk_reader, &track, &sector, &side, &chksum);
+            clem_disk_nib_reader_address_35(&disk_reader, &track, &sector, &side, &chksum);
+            break;
+        case CLEM_NIB_TRACK_SCAN_READ_DATA:
+            sector_data_start = data_start + sector * 512;
+            if ((sector_data_start >= data_end || sector_data_start + 512 > data_end) ||
+                !clem_disk_nib_reader_data_35(&disk_reader, sector_data_start,
+                                              sector_data_start + 512, data_chksum_ondisk,
+                                              data_chksum)) {
+                sz = 0;
+                track_scan_finished = true;
+            }
+            break;
+        case CLEM_NIB_TRACK_SCAN_ERROR:
+            track_scan_finished = true;
+            sz = 0;
             break;
         }
     }
 
-    return track_scan_finished;
+    return track_scan_finished ? sz : 0;
 }
+
+static bool clem_disk_nib_reader_data_525(struct ClemensNibbleDiskReader *reader,
+                                          uint8_t *data_start, uint8_t *data_end,
+                                          uint8_t *chksum_out, uint8_t *chksum_calc) {
+    /* Expecting 256 + CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE + 1 bytes (checksum) */
+    /* Output will be the 256 byte sector and the calculated checksum */
+    /* Like the 3.5" disk encode/decode, this has been ported from Ciderpress, though
+       the method for 5.25" is **way** easier to comprehend than the one used for 3.5"
+       disks. */
+    const uint8_t *disk_bytes = &reader->disk_bytes[0];
+    uint8_t enc2_unpacked[CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE * 3];
+    unsigned chksum, i2, i6;
+    uint8_t rbyte;
+    uint8_t tmp;
+
+    if (data_end - data_start < 256)
+        return false;
+
+    /* Generate a table of 2-bit parts for each 6-bit nibble (256 total.)  The
+       extra two bytes aren't actually used and will always decode to byte values of 0 */
+    chksum = 0;
+    for (i2 = 0; i2 < CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE; i2++) {
+        CLEM_NIB_DECODE_BYTE(&rbyte, *disk_bytes++);
+        if (rbyte == 0x80)
+            return false;
+        chksum ^= rbyte;
+        /* bits 0,1   2,3   4,5  switched and shifted to the first two bits*/
+        enc2_unpacked[i2] = ((chksum & 0x1) << 1) | ((chksum & 0x2) >> 1);
+        enc2_unpacked[i2 + CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE] =
+            ((chksum & 0x4) >> 1) | ((chksum & 0x8) >> 3);
+        enc2_unpacked[i2 + CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE * 2] =
+            ((chksum & 0x10) >> 3) | ((chksum & 0x20) >> 5);
+    }
+    /* Decoded the 6-bit value, and now combine with the 2-bit value from our table */
+    for (i6 = 0; i6 < 256; ++i6) {
+        CLEM_NIB_DECODE_BYTE(&rbyte, *disk_bytes++);
+        if (rbyte == 0x80)
+            return false;
+        chksum ^= rbyte;
+        data_start[i6] = ((chksum & 0xff) << 2) | enc2_unpacked[i6];
+    }
+    *chksum_calc = chksum;
+
+    CLEM_NIB_DECODE_BYTE(&rbyte, *disk_bytes++);
+    if (rbyte == 0x80)
+        return false;
+    *chksum_out = rbyte;
+
+    return true;
+}
+
+unsigned clem_disk_nib_decode_nibblized_track_525(const struct ClemensNibbleDisk *nib,
+                                                  const unsigned *logical_sector_map,
+                                                  unsigned bits_track_index, uint8_t *data_start,
+                                                  uint8_t *data_end) {
+    struct ClemensNibbleDiskReader disk_reader;
+    unsigned i, sz, disk_region;
+    uint8_t volume, sector, track, chksum;
+    bool track_scan_finished;
+    uint8_t *sector_data_start;
+    uint8_t data_chksum_ondisk;
+    uint8_t data_chksum;
+
+    clem_disk_nib_reader_init(&disk_reader, nib, bits_track_index);
+    sz = 0;
+    track_scan_finished = false;
+    while (!track_scan_finished) {
+        if (!clem_disk_nib_reader_next(&disk_reader))
+            continue;
+        switch (disk_reader.track_scan_state) {
+        case CLEM_NIB_TRACK_SCAN_AT_TRACK_END:
+            track_scan_finished = true;
+            break;
+        case CLEM_NIB_TRACK_SCAN_FIND_ADDRESS_525:
+            clem_disk_nib_reader_address_525(&disk_reader, &volume, &track, &sector, &chksum);
+            if (sector >= 16) {
+                track_scan_finished = true;
+                return 0;
+            }
+            break;
+        case CLEM_NIB_TRACK_SCAN_READ_DATA:
+            sector_data_start = data_start + logical_sector_map[sector] * 256;
+            if ((sector_data_start >= data_end || sector_data_start + 256 > data_end) ||
+                !clem_disk_nib_reader_data_525(&disk_reader, sector_data_start,
+                                               sector_data_start + 256, &data_chksum_ondisk,
+                                               &data_chksum)) {
+                sz = 0;
+                track_scan_finished = true;
+            }
+            break;
+        case CLEM_NIB_TRACK_SCAN_ERROR:
+            track_scan_finished = true;
+            sz = 0;
+            break;
+        }
+    }
+
+    return track_scan_finished ? sz : 0;
+}
+
+/*
+// TODO: For 5.25 drives
+if (nib->disk_type == CLEM_DISK_TYPE_5_25) {
+                //  physical sector indices are stored for Disk II style devices
+                //  need the logical sector to write it out to our target track
+                sector = logical_sector_map[sector];
+            }*/
+
+//#if defined(CLEM_SAMPLE_APP)
+/** Sample App */
+#include <stdio.h>
+
+static bool sample_encode_disk(struct ClemensNibbleDisk *nib_disk, unsigned format, uint8_t *data) {
+    struct ClemensNibEncoder encoder;
+    _ClemensPhysicalSectorMap to_logical_sector_map =
+        get_physical_to_logical_sector_map(nib_disk->disk_type, format);
+
+    clem_nib_begin_track_encoder(&encoder, nib_disk, 0, 0, CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(1));
+    clem_disk_nib_encode_track_35(&encoder, 0, 0, 0x22, 0, 1, to_logical_sector_map[0], data);
+
+    clem_nib_end_track_encoder(&encoder, nib_disk, 0);
+    return true;
+}
+
+static unsigned sample_decode_disk(uint8_t *data, uint8_t *data_end,
+                                   struct ClemensNibbleDisk *nib_disk, unsigned format) {
+    _ClemensPhysicalSectorMap to_logical_sector_map =
+        get_physical_to_logical_sector_map(nib_disk->disk_type, format);
+    const unsigned *to_logical_sectors_for_track_map =
+        to_logical_sector_map[clem_disk_nib_get_region_from_track(nib_disk->disk_type, 0)];
+    return clem_disk_nib_decode_nibblized_track_35(nib_disk, to_logical_sectors_for_track_map, 0,
+                                                   data, data_end);
+}
+
+static void sample_output(FILE *out, const uint8_t *data, const uint8_t *data_end,
+                          unsigned bytes_per_line) {
+    unsigned i;
+    unsigned data_size = (unsigned)(data_end - data);
+    const uint8_t *out_data;
+    out_data = data;
+    for (i = 0; i < data_size; ++i) {
+        if ((i % bytes_per_line) == 0) {
+            fprintf(out, "%06X: ", i);
+        }
+        if ((i % bytes_per_line) == (bytes_per_line - 1) || (i + 1) == data_size) {
+            fprintf(out, "%02X\n", out_data[i]);
+        } else {
+            fprintf(out, "%02X ", out_data[i]);
+        }
+    }
+}
+
+int main(int argc, const char *argv[]) {
+    //  generate some data to encode
+    struct ClemensNibbleDisk nib_disk;
+    uint8_t data[512];
+    uint8_t encoded[2048];
+    unsigned i, sz;
+    uint8_t *out_data;
+
+    printf("DISK 3.5 Single Sector Encode\n");
+    printf("-----------------------------\n");
+    printf("Empty Sector\n");
+    for (i = 0; i < 512; ++i) {
+        data[i] = 0;
+    }
+
+    memset(&nib_disk, 0, sizeof(struct ClemensNibbleDisk));
+    nib_disk.disk_type = CLEM_DISK_TYPE_3_5;
+    nib_disk.is_double_sided = false;
+    nib_disk.is_write_protected = false;
+    clem_nib_reset_tracks(&nib_disk, 1, encoded, encoded + sizeof(encoded));
+
+    sample_encode_disk(&nib_disk, CLEM_DISK_FORMAT_PRODOS, data);
+    sz = sample_decode_disk(data, data + sizeof(data), &nib_disk, CLEM_DISK_FORMAT_PRODOS);
+
+    printf("Encoded track(0), sector(0): %u bytes\n", nib_disk.track_byte_count[0]);
+    sample_output(stdout, nib_disk.bits_data + nib_disk.track_byte_offset[0],
+                  nib_disk.bits_data + nib_disk.track_byte_offset[0] + nib_disk.track_byte_count[0],
+                  16);
+
+    printf("Decoded track(0), sector(0): %u bytes\n", sz);
+    sample_output(stdout, data, data + sz, 16);
+
+    return 0;
+}
+//#endif

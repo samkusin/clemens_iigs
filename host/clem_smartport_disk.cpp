@@ -8,7 +8,7 @@
 std::vector<uint8_t> ClemensSmartPortDisk::createData(unsigned block_count) {
     std::vector<uint8_t> data(block_count * 512 + CLEM_2IMG_HEADER_BYTE_SIZE);
     Clemens2IMGDisk disk;
-    if (clem_2img_generate_header(&disk, CLEM_2IMG_FORMAT_PRODOS, data.data(),
+    if (clem_2img_generate_header(&disk, CLEM_DISK_FORMAT_PRODOS, data.data(),
                                   data.data() + data.size(), CLEM_2IMG_HEADER_BYTE_SIZE)) {
         if (clem_2img_build_image(&disk, data.data(), data.data() + disk.image_buffer_length)) {
             return data;
@@ -48,7 +48,7 @@ auto ClemensSmartPortDisk::initializeContainer() -> ImageType {
             //  type we'll support for now on SmartPort disks
             //  validate that the image size is block aligned
             if ((image_.size() % 512) == 0) {
-                clem_2img_generate_header(&disk_, CLEM_2IMG_FORMAT_PRODOS, image_.data(),
+                clem_2img_generate_header(&disk_, CLEM_DISK_FORMAT_PRODOS, image_.data(),
                                           image_.data() + image_.size(), 0);
             }
         }
@@ -66,7 +66,7 @@ ClemensSmartPortDisk::~ClemensSmartPortDisk() {}
 void ClemensSmartPortDisk::write(unsigned block_index, const uint8_t *data) {
     if (block_index >= disk_.block_count)
         return;
-    if (disk_.format != CLEM_2IMG_FORMAT_PRODOS)
+    if (disk_.format != CLEM_DISK_FORMAT_PRODOS)
         return;
 
     memcpy((uint8_t *)disk_.data + block_index * 512, data, 512);
@@ -75,7 +75,7 @@ void ClemensSmartPortDisk::write(unsigned block_index, const uint8_t *data) {
 void ClemensSmartPortDisk::read(unsigned block_index, uint8_t *data) {
     if (block_index >= disk_.block_count)
         return;
-    if (disk_.format != CLEM_2IMG_FORMAT_PRODOS)
+    if (disk_.format != CLEM_DISK_FORMAT_PRODOS)
         return;
 
     memcpy(data, disk_.data + block_index * 512, 512);

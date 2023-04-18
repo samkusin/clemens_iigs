@@ -96,7 +96,7 @@ ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveTyp
     }
     case ImageProDOS: {
         struct Clemens2IMGDisk disk {};
-        if (clem_2img_generate_header(&disk, CLEM_2IMG_FORMAT_PRODOS, sourceDataPtr,
+        if (clem_2img_generate_header(&disk, CLEM_DISK_FORMAT_PRODOS, sourceDataPtr,
                                       sourceDataPtrEnd, 0)) {
             disk.nib = &nib;
             if (nibblizeDisk(disk)) {
@@ -113,7 +113,7 @@ ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveTyp
     case ImageDOS:
     case ImageDSK: {
         struct Clemens2IMGDisk disk {};
-        if (clem_2img_generate_header(&disk, CLEM_2IMG_FORMAT_DOS, sourceDataPtr, sourceDataPtrEnd,
+        if (clem_2img_generate_header(&disk, CLEM_DISK_FORMAT_DOS, sourceDataPtr, sourceDataPtrEnd,
                                       0)) {
             disk.nib = &nib;
             if (nibblizeDisk(disk)) {

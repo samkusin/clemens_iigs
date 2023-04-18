@@ -10,8 +10,8 @@
  */
 
 #include "clem_woz.h"
-#include "clem_debug.h"
 
+#include <assert.h>
 #include <stdbool.h>
 #include <string.h>
 
@@ -335,7 +335,7 @@ const uint8_t *clem_woz_parse_trks_chunk(struct ClemensWOZDisk *disk,
                 _clem_woz_iter_inc(&woz_iter, 6);
                 out_bits += disk->max_track_size_bytes;
                 if (out_bits > disk->nib->bits_data_end) {
-                    CLEM_ASSERT(false);
+                    assert(false);
                     return NULL;
                 }
                 last_byte_offset += disk->max_track_size_bytes;
@@ -344,7 +344,7 @@ const uint8_t *clem_woz_parse_trks_chunk(struct ClemensWOZDisk *disk,
                 disk->nib->track_initialized[idx] = 0;
             }
         } else {
-            CLEM_ASSERT(false);
+            assert(false);
             return NULL;
         }
     } else {
@@ -363,7 +363,7 @@ const uint8_t *clem_woz_parse_trks_chunk(struct ClemensWOZDisk *disk,
             uint8_t *out_bits = disk->nib->bits_data;
             for (idx = 0; idx < CLEM_DISK_LIMIT_QTR_TRACKS; ++idx) {
                 if (out_bits + disk->nib->track_byte_count[idx] > disk->nib->bits_data_end) {
-                    CLEM_ASSERT(false);
+                    assert(false);
                     return NULL;
                 }
                 if (disk->nib->track_byte_count[idx]) {
