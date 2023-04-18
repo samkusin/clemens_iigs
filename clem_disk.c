@@ -289,13 +289,17 @@ bool clem_disk_nib_reader_next(struct ClemensNibbleDiskReader *reader) {
             reader->track_scan_state_next = CLEM_NIB_TRACK_SCAN_FIND_DATA_PROLOGUE;
         } else if (reader->disk_bytes[1] == 0xAA && reader->disk_bytes_cnt == 2) {
             reader->track_scan_state_next = CLEM_NIB_TRACK_SCAN_FIND_DATA_PROLOGUE;
-        } else if (reader->disk_bytes[2] == 0xAD && reader->disk_bytes_cnt == 3) {
-            //  3.5" disks have the sector encoded in the fourth byte
-            reader->track_scan_state_next = reader->track_is_35
-                                                ? CLEM_NIB_TRACK_SCAN_FIND_DATA_PROLOGUE
-                                                : CLEM_NIB_TRACK_SCAN_READ_DATA;
-        } else if (reader->disk_bytes_cnt == 4) {
-            reader->track_scan_state_next = CLEM_NIB_TRACK_SCAN_READ_DATA;
+        } else if (reader->disk_bytes[2] == 0xAD) {
+            if (reader->disk_bytes_cnt == 3) {
+                //  3.5" disks have the sector encoded in the fourth byte
+                reader->track_scan_state_next = reader->track_is_35
+                                                    ? CLEM_NIB_TRACK_SCAN_FIND_DATA_PROLOGUE
+                                                    : CLEM_NIB_TRACK_SCAN_READ_DATA;
+            } else if (reader->disk_bytes_cnt == 4) {
+                reader->track_scan_state_next = CLEM_NIB_TRACK_SCAN_READ_DATA;
+            }
+        } else {
+            reader->disk_bytes_cnt = 0;
         }
         break;
     case CLEM_NIB_TRACK_SCAN_READ_DATA:
@@ -339,8 +343,8 @@ void clem_nib_end_track_encoder(struct ClemensNibEncoder *encoder, struct Clemen
                                 unsigned nib_track_index) {
     //  TODO: use actual bits/bytes encoded vs the fixed amount per track
     //        (use encoder->bit_index at end of track)
-    nib->track_bits_count[nib_track_index] = encoder->bit_index; // encoder->bit_index_end;
-    nib->track_byte_count[nib_track_index] = (encoder->bit_index + 7) / 8;
+    nib->track_bits_count[nib_track_index] = encoder->bit_index_end; // encoder->bit_index_end;
+    nib->track_byte_count[nib_track_index] = (encoder->bit_index_end + 7) / 8;
     nib->track_initialized[nib_track_index] = 1;
 }
 
@@ -784,12 +788,13 @@ unsigned clem_disk_nib_decode_nibblized_track_35(const struct ClemensNibbleDisk 
     sz = 0;
     track_scan_finished = false;
     while (!track_scan_finished) {
+        if (disk_reader.track_scan_state == CLEM_NIB_TRACK_SCAN_AT_TRACK_END) {
+            track_scan_finished = true;
+            continue;
+        }
         if (!clem_disk_nib_reader_next(&disk_reader))
             continue;
         switch (disk_reader.track_scan_state) {
-        case CLEM_NIB_TRACK_SCAN_AT_TRACK_END:
-            track_scan_finished = true;
-            break;
         case CLEM_NIB_TRACK_SCAN_FIND_ADDRESS_35:
             clem_disk_nib_reader_address_35(&disk_reader, &track, &sector, &side, &chksum);
             break;
@@ -801,6 +806,8 @@ unsigned clem_disk_nib_decode_nibblized_track_35(const struct ClemensNibbleDisk 
                                               data_chksum)) {
                 sz = 0;
                 track_scan_finished = true;
+            } else {
+                sz += 512;
             }
             break;
         case CLEM_NIB_TRACK_SCAN_ERROR:
@@ -900,6 +907,8 @@ unsigned clem_disk_nib_decode_nibblized_track_525(const struct ClemensNibbleDisk
                                                &data_chksum)) {
                 sz = 0;
                 track_scan_finished = true;
+            } else {
+                sz += 256;
             }
             break;
         case CLEM_NIB_TRACK_SCAN_ERROR:
@@ -929,8 +938,11 @@ static bool sample_encode_disk(struct ClemensNibbleDisk *nib_disk, unsigned form
     _ClemensPhysicalSectorMap to_logical_sector_map =
         get_physical_to_logical_sector_map(nib_disk->disk_type, format);
 
-    clem_nib_begin_track_encoder(&encoder, nib_disk, 0, 0, CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(1));
-    clem_disk_nib_encode_track_35(&encoder, 0, 0, 0x22, 0, 1, to_logical_sector_map[0], data);
+    clem_nib_begin_track_encoder(
+        &encoder, nib_disk, 0, 0,
+        CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(g_clem_max_sectors_per_region_35[0]));
+    clem_disk_nib_encode_track_35(&encoder, 0, 0, 0x22, 0, g_clem_max_sectors_per_region_35[0],
+                                  to_logical_sector_map[0], data);
 
     clem_nib_end_track_encoder(&encoder, nib_disk, 0);
     return true;
@@ -967,16 +979,19 @@ static void sample_output(FILE *out, const uint8_t *data, const uint8_t *data_en
 int main(int argc, const char *argv[]) {
     //  generate some data to encode
     struct ClemensNibbleDisk nib_disk;
-    uint8_t data[512];
-    uint8_t encoded[2048];
-    unsigned i, sz;
+    uint8_t data[512 * 16];
+    uint8_t encoded[2048 * 16];
+    unsigned i, j, sz;
     uint8_t *out_data;
 
     printf("DISK 3.5 Single Sector Encode\n");
     printf("-----------------------------\n");
     printf("Empty Sector\n");
-    for (i = 0; i < 512; ++i) {
-        data[i] = 0;
+
+    for (j = 0; j < 16; ++j) {
+        for (i = 0; i < 512; ++i) {
+            data[j * 512 + i] = (i + j) % 256;
+        }
     }
 
     memset(&nib_disk, 0, sizeof(struct ClemensNibbleDisk));
