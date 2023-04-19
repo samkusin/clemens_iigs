@@ -6,14 +6,19 @@ add_executable(test_emulate_minimal test_emulate_minimal.c)
 target_link_libraries(test_emulate_minimal clemens_65816 unity)
 
 add_executable(test_disk_nib test_disk_nib.c)
-target_link_libraries(test_disk_nib clemens_65816_mmio unity)
+target_link_libraries(test_disk_nib clemens_disktypes unity)
+
+add_executable(test_gameport test_gameport.c)
+target_link_libraries(test_gameport clemens_65816_mmio unity)
 
 add_executable(test_mmio_video_switches test_mmio_video_switches.c)
 target_link_libraries(test_mmio_video_switches clemens_65816_mmio unity)
 
 add_test(NAME minimal COMMAND test_emulate_minimal)
+add_test(NAME disk_nib COMMAND test_disk_nib)
 add_test(NAME gameport COMMAND test_gameport)
 add_test(NAME mmio_video_switches COMMAND test_mmio_video_switches)
+
 
 # add_library(test_lib util.c)
 # target_link_libraries(test_lib clemens_65816 unity)

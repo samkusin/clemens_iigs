@@ -129,11 +129,10 @@ bool clem_2img_nibblize_data(struct Clemens2IMGDisk *disk);
  * @param data_end
  * @param nib
  * @param corrupted
- * @return unsigned Amount of bytes encoded or 0 on error
+ * @return false if decoding to a DOS/ProDOS flat image failed.
  */
-unsigned clem_2img_decode_nibblized_disk(struct Clemens2IMGDisk *disk, uint8_t *data_start,
-                                         uint8_t *data_end, const struct ClemensNibbleDisk *nib,
-                                         bool *corrupted);
+bool clem_2img_decode_nibblized_disk(struct Clemens2IMGDisk *disk, uint8_t *data_start,
+                                     uint8_t *data_end, const struct ClemensNibbleDisk *nib);
 
 #ifdef __cplusplus
 }

@@ -346,13 +346,27 @@ void clem_disk_nib_encode_track_525(struct ClemensNibEncoder *nib_encoder, uint8
 
 unsigned clem_disk_nib_decode_nibblized_track_35(const struct ClemensNibbleDisk *nib,
                                                  const unsigned *logical_sector_map,
-                                                 unsigned bits_track_index, uint8_t *data_start,
+                                                 unsigned bits_track_index,
+                                                 unsigned logical_sector_index, uint8_t *data_start,
                                                  uint8_t *data_end);
 
 unsigned clem_disk_nib_decode_nibblized_track_525(const struct ClemensNibbleDisk *nib,
                                                   const unsigned *logical_sector_map,
-                                                  unsigned bits_track_index, uint8_t *data_start,
-                                                  uint8_t *data_end);
+                                                  unsigned bits_track_index,
+                                                  unsigned logical_sector_index,
+                                                  uint8_t *data_start, uint8_t *data_end);
+
+bool clem_disk_nib_encode_35(struct ClemensNibbleDisk *nib, unsigned format, bool double_sided,
+                             const uint8_t *data_start, const uint8_t *data_end);
+
+bool clem_disk_nib_encode_525(struct ClemensNibbleDisk *nib, unsigned format, unsigned dos_volume,
+                              const uint8_t *data_start, const uint8_t *data_end);
+
+bool clem_disk_nib_decode_35(const struct ClemensNibbleDisk *nib, unsigned format,
+                             uint8_t *data_start, uint8_t *data_end);
+
+bool clem_disk_nib_decode_525(const struct ClemensNibbleDisk *nib, unsigned format,
+                              uint8_t *data_start, uint8_t *data_end);
 
 #ifdef __cplusplus
 }
