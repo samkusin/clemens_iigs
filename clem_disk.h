@@ -324,6 +324,7 @@ struct ClemensNibEncoder {
     uint8_t *end;
     unsigned bit_index;
     unsigned bit_index_end;
+    unsigned wraparound;
 };
 
 bool clem_nib_begin_track_encoder(struct ClemensNibEncoder *encoder, struct ClemensNibbleDisk *nib,

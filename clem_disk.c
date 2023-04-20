@@ -337,6 +337,7 @@ bool clem_nib_begin_track_encoder(struct ClemensNibEncoder *encoder, struct Clem
     encoder->end = encoder->begin + bits_data_size;
     encoder->bit_index = 0;
     encoder->bit_index_end = bits_data_size * 8;
+    encoder->wraparound = 0;
     nib->track_byte_offset[nib_track_index] = bits_data_offset;
     nib->track_byte_count[nib_track_index] = bits_data_size;
     return true;
@@ -346,8 +347,12 @@ void clem_nib_end_track_encoder(struct ClemensNibEncoder *encoder, struct Clemen
                                 unsigned nib_track_index) {
     //  TODO: use actual bits/bytes encoded vs the fixed amount per track
     //        (use encoder->bit_index at end of track)
-    nib->track_bits_count[nib_track_index] = encoder->bit_index_end; // encoder->bit_index_end;
-    nib->track_byte_count[nib_track_index] = (encoder->bit_index_end + 7) / 8;
+    if (encoder->wraparound > 0) {
+        nib->track_bits_count[nib_track_index] = encoder->bit_index_end;
+    } else {
+        nib->track_bits_count[nib_track_index] = encoder->bit_index;
+    }
+    nib->track_byte_count[nib_track_index] = (nib->track_bits_count[nib_track_index] + 7) / 8;
     nib->track_initialized[nib_track_index] = 1;
 }
 
@@ -360,6 +365,9 @@ static void clem_nib_write_bytes(struct ClemensNibEncoder *encoder, unsigned cnt
     unsigned out_shift = 7 - (encoder->bit_index % 8);
     unsigned in_shift = 0;
 
+    if (nib_bit_index_end >= encoder->bit_index_end) {
+        encoder->wraparound++;
+    }
     nib_bit_index_end %= encoder->bit_index_end;
 
     while (encoder->bit_index != nib_bit_index_end) {
@@ -486,17 +494,13 @@ static void clem_nib_encode_data_525(struct ClemensNibEncoder *encoder, const ui
     unsigned enc2pos, enc2shift, chksum;
     int i6, i2;
     uint8_t rbyte;
-    uint8_t tmp;
 
     memset(enc2, 0, sizeof(enc2));
     for (i2 = 0, enc2pos = CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE - 1, enc2shift = 0; i2 < 256;
          i2++) {
         rbyte = buf[i2];
         enc6[i2] = rbyte >> 2;
-        tmp = enc2[enc2pos];
-        tmp |= (((rbyte & 1) << 1) | ((rbyte & 2) >> 1));
-        tmp <<= enc2shift;
-        enc2[enc2pos] = tmp;
+        enc2[enc2pos] |= (((rbyte & 1) << 1) | ((rbyte & 2) >> 1)) << enc2shift;
         if (enc2pos == 0) {
             enc2pos = CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE;
             enc2shift += 2;
@@ -891,6 +895,10 @@ unsigned clem_disk_nib_decode_nibblized_track_525(const struct ClemensNibbleDisk
     sz = 0;
     track_scan_finished = false;
     while (!track_scan_finished) {
+        if (disk_reader.track_scan_state == CLEM_NIB_TRACK_SCAN_AT_TRACK_END) {
+            track_scan_finished = true;
+            continue;
+        }
         if (!clem_disk_nib_reader_next(&disk_reader))
             continue;
         switch (disk_reader.track_scan_state) {
@@ -1123,7 +1131,7 @@ bool clem_disk_nib_decode_525(const struct ClemensNibbleDisk *nib, unsigned form
                                                       data_start, data_end)) {
             return false; // ERROR!
         }
-        logical_sector_index += g_clem_max_sectors_per_region_35[disk_region];
+        logical_sector_index += CLEM_DISK_525_NUM_SECTORS_PER_TRACK;
     }
 
     return true;
@@ -1136,12 +1144,24 @@ bool clem_disk_nib_decode_525(const struct ClemensNibbleDisk *nib, unsigned form
 
 static bool sample_encode_disk(struct ClemensNibbleDisk *nib_disk, unsigned format, uint8_t *data,
                                uint8_t *data_end) {
-    return clem_disk_nib_encode_35(nib_disk, format, true, data, data_end);
+    switch (nib_disk->disk_type) {
+    case CLEM_DISK_TYPE_3_5:
+        return clem_disk_nib_encode_35(nib_disk, format, true, data, data_end);
+    case CLEM_DISK_TYPE_5_25:
+        return clem_disk_nib_encode_525(nib_disk, format, true, data, data_end);
+    }
+    return false;
 }
 
 static bool sample_decode_disk(uint8_t *data, uint8_t *data_end, struct ClemensNibbleDisk *nib_disk,
                                unsigned format) {
-    return clem_disk_nib_decode_35(nib_disk, format, data, data_end);
+    switch (nib_disk->disk_type) {
+    case CLEM_DISK_TYPE_3_5:
+        return clem_disk_nib_decode_35(nib_disk, format, data, data_end);
+    case CLEM_DISK_TYPE_5_25:
+        return clem_disk_nib_decode_525(nib_disk, format, data, data_end);
+    }
+    return false;
 }
 
 static void sample_output(FILE *out, const uint8_t *data, const uint8_t *data_end,
@@ -1162,6 +1182,17 @@ static void sample_output(FILE *out, const uint8_t *data, const uint8_t *data_en
     }
 }
 
+void output_nib_disk(struct ClemensNibbleDisk *nib_disk) {
+    unsigned track_idx;
+    for (track_idx = 0; track_idx < nib_disk->track_count; ++track_idx) {
+        printf("Encoded track(%u), : %u bytes\n", track_idx, nib_disk->track_byte_count[track_idx]);
+        sample_output(stdout, nib_disk->bits_data + nib_disk->track_byte_offset[track_idx],
+                      nib_disk->bits_data + nib_disk->track_byte_offset[track_idx] +
+                          nib_disk->track_byte_count[track_idx],
+                      16);
+    }
+}
+
 int main(int argc, const char *argv[]) {
     //  generate some data to encode
     struct ClemensNibbleDisk nib_disk;
@@ -1172,53 +1203,96 @@ int main(int argc, const char *argv[]) {
     unsigned region_idx, track_idx, sec_idx, i, sz;
     uint8_t *decoded;
     uint8_t *decoded_end;
+    unsigned sector_count;
+    unsigned sector_size;
+    unsigned nib_size;
 
-    source = malloc(512 * CLEM_DISK_35_DOUBLE_PRODOS_BLOCK_COUNT);
-    encoded = malloc(CLEM_DISK_35_MAX_DATA_SIZE);
-    decoded = malloc(512 * CLEM_DISK_35_DOUBLE_PRODOS_BLOCK_COUNT);
-    decoded_end = decoded + 512 * CLEM_DISK_35_DOUBLE_PRODOS_BLOCK_COUNT;
+    memset(&nib_disk, 0, sizeof(struct ClemensNibbleDisk));
 
-    printf("DISK 3.5 Single Sector Encode\n");
-    printf("-----------------------------\n");
-    printf("Empty Sector\n");
-    source_end = source;
-    for (region_idx = 0; region_idx < CLEM_DISK_35_NUM_REGIONS; ++region_idx) {
-        for (track_idx = g_clem_track_start_per_region_35[region_idx];
-             track_idx < g_clem_track_start_per_region_35[region_idx + 1]; ++track_idx) {
-            for (sec_idx = 0; sec_idx < g_clem_max_sectors_per_region_35[region_idx]; ++sec_idx) {
-                for (i = 0; i < 512; ++i) {
+    if (argc < 2 || strncmp(argv[1], "35", 4) == 0) {
+        sector_count = CLEM_DISK_35_DOUBLE_PRODOS_BLOCK_COUNT;
+        sector_size = 512;
+        nib_size = CLEM_DISK_35_MAX_DATA_SIZE;
+        nib_disk.disk_type = CLEM_DISK_TYPE_3_5;
+    } else if (strncmp(argv[1], "525", 4) == 0) {
+        sector_count = CLEM_DISK_525_PRODOS_BLOCK_COUNT * 2;
+        sector_size = 256;
+        nib_size = CLEM_DISK_525_MAX_DATA_SIZE;
+        nib_disk.disk_type = CLEM_DISK_TYPE_5_25;
+    } else {
+        printf("usage: %s {35|525}\n", argv[0]);
+        return 1;
+    }
+
+    source = malloc(sector_size * sector_count);
+    encoded = malloc(sector_size);
+    decoded = malloc(sector_size * sector_count);
+    decoded_end = decoded + (sector_size * sector_count);
+    memset(decoded, 0, sector_size * sector_count);
+
+    if (nib_disk.disk_type == CLEM_DISK_TYPE_3_5) {
+        printf("DISK 3.5 Single Sector Encode\n");
+        printf("-----------------------------\n");
+        source_end = source;
+        for (region_idx = 0; region_idx < CLEM_DISK_35_NUM_REGIONS; ++region_idx) {
+            for (track_idx = g_clem_track_start_per_region_35[region_idx];
+                 track_idx < g_clem_track_start_per_region_35[region_idx + 1]; ++track_idx) {
+                for (sec_idx = 0; sec_idx < g_clem_max_sectors_per_region_35[region_idx];
+                     ++sec_idx) {
+                    for (i = 0; i < sector_size; ++i) {
+                        source_end[i] = sec_idx << ((track_idx & 1) ? 4 : 0);
+                    }
+                    source_end += sector_size;
+                }
+            }
+        }
+    } else {
+        printf("DISK 5.25 Single Sector Encode\n");
+        printf("------------------------------\n");
+        source_end = source;
+        for (track_idx = 0; track_idx < 35; ++track_idx) {
+            for (sec_idx = 0; sec_idx < CLEM_DISK_525_NUM_SECTORS_PER_TRACK; ++sec_idx) {
+                for (i = 0; i < sector_size; ++i) {
                     source_end[i] = sec_idx << ((track_idx & 1) ? 4 : 0);
                 }
-                source_end += 512;
+                source_end += sector_size;
             }
         }
     }
-    memset(&nib_disk, 0, sizeof(struct ClemensNibbleDisk));
-    nib_disk.disk_type = CLEM_DISK_TYPE_3_5;
-    nib_disk.is_double_sided = false;
-    nib_disk.is_write_protected = false;
-    clem_nib_reset_tracks(&nib_disk, 2, encoded, encoded + CLEM_DISK_35_MAX_DATA_SIZE);
-    sample_encode_disk(&nib_disk, CLEM_DISK_FORMAT_PRODOS, source, source_end);
-    sample_decode_disk(decoded, decoded_end, &nib_disk, CLEM_DISK_FORMAT_PRODOS);
-
-    for (track_idx = 0; track_idx < nib_disk.track_count; ++track_idx) {
-        printf("Encoded track(%u), : %u bytes\n", track_idx, nib_disk.track_byte_count[track_idx]);
-        sample_output(stdout, nib_disk.bits_data + nib_disk.track_byte_offset[track_idx],
-                      nib_disk.bits_data + nib_disk.track_byte_offset[track_idx] +
-                          nib_disk.track_byte_count[track_idx],
-                      16);
+    clem_nib_reset_tracks(&nib_disk, 2, encoded, encoded + nib_size);
+    if (!sample_encode_disk(&nib_disk, CLEM_DISK_FORMAT_PRODOS, source, source_end)) {
+        printf("Encode failed!\n");
+    }
+    if (!sample_decode_disk(decoded, decoded_end, &nib_disk, CLEM_DISK_FORMAT_PRODOS)) {
+        printf("Decode failed!\n");
     }
 
-    source_p = decoded;
-    for (region_idx = 0; region_idx < CLEM_DISK_35_NUM_REGIONS; ++region_idx) {
-        for (track_idx = g_clem_track_start_per_region_35[region_idx];
-             track_idx < g_clem_track_start_per_region_35[region_idx + 1]; ++track_idx) {
-            for (sec_idx = 0; sec_idx < g_clem_max_sectors_per_region_35[region_idx]; ++sec_idx) {
-                if (nib_disk.meta_track_map[track_idx] != 0xff) {
-                    printf("Decoded track(%u), sector(%u)\n", track_idx, sec_idx);
-                    sample_output(stdout, source_p, source_p + 512, 16);
+    output_nib_disk(&nib_disk);
+
+    if (nib_disk.disk_type == CLEM_DISK_TYPE_3_5) {
+        source_p = decoded;
+        for (region_idx = 0; region_idx < CLEM_DISK_35_NUM_REGIONS; ++region_idx) {
+            for (track_idx = g_clem_track_start_per_region_35[region_idx];
+                 track_idx < g_clem_track_start_per_region_35[region_idx + 1]; ++track_idx) {
+                for (sec_idx = 0; sec_idx < g_clem_max_sectors_per_region_35[region_idx];
+                     ++sec_idx) {
+                    if (nib_disk.meta_track_map[track_idx] != 0xff) {
+                        printf("Decoded track(%u), sector(%u)\n", track_idx, sec_idx);
+                        sample_output(stdout, source_p, source_p + sector_size, 16);
+                        source_p += sector_size;
+                    }
                 }
-                source_p += 512;
+            }
+        }
+    } else {
+        source_p = decoded;
+        for (track_idx = 0; track_idx < 35; ++track_idx) {
+            for (sec_idx = 0; sec_idx < CLEM_DISK_525_NUM_SECTORS_PER_TRACK; ++sec_idx) {
+                if (nib_disk.meta_track_map[track_idx * 4] != 0xff) {
+                    printf("Decoded track(%u), sector(%u)\n", track_idx, sec_idx);
+                    sample_output(stdout, source_p, source_p + sector_size, 16);
+                    source_p += sector_size;
+                }
             }
         }
     }
