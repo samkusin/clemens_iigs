@@ -226,7 +226,7 @@ bool clem_2img_parse_header(struct Clemens2IMGDisk *disk, const uint8_t *data,
             data_size = _increment_data_ptr(data, 4, data_end);
             if (data_size == 4) {
                 param32 = _decode_u32(data);
-                disk->creator_data_end = disk->creator + param32;
+                disk->creator_data_end = disk->creator_data + param32;
                 allocation_amt += param32;
                 ++state;
             } else {
@@ -411,6 +411,8 @@ static bool _clem_2img_nibblize_data_35(struct Clemens2IMGDisk *disk) {
         return false;
     }
 
+    clem_nib_reset_tracks(disk->nib, disk->nib->track_count, disk->nib->bits_data,
+                          disk->nib->bits_data_end);
     disk->nib->is_write_protected = disk->is_write_protected;
     return clem_disk_nib_encode_35(disk->nib, disk->format, is_double_sided, disk->data,
                                    disk->data_end);
@@ -419,18 +421,18 @@ static bool _clem_2img_nibblize_data_35(struct Clemens2IMGDisk *disk) {
 static bool _clem_2img_nibblize_data_525(struct Clemens2IMGDisk *disk) {
     disk->nib->is_write_protected = disk->is_write_protected;
     disk->nib->track_count = 35;
+    clem_nib_reset_tracks(disk->nib, disk->nib->track_count, disk->nib->bits_data,
+                          disk->nib->bits_data_end);
     return clem_disk_nib_encode_525(disk->nib, disk->format, disk->dos_volume, disk->data,
                                     disk->data_end);
 }
 
 bool clem_2img_nibblize_data(struct Clemens2IMGDisk *disk) {
-    clem_nib_reset_tracks(disk->nib, disk->nib->track_count, disk->nib->bits_data,
-                          disk->nib->bits_data_end);
     switch (disk->nib->disk_type) {
     case CLEM_DISK_TYPE_5_25:
-        return _clem_2img_nibblize_data_35(disk);
-    case CLEM_DISK_TYPE_3_5:
         return _clem_2img_nibblize_data_525(disk);
+    case CLEM_DISK_TYPE_3_5:
+        return _clem_2img_nibblize_data_35(disk);
     }
     return false;
 }
