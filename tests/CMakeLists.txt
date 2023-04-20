@@ -18,6 +18,9 @@ add_subdirectory(unity)
 add_library(clem_test_utils STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils.c)
 
+add_executable(test_adc cpu/test_adc.c)
+target_link_libraries(test_adc clemens_65816 unity)
+
 add_executable(test_emulate_minimal test_emulate_minimal.c)
 target_link_libraries(test_emulate_minimal clemens_65816 unity)
 
@@ -37,6 +40,7 @@ add_executable(test_disk_woz test_disk_woz.c ${TEST_ASSETS_DISK_IMAGES})
 target_link_libraries(test_disk_woz clemens_disktypes clem_test_utils unity)
 
 add_test(NAME minimal COMMAND test_emulate_minimal)
+add_test(NAME cpu_adc COMMAND test_adc)
 add_test(NAME disk_nib COMMAND test_disk_nib)
 add_test(NAME disk_2img COMMAND test_disk_2img)
 add_test(NAME disk_woz COMMAND test_disk_woz)
