@@ -187,6 +187,33 @@ void test_clem_track_525_encode_decode(void) {
     TEST_ASSERT_EQUAL_INT(0, block_not_equal_cnt);
 }
 
+void test_clem_track_525_encode_decode_dos(void) {
+    struct ClemensNibbleDisk nib;
+    uint8_t decoded_disk[140 * 1024];
+    unsigned i, block_not_equal_cnt;
+
+    //  800K disk test
+    memset(&nib, 0, sizeof(nib));
+    nib.disk_type = CLEM_DISK_TYPE_5_25;
+    clem_nib_reset_tracks(&nib, 35, g_nib_data, g_nib_data + g_nib_size);
+
+    TEST_ASSERT_TRUE(clem_disk_nib_encode_525(&nib, CLEM_DISK_FORMAT_DOS, true, &g_525_disk[0],
+                                              &g_525_disk[0] + sizeof(g_525_disk)));
+
+    TEST_ASSERT_TRUE(clem_disk_nib_decode_525(&nib, CLEM_DISK_FORMAT_DOS, &decoded_disk[0],
+                                              &decoded_disk[0] + sizeof(decoded_disk)));
+
+    for (i = 0, block_not_equal_cnt = 0; i < CLEM_DISK_525_PRODOS_BLOCK_COUNT * 2; ++i) {
+        int block_cmp = memcmp(&g_525_disk[i * 256], &decoded_disk[i * 256], 256);
+        if (block_cmp != 0) {
+            TEST_PRINTF("Sector %u not equal", i);
+            ++block_not_equal_cnt;
+        }
+    }
+
+    TEST_ASSERT_EQUAL_INT(0, block_not_equal_cnt);
+}
+
 int main(void) {
     suiteSetUp();
     UNITY_BEGIN();
@@ -194,5 +221,6 @@ int main(void) {
     RUN_TEST(test_clem_track_35_encode_decode);
     RUN_TEST(test_clem_track_525_encode);
     RUN_TEST(test_clem_track_525_encode_decode);
+    RUN_TEST(test_clem_track_525_encode_decode_dos);
     return UNITY_END();
 }

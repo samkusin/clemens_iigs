@@ -119,16 +119,12 @@ bool clem_2img_nibblize_data(struct Clemens2IMGDisk *disk);
  * @brief Encodes the nibbilized data into bytes that conform to the disk format
  *
  * Encodes nibbles into GCR encoded data bytes for DOS or ProDOS compliant images.
- * This will not work correctly for corrupted images
- *
- * If corrupted is set to true, assume the data is corrupted and offer the user
- * an option to save the disk as a WOZ image to avoid potential data loss.
+ * This will not work correctly for corrupted images and will return false.
  *
  * @param disk
  * @param data_start
  * @param data_end
  * @param nib
- * @param corrupted
  * @return false if decoding to a DOS/ProDOS flat image failed.
  */
 bool clem_2img_decode_nibblized_disk(struct Clemens2IMGDisk *disk, uint8_t *data_start,
