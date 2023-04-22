@@ -9,6 +9,13 @@
 #include <future>
 #include <utility>
 
+//  Using the ClemensDiskBrowser
+//    - Browse for disk images supported by the emulator for the specified DiskType
+//    - The selected file path asset is then used to create an actual loaded
+//      asset (see ClemensDiskAsset interface.)
+//    - The selected asset path/driveType will be 'sent' to the backend so it
+//      can perform the nibblization and own the associated memory for the asset.
+//
 class ClemensDiskBrowser {
   public:
     ClemensDiskBrowser(const std::string &idName) : idName_(idName) {}

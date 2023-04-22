@@ -105,20 +105,27 @@ extern "C" {
 
    3.5" Disks are documented earlier in this header.
 */
-#define CLEM_DISK_525_BYTES_PER_TRACK      (13 * 512)
-#define CLEM_DISK_525_BYTES_TRACK_GAP_1    64
-#define CLEM_DISK_525_BYTES_TRACK_GAP_2    6
-#define CLEM_DISK_525_BYTES_TRACK_GAP_3    24
+#define CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE 86
+#define CLEM_DISK_525_BYTES_TRACK_GAP_1           64
+#define CLEM_DISK_525_BYTES_TRACK_GAP_2           6
+#define CLEM_DISK_525_BYTES_TRACK_GAP_3           24
+#define CLEM_DISK_525_BYTES_PER_SECTOR_BASE       (CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE + 256 + 32)
+#define CLEM_DISK_525_BYTES_PER_SECTOR                                                             \
+    (CLEM_DISK_525_BYTES_TRACK_GAP_2 + CLEM_DISK_525_BYTES_TRACK_GAP_3 +                           \
+     CLEM_DISK_525_BYTES_PER_SECTOR_BASE)
+#define CLEM_DISK_525_BYTES_PER_TRACK                                                              \
+    (CLEM_DISK_525_BYTES_TRACK_GAP_1 + CLEM_DISK_525_BYTES_PER_SECTOR * 16)
+
 #define CLEM_DISK_35_BYTES_TRACK_GAP_1     500
 #define CLEM_DISK_35_BYTES_TRACK_GAP_3     53
 #define CLEM_DISK_35_BYTES_PER_SECTOR_BASE 728
-
 #define CLEM_DISK_35_BYTES_PER_SECTOR                                                              \
     (CLEM_DISK_35_BYTES_PER_SECTOR_BASE + CLEM_DISK_35_BYTES_TRACK_GAP_3)
+
 #define CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(_sectors_)                                            \
     (1 + (CLEM_DISK_35_BYTES_TRACK_GAP_1 - CLEM_DISK_35_BYTES_TRACK_GAP_3) +                       \
      ((_sectors_)*CLEM_DISK_35_BYTES_PER_SECTOR))
-#define CLEM_DISK_525_MAX_DATA_SIZE (50 * CLEM_DISK_525_BYTES_PER_TRACK)
+#define CLEM_DISK_525_MAX_DATA_SIZE (40 * CLEM_DISK_525_BYTES_PER_TRACK)
 #define CLEM_DISK_35_MAX_DATA_SIZE  (160 * CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(12))
 
 /* use for read sequencing */
@@ -225,6 +232,16 @@ unsigned *clem_disk_create_logical_to_physical_sector_map(unsigned *sectors, uns
  */
 unsigned clem_disk_calculate_nib_storage_size(unsigned disk_type);
 
+/**
+ * @brief Initializes a disk object to an empty track list
+ *
+ * @param nib
+ * @param type
+ * @param bits_data
+ * @param bits_data_end
+ */
+void clem_nib_init_disk(struct ClemensNibbleDisk *nib, unsigned type, uint8_t *bits_data,
+                        uint8_t *bits_data_end);
 /**
  * @brief Rests all track points back to empty (keeping the disk type and raw data buffer intact.)
  *

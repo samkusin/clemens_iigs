@@ -127,6 +127,9 @@ bool clemens_assign_smartport_disk(ClemensMMIO *mmio, unsigned drive_index,
                                    struct ClemensSmartPortDevice *device) {
     if (drive_index >= CLEM_SMARTPORT_DRIVE_LIMIT)
         return false;
+    if (mmio->active_drives.smartport[drive_index].device.device_id !=
+        CLEM_SMARTPORT_DEVICE_ID_NONE)
+        return false;
     memcpy(&mmio->active_drives.smartport[drive_index].device, device,
            sizeof(struct ClemensSmartPortDevice));
     return true;
@@ -144,7 +147,7 @@ void clemens_remove_smartport_disk(ClemensMMIO *mmio, unsigned drive_index,
            sizeof(struct ClemensSmartPortDevice));
     memset(&mmio->active_drives.smartport[drive_index].device, 0,
            sizeof(struct ClemensSmartPortDevice));
-    mmio->active_drives.smartport[drive_index].unit_id = 0;
+    mmio->active_drives.smartport[drive_index].unit_id = CLEM_SMARTPORT_DEVICE_ID_NONE;
 }
 
 bool clemens_is_drive_io_active(ClemensMMIO *mmio) {

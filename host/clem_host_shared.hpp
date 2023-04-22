@@ -1,7 +1,9 @@
 #ifndef CLEM_HOST_SHARED_HPP
 #define CLEM_HOST_SHARED_HPP
 
+#include "clem_disk.h"
 #include "clem_mmio_types.h"
+#include "clem_smartport.h"
 
 #include <array>
 #include <chrono>
@@ -45,8 +47,10 @@ struct ClemensBackendConfig {
     std::string diskLibraryRootPath;
     std::string snapshotRootPath;
     std::string traceRootPath;
-    std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDriveStates;
-    std::array<ClemensBackendDiskDriveState, 1> smartPortDriveStates;
+    std::array<std::string, kClemensDrive_Count> diskImagePaths;
+    std::array<std::string, CLEM_SMARTPORT_DRIVE_LIMIT> smartPortImagePaths;
+    std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDriveStates; // TODO rem
+    std::array<ClemensBackendDiskDriveState, 1> smartPortDriveStates;              // TODO rem
     std::array<std::string, CLEM_CARD_SLOT_COUNT> cardNames;
     std::vector<ClemensBackendBreakpoint> breakpoints;
     unsigned audioSamplesPerSecond;

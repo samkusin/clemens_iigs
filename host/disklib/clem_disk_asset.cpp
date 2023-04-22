@@ -10,6 +10,27 @@
 
 static constexpr unsigned kClemensWOZMaxSupportedVersion = 2;
 
+void ClemensDiskDriveStatus::mount(const std::string &path) {
+    assetPath = path;
+    isEjecting = false;
+    isSpinning = false;
+    isWriteProtected = false;
+    isSaved = false;
+    error = Error::None;
+}
+
+void ClemensDiskDriveStatus::saveFailed() {
+    error = Error::SaveFailed;
+    isSaved = false;
+}
+
+bool ClemensDiskDriveStatus::isMounted() const { return !assetPath.empty(); }
+
+ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath)
+    : ClemensDiskAsset(assetPath, kClemensDrive_Invalid) {
+    diskType_ = DiskHDD;
+}
+
 ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveType driveType)
     : ClemensDiskAsset() {
     path_ = assetPath;
@@ -32,14 +53,14 @@ ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveTyp
 }
 
 ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveType driveType,
-                                   std::vector<uint8_t> source, ClemensNibbleDisk &nib)
+                                   cinek::ByteBuffer::ConstRange source, ClemensNibbleDisk &nib)
     : ClemensDiskAsset(assetPath, driveType) {
 
-    estimatedEncodedSize_ = source.size();
+    estimatedEncodedSize_ = cinek::length(source);
 
     //  decode pass (i.e. nibbilization)
-    const uint8_t *sourceDataPtr = source.data();
-    const uint8_t *sourceDataPtrEnd = source.data() + source.size();
+    const uint8_t *sourceDataPtr = source.first;
+    const uint8_t *sourceDataPtrEnd = source.first + estimatedEncodedSize_;
     const uint8_t *sourceDataPtrTail = sourceDataPtr;
     switch (imageType_) {
     case ImageWOZ: {
@@ -71,7 +92,7 @@ ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveTyp
                 //  into the compressed vector
                 size_t creatorDataSize = disk.creator_data_end - disk.creator_data;
                 size_t commentDataSize = disk.comment_end - disk.comment;
-                assert(disk.image_buffer == source.data());
+                assert(disk.image_buffer == sourceDataPtr);
                 if (creatorDataSize + commentDataSize > 0) {
                     data_.reserve(creatorDataSize + commentDataSize);
                     std::copy(disk.creator_data, disk.creator_data_end, std::back_inserter(data_));
@@ -167,7 +188,7 @@ bool ClemensDiskAsset::nibblizeDisk(struct Clemens2IMGDisk &disk) {
     return true;
 }
 
-std::pair<size_t, bool> ClemensDiskAsset::encode(uint8_t *out, uint8_t *outEnd,
+std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
                                                  const ClemensNibbleDisk &nib) {
     // convert nibblized disk into the asset's image type and output the results
     // onto the out/outEnd buffer
@@ -220,12 +241,14 @@ std::pair<size_t, bool> ClemensDiskAsset::encode(uint8_t *out, uint8_t *outEnd,
     case ImageProDOS:
         if (std::holds_alternative<Clemens2IMGDisk>(metadata_)) {
             auto disk = std::get<Clemens2IMGDisk>(metadata_);
+#pragma message("ProDOS save")
         }
         break;
     case ImageDOS:
     case ImageDSK:
         if (std::holds_alternative<Clemens2IMGDisk>(metadata_)) {
             auto disk = std::get<Clemens2IMGDisk>(metadata_);
+#pragma message("DOS save")
         }
         break;
     case ImageNone:
@@ -237,7 +260,7 @@ std::pair<size_t, bool> ClemensDiskAsset::encode(uint8_t *out, uint8_t *outEnd,
             out = std::copy(data_.begin(), data_.end(), out);
         } else {
             //  at this point, some data will be lost - but not essential data
-            //  and so allow this image to be serialized - but should be warn?
+            //  and so allow this image to be serialized - but should we warn?
             assert(false);
         }
         result.first = (size_t)(out - outStart);
