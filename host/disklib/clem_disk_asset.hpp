@@ -1,6 +1,7 @@
 #ifndef CLEM_HOST_DISK_STATE_HPP
 #define CLEM_HOST_DISK_STATE_HPP
 
+#include "cinek/buffer.hpp"
 #include "clem_2img.h"
 #include "clem_disk.h"
 #include "clem_woz.h"
@@ -23,9 +24,10 @@ struct ClemensDiskAsset {
     };
 
     ClemensDiskAsset() = default;
+    ClemensDiskAsset(const std::string &assetPath);
     ClemensDiskAsset(const std::string &assetPath, ClemensDriveType driveType);
     ClemensDiskAsset(const std::string &assetPath, ClemensDriveType driveType,
-                     std::vector<uint8_t> source, ClemensNibbleDisk &nib);
+                     cinek::ByteBuffer::ConstRange source, ClemensNibbleDisk &nib);
     operator bool() const { return imageType_ != ImageNone; }
     ErrorType errorType() const { return errorType_; }
     ImageType imageType() const { return imageType_; }
@@ -33,11 +35,11 @@ struct ClemensDiskAsset {
     const std::string &path() const { return path_; }
     size_t getEstimatedEncodedSize() const { return estimatedEncodedSize_; }
 
-    //  Encodes the nibblized disk into the supplied buffer, in combination with
+    //  Decodes the nibblized disk into the supplied buffer, in combination with
     //  any image specific data left in the asset's processed data buffer.  The
     //  final output will be serializable in full to a file of the asset's original
     //  asset type.
-    std::pair<size_t, bool> encode(uint8_t *out, uint8_t *outEnd, const ClemensNibbleDisk &nib);
+    std::pair<size_t, bool> decode(uint8_t *out, uint8_t *outEnd, const ClemensNibbleDisk &nib);
 
   private:
     bool nibblizeDisk(struct Clemens2IMGDisk &disk);
@@ -50,12 +52,18 @@ struct ClemensDiskAsset {
     std::variant<ClemensWOZDisk, Clemens2IMGDisk> metadata_;
 };
 
-struct ClemensDiskDriveState {
+struct ClemensDiskDriveStatus {
+    enum class Error { None, MountFailed, SaveFailed };
     std::string assetPath;
     bool isWriteProtected = false;
     bool isSpinning = false;
     bool isEjecting = false;
-    bool saveFailed = false;
+    bool isSaved = false;
+    Error error = Error::None;
+
+    void mount(const std::string &path);
+    void saveFailed();
+    bool isMounted() const;
 };
 
 #endif

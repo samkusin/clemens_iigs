@@ -1,0 +1,2 @@
+AB=1
+LD_LIBRARY_PATH=/usr/local/lib/clang

@@ -2,9 +2,12 @@
 #define CLEM_HOST_BACKEND_HPP
 
 #include "clem_command_queue.hpp"
+#include "clem_disk.h"
 #include "clem_host_shared.hpp"
 #include "clem_interpreter.hpp"
 #include "clem_smartport_disk.hpp"
+#include "disklib/clem_disk_asset.hpp"
+#include "disklib/clem_storage_unit.hpp"
 
 #include "cinek/buffer.hpp"
 #include "cinek/fixedstack.hpp"
@@ -150,10 +153,15 @@ class ClemensBackend : public ClemensCommandQueueListener {
     ClemensMMIO mmio_;
     ClemensCard *mockingboard_;
 
-    std::array<ClemensWOZDisk, kClemensDrive_Count> diskContainers_;
-    std::array<ClemensNibbleDisk, kClemensDrive_Count> disks_;
-    std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives_;
-    std::array<ClemensBackendDiskDriveState, CLEM_SMARTPORT_DRIVE_LIMIT> smartPortDrives_;
+    ClemensStorageUnit storageUnit_;
+
+    std::array<ClemensWOZDisk, kClemensDrive_Count> diskContainers_; // TODO rem
+    std::array<ClemensNibbleDisk, kClemensDrive_Count> disks_;       // TODO rem
+    std::array<ClemensNibbleDisk, kClemensDrive_Count> nibbleDisks_;
+    std::array<ClemensDiskAsset, kClemensDrive_Count> diskAssets_;
+    std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives_; // TODO rem
+    std::array<ClemensBackendDiskDriveState, CLEM_SMARTPORT_DRIVE_LIMIT>
+        smartPortDrives_; // TODO rem
     std::array<ClemensSmartPortDisk, CLEM_SMARTPORT_DRIVE_LIMIT> smartPortDisks_;
     // }
 

@@ -56,7 +56,9 @@ endif()
 
 set(DISKLIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_disk_browser.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_disk_asset.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_disk_asset.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_prodos_disk.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_storage_unit.cpp")
 
 set(PROJECT_SOURCES
     ${PLATFORM_SOURCES}
@@ -90,7 +92,7 @@ set(PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_serializer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_startup_view.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_smartport_disk.cpp")
-
+ 
 add_executable(clemens_iigs ${PROJECT_SOURCES})
 target_include_directories(clemens_iigs
     PRIVATE ${CMAKE_CURRENT_BINARY_DIR}

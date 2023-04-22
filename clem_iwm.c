@@ -291,9 +291,12 @@ bool clem_iwm_eject_disk_async(struct ClemensDeviceIWM *iwm, struct ClemensDrive
                                struct ClemensNibbleDisk *disk) {
 
     if (drive->has_disk) {
+        memcpy(disk, &drive->disk, sizeof(drive->disk));
         if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
             if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {
                 clem_disk_35_start_eject(drive);
+            }
+            if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTED)) {
                 return false;
             }
         }

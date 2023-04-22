@@ -123,6 +123,17 @@ unsigned *clem_disk_create_logical_to_physical_sector_map(unsigned *sectors, uns
     return sectors;
 }
 
+void clem_nib_init_disk(struct ClemensNibbleDisk *nib, unsigned type, uint8_t *bits_data,
+                        uint8_t *bits_data_end) {
+    nib->disk_type = type;
+    nib->bits_data = bits_data;
+    nib->bits_data_end = bits_data_end;
+    memset(nib->meta_track_map, 0xff, sizeof(nib->meta_track_map));
+    memset(nib->track_bits_count, 0x00, sizeof(nib->track_bits_count));
+    memset(nib->track_byte_count, 0x00, sizeof(nib->track_byte_count));
+    memset(nib->track_initialized, 0x00, sizeof(nib->track_initialized));
+}
+
 void clem_nib_reset_tracks(struct ClemensNibbleDisk *nib, unsigned track_count, uint8_t *bits_data,
                            uint8_t *bits_data_end) {
     nib->track_count = track_count;
@@ -481,8 +492,6 @@ static void clem_nib_encode_data_35(struct ClemensNibEncoder *encoder, const uin
     clem_nib_encode_one_6_2(encoder, chksum[1]);
     clem_nib_encode_one_6_2(encoder, chksum[0]);
 }
-
-#define CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE 86
 
 static void clem_nib_encode_data_525(struct ClemensNibEncoder *encoder, const uint8_t *buf,
                                      unsigned cnt) {
