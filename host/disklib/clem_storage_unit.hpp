@@ -5,7 +5,6 @@
 #include "cinek/buffertypes.hpp"
 #include "cinek/fixedstack.hpp"
 #include "clem_disk.h"
-#include "clem_smartport_disk.hpp"
 #include "disklib/clem_disk_asset.hpp"
 #include "disklib/clem_prodos_disk.hpp"
 
@@ -35,18 +34,17 @@ class ClemensStorageUnit {
     bool assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex, const std::string &imagePath);
     bool insertDisk(ClemensMMIO &mmio, ClemensDriveType driveType, const std::string &path);
     bool ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType);
-    void query(ClemensMMIO &mmio,
-               std::array<ClemensDiskDriveState, kClemensDrive_Count> &diskDriveStates,
-               std::array<ClemensDiskDriveState, CLEM_SMARTPORT_DRIVE_LIMIT> &smartPortStates);
-
-    void commit();
+    void update(ClemensMMIO &mmio);
     bool serialize(mpack_writer_t *writer);
     bool unserialize(mpack_reader_t *reader);
 
+    const ClemensDiskDriveStatus &getDriveStatus(ClemensDriveType driveType) const;
+    const ClemensDiskDriveStatus &getSmartPortStatus(unsigned driveIndex) const;
+
   private:
     void allocateBuffers();
-    bool saveDisk(ClemensDriveType driveType, ClemensNibbleDisk &disk);
-    bool saveHardDisk(unsigned driveIndex, ClemensProDOSDisk &disk);
+    void saveDisk(ClemensDriveType driveType, ClemensNibbleDisk &disk);
+    void saveHardDisk(unsigned driveIndex, ClemensProDOSDisk &disk);
 
   private:
     std::array<cinek::Range<uint8_t>, kClemensDrive_Count> nibbleBuffers_;

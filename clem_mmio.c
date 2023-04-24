@@ -1623,7 +1623,8 @@ static void _clem_mmio_memory_map(ClemensMMIO *mmio, uint32_t memory_flags) {
     mmio->mmap_register = memory_flags;
 }
 
-void _clem_mmio_init_page_maps(ClemensMMIO *mmio, uint32_t memory_flags) {
+void _clem_mmio_init_page_maps(ClemensMMIO *mmio, uint32_t fpi_ram_bank_count,
+                               uint32_t fpi_rom_bank_count, uint32_t memory_flags) {
     struct ClemensMemoryPageMap *page_map;
     struct ClemensMemoryPageInfo *page;
     unsigned page_idx;
@@ -1697,11 +1698,11 @@ void _clem_mmio_init_page_maps(ClemensMMIO *mmio, uint32_t memory_flags) {
     mmio->bank_page_map[0x00] = &mmio->fpi_main_page_map;
     mmio->bank_page_map[0x01] = &mmio->fpi_aux_page_map;
 
-    for (bank_idx = 0x02; bank_idx < mmio->fpi_ram_bank_count; ++bank_idx) {
+    for (bank_idx = 0x02; bank_idx < fpi_ram_bank_count; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->fpi_direct_page_map;
     }
     /* TODO: handle expansion RAM */
-    for (bank_idx = mmio->fpi_ram_bank_count; bank_idx < 0x80; ++bank_idx) {
+    for (bank_idx = fpi_ram_bank_count; bank_idx < 0x80; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->empty_page_map;
     }
     /* Handles unavailable banks beyond the 0x80 bank IIgs hard RAM limit */
@@ -1712,10 +1713,10 @@ void _clem_mmio_init_page_maps(ClemensMMIO *mmio, uint32_t memory_flags) {
     mmio->bank_page_map[0xE0] = &mmio->mega2_main_page_map;
     mmio->bank_page_map[0xE1] = &mmio->mega2_aux_page_map;
     /* TODO: handle expansion ROM and 128K firmware ROM 01*/
-    for (bank_idx = 0xF0; bank_idx < 0xFC; ++bank_idx) {
+    for (bank_idx = 0xF0; bank_idx < 0x100; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->empty_page_map;
     }
-    for (bank_idx = 0xFC; bank_idx < 0x100; ++bank_idx) {
+    for (bank_idx = 0x100 - fpi_rom_bank_count; bank_idx < 0x100; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->fpi_rom_page_map;
     }
 
@@ -1747,8 +1748,8 @@ void clem_mmio_restore(ClemensMMIO *mmio) {
 
 void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
                     struct ClemensMemoryPageMap **bank_page_map, void *slot_expansion_rom,
-                    unsigned int fpi_ram_bank_count, uint8_t *e0_bank, uint8_t *e1_bank,
-                    struct ClemensTimeSpec *tspec) {
+                    unsigned int fpi_ram_bank_count, unsigned int fpi_rom_bank_count,
+                    uint8_t *e0_bank, uint8_t *e1_bank, struct ClemensTimeSpec *tspec) {
     int idx;
     //  Memory map starts out without shadowing, but our call to
     //  init_page_maps will initialize the memory map on IIgs reset
@@ -1763,7 +1764,6 @@ void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
     mmio->last_data_address = 0xffffffff;
     mmio->bank_page_map = bank_page_map;
     mmio->emulator_detect = CLEM_MMIO_EMULATOR_DETECT_IDLE;
-    mmio->fpi_ram_bank_count = fpi_ram_bank_count;
     mmio->card_expansion_rom_index = -1;
     //  TODO: look into making mega2 memory solely reside inside mmio to avoid this
     //        external dependency.
@@ -1776,8 +1776,9 @@ void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
     }
 
     //  initial settings for memory map on reset/initr
-    _clem_mmio_init_page_maps(mmio, CLEM_MEM_IO_MMAP_NSHADOW_SHGR | CLEM_MEM_IO_MMAP_WRLCRAM |
-                                        CLEM_MEM_IO_MMAP_LCBANK2);
+    _clem_mmio_init_page_maps(mmio, fpi_ram_bank_count, fpi_rom_bank_count,
+                              CLEM_MEM_IO_MMAP_NSHADOW_SHGR | CLEM_MEM_IO_MMAP_WRLCRAM |
+                                  CLEM_MEM_IO_MMAP_LCBANK2);
 
     clem_mmio_reset(mmio, tspec);
 }

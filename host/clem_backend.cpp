@@ -1,12 +1,12 @@
 #include "clem_backend.hpp"
 #include "cinek/ckdefs.h"
 #include "clem_device.h"
-#include "clem_disk_utils.hpp"
 #include "clem_host_platform.h"
 #include "clem_host_shared.hpp"
 #include "clem_mem.h"
 #include "clem_program_trace.hpp"
 #include "clem_serializer.hpp"
+#include "disklib/clem_disk_utils.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 #include "iocards/mockingboard.h"
@@ -779,15 +779,14 @@ void ClemensBackend::initApple2GS(const std::string &romPathname) {
                                       CLEM_IIGS_BANK_SIZE);
         memset(romBuffer.forwardSize(CLEM_IIGS_BANK_SIZE).first, 0, CLEM_IIGS_BANK_SIZE);
     }
-
-    int result =
-        clemens_init(&machine_, kClocksPerSlowCycle, kClocksPerFastCycle, romBuffer.getHead(),
-                     romBuffer.getSize(), slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
-                     slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
-                     slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount), kFPIBankCount);
+    const unsigned kFPIROMBankCount = romBuffer.getSize() / CLEM_IIGS_BANK_SIZE;
+    int result = clemens_init(
+        &machine_, kClocksPerSlowCycle, kClocksPerFastCycle, romBuffer.getHead(), kFPIROMBankCount,
+        slabMemory_.allocate(CLEM_IIGS_BANK_SIZE), slabMemory_.allocate(CLEM_IIGS_BANK_SIZE),
+        slabMemory_.allocate(CLEM_IIGS_BANK_SIZE * kFPIBankCount), kFPIBankCount);
     clem_mmio_init(&mmio_, &machine_.dev_debug, machine_.mem.bank_page_map,
-                   slabMemory_.allocate(2048 * 7), kFPIBankCount, machine_.mem.mega2_bank_map[0],
-                   machine_.mem.mega2_bank_map[1], &machine_.tspec);
+                   slabMemory_.allocate(2048 * 7), kFPIBankCount, kFPIROMBankCount,
+                   machine_.mem.mega2_bank_map[0], machine_.mem.mega2_bank_map[1], &machine_.tspec);
     if (result < 0) {
         fmt::print("Clemens library failed to initialize with err code (%d)\n", result);
         return;

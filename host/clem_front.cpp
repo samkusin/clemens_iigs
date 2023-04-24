@@ -2,7 +2,7 @@
 #include "clem_assets.hpp"
 #include "clem_backend.hpp"
 #include "clem_disk.h"
-#include "clem_disk_utils.hpp"
+#include "disklib/clem_disk_utils.hpp"
 #include "clem_host_platform.h"
 #include "clem_host_shared.hpp"
 #include "clem_host_utils.hpp"

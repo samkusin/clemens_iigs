@@ -16,7 +16,7 @@ extern "C" {
  * @param speed_factor
  * @param clocks_step
  * @param rom
- * @param romSize
+ * @param fpiROMBankCount
  * @param e0bank
  * @param e1bank
  * @param fpiRAM
@@ -24,7 +24,7 @@ extern "C" {
  * @return int
  */
 int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks_step, void *rom,
-                 size_t romSize, void *e0bank, void *e1bank, void *fpiRAM,
+                 unsigned int fpiROMBankCount, void *e0bank, void *e1bank, void *fpiRAM,
                  unsigned int fpiRAMBankCount);
 
 /**

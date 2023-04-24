@@ -77,32 +77,34 @@ bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIn
     if (!unit) {
         fmt::print(
             stderr,
-            "ClemensStorageUnit::assignSmartPortDisk - Invalid smartport unit index {} specified\n",
+            "ClemensStorageUnit::assignSmartPortDisk - Invalid smartport unit {} specified\n",
             driveIndex);
         return false;
     }
-    if (unit->device.device_id) {
-        fmt::print(
-            stderr,
-            "ClemensStorageUnit::assignSmartPortDisk - Drive unit index {} is already mounted\n",
-            driveIndex);
+    if (hardDiskStatuses_[driveIndex].isMounted()) {
+        fmt::print(stderr,
+                   "ClemensStorageUnit::assignSmartPortDisk - Drive unit {} is already mounted\n",
+                   driveIndex);
         return false;
     }
 
     auto asset = ClemensDiskAsset(imagePath);
-    switch (asset.imageType()) {
-    case ClemensDiskAsset::Image2IMG:
-    case ClemensDiskAsset::ImageWOZ: {
-        struct ClemensSmartPortDevice device {};
-        hardDiskAssets_[driveIndex] = asset;
-        hardDisks_[0].bind(device, hardDiskAssets_[driveIndex]);
-        hardDiskStatuses_[driveIndex].mount(imagePath);
-        return clemens_assign_smartport_disk(&mmio, driveIndex, &device);
+    if (asset.imageType() != ClemensDiskAsset::Image2IMG &&
+        asset.imageType() != ClemensDiskAsset::ImageWOZ) {
+        hardDiskStatuses_[driveIndex].mountFailed();
+        return false;
     }
-    default:
-        break;
+
+    struct ClemensSmartPortDevice device {};
+    hardDiskAssets_[driveIndex] = asset;
+    if (!hardDisks_[0].bind(device, hardDiskAssets_[driveIndex])) {
+        fmt::print(stderr, "ClemensStorageUnit::assignSmartPortDisk - Bind failed for disk {}:{}\n",
+                   driveIndex, imagePath);
+        hardDiskStatuses_[driveIndex].mountFailed();
+        return false;
     }
-    return false;
+    hardDiskStatuses_[driveIndex].mount(imagePath);
+    return clemens_assign_smartport_disk(&mmio, driveIndex, &device);
 }
 
 bool ClemensStorageUnit::insertDisk(ClemensMMIO &mmio, ClemensDriveType driveType,
@@ -110,19 +112,26 @@ bool ClemensStorageUnit::insertDisk(ClemensMMIO &mmio, ClemensDriveType driveTyp
     ClemensDrive *drive = clemens_drive_get(&mmio, driveType);
     if (!drive)
         return false;
-    if (diskStatuses_[driveType].isMounted())
+    if (diskStatuses_[driveType].isMounted()) {
+        fmt::print(stderr, "ClemensStorageUnit::insertDisk - Drive type {} is already mounted\n",
+                   ClemensDiskUtilities::getDriveName(driveType));
         return false;
+    }
 
     std::ifstream input(path, std::ios_base::in | std::ios_base::binary);
-    if (!input.is_open())
+    if (!input.is_open()) {
+        diskStatuses_[driveType].mountFailed();
         return false;
-
+    }
     size_t inputImageSize = input.seekg(0, std::ios_base::end).tellg();
     if (inputImageSize > decodeBuffer_.getCapacity()) {
-        fmt::print(
-            stderr,
-            "ClemensStorageUnit::insertDisk - image {} size is greather than disk buffer size {}\n",
-            path, decodeBuffer_.getCapacity());
+        assert(false);
+        fmt::print(stderr,
+                   "ClemensStorageUnit::insertDisk - image {}:{} size is greater than disk "
+                   "buffer size {}\n",
+                   ClemensDiskUtilities::getDriveName(driveType), path,
+                   decodeBuffer_.getCapacity());
+        diskStatuses_[driveType].mountFailed();
         return false;
     }
 
@@ -131,8 +140,15 @@ bool ClemensStorageUnit::insertDisk(ClemensMMIO &mmio, ClemensDriveType driveTyp
     auto bits = decodeBuffer_.forwardSize(inputImageSize);
     input.seekg(0);
     input.read((char *)bits.first, inputImageSize);
-    if (!input.good())
+    if (!input.good()) {
+        fmt::print(stderr,
+                   "ClemensStorageUnit::insertDisk - image {}:{} size is greater than disk "
+                   "buffer size {}\n",
+                   ClemensDiskUtilities::getDriveName(driveType), path,
+                   decodeBuffer_.getCapacity());
+        diskStatuses_[driveType].mountFailed();
         return false;
+    }
     input.close();
 
     struct ClemensNibbleDisk disk {};
@@ -157,53 +173,71 @@ bool ClemensStorageUnit::insertDisk(ClemensMMIO &mmio, ClemensDriveType driveTyp
     return clemens_assign_disk(&mmio, driveType, &disk);
 }
 
-bool ClemensStorageUnit::saveDisk(ClemensDriveType driveType, ClemensNibbleDisk &disk) {
-    if (!diskStatuses_[driveType].isMounted())
+bool ClemensStorageUnit::ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType) {
+    if (!clemens_drive_get(&mmio, driveType)->has_disk || !diskStatuses_[driveType].isMounted())
         return false;
+    if (diskStatuses_[driveType].isEjecting)
+        return true;
+
+    struct ClemensNibbleDisk disk {};
+    clemens_eject_disk_async(&mmio, driveType, &disk);
+    //  save immediately - this can be done again when fully ejected
+    saveDisk(driveType, disk);
+    return true;
+}
+
+void ClemensStorageUnit::update(ClemensMMIO &mmio) {
+    for (auto it = diskStatuses_.begin(); it != diskStatuses_.end(); ++it) {
+        auto driveType = static_cast<ClemensDriveType>(it - diskStatuses_.begin());
+        auto *drive = clemens_drive_get(&mmio, driveType);
+        auto &status = diskStatuses_[driveType];
+        if (!diskStatuses_[driveType].isMounted()) {
+            continue;
+        }
+    }
+}
+
+const ClemensDiskDriveStatus &ClemensStorageUnit::getDriveStatus(ClemensDriveType driveType) const {
+    return diskStatuses_[driveType];
+}
+
+const ClemensDiskDriveStatus &ClemensStorageUnit::getSmartPortStatus(unsigned driveIndex) const {
+    return hardDiskStatuses_[driveIndex];
+}
+
+void ClemensStorageUnit::saveDisk(ClemensDriveType driveType, ClemensNibbleDisk &disk) {
+    if (!diskStatuses_[driveType].isMounted())
+        return;
 
     decodeBuffer_.reset();
     auto writeOut = decodeBuffer_.forwardSize(decodeBuffer_.getCapacity());
     auto decodedDisk = diskAssets_[driveType].decode(writeOut.first, writeOut.second, disk);
-    if (!decodedDisk.second) {
-        diskStatuses_[driveType].error = ClemensDiskDriveStatus::Error::SaveFailed;
-        return false;
-    }
+    if (decodedDisk.second) {
+        diskStatuses_[driveType].saveFailed();
 
-    auto imagePath = diskAssets_[driveType].path();
-    std::ofstream out(imagePath, std::ios_base::out | std::ios_base::binary);
-    if (!out.fail()) {
-        out.write((char *)writeOut.first, decodedDisk.first);
-        if (!out.fail() && !out.bad()) {
-            diskStatuses_[driveType].isSaved = true;
-            return true;
+        auto imagePath = diskAssets_[driveType].path();
+        std::ofstream out(imagePath, std::ios_base::out | std::ios_base::binary);
+        if (!out.fail()) {
+            out.write((char *)writeOut.first, decodedDisk.first);
+            if (!out.fail() && !out.bad()) {
+                diskStatuses_[driveType].saved();
+                return;
+            }
         }
     }
+
     diskStatuses_[driveType].saveFailed();
-
-    return false;
 }
 
-bool ClemensStorageUnit::saveHardDisk(unsigned driveIndex, ClemensProDOSDisk &disk) {
-
-    return disk.save();
-}
-
-bool ClemensStorageUnit::ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType) {
-    struct ClemensNibbleDisk disk;
-    if (!clemens_drive_get(&mmio, driveType)->has_disk)
-        return false;
-    clemens_eject_disk_async(&mmio, driveType, &disk);
-    //  save immediately - this can be done again when fully ejected
-    if (!saveDisk(driveType, disk)) {
+void ClemensStorageUnit::saveHardDisk(unsigned driveIndex, ClemensProDOSDisk &disk) {
+    if (!hardDiskStatuses_[driveIndex].isMounted())
+        return;
+    if (!disk.save()) {
+        hardDiskStatuses_[driveIndex].saveFailed();
+        return;
     }
-    return true;
+    hardDiskStatuses_[driveIndex].saved();
 }
-
-void ClemensStorageUnit::query(
-    ClemensMMIO &mmio, std::array<ClemensDiskDriveState, kClemensDrive_Count> &diskDriveStates,
-    std::array<ClemensDiskDriveState, CLEM_SMARTPORT_DRIVE_LIMIT> &smartPortStates) {}
-
-void ClemensStorageUnit::commit() {}
 
 bool ClemensStorageUnit::serialize(mpack_writer_t *writer) { return false; }
 

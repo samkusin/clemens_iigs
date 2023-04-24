@@ -1,5 +1,5 @@
 #include "clem_command_queue.hpp"
-#include "clem_disk_utils.hpp"
+#include "disklib/clem_disk_utils.hpp"
 
 #include "cinek/ckdebug.h"
 
