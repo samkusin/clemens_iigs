@@ -1,5 +1,5 @@
 #include "clem_disk_browser.hpp"
-#include "disklib/clem_disk_asset.hpp"
+#include "clem_disk_asset.hpp"
 #include "imgui.h"
 
 #include <algorithm>
@@ -19,8 +19,13 @@
 #include "clem_woz.h"
 
 #if defined(_WIN32)
-#include <fileapi.h>
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 static unsigned win32GetDriveLettersBitmask() { return ::GetLogicalDrives(); }
+static struct tm *getTimeSpecFromTime(struct tm *tspec, std::time_t timet) {
+    localtime_s(tspec, &timet);
+    return tspec;
+}
 #else
 static unsigned win32GetDriveLettersBitmask() { return 0; }
 static struct tm *getTimeSpecFromTime(struct tm *tspec, std::time_t timet) {
@@ -196,7 +201,7 @@ bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
 
     if (!getRecordsResult_.valid()) {
         getRecordsResult_ =
-            std::async(std::launch::async, &getRecordsFromDirectory, cwdPath, diskType_);
+            std::async(std::launch::async, &getRecordsFromDirectory, cwdPath.string(), diskType_);
     }
     if (getRecordsResult_.valid()) {
         if (getRecordsResult_.wait_for(std::chrono::milliseconds(1)) == std::future_status::ready) {

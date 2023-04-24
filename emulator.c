@@ -718,23 +718,25 @@ void clemens_create_page_mapping(struct ClemensMemoryPageInfo *page, uint8_t pag
 }
 
 int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks_step, void *rom,
-                 size_t romSize, void *e0bank, void *e1bank, void *fpiRAM,
+                 unsigned int fpiROMBankCount, void *e0bank, void *e1bank, void *fpiRAM,
                  unsigned int fpiRAMBankCount) {
-    unsigned idx;
+    unsigned idx, rom_bank_idx;
 
     clemens_simple_init(machine, speed_factor, clocks_step, fpiRAM, fpiRAMBankCount);
 
     if (rom == NULL) {
         return -1;
     }
-    if (fpiRAMBankCount < 4 || fpiRAM == NULL || e0bank == NULL || e1bank == NULL) {
+    if (fpiRAMBankCount < 2 || fpiRAM == NULL || e0bank == NULL || e1bank == NULL) {
         return -2;
     }
     /* memory organization for the FPI */
     /* TODO: Support ROM 01 */
-    for (idx = 0xfc; idx <= 0xff; ++idx) {
+    rom_bank_idx = 0x100 - fpiROMBankCount;
+    for (idx = rom_bank_idx; idx < 0x100; ++idx) {
         machine->mem.fpi_bank_used[idx] = true;
-        machine->mem.fpi_bank_map[idx] = (uint8_t *)rom + CLEM_IIGS_BANK_SIZE * (idx - 0xfc);
+        machine->mem.fpi_bank_map[idx] =
+            (uint8_t *)rom + CLEM_IIGS_BANK_SIZE * (idx - rom_bank_idx);
     }
     /* TODO: remap non used banks to used banks per the wrapping mechanism on
        the IIgs
@@ -3086,12 +3088,15 @@ void clemens_emulate_cpu(ClemensMachine *clem) {
             cpu->enabled = true;
             clem_debug_reset(&clem->dev_debug);
 
+            CLEM_LOG("Machine RESB LO");
+
             _clem_cycle(clem);
         }
         _clem_cycle(clem);
         if (clem->resb_counter > 0) {
             if (--clem->resb_counter <= 0) {
                 cpu->pins.resbIn = true;
+                CLEM_LOG("Machine RESB HI");
             }
         }
         // Clocks_spent set to ZERO!  All MMIO should follow suit now that reset cycle

@@ -17,17 +17,12 @@ set(CMAKE_CXX_STANDARD 17)
 # build imgui
 # build app
 
-add_subdirectory(ext/imgui)
+
 
 set(CINEK_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/cinek/ckdebug.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/cinek/buffer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/cinek/encode.c")
-
-set(SOKOL_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/ext/sokol/sokol_gfx.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ext/sokol/sokol_app.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ext/sokol/sokol_glue.h")
 
 set(FMT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/core.h"
@@ -39,6 +34,66 @@ set(EXT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/ini.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/miniz.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/stb.c")
+
+add_library(clemens_host_core
+    ${CINEK_SOURCES}
+    ${FMT_SOURCES}
+    ${EXT_SOURCES})
+target_compile_features( clemens_host_core PUBLIC cxx_std_17 )
+target_link_libraries(clemens_host_core
+    PUBLIC
+        clemens_65816_mmio
+        clemens_65816_render
+        clemens_65816_serializer
+        clemens_65816_iocards
+        clemens_65816_smartport_devices)
+target_include_directories(clemens_host_core
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ext ${CMAKE_CURRENT_SOURCE_DIR})
+
+if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(clemens_host_core PUBLIC -Wall -Wextra -Wno-missing-field-initializers -pedantic)
+    target_compile_options(clemens_host_core PUBLIC $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-fno-exceptions -fno-rtti>)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        # GCC 8 doesn't link the fs library even with C++17 enabled
+        target_link_libraries(clemens_host_core PUBLIC $<$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>:stdc++fs>)
+    endif()
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    # Removing MSVC options that are less necessary for game / simulation
+    # development.
+    #
+    # CRT_SECURE_NO_WARNINGS removes the C11-ish enforcement of using secure
+    # versions of classic C APIs that MSVC enforces instead of relying on a
+    # catch-all language dialect option like GCC/Clang
+    #
+    # ITERATOR_DEBUG_LEVEL set to 0 removes std container debugging enhancements
+    # specific to MSVC's implementation
+    #
+    # Remove Exceptions and RTTI ON defaults to eliminate warnings when we disable them
+
+    # TODO: this should be part of a toolchain file
+    string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    string(REGEX REPLACE "/EHsc*" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+
+    target_compile_definitions(clemens_host_core PUBLIC _CRT_SECURE_NO_WARNINGS _ITERATOR_DEBUG_LEVEL=0)
+    target_compile_options(clemens_host_core PUBLIC /EHs-c-)
+    target_compile_definitions(clemens_host_core PUBLIC _HAS_EXCEPTIONS=0 FMT_EXCEPTIONS=0)
+    target_compile_options(clemens_host_core PUBLIC /GR-)
+else()
+    message(WARNING "Unsupported compiler")
+endif()
+
+
+set(CLEMENS_HOST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_subdirectory(harness)
+add_subdirectory(ext/imgui)
+
+################################################################################
+
+set(SOKOL_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/sokol/sokol_gfx.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/sokol/sokol_app.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/sokol/sokol_glue.h")
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(PLATFORM_SOURCES
@@ -57,14 +112,12 @@ endif()
 set(DISKLIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_disk_browser.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_disk_asset.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_disk_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_prodos_disk.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_storage_unit.cpp")
 
 set(PROJECT_SOURCES
     ${PLATFORM_SOURCES}
-    ${CINEK_SOURCES}
-    ${EXT_SOURCES}
-    ${FMT_SOURCES}
     ${SOKOL_SOURCES}
     ${DISKLIB_SOURCES}
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_assets.cpp"
@@ -74,7 +127,6 @@ set(PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_command_queue.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_configuration.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk_library.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_front.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_app.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_utils.cpp"
@@ -92,22 +144,14 @@ set(PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_serializer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_startup_view.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_smartport_disk.cpp")
- 
+
 add_executable(clemens_iigs ${PROJECT_SOURCES})
-target_include_directories(clemens_iigs
-    PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
-            ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_CURRENT_SOURCE_DIR}/ext)
 target_link_libraries(clemens_iigs
     PRIVATE
-        clemens_65816_mmio
-        clemens_65816_render
-        clemens_65816_serializer
-        clemens_65816_iocards
-        clemens_65816_smartport_devices
+        clemens_host_core
         imgui)
-
-target_compile_features( clemens_iigs PRIVATE cxx_std_17 )
+target_include_directories(clemens_iigs
+    PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_D3D11)
@@ -140,38 +184,6 @@ elseif(APPLE)
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/macos_bundle_info_plist.in"
         #MACOSX_BUNDLE_ICON_FILE ${PROJECT_SOURCE_DIR}/packaging/exampleApp.icns
         XCODE_ATTRIBUTE_EXECUTABLE_NAME "Clemens IIGS")
-endif()
-
-if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(clemens_iigs PRIVATE -Wall -Wextra -Wno-missing-field-initializers -pedantic)
-    target_compile_options(clemens_iigs PRIVATE $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-fno-exceptions -fno-rtti>)
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        # GCC 8 doesn't link the fs library even with C++17 enabled
-        target_link_libraries(clemens_iigs PRIVATE $<$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>:stdc++fs>)
-    endif()
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    # Removing MSVC options that are less necessary for game / simulation
-    # development.
-    #
-    # CRT_SECURE_NO_WARNINGS removes the C11-ish enforcement of using secure
-    # versions of classic C APIs that MSVC enforces instead of relying on a
-    # catch-all language dialect option like GCC/Clang
-    #
-    # ITERATOR_DEBUG_LEVEL set to 0 removes std container debugging enhancements
-    # specific to MSVC's implementation
-    #
-    # Remove Exceptions and RTTI ON defaults to eliminate warnings when we disable them
-
-    # TODO: this should be part of a toolchain file
-    string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-    string(REGEX REPLACE "/EHsc*" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-
-    target_compile_definitions(clemens_iigs PRIVATE _CRT_SECURE_NO_WARNINGS _ITERATOR_DEBUG_LEVEL=0)
-    target_compile_options(clemens_iigs PRIVATE /EHs-c-)
-    target_compile_definitions(clemens_iigs PRIVATE _HAS_EXCEPTIONS=0 FMT_EXCEPTIONS=0)
-    target_compile_options(clemens_iigs PRIVATE /GR-)
-else()
-    message(WARNING "Unsupported compiler")
 endif()
 
 # handle packaging - this is an abbreviated form of the CPack packaging scripts

@@ -1,7 +1,7 @@
 #include "clem_serializer.hpp"
-#include "clem_disk_utils.hpp"
 #include "clem_host_utils.hpp"
 #include "clem_smartport_disk.hpp"
+#include "disklib/clem_disk_utils.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 #include "serializer.h"

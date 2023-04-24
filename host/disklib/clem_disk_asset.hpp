@@ -63,6 +63,8 @@ struct ClemensDiskDriveStatus {
 
     void mount(const std::string &path);
     void saveFailed();
+    void mountFailed();
+    void saved();
     bool isMounted() const;
 };
 

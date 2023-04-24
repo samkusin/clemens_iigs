@@ -24,6 +24,16 @@ void ClemensDiskDriveStatus::saveFailed() {
     isSaved = false;
 }
 
+void ClemensDiskDriveStatus::mountFailed() {
+    error = Error::MountFailed;
+    assetPath.clear();
+}
+
+void ClemensDiskDriveStatus::saved() {
+    error = Error::None;
+    isSaved = true;
+}
+
 bool ClemensDiskDriveStatus::isMounted() const { return !assetPath.empty(); }
 
 ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath)
@@ -215,6 +225,7 @@ std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
     case ImageWOZ:
         if (std::holds_alternative<ClemensWOZDisk>(metadata_)) {
             auto disk = std::get<ClemensWOZDisk>(metadata_);
+            disk.nib = const_cast<ClemensNibbleDisk *>(&nib);
             size_t outSize = outEnd - out;
             out = clem_woz_serialize(&disk, out, &outSize);
         }
@@ -241,14 +252,14 @@ std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
     case ImageProDOS:
         if (std::holds_alternative<Clemens2IMGDisk>(metadata_)) {
             auto disk = std::get<Clemens2IMGDisk>(metadata_);
-#pragma message("ProDOS save")
+#pragma message("TODO: ProDOS save")
         }
         break;
     case ImageDOS:
     case ImageDSK:
         if (std::holds_alternative<Clemens2IMGDisk>(metadata_)) {
             auto disk = std::get<Clemens2IMGDisk>(metadata_);
-#pragma message("DOS save")
+#pragma message("TODO: DOS save")
         }
         break;
     case ImageNone:

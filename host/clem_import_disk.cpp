@@ -1,8 +1,8 @@
 #include "clem_import_disk.hpp"
 
 #include "clem_2img.h"
-#include "clem_disk_utils.hpp"
 #include "clem_woz.h"
+#include "disklib/clem_disk_utils.hpp"
 
 #include <cassert>
 #include <cstdlib>
