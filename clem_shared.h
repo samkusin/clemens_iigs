@@ -6,7 +6,14 @@
 typedef uint64_t clem_clocks_time_t;
 typedef uint32_t clem_clocks_duration_t;
 
-typedef uint8_t *(*ClemensSerializerAllocateCb)(unsigned, void *);
+#define CLEM_SERIALIZER_ALLOCATION_FPI_MEMORY_BANK   0
+#define CLEM_SERIALIZER_ALLOCATION_MEGA2_MEMORY_BANK 1
+#define CLEM_SERIALIZER_ALLOCATION_DISK_NIB_3_5      2
+#define CLEM_SERIALIZER_ALLOCATION_DISK_NIB_5_25     3
+#define CLEM_SERIALIZER_ALLOCATION_AUDIO_BUFFER      4
+
+typedef uint8_t *(*ClemensSerializerAllocateCb)(unsigned /* type */, unsigned /* amount */,
+                                                void * /* context */);
 
 #define CLEM_TIME_UNINITIALIZED ((clem_clocks_time_t)(-1))
 

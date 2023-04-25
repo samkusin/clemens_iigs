@@ -13,8 +13,6 @@ add_custom_command(OUTPUT ${CLEMENS_TEST_COMMON_ASSETS}
     COMMENT "Unarchiving test assets into ${CMAKE_CURRENT_BINARY_DIR}"
     VERBATIM)
 
-add_subdirectory(unity)
-
 add_library(clem_test_utils STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils.c)
 

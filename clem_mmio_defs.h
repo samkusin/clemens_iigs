@@ -738,4 +738,9 @@
 
 #define CLEM_AUDIO_DIAGNOSTICS 0
 
+// See clemens_eject_disk_in_progress()
+#define CLEM_EJECT_DISK_STATUS_NONE        0
+#define CLEM_EJECT_DISK_STATUS_IN_PROGRESS 1
+#define CLEM_EJECT_DISK_STATUS_EJECTED     2
+
 #endif

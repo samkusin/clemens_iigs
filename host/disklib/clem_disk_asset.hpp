@@ -11,12 +11,25 @@
 #include <variant>
 #include <vector>
 
+//  forward declarations
+typedef struct mpack_reader_t mpack_reader_t;
+typedef struct mpack_writer_t mpack_writer_t;
+
 //  A container for an *external* disk image.
 //  The data
 struct ClemensDiskAsset {
-    enum ImageType { ImageNone, ImageDSK, ImageProDOS, ImageDOS, Image2IMG, ImageWOZ };
-    enum DiskType { DiskNone, Disk525, Disk35, DiskHDD };
+    enum ImageType {
+        ImageInvalid,
+        ImageNone,
+        ImageDSK,
+        ImageProDOS,
+        ImageDOS,
+        Image2IMG,
+        ImageWOZ
+    };
+    enum DiskType { DiskInvalid, DiskNone, Disk525, Disk35, DiskHDD };
     enum ErrorType {
+        ErrorInvalid,
         ErrorNone,
         ErrorInvalidImage,
         ErrorImageNotSupported,
@@ -40,6 +53,9 @@ struct ClemensDiskAsset {
     //  final output will be serializable in full to a file of the asset's original
     //  asset type.
     std::pair<size_t, bool> decode(uint8_t *out, uint8_t *outEnd, const ClemensNibbleDisk &nib);
+
+    bool serialize(mpack_writer_t *writer);
+    bool unserialize(mpack_reader_t *reader);
 
   private:
     bool nibblizeDisk(struct Clemens2IMGDisk &disk);

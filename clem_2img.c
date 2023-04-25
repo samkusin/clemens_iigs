@@ -137,7 +137,6 @@ bool clem_2img_parse_header(struct Clemens2IMGDisk *disk, const uint8_t *data,
         case 5: // flags
             data_size = _increment_data_ptr(data, 4, data_end);
             if (data_size == 4) {
-                disk->is_nibblized = false;
                 param32 = _decode_u32(data);
                 if (param32 & 0x80000000) {
                     disk->is_write_protected = true;
@@ -371,7 +370,6 @@ bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, co
         disk->dos_volume = 0x00;
     }
     disk->is_write_protected = true;
-    disk->is_nibblized = false;
     return true;
 }
 

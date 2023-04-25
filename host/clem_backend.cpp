@@ -259,7 +259,7 @@ void ClemensBackend::ejectAllDisks() {
         auto driveIndex = unsigned(diskDriveIt - diskDrives_.begin());
         auto driveType = static_cast<ClemensDriveType>(driveIndex);
 
-        clemens_eject_disk(&mmio_, driveType, &disks_[driveIndex]);
+        clemens_eject_disk_old(&mmio_, driveType, &disks_[driveIndex]);
         unmountDisk(driveType);
     }
     for (auto hardDriveIt = smartPortDrives_.begin(); hardDriveIt != smartPortDrives_.end();
@@ -551,7 +551,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
             if (diskDrive.imagePath.empty())
                 continue;
             if (diskDrive.isEjecting || !clemensDrive->has_disk) {
-                if (clemens_eject_disk_async(&mmio_, driveType, &disks_[driveIndex])) {
+                if (clemens_eject_disk_async_old(&mmio_, driveType, &disks_[driveIndex])) {
                     diskDrive.isEjecting = false;
                     diskDrive.saveFailed = !unmountDisk(driveType);
                 }

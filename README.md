@@ -228,6 +228,7 @@ All projects below have permissive enough licenses (MIT, BSD, Apache) to be dist
 * [fmt](https://github.com/fmtlib/fmt) A minimal std::format implementation
 * [doctest](https://github.com/doctest/doctest) A minimal C++ single-header testing framework
 * [inih](https://github.com/benhoyt/inih) A minimal C based INI file parser
+* [json](https://github.com/nlohmann/json) Used for test serialization
 
 ## License
 
