@@ -1,6 +1,7 @@
 #ifndef CLEM_EMULATOR_MMIO_H
 #define CLEM_EMULATOR_MMIO_H
 
+#include "clem_disk.h"
 #include "clem_mmio.h"
 
 #ifdef __cplusplus
@@ -96,14 +97,41 @@ bool clemens_assign_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
                          struct ClemensNibbleDisk *disk);
 
 /**
+ * @brief Insert a disk of specified type, returning the disk that emulators populate
+ *
+ * @param mmio
+ * @param drive_type
+ * @return struct ClemensNibbleDisk*
+ */
+struct ClemensNibbleDisk *clemens_insert_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type);
+
+/**
  * @brief
  *
  * @param mmio
  * @param drive_type
  * @param disk  The output disk
  */
-void clemens_eject_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
-                        struct ClemensNibbleDisk *disk);
+void clemens_eject_disk_old(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
+                            struct ClemensNibbleDisk *disk);
+
+/**
+ * @brief
+ *
+ * @param mmio
+ * @param drive_type
+ * @return struct ClemensNibbleDisk*
+ */
+struct ClemensNibbleDisk *clemens_eject_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type);
+
+/**
+ * @brief Polls the current eject status until done (returns false)
+ *
+ * @param mmio
+ * @param drive_type
+ * @return unsigned See CLEM_EJECT_DISK_STATUS_XXX
+ */
+unsigned clemens_eject_disk_in_progress(ClemensMMIO *mmio, enum ClemensDriveType drive_type);
 
 /**
  * @brief Performs a device specific eject of a disk (3.5" disks mainly.)
@@ -117,8 +145,8 @@ void clemens_eject_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
  * @return true Disk has ejected
  * @return false Disk is still ejecting
  */
-bool clemens_eject_disk_async(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
-                              struct ClemensNibbleDisk *disk);
+bool clemens_eject_disk_async_old(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
+                                  struct ClemensNibbleDisk *disk);
 
 /**
  * @brief Assigns a SmartPort device to one of the available SmartPort slots.

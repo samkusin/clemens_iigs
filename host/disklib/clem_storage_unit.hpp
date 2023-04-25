@@ -35,11 +35,14 @@ class ClemensStorageUnit {
     bool insertDisk(ClemensMMIO &mmio, ClemensDriveType driveType, const std::string &path);
     bool ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType);
     void update(ClemensMMIO &mmio);
-    bool serialize(mpack_writer_t *writer);
-    bool unserialize(mpack_reader_t *reader);
+    bool serialize(ClemensMMIO &mmio, mpack_writer_t *writer);
+    bool unserialize(ClemensMMIO &mmio, mpack_reader_t *reader, ClemensUnserializerContext context);
 
     const ClemensDiskDriveStatus &getDriveStatus(ClemensDriveType driveType) const;
     const ClemensDiskDriveStatus &getSmartPortStatus(unsigned driveIndex) const;
+
+    cinek::Range<uint8_t> getDiskBuffer(ClemensDriveType driveType);
+    cinek::Range<uint8_t> getSmartPortBuffer(unsigned driveIndex);
 
   private:
     void allocateBuffers();

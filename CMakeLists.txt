@@ -74,6 +74,7 @@ set(CLEMENS_TEST_ASSETS_ARCHIVE ${CMAKE_CURRENT_SOURCE_DIR}/data.zip)
 
 if(BUILD_TESTING)
 enable_testing()
+add_subdirectory(external/unity)
 add_subdirectory(tests)
 endif()
 

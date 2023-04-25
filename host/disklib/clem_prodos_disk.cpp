@@ -9,6 +9,8 @@
 #include <fstream>
 #include <ios>
 
+#include "external/mpack.h"
+
 ClemensProDOSDisk::ClemensProDOSDisk() {}
 
 ClemensProDOSDisk::ClemensProDOSDisk(cinek::ByteBuffer backingBuffer)
@@ -125,4 +127,66 @@ uint8_t ClemensProDOSDisk::doWriteBlock(void *userContext, unsigned /*driveIndex
 
 uint8_t ClemensProDOSDisk::doFlush(void * /*userContext*/, unsigned /*driveIndex*/) {
     return CLEM_SMARTPORT_STATUS_CODE_OFFLINE;
+}
+
+bool ClemensProDOSDisk::serialize(mpack_writer_t *writer, ClemensSmartPortDevice &device) {
+    mpack_build_map(writer);
+
+    mpack_write_cstr(writer, "impl");
+    {
+        if (interface_.block_limit > 0) {
+            clem_smartport_prodos_hdd32_serialize(writer, &device, &interface_);
+        } else {
+            mpack_write_nil(writer);
+        }
+    }
+
+    //  this will be either a 2IMG or a ProDOS image
+    mpack_write_cstr(writer, "pages");
+    {
+        unsigned bytesLeft = (unsigned)storage_.getSize();
+        unsigned pageCount = (bytesLeft + 4095) / 4096;
+        unsigned byteOffset = 0;
+        mpack_start_array(writer, pageCount);
+        while (bytesLeft > 0) {
+            unsigned writeCount = std::min(bytesLeft, 4096U);
+            mpack_write_bin(writer, (const char *)storage_.getHead() + byteOffset, writeCount);
+            bytesLeft -= writeCount;
+            byteOffset += writeCount;
+        }
+        mpack_finish_array(writer);
+    }
+
+    mpack_complete_map(writer);
+    return true;
+}
+
+bool ClemensProDOSDisk::unserialize(mpack_reader_t *reader, ClemensSmartPortDevice &device,
+                                    ClemensUnserializerContext context) {
+    mpack_expect_map(reader);
+
+    mpack_expect_cstr_match(reader, "impl");
+    if (mpack_peek_tag(reader).type == mpack_type_nil) {
+        mpack_expect_nil(reader);
+    } else {
+        clem_smartport_prodos_hdd32_unserialize(reader, &device, &interface_, context.allocCb,
+                                                context.allocUserPtr);
+    }
+    mpack_expect_cstr_match(reader, "pages");
+    {
+        unsigned pageCount = mpack_expect_array(reader);
+        storage_.reset();
+        assert((unsigned)storage_.getCapacity() >= pageCount * 4096);
+        while (pageCount > 0) {
+            unsigned byteCount = mpack_expect_bin(reader);
+            auto bytes = storage_.forwardSize(byteCount);
+            mpack_read_bytes(reader, (char *)bytes.first, byteCount);
+            mpack_done_bin(reader);
+            pageCount--;
+        }
+        mpack_done_array(reader);
+    }
+
+    mpack_done_map(reader);
+    return true;
 }

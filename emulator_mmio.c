@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "clem_disk.h"
 #include "clem_mmio_defs.h"
 
 #include "emulator.h"
@@ -64,6 +65,21 @@ struct ClemensSmartPortUnit *clemens_smartport_unit_get(ClemensMMIO *mmio, unsig
     return &mmio->active_drives.smartport[unit_index];
 }
 
+//  TODO:
+//  1. 'disk' is no longer passed in
+//  2. assign and eject no longer take a disk pointer
+//  3. drive->has_disk determines whether the disk is mounted
+//  4. clemens_insert_disk returns the disk pointer for apps to
+//     write to
+//  5. clemens_eject_disk returns the disk pointer for apps to read from
+//  6. there will be no memcpys in assign and eject since the pointers
+//     to drive->disk are the ones used for reading and writing disks
+//  7. clemens_assign_disk_buffer(mmio, drive_type, bits, bits_end)
+//     called by application on init()
+//  8. this means clem_storage_unit.cpp doesn't allocate any nibble buffers
+//     this means clem_storage_unit constructor takes as input the hard disk
+//     buffer, and so does unserialize()
+//          - clem_storage_unit does not handle allocation of disk buffers anymore
 bool clemens_assign_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
                          struct ClemensNibbleDisk *disk) {
     struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
@@ -94,12 +110,12 @@ bool clemens_assign_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
     if (disk->disk_type != CLEM_DISK_TYPE_NONE) {
         CLEM_LOG("%s inserting disk", s_drive_names[drive_type]);
     }
-    clem_iwm_insert_disk(&mmio->dev_iwm, drive, disk);
+    clem_iwm_insert_disk_old(&mmio->dev_iwm, drive, disk);
     return true;
 }
 
-void clemens_eject_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
-                        struct ClemensNibbleDisk *disk) {
+void clemens_eject_disk_old(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
+                            struct ClemensNibbleDisk *disk) {
     struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
     if (!drive)
         return;
@@ -107,20 +123,47 @@ void clemens_eject_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
     if (drive->disk.disk_type != CLEM_DISK_TYPE_NONE) {
         CLEM_LOG("%s ejecting disk", s_drive_names[drive_type]);
     }
-    clem_iwm_eject_disk(&mmio->dev_iwm, drive, disk);
+    clem_iwm_eject_disk_old(&mmio->dev_iwm, drive, disk);
 }
 
-bool clemens_eject_disk_async(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
-                              struct ClemensNibbleDisk *disk) {
+bool clemens_eject_disk_async_old(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
+                                  struct ClemensNibbleDisk *disk) {
     struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
     if (drive) {
         if (drive->disk.disk_type != CLEM_DISK_TYPE_NONE) {
             CLEM_LOG("%s ejecting disk", s_drive_names[drive_type]);
         }
-        return clem_iwm_eject_disk_async(&mmio->dev_iwm, drive, disk);
+        return clem_iwm_eject_disk_async_old(&mmio->dev_iwm, drive, disk);
     }
-    clem_iwm_eject_disk(&mmio->dev_iwm, drive, disk);
+    clem_iwm_eject_disk_old(&mmio->dev_iwm, drive, disk);
     return true;
+}
+
+struct ClemensNibbleDisk *clemens_insert_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type) {
+    struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
+    struct ClemensNibbleDisk *disk = NULL;
+    if (drive) {
+        disk = clem_iwm_insert_disk(&mmio->dev_iwm, drive);
+        if (disk) {
+            CLEM_LOG("%s inserting disk", s_drive_names[drive_type]);
+        }
+    }
+    return disk;
+}
+
+unsigned clemens_eject_disk_in_progress(ClemensMMIO *mmio, enum ClemensDriveType drive_type) {
+    struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
+    if (!drive)
+        return CLEM_EJECT_DISK_STATUS_NONE;
+
+    return clem_iwm_eject_disk_in_progress(&mmio->dev_iwm, drive);
+}
+
+struct ClemensNibbleDisk *clemens_eject_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type) {
+    struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
+    if (!drive)
+        return NULL;
+    return clem_iwm_eject_disk(&mmio->dev_iwm, drive);
 }
 
 bool clemens_assign_smartport_disk(ClemensMMIO *mmio, unsigned drive_index,

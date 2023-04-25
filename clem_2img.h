@@ -45,7 +45,6 @@ struct Clemens2IMGDisk {
     uint32_t image_buffer_length; /**< Length of the original memory buffer */
     uint32_t image_data_offset;   /**< Offset to original track data */
     bool is_write_protected;      /**< Write protected image */
-    bool is_nibblized;            /**< See the clem_2img_nibblize_data call */
 
     /* This is provided by the caller.  At the very least the nib->bits_data and
        nib->bits_data_end byte vector must be defined before calling

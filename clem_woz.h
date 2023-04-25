@@ -20,6 +20,7 @@
 /* clem_woz_unserialize errors */
 #define CLEM_WOZ_INVALID_DATA        (-1)
 #define CLEM_WOZ_UNSUPPORTED_VERSION (-2)
+#define CLEM_WOZ_NO_NIB              (-3) // if nib was NULL
 
 #define CLEM_WOZ_CHUNK_INFO     0
 #define CLEM_WOZ_CHUNK_TMAP     1
@@ -64,12 +65,13 @@ struct ClemensWOZChunkHeader {
 };
 
 struct ClemensWOZDisk {
+    unsigned version;
     unsigned disk_type; /* CLEM_WOZ_DISK_XXX */
     unsigned boot_type; /* CLEM_WOZ_BOOT_XXX */
     unsigned flags;     /* CLEM_WOZ_SUPPORT, CLEM_WOZ_IMAGE */
     unsigned required_ram_kb;
     unsigned max_track_size_bytes;
-    unsigned version;
+    unsigned bit_timing_ns;
     /* These values are not used, but are persisted so we don't lose data on
        the serialization pass */
     uint16_t flux_block;
