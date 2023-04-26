@@ -26,3 +26,5 @@ add_executable(clemens_test_harness
 
 target_link_libraries(clemens_test_harness
     PRIVATE clemens_host_core)
+
+target_compile_definitions(clemens_test_harness PRIVATE JSON_NOEXCEPTION)

@@ -1,0 +1,26 @@
+[
+    {
+        "act": "reset"
+    },
+    {
+        "act": "step",
+        "param": 100
+    },
+    {
+        "act": "insert_disk",
+        "param": {
+            "drive": "s6d1",
+            "disk": "data/dos_3_3_master.woz"
+        }
+    },
+    {
+        "act": "step",
+        "param": 100
+    },
+    {
+        "act": "eject_disk",
+        "param": {
+            "drive": "s6d1"
+        }
+    }
+]
