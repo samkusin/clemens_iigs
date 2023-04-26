@@ -729,7 +729,7 @@ static unsigned clemens_unserialize_custom(mpack_reader_t *reader, void *ptr, un
         v1 = mpack_expect_bin(reader);
         if (v0 != v1) {
             audio_mix_buffer->data =
-                (*alloc_cb)(CLEM_SERIALIZER_ALLOCATION_AUDIO_BUFFER, v1, context);
+                (*alloc_cb)(CLEM_EMULATOR_ALLOCATION_AUDIO_BUFFER, v1, context);
         }
         mpack_read_bytes(reader, (char *)audio_mix_buffer->data, v1);
         mpack_done_bin(reader);
@@ -744,9 +744,9 @@ static unsigned clemens_unserialize_custom(mpack_reader_t *reader, void *ptr, un
             v0 = mpack_expect_bin(reader);
             v1 = (nib_disk->bits_data_end - nib_disk->bits_data);
             if (v0 > v1) {
-                unsigned alloc_type = CLEM_SERIALIZER_ALLOCATION_DISK_NIB_3_5;
+                unsigned alloc_type = CLEM_EMULATOR_ALLOCATION_DISK_NIB_3_5;
                 if (nib_disk->disk_type == CLEM_DISK_TYPE_5_25)
-                    alloc_type = CLEM_SERIALIZER_ALLOCATION_DISK_NIB_5_25;
+                    alloc_type = CLEM_EMULATOR_ALLOCATION_DISK_NIB_5_25;
                 nib_disk->bits_data = (uint8_t *)(*alloc_cb)(alloc_type, v0, context);
                 nib_disk->bits_data_end = nib_disk->bits_data + v0;
             }
@@ -798,16 +798,16 @@ mpack_reader_t *clemens_unserialize_machine(mpack_reader_t *reader, ClemensMachi
             }
             if (!machine->mem.fpi_bank_map[idx]) {
                 machine->mem.fpi_bank_map[idx] =
-                    (*alloc_cb)(CLEM_SERIALIZER_ALLOCATION_FPI_MEMORY_BANK, 1, context);
+                    (*alloc_cb)(CLEM_EMULATOR_ALLOCATION_FPI_MEMORY_BANK, 1, context);
             }
             mpack_expect_bin_buf(reader, (char *)machine->mem.fpi_bank_map[idx],
                                  CLEM_IIGS_BANK_SIZE);
         }
     }
     machine->mem.mega2_bank_map[0] =
-        (*alloc_cb)(CLEM_SERIALIZER_ALLOCATION_MEGA2_MEMORY_BANK, 1, context);
+        (*alloc_cb)(CLEM_EMULATOR_ALLOCATION_MEGA2_MEMORY_BANK, 1, context);
     machine->mem.mega2_bank_map[1] =
-        (*alloc_cb)(CLEM_SERIALIZER_ALLOCATION_MEGA2_MEMORY_BANK, 1, context);
+        (*alloc_cb)(CLEM_EMULATOR_ALLOCATION_MEGA2_MEMORY_BANK, 1, context);
     mpack_expect_bin_buf(reader, (char *)machine->mem.mega2_bank_map[0], CLEM_IIGS_BANK_SIZE);
     mpack_expect_bin_buf(reader, (char *)machine->mem.mega2_bank_map[1], CLEM_IIGS_BANK_SIZE);
 
