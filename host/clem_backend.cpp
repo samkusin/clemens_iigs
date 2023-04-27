@@ -6,7 +6,7 @@
 #include "clem_mem.h"
 #include "clem_program_trace.hpp"
 #include "clem_serializer.hpp"
-#include "disklib/clem_disk_utils.hpp"
+#include "core/clem_disk_utils.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 #include "iocards/mockingboard.h"

@@ -15,7 +15,7 @@ extern "C" {
  * @return true
  * @return false
  */
-bool clemens_is_mmio_initialized(ClemensMMIO *mmio);
+bool clemens_is_mmio_initialized(const ClemensMMIO *mmio);
 
 /**
  * @brief Emulate the I/O portion of an Apple IIgs
@@ -97,15 +97,6 @@ bool clemens_assign_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
                          struct ClemensNibbleDisk *disk);
 
 /**
- * @brief Insert a disk of specified type, returning the disk that emulators populate
- *
- * @param mmio
- * @param drive_type
- * @return struct ClemensNibbleDisk*
- */
-struct ClemensNibbleDisk *clemens_insert_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type);
-
-/**
  * @brief
  *
  * @param mmio
@@ -114,6 +105,41 @@ struct ClemensNibbleDisk *clemens_insert_disk(ClemensMMIO *mmio, enum ClemensDri
  */
 void clemens_eject_disk_old(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
                             struct ClemensNibbleDisk *disk);
+
+/**
+ * @brief Performs a device specific eject of a disk (3.5" disks mainly.)
+ *
+ * The eject sequence can take a second or so if exact Apple Drive 3.5"
+ * emulation is desired.
+ *
+ * @param mmio
+ * @param drive_type
+ * @param disk  The final nibbilised disk object
+ * @return true Disk has ejected
+ * @return false Disk is still ejecting
+ */
+bool clemens_eject_disk_async_old(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
+                                  struct ClemensNibbleDisk *disk);
+
+/**
+ * @brief
+ *
+ * @param mmio
+ * @param drive_type
+ * @param bits_data
+ * @param bits_data_end
+ */
+void clemens_assign_disk_buffer(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
+                                uint8_t *bits_data, uint8_t *bits_data_end);
+
+/**
+ * @brief Insert a disk of specified type, returning the disk that emulators populate
+ *
+ * @param mmio
+ * @param drive_type
+ * @return struct ClemensNibbleDisk*
+ */
+struct ClemensNibbleDisk *clemens_insert_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type);
 
 /**
  * @brief
@@ -132,21 +158,6 @@ struct ClemensNibbleDisk *clemens_eject_disk(ClemensMMIO *mmio, enum ClemensDriv
  * @return unsigned See CLEM_EJECT_DISK_STATUS_XXX
  */
 unsigned clemens_eject_disk_in_progress(ClemensMMIO *mmio, enum ClemensDriveType drive_type);
-
-/**
- * @brief Performs a device specific eject of a disk (3.5" disks mainly.)
- *
- * The eject sequence can take a second or so if exact Apple Drive 3.5"
- * emulation is desired.
- *
- * @param mmio
- * @param drive_type
- * @param disk  The final nibbilised disk object
- * @return true Disk has ejected
- * @return false Disk is still ejecting
- */
-bool clemens_eject_disk_async_old(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
-                                  struct ClemensNibbleDisk *disk);
 
 /**
  * @brief Assigns a SmartPort device to one of the available SmartPort slots.

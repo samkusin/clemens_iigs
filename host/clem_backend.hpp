@@ -6,8 +6,8 @@
 #include "clem_host_shared.hpp"
 #include "clem_interpreter.hpp"
 #include "clem_smartport_disk.hpp"
-#include "disklib/clem_disk_asset.hpp"
-#include "disklib/clem_storage_unit.hpp"
+#include "core/clem_disk_asset.hpp"
+#include "core/clem_storage_unit.hpp"
 
 #include "cinek/buffer.hpp"
 #include "cinek/fixedstack.hpp"

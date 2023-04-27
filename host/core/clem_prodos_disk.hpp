@@ -3,7 +3,7 @@
 
 #include "cinek/buffer.hpp"
 #include "clem_shared.h"
-#include "disklib/clem_disk_asset.hpp"
+#include "core/clem_disk_asset.hpp"
 #include "smartport/prodos_hdd32.h"
 
 #include "clem_2img.h"

@@ -695,7 +695,7 @@ bool clemens_is_resetting(const ClemensMachine *clem) {
     return (!clem->cpu.pins.resbIn) || clem->cpu.state_type == kClemensCPUStateType_Reset;
 }
 
-void clemens_host_setup(ClemensMachine *clem, LoggerFn logger, void *debug_user_ptr) {
+void clemens_host_setup(ClemensMachine *clem, ClemensLoggerFn logger, void *debug_user_ptr) {
     clem->logger_fn = logger;
     clem->debug_user_ptr = debug_user_ptr;
     //  TODO: remove this once the debug context singleton limitation is removed

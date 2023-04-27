@@ -1,7 +1,7 @@
 #ifndef CLEM_HOST_TEST_HARNESS_MACHINE_HPP
 #define CLEM_HOST_TEST_HARNESS_MACHINE_HPP
 
-#include "disklib/clem_storage_unit.hpp"
+#include "core/clem_storage_unit.hpp"
 
 #include "clem_mmio_types.h"
 #include "clem_types.h"

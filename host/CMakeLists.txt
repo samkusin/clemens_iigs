@@ -2,22 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 
 project(clements_iigs VERSION 0.6.0 LANGUAGES C CXX)
 
-string(TIMESTAMP CLEM_HOST_COPYRIGHT_YEAR "%Y")
-set(CLEMENS_HOMEPAGE "https://samirsinha.com/tags/clemens/")
-
-configure_file(version.h.in version.h)
-
-if(APPLE)
-    enable_language(OBJC)
-endif()
-
-set(CMAKE_CXX_STANDARD 17)
-
-# build header-only source
-# build imgui
-# build app
-
-
+################################################################################
 
 set(CINEK_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/cinek/ckdebug.c"
@@ -35,28 +20,19 @@ set(EXT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/miniz.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/stb.c")
 
-add_library(clemens_host_core
+add_library(clemens_host_shared
     ${CINEK_SOURCES}
     ${FMT_SOURCES}
     ${EXT_SOURCES})
-target_compile_features( clemens_host_core PUBLIC cxx_std_17 )
-target_link_libraries(clemens_host_core
-    PUBLIC
-        clemens_65816_mmio
-        clemens_65816_render
-        clemens_65816_serializer
-        clemens_65816_iocards
-        clemens_65816_smartport_devices)
-target_include_directories(clemens_host_core
-    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ext ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_features(clemens_host_shared PUBLIC cxx_std_17)
+target_include_directories(clemens_host_shared
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ext)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(clemens_host_core PUBLIC -Wall -Wextra -Wno-missing-field-initializers -pedantic)
-    target_compile_options(clemens_host_core PUBLIC $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-fno-exceptions -fno-rtti>)
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        # GCC 8 doesn't link the fs library even with C++17 enabled
-        target_link_libraries(clemens_host_core PUBLIC $<$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>:stdc++fs>)
-    endif()
+    target_compile_options(clemens_host_shared 
+        PUBLIC -Wall -Wextra -Wno-missing-field-initializers -pedantic)
+    target_compile_options(clemens_host_shared 
+        PUBLIC $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-fno-exceptions -fno-rtti>)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     # Removing MSVC options that are less necessary for game / simulation
     # development.
@@ -74,21 +50,54 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     string(REGEX REPLACE "/EHsc*" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
-    target_compile_definitions(clemens_host_core PUBLIC _CRT_SECURE_NO_WARNINGS _ITERATOR_DEBUG_LEVEL=0)
-    target_compile_options(clemens_host_core PUBLIC /EHs-c-)
-    target_compile_definitions(clemens_host_core PUBLIC _HAS_EXCEPTIONS=0 FMT_EXCEPTIONS=0)
-    target_compile_options(clemens_host_core PUBLIC /GR-)
+    target_compile_definitions(clemens_host_shared
+        PUBLIC _CRT_SECURE_NO_WARNINGS _ITERATOR_DEBUG_LEVEL=0)
+    target_compile_options(clemens_host_shared PUBLIC /EHs-c-)
+    target_compile_definitions(clemens_host_shared
+        PUBLIC _HAS_EXCEPTIONS=0 FMT_EXCEPTIONS=0)
+    target_compile_options(clemens_host_shared PUBLIC /GR-)
 else()
     message(WARNING "Unsupported compiler")
 endif()
 
+################################################################################
 
-set(CLEMENS_HOST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(clemens_host_core
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/clem_apple2gs.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/clem_disk_asset.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/clem_disk_utils.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/clem_prodos_disk.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/clem_storage_unit.cpp")
+target_compile_features( clemens_host_core PUBLIC cxx_std_17 )
+target_link_libraries(clemens_host_core
+    PUBLIC
+        clemens_65816_mmio
+        clemens_65816_render
+        clemens_65816_serializer
+        clemens_65816_iocards
+        clemens_65816_smartport_devices
+        clemens_host_shared)
+target_include_directories(clemens_host_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_subdirectory(harness)
-add_subdirectory(ext/imgui)
+
 
 ################################################################################
+
+string(TIMESTAMP CLEM_HOST_COPYRIGHT_YEAR "%Y")
+set(CLEMENS_HOMEPAGE "https://samirsinha.com/tags/clemens/")
+
+configure_file(version.h.in version.h)
+
+if(APPLE)
+    enable_language(OBJC)
+endif()
+
+# build header-only source
+# build imgui
+# build app
+
+add_subdirectory(ext/imgui)
 
 set(SOKOL_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/sokol/sokol_gfx.h"
@@ -109,23 +118,16 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.mm")
 endif()
 
-set(DISKLIB_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_disk_browser.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_disk_asset.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_disk_utils.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_prodos_disk.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/disklib/clem_storage_unit.cpp")
-
 set(PROJECT_SOURCES
     ${PLATFORM_SOURCES}
     ${SOKOL_SOURCES}
-    ${DISKLIB_SOURCES}
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_assets.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_display.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_backend.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_command_queue.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_configuration.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk_browser.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk_library.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_front.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_app.cpp"

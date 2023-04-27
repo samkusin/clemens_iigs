@@ -5,8 +5,8 @@
 #include "cinek/buffertypes.hpp"
 #include "cinek/fixedstack.hpp"
 #include "clem_disk.h"
-#include "disklib/clem_disk_asset.hpp"
-#include "disklib/clem_prodos_disk.hpp"
+#include "core/clem_disk_asset.hpp"
+#include "core/clem_prodos_disk.hpp"
 
 #include <array>
 #include <string>
