@@ -15,7 +15,10 @@
     },
     {
         "act": "step",
-        "param": 100
+        "param": {
+            "count": 100,
+            "status": 10
+        }
     },
     {
         "act": "eject_disk",

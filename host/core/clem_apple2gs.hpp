@@ -65,8 +65,15 @@ class ClemensAppleIIGS {
     ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener &listener);
     //  Destructor (saves state)
     ~ClemensAppleIIGS();
+
     //  If construction was successful, returns true.  This should be checked
     //  after creating the object.
+    bool isOk() const {
+        return status_ == Status::Initialized || status_ == Status::Online ||
+               status_ == Status::Stopped;
+    }
+
+    //  Get details of any failure or more detailed status
     Status getStatus() const;
 
     //  Save the current state into the output stream
