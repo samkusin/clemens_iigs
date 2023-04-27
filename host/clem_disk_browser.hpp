@@ -1,7 +1,7 @@
 #ifndef CLEM_HOST_DISK_BROWSER_HPP
 #define CLEM_HOST_DISK_BROWSER_HPP
 
-#include "clem_disk_asset.hpp"
+#include "core/clem_disk_asset.hpp"
 
 #include "imgui.h"
 

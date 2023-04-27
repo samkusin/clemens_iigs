@@ -18,10 +18,6 @@ add_custom_command(OUTPUT ${CLEMENS_TEST_COMMON_ASSETS}
 add_executable(clemens_test_harness
     main.cpp
     machine.cpp
-    ${CLEMENS_HOST_SOURCE_DIR}/disklib/clem_disk_asset.cpp
-    ${CLEMENS_HOST_SOURCE_DIR}/disklib/clem_disk_utils.cpp
-    ${CLEMENS_HOST_SOURCE_DIR}/disklib/clem_prodos_disk.cpp
-    ${CLEMENS_HOST_SOURCE_DIR}/disklib/clem_storage_unit.cpp
     ${CLEMENS_TEST_COMMON_ASSETS})
 
 target_link_libraries(clemens_test_harness

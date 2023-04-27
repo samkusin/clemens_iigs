@@ -8,7 +8,7 @@
 #include "clem_defs.h"
 
 typedef struct ClemensMachine ClemensMachine;
-typedef void (*LoggerFn)(int level, ClemensMachine *machine, const char *msg);
+typedef void (*ClemensLoggerFn)(int level, ClemensMachine *machine, const char *msg);
 
 #ifdef __cplusplus
 extern "C" {
@@ -205,7 +205,7 @@ struct ClemensMemory {
 };
 
 struct ClemensDeviceDebugger {
-    LoggerFn log_message;
+    ClemensLoggerFn log_message;
     uint16_t pc; /* these values are passed from the CPU per frame */
     uint8_t pbr;
 };
@@ -233,7 +233,7 @@ typedef struct ClemensMachine {
     /* opcode print callback */
     ClemensOpcodeCallback opcode_post;
     /* logger callback (if NULL, uses stdout) */
-    LoggerFn logger_fn;
+    ClemensLoggerFn logger_fn;
 } ClemensMachine;
 
 #ifdef __cplusplus

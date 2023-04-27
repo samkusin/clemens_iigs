@@ -2,7 +2,7 @@
 
 #include "clem_defs.h"
 #include "clem_disk.h"
-#include "disklib/clem_disk_utils.hpp"
+#include "core/clem_disk_utils.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 
@@ -39,6 +39,8 @@ ClemensTestHarness::ClemensTestHarness()
         emulatorMemoryAllocate(CLEM_EMULATOR_ALLOCATION_CARD_BUFFER, CLEM_CARD_SLOT_COUNT, this),
         kFPIBankCount, kFPIROMBankCount, core_.mem.mega2_bank_map[0], core_.mem.mega2_bank_map[1],
         &core_.tspec);
+
+    // clemens_assign_disk_buffer(/* TODO */);
 
     setupBootROM();
 }

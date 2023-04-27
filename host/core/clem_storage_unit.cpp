@@ -5,8 +5,8 @@
 #include "clem_disk.h"
 #include "clem_mmio_types.h"
 #include "clem_smartport.h"
-#include "disklib/clem_disk_asset.hpp"
-#include "disklib/clem_prodos_disk.hpp"
+#include "core/clem_disk_asset.hpp"
+#include "core/clem_prodos_disk.hpp"
 #include "emulator_mmio.h"
 #include "external/mpack.h"
 
@@ -278,6 +278,10 @@ bool ClemensStorageUnit::serialize(ClemensMMIO &mmio, mpack_writer_t *writer) {
     //  the backing buffers are reallocated on unserialize and the data is
     //  read from the emulator serialize module
     //  so we serialize disk asset objects
+
+    mpack_build_map(writer);
+    mpack_write_cstr(writer, "disk.assets");
+    mpack_start_array(writer, diskAssets_.size());
     bool success = true;
     for (auto &asset : diskAssets_) {
         if (!asset.serialize(writer)) {
@@ -285,12 +289,20 @@ bool ClemensStorageUnit::serialize(ClemensMMIO &mmio, mpack_writer_t *writer) {
             break;
         }
     }
+    mpack_finish_array(writer);
+
+    mpack_write_cstr(writer, "smartport.assets");
+    mpack_start_array(writer, hardDiskAssets_.size());
     for (auto &asset : hardDiskAssets_) {
         if (!asset.serialize(writer)) {
             success = false;
             break;
         }
     }
+    mpack_finish_array(writer);
+
+    mpack_write_cstr(writer, "smartport.data");
+    mpack_start_array(writer, hardDisks_.size());
     for (unsigned i = 0; i < hardDisks_.size(); ++i) {
         auto *device = clemens_smartport_unit_get(&mmio, i);
         if (!hardDisks_[i].serialize(writer, device->device)) {
@@ -298,6 +310,9 @@ bool ClemensStorageUnit::serialize(ClemensMMIO &mmio, mpack_writer_t *writer) {
             break;
         }
     }
+    mpack_finish_array(writer);
+
+    mpack_complete_map(writer);
 
     return success;
 }
@@ -306,19 +321,33 @@ bool ClemensStorageUnit::unserialize(ClemensMMIO &mmio, mpack_reader_t *reader,
                                      ClemensUnserializerContext context) {
     allocateBuffers();
 
+    if (!mpack_expect_map(reader))
+        return false;
+
     bool success = true;
+
+    mpack_expect_cstr_match(reader, "disk.assets");
+    mpack_expect_array(reader);
     for (auto &asset : diskAssets_) {
         if (!asset.unserialize(reader)) {
             success = false;
             break;
         }
     }
+    mpack_done_array(reader);
+
+    mpack_expect_cstr_match(reader, "smartport.assets");
+    mpack_expect_array(reader);
     for (auto &asset : hardDiskAssets_) {
         if (!asset.unserialize(reader)) {
             success = false;
             break;
         }
     }
+    mpack_done_array(reader);
+
+    mpack_expect_cstr_match(reader, "smartport.data");
+    mpack_expect_array(reader);
     for (unsigned i = 0; i < hardDisks_.size(); ++i) {
         auto *device = clemens_smartport_unit_get(&mmio, i);
         if (!hardDisks_[i].unserialize(reader, device->device, context)) {
@@ -326,6 +355,9 @@ bool ClemensStorageUnit::unserialize(ClemensMMIO &mmio, mpack_reader_t *reader,
             break;
         }
     }
+    mpack_done_array(reader);
+
+    mpack_done_map(reader);
 
     return success;
 }

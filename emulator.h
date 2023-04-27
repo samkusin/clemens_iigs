@@ -113,7 +113,7 @@ void clemens_emulate_cpu(ClemensMachine *clem);
  * @param logger
  * @param debug_user_ptr
  */
-void clemens_host_setup(ClemensMachine *clem, LoggerFn logger, void *debug_user_ptr);
+void clemens_host_setup(ClemensMachine *clem, ClemensLoggerFn logger, void *debug_user_ptr);
 
 /**
  * @brief
@@ -187,7 +187,7 @@ unsigned clemens_out_hex_data_from_memory(char *hex, const uint8_t *memory,
  * bank 0 reads the physical bank 0 and ignores settings such as RAMRD on the
  * //gs.
  *
- * Note, adr is almost always 0 unless copying a portial bank.   In that case
+ * Note, adr is almost always 0 unless copying a partial bank.   In that case
  * if adr + out_byte_cnt > 64K, this API will copy the data into the out buffer
  * sequentially (out = data at adr + out_byte_cnt, and the data in the bank
  * preceeding the data at adr will be copied after that - essentially wrapping

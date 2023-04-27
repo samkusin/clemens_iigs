@@ -264,9 +264,9 @@ struct ClemensNibbleDisk *clem_iwm_insert_disk(struct ClemensDeviceIWM *iwm,
 
     drive->pulse_clocks_dt = 0;
 
-    if (drive->disk.bit_timing_ns == CLEM_DISK_5_25_BIT_TIMING_NS) {
+    if (drive->disk.disk_type == CLEM_DISK_TYPE_5_25) {
         drive->pulse_clocks_dt = CLEM_IWM_SYNC_CLOCKS_NORMAL;
-    } else if (drive->disk.bit_timing_ns == CLEM_DISK_3_5_BIT_TIMING_NS) {
+    } else if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
         drive->pulse_clocks_dt = CLEM_IWM_SYNC_CLOCKS_FAST;
     } else {
         return NULL;

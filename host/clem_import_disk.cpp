@@ -2,7 +2,7 @@
 
 #include "clem_2img.h"
 #include "clem_woz.h"
-#include "disklib/clem_disk_utils.hpp"
+#include "core/clem_disk_utils.hpp"
 
 #include <cassert>
 #include <cstdlib>
