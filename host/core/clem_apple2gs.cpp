@@ -98,19 +98,28 @@ ClemensAppleIIGS::ClemensAppleIIGS(const Config &config, ClemensSystemListener &
     // Ensure a valid ROM buffer regardless of whether a valid ROM was loaded
     // In the error case, we'll want to have a placeholder ROM.
     cinek::ByteBuffer romBuffer;
-    std::ifstream romFileStream(config.romPath, std::ios::binary | std::ios::ate);
-    unsigned romMemorySize = 0;
-    if (romFileStream.is_open()) {
-        romMemorySize = unsigned(romFileStream.tellg());
-        romBuffer = cinek::ByteBuffer((uint8_t *)slab_.allocate(romMemorySize), romMemorySize);
-        romFileStream.seekg(0, std::ios::beg);
-        romFileStream.read((char *)romBuffer.forwardSize(romMemorySize).first, romMemorySize);
-        romFileStream.close();
-    } else {
-        //  TODO: load a dummy ROM, for now an empty buffer
+    if (!config.romPath.empty()) {
+        std::ifstream romFileStream(config.romPath, std::ios::binary | std::ios::ate);
+        unsigned romMemorySize = 0;
+        if (romFileStream.is_open()) {
+            romMemorySize = unsigned(romFileStream.tellg());
+            romBuffer = cinek::ByteBuffer((uint8_t *)slab_.allocate(romMemorySize), romMemorySize);
+            romFileStream.seekg(0, std::ios::beg);
+            romFileStream.read((char *)romBuffer.forwardSize(romMemorySize).first, romMemorySize);
+            romFileStream.close();
+        }
+    }
+    if (romBuffer.isEmpty()) {
+        //  TODO: load a dummy ROM, for a truly placeholder infinite loop ROM
         romBuffer =
             cinek::ByteBuffer((uint8_t *)slab_.allocate(CLEM_IIGS_BANK_SIZE), CLEM_IIGS_BANK_SIZE);
         memset(romBuffer.forwardSize(CLEM_IIGS_BANK_SIZE).first, 0, CLEM_IIGS_BANK_SIZE);
+        auto *rom = romBuffer.getHead();
+        rom[CLEM_6502_RESET_VECTOR_LO_ADDR] = 0x62;
+        rom[CLEM_6502_RESET_VECTOR_HI_ADDR] = 0xfa;
+        //  BRA -2 (infinite loop)
+        rom[0xfa62] = 0x80;
+        rom[0xfa63] = 0xFE;
     }
 
     //  Initialize the Machine

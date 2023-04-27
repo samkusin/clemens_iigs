@@ -17,7 +17,7 @@ add_custom_command(OUTPUT ${CLEMENS_TEST_COMMON_ASSETS}
 
 add_executable(clemens_test_harness
     main.cpp
-    machine.cpp
+    harness.cpp
     ${CLEMENS_TEST_COMMON_ASSETS})
 
 target_link_libraries(clemens_test_harness
