@@ -6,8 +6,12 @@
 #include "emulator.h"
 #include "emulator_mmio.h"
 
+#include "external/mpack.h"
 #include "fmt/color.h"
 #include "fmt/format.h"
+
+#include <fstream>
+#include <memory>
 
 ClemensTestHarness::ClemensTestHarness() : execCounter_(0), failed_(false) {
     ClemensAppleIIGS::Config config{};
@@ -47,6 +51,10 @@ bool ClemensTestHarness::run(nlohmann::json &command) {
         return insertDisk(params);
     } else if (actionName == "eject_disk") {
         return ejectDisk(params);
+    } else if (actionName == "save") {
+        return save(params);
+    } else if (actionName == "load") {
+        return load(params);
     }
     return false;
 }
@@ -85,7 +93,7 @@ bool ClemensTestHarness::step(nlohmann::json params) {
 
 bool ClemensTestHarness::insertDisk(nlohmann::json params) {
     if (params.empty()) {
-        localLog(CLEM_DEBUG_LOG_WARN, "CMD", "insertDisk <drive_name> <image_path>");
+        localLog(CLEM_DEBUG_LOG_WARN, "CMD", "insertDisk <drive> <disk>");
         return false;
     }
     ClemensDriveType driveType = kClemensDrive_Invalid;
@@ -107,7 +115,7 @@ bool ClemensTestHarness::insertDisk(nlohmann::json params) {
 
 bool ClemensTestHarness::ejectDisk(nlohmann::json params) {
     if (params.empty()) {
-        localLog(CLEM_DEBUG_LOG_WARN, "CMD", "ejectDisk <drive_name>");
+        localLog(CLEM_DEBUG_LOG_WARN, "CMD", "ejectDisk <drive>");
         return false;
     }
 
@@ -122,6 +130,75 @@ bool ClemensTestHarness::ejectDisk(nlohmann::json params) {
     }
 
     return a2gs_->getStorage().ejectDisk(a2gs_->getMMIO(), driveType);
+}
+
+bool ClemensTestHarness::save(nlohmann::json params) {
+    if (params.empty() || !params.is_string()) {
+        localLog(CLEM_DEBUG_LOG_WARN, "CMD", "save <path>");
+        return false;
+    }
+
+    auto path = params.get<std::string>();
+    mpack_writer_t writer{};
+    mpack_writer_init_filename(&writer, path.c_str());
+    if (mpack_writer_error(&writer) != mpack_ok) {
+        localLog(CLEM_DEBUG_LOG_WARN, "CMD", "save {} failed.", path);
+        return false;
+    }
+
+    auto result = a2gs_->save(&writer);
+
+    if (result.second) {
+        localLog(CLEM_DEBUG_LOG_WARN, "CMD", "save completed '{}'.", path);
+    } else {
+        localLog(CLEM_DEBUG_LOG_WARN, "CMD", "save failed in component '{}'.", result.first);
+    }
+
+    mpack_writer_destroy(&writer);
+    return result.second;
+}
+
+bool ClemensTestHarness::load(nlohmann::json params) {
+    if (params.empty() || !params.is_string()) {
+        localLog(CLEM_DEBUG_LOG_WARN, "CMD", "load <path>");
+        return false;
+    }
+
+    auto path = params.get<std::string>();
+    mpack_reader_t reader{};
+    mpack_reader_init_filename(&reader, path.c_str());
+    if (mpack_reader_error(&reader) != mpack_ok) {
+        localLog(CLEM_DEBUG_LOG_WARN, "CMD", "load {} failed.", path);
+        return false;
+    }
+    bool success = true;
+    auto a2gsNext = std::make_unique<ClemensAppleIIGS>(&reader, *this);
+    if (!a2gsNext->isOk()) {
+        localLog(CLEM_DEBUG_LOG_WARN, "CMD", "load snapshot error failed.");
+        switch (a2gsNext->getStatus()) {
+        case ClemensAppleIIGS::Status::UnsupportedSnapshotVersion:
+            localLog(CLEM_DEBUG_LOG_WARN, "CMD", "Unsupported version.");
+            break;
+        case ClemensAppleIIGS::Status::CorruptedSnapshot:
+            localLog(CLEM_DEBUG_LOG_WARN, "CMD", "Snapshot corrupted.");
+            break;
+        case ClemensAppleIIGS::Status::Failed:
+            localLog(CLEM_DEBUG_LOG_WARN, "CMD", "System failed.");
+            break;
+        default:
+            break;
+        }
+        success = false;
+    }
+    mpack_reader_destroy(&reader);
+    if (!success)
+        return false;
+
+    localLog(CLEM_DEBUG_LOG_INFO, "CMD", "Snapshot {} loaded.", path);
+
+    a2gs_ = std::move(a2gsNext);
+
+    return true;
 }
 
 void ClemensTestHarness::step(unsigned cnt, unsigned statusStepRate) {

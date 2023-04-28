@@ -23,6 +23,7 @@ union ClemensSerializerVariant {
 
 #define CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER 0x00000001
 #define CLEM_SERIALIZER_CUSTOM_RECORD_NIBBLE_DISK      0x00000002
+#define CLEM_SERIALIZER_CUSTOM_RECORD_CARD_MEMORY      0x00000003
 
 struct ClemensSerializerRecord kVGC[] = {
     /* scan lines are generated */
@@ -292,6 +293,8 @@ struct ClemensSerializerRecord kMMIO[] = {
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMMIO, dev_scc, struct ClemensDeviceSCC, kSCC),
     CLEM_SERIALIZER_RECORD_OBJECT(ClemensMMIO, active_drives, struct ClemensDriveBay, kDriveBay),
     CLEM_SERIALIZER_RECORD_INT32(ClemensMMIO, state_type),
+    CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, fpi_ram_bank_count),
+    CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, fpi_rom_bank_count),
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, mmap_register),
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, last_data_address),
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, emulator_detect),
@@ -302,7 +305,9 @@ struct ClemensSerializerRecord kMMIO[] = {
     CLEM_SERIALIZER_RECORD_INT32(ClemensMMIO, card_expansion_rom_index),
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, irq_line),
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, nmi_line),
-
+    CLEM_SERIALIZER_RECORD_CUSTOM(ClemensMMIO, card_slot_expansion_memory,
+                                  uint8_t *[CLEM_CARD_SLOT_COUNT],
+                                  CLEM_SERIALIZER_CUSTOM_RECORD_CARD_MEMORY),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 struct ClemensSerializerRecord kTimeSpec[] = {
@@ -510,8 +515,9 @@ static unsigned clemens_serialize_custom(mpack_writer_t *writer, void *ptr, unsi
     struct ClemensAudioMixBuffer *audio_mix_buffer;
     struct ClemensNibbleDisk *nib_disk;
     struct ClemensClock *clock;
+    uint8_t **card_slot_memory;
 
-    unsigned blob_size;
+    unsigned blob_size, i;
 
     mpack_build_map(writer);
     switch (record_id) {
@@ -540,6 +546,16 @@ static unsigned clemens_serialize_custom(mpack_writer_t *writer, void *ptr, unsi
         } else {
             mpack_write_bool(writer, false);
         }
+        break;
+
+    case CLEM_SERIALIZER_CUSTOM_RECORD_CARD_MEMORY:
+        card_slot_memory = (uint8_t **)ptr;
+        mpack_write_cstr(writer, "card_rom");
+        mpack_start_array(writer, CLEM_CARD_SLOT_COUNT);
+        for (i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
+            mpack_write_bin(writer, (char *)card_slot_memory[i], 2048);
+        }
+        mpack_finish_array(writer);
         break;
     }
 
@@ -714,6 +730,8 @@ static unsigned clemens_unserialize_custom(mpack_reader_t *reader, void *ptr, un
     struct ClemensNibbleDisk *nib_disk;
     char key[64];
     unsigned v0, v1;
+    uint8_t **card_memory_ptr;
+
     mpack_expect_map(reader);
     switch (record_id) {
     case CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER:
@@ -755,6 +773,21 @@ static unsigned clemens_unserialize_custom(mpack_reader_t *reader, void *ptr, un
         } else {
             memset(nib_disk->bits_data, 0, nib_disk->bits_data_end - nib_disk->bits_data);
         }
+        break;
+    case CLEM_SERIALIZER_CUSTOM_RECORD_CARD_MEMORY:
+        card_memory_ptr = (uint8_t **)ptr;
+        *card_memory_ptr = (uint8_t *)(*alloc_cb)(CLEM_EMULATOR_ALLOCATION_CARD_BUFFER,
+                                                  CLEM_CARD_SLOT_COUNT, context);
+        for (v0 = 1; v0 < CLEM_CARD_SLOT_COUNT; ++v0) {
+            card_memory_ptr[v0] = card_memory_ptr[0] + v0 * 2048;
+        }
+        mpack_expect_cstr_match(reader, "card_rom");
+        v1 = mpack_expect_array_max(reader, CLEM_CARD_SLOT_COUNT);
+        for (v0 = 0; v0 < v1; ++v0) {
+            unsigned cnt = mpack_expect_bin_max(reader, 2048);
+            mpack_read_bytes(reader, (char *)card_memory_ptr[v0], cnt);
+        }
+        mpack_done_array(reader);
         break;
     }
     mpack_done_map(reader);
@@ -811,6 +844,8 @@ mpack_reader_t *clemens_unserialize_machine(mpack_reader_t *reader, ClemensMachi
     mpack_expect_bin_buf(reader, (char *)machine->mem.mega2_bank_map[0], CLEM_IIGS_BANK_SIZE);
     mpack_expect_bin_buf(reader, (char *)machine->mem.mega2_bank_map[1], CLEM_IIGS_BANK_SIZE);
 
+    memset(&machine->mem.bank_page_map, 0, sizeof(machine->mem.bank_page_map));
+
     return reader;
 }
 
@@ -827,6 +862,7 @@ mpack_writer_t *clemens_serialize_mmio(mpack_writer_t *writer, ClemensMMIO *mmio
 }
 
 mpack_reader_t *clemens_unserialize_mmio(mpack_reader_t *reader, ClemensMMIO *mmio,
+                                         ClemensMachine *machine,
                                          ClemensSerializerAllocateCb alloc_cb, void *context) {
     struct ClemensSerializerRecord root;
     void *data_adr = (void *)mmio;
@@ -841,7 +877,8 @@ mpack_reader_t *clemens_unserialize_mmio(mpack_reader_t *reader, ClemensMMIO *mm
         return NULL;
     }
 
-    clem_mmio_restore(mmio);
+    clem_mmio_restore(mmio, machine->mem.bank_page_map, machine->mem.mega2_bank_map[0],
+                      machine->mem.mega2_bank_map[1]);
 
     return reader;
 }

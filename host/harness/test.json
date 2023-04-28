@@ -21,6 +21,38 @@
         }
     },
     {
+        "act": "save",
+        "param": "sample.clemens-sav"
+    },
+    {
+        "act": "eject_disk",
+        "param": {
+            "drive": "s6d1"
+        }
+    },
+    {
+        "act": "step",
+        "param": 100
+    },
+    {
+        "act": "load",
+        "param": "sample.clemens-sav"
+    },
+    {
+        "act": "eject_disk",
+        "param": {
+            "drive": "s6d1"
+        }
+    },
+    {
+        "act": "step",
+        "param": 100
+    },
+    {
+        "act": "load",
+        "param": "sample.clemens-sav"
+    },
+    {
         "act": "eject_disk",
         "param": {
             "drive": "s6d1"

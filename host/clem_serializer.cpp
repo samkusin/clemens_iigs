@@ -248,7 +248,7 @@ bool load(std::string outputPath, ClemensMachine *machine, ClemensMMIO *mmio, si
         return false;
     }
     mpack_expect_cstr_match(&reader, "mmio");
-    if (!clemens_unserialize_mmio(&reader, mmio, alloc_cb, context)) {
+    if (!clemens_unserialize_mmio(&reader, mmio, NULL, alloc_cb, context)) {
         // power off the machine
         mpack_reader_destroy(&reader);
         return false;

@@ -42,7 +42,7 @@ bool execute(ClemensTestHarness &harness, std::basic_istream<char> &input) {
         if (manifest.is_object()) {
             commandOk = harness.run(manifest);
             if (!commandOk) {
-                fmt::print(stderr, "Command syntax not valid:\n{}\n", manifest.dump());
+                fmt::print(stderr, "Command failed:\n{}\n", manifest.dump());
             }
         } else if (manifest.is_array()) {
             for (auto item : manifest) {
@@ -52,7 +52,7 @@ bool execute(ClemensTestHarness &harness, std::basic_istream<char> &input) {
                     commandOk = false;
                 }
                 if (!commandOk) {
-                    fmt::print(stderr, "Command syntax not valid:\n{}\n", item.dump());
+                    fmt::print(stderr, "Command failed:\n{}\n", item.dump());
                     break;
                 }
             }

@@ -18,18 +18,9 @@ typedef struct mpack_writer_t mpack_writer_t;
 //  A container for an *external* disk image.
 //  The data
 struct ClemensDiskAsset {
-    enum ImageType {
-        ImageInvalid,
-        ImageNone,
-        ImageDSK,
-        ImageProDOS,
-        ImageDOS,
-        Image2IMG,
-        ImageWOZ
-    };
-    enum DiskType { DiskInvalid, DiskNone, Disk525, Disk35, DiskHDD };
+    enum ImageType { ImageNone, ImageDSK, ImageProDOS, ImageDOS, Image2IMG, ImageWOZ };
+    enum DiskType { DiskNone, Disk525, Disk35, DiskHDD };
     enum ErrorType {
-        ErrorInvalid,
         ErrorNone,
         ErrorInvalidImage,
         ErrorImageNotSupported,
