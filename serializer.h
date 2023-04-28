@@ -143,6 +143,7 @@ mpack_writer_t *clemens_serialize_mmio(mpack_writer_t *writer, ClemensMMIO *mmio
  * @return mpack_reader_t*
  */
 mpack_reader_t *clemens_unserialize_mmio(mpack_reader_t *reader, ClemensMMIO *mmio,
+                                         ClemensMachine *machine,
                                          ClemensSerializerAllocateCb alloc_cb, void *context);
 
 /* The following APIs are provided for completeness, but they are typically

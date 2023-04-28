@@ -28,6 +28,8 @@ class ClemensTestHarness : public ClemensSystemListener {
     bool step(nlohmann::json params);
     bool insertDisk(nlohmann::json params);
     bool ejectDisk(nlohmann::json params);
+    bool save(nlohmann::json params);
+    bool load(nlohmann::json params);
 
   private:
     void step(unsigned cnt, unsigned statusStepRate);

@@ -23,11 +23,7 @@ namespace {
 constexpr unsigned kDecodingBufferSize = 4 * 1024 * 1024;
 constexpr unsigned kSmartPortDiskSize = 32 * 1024 * 1024;
 
-unsigned calculateSlabHeapSize() {
-
-    return CLEM_DISK_525_MAX_DATA_SIZE * 2 + CLEM_DISK_35_MAX_DATA_SIZE * 2 + kSmartPortDiskSize +
-           kDecodingBufferSize + 4096;
-}
+unsigned calculateSlabHeapSize() { return kSmartPortDiskSize + kDecodingBufferSize + 4096; }
 } // namespace
 
 ClemensStorageUnit::ClemensStorageUnit()
@@ -39,25 +35,9 @@ ClemensStorageUnit::ClemensStorageUnit()
 ClemensStorageUnit::~ClemensStorageUnit() { free(slab_.getHead()); }
 
 void ClemensStorageUnit::allocateBuffers() {
+    //  TODO! TODO!  Remove the nibbleBuffers since they are now owned by the device
+
     slab_.reset();
-
-    // buffers for the ClemensNibbleDisks to insert/eject
-    uint8_t *buffer;
-    buffer = slab_.allocateArray<uint8_t>(CLEM_DISK_35_MAX_DATA_SIZE);
-    nibbleBuffers_[kClemensDrive_3_5_D1].first = buffer;
-    nibbleBuffers_[kClemensDrive_3_5_D1].second = buffer + CLEM_DISK_35_MAX_DATA_SIZE;
-
-    buffer = slab_.allocateArray<uint8_t>(CLEM_DISK_35_MAX_DATA_SIZE);
-    nibbleBuffers_[kClemensDrive_3_5_D2].first = buffer;
-    nibbleBuffers_[kClemensDrive_3_5_D2].second = buffer + CLEM_DISK_35_MAX_DATA_SIZE;
-
-    buffer = slab_.allocateArray<uint8_t>(CLEM_DISK_525_MAX_DATA_SIZE);
-    nibbleBuffers_[kClemensDrive_5_25_D1].first = buffer;
-    nibbleBuffers_[kClemensDrive_5_25_D1].second = buffer + CLEM_DISK_525_MAX_DATA_SIZE;
-
-    buffer = slab_.allocateArray<uint8_t>(CLEM_DISK_525_MAX_DATA_SIZE);
-    nibbleBuffers_[kClemensDrive_5_25_D2].first = buffer;
-    nibbleBuffers_[kClemensDrive_5_25_D2].second = buffer + CLEM_DISK_525_MAX_DATA_SIZE;
 
     // create empty backing ProDOS buffer for SmartPort disk
     hardDisks_[0] = ClemensProDOSDisk(cinek::ByteBuffer(
@@ -151,26 +131,19 @@ bool ClemensStorageUnit::insertDisk(ClemensMMIO &mmio, ClemensDriveType driveTyp
     }
     input.close();
 
-    struct ClemensNibbleDisk disk {};
+    struct ClemensNibbleDisk *disk = clemens_insert_disk(&mmio, driveType);
+    if (!disk)
+        return false;
 
-    switch (driveType) {
-    case kClemensDrive_3_5_D1:
-    case kClemensDrive_3_5_D2:
-        clem_nib_init_disk(&disk, CLEM_DISK_TYPE_3_5, nibbleBuffers_[driveType].first,
-                           nibbleBuffers_[driveType].second);
-        break;
-    case kClemensDrive_5_25_D1:
-    case kClemensDrive_5_25_D2:
-        clem_nib_init_disk(&disk, CLEM_DISK_TYPE_5_25, nibbleBuffers_[driveType].first,
-                           nibbleBuffers_[driveType].second);
-        break;
-    default:
+    diskAssets_[driveType] = ClemensDiskAsset(path, driveType, decodeBuffer_.getRange(), *disk);
+    if (diskAssets_[driveType].errorType() != ClemensDiskAsset::ErrorNone) {
+        diskAssets_[driveType] = ClemensDiskAsset();
+        clemens_eject_disk(&mmio, driveType);
+        diskStatuses_[driveType].mountFailed();
         return false;
     }
-
-    diskAssets_[driveType] = ClemensDiskAsset(path, driveType, decodeBuffer_.getRange(), disk);
     diskStatuses_[driveType].mount(path);
-    return clemens_assign_disk(&mmio, driveType, &disk);
+    return true;
 }
 
 bool ClemensStorageUnit::ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType) {
@@ -179,10 +152,9 @@ bool ClemensStorageUnit::ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType
     if (diskStatuses_[driveType].isEjecting)
         return true;
 
-    struct ClemensNibbleDisk disk {};
-    clemens_eject_disk_async_old(&mmio, driveType, &disk);
     //  save immediately - this can be done again when fully ejected
-    saveDisk(driveType, disk);
+    struct ClemensNibbleDisk *disk = clemens_eject_disk(&mmio, driveType);
+    saveDisk(driveType, *disk);
     return true;
 }
 
@@ -200,14 +172,14 @@ void ClemensStorageUnit::update(ClemensMMIO &mmio) {
         status.isSpinning = drive->is_spindle_on;
         status.isWriteProtected = drive->disk.is_write_protected;
         if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
-            status.isEjecting = clemens_eject_disk_in_progress(&mmio, driveType) ==
-                                CLEM_EJECT_DISK_STATUS_IN_PROGRESS;
-            if (status.isEjecting) {
-                ClemensNibbleDisk disk;
-                status.isEjecting = clemens_eject_disk_async_old(&mmio, driveType, &disk);
-                if (!status.isEjecting) {
-                    saveDisk(driveType, disk);
-                }
+            auto ejectStatus = clemens_eject_disk_in_progress(&mmio, driveType);
+            status.isEjecting = ejectStatus == CLEM_EJECT_DISK_STATUS_IN_PROGRESS;
+            if (ejectStatus == CLEM_EJECT_DISK_STATUS_EJECTED) {
+                //  user initiated eject will have already called clemens_eject_disk()
+                //  this flow handles an eject initiated by the emulator
+                struct ClemensNibbleDisk *disk = clemens_eject_disk(&mmio, driveType);
+                assert(disk);
+                saveDisk(driveType, *disk);
             }
         }
     }
@@ -283,8 +255,9 @@ bool ClemensStorageUnit::serialize(ClemensMMIO &mmio, mpack_writer_t *writer) {
     mpack_write_cstr(writer, "disk.assets");
     mpack_start_array(writer, diskAssets_.size());
     bool success = true;
-    for (auto &asset : diskAssets_) {
-        if (!asset.serialize(writer)) {
+    for (auto assetIt = diskAssets_.begin(); assetIt != diskAssets_.end(); ++assetIt) {
+        auto driveType = static_cast<ClemensDriveType>(assetIt - diskAssets_.begin());
+        if (!diskAssets_[driveType].serialize(writer)) {
             success = false;
             break;
         }
@@ -293,8 +266,9 @@ bool ClemensStorageUnit::serialize(ClemensMMIO &mmio, mpack_writer_t *writer) {
 
     mpack_write_cstr(writer, "smartport.assets");
     mpack_start_array(writer, hardDiskAssets_.size());
-    for (auto &asset : hardDiskAssets_) {
-        if (!asset.serialize(writer)) {
+    for (auto assetIt = hardDiskAssets_.begin(); assetIt != hardDiskAssets_.end(); ++assetIt) {
+        auto driveIndex = static_cast<unsigned>(assetIt - hardDiskAssets_.begin());
+        if (!hardDiskAssets_[driveIndex].serialize(writer)) {
             success = false;
             break;
         }
@@ -328,21 +302,25 @@ bool ClemensStorageUnit::unserialize(ClemensMMIO &mmio, mpack_reader_t *reader,
 
     mpack_expect_cstr_match(reader, "disk.assets");
     mpack_expect_array(reader);
-    for (auto &asset : diskAssets_) {
-        if (!asset.unserialize(reader)) {
+    for (auto assetIt = diskAssets_.begin(); assetIt != diskAssets_.end(); ++assetIt) {
+        auto driveType = static_cast<ClemensDriveType>(assetIt - diskAssets_.begin());
+        if (!diskAssets_[driveType].unserialize(reader)) {
             success = false;
             break;
         }
+        diskStatuses_[driveType].mount(diskAssets_[driveType].path());
     }
     mpack_done_array(reader);
 
     mpack_expect_cstr_match(reader, "smartport.assets");
     mpack_expect_array(reader);
-    for (auto &asset : hardDiskAssets_) {
-        if (!asset.unserialize(reader)) {
+    for (auto assetIt = hardDiskAssets_.begin(); assetIt != hardDiskAssets_.end(); ++assetIt) {
+        auto driveIndex = static_cast<unsigned>(assetIt - hardDiskAssets_.begin());
+        if (!hardDiskAssets_[driveIndex].unserialize(reader)) {
             success = false;
             break;
         }
+        hardDiskStatuses_[driveIndex].mount(hardDiskAssets_[driveIndex].path());
     }
     mpack_done_array(reader);
 

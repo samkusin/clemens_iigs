@@ -233,16 +233,6 @@ unsigned *clem_disk_create_logical_to_physical_sector_map(unsigned *sectors, uns
 unsigned clem_disk_calculate_nib_storage_size(unsigned disk_type);
 
 /**
- * @brief Initializes a disk object to an empty track list
- *
- * @param nib
- * @param type
- * @param bits_data
- * @param bits_data_end
- */
-void clem_nib_init_disk(struct ClemensNibbleDisk *nib, unsigned type, uint8_t *bits_data,
-                        uint8_t *bits_data_end);
-/**
  * @brief Rests all track points back to empty (keeping the disk type and raw data buffer intact.)
  *
  * @param nib

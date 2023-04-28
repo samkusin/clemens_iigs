@@ -263,11 +263,12 @@ const uint8_t *clem_woz_parse_info_chunk(struct ClemensWOZDisk *disk,
     }
 
     if (disk->disk_type == CLEM_WOZ_DISK_5_25) {
-        if (disk->nib)
-            disk->nib->disk_type = CLEM_DISK_TYPE_5_25;
+        //  must be set before call
+        if (disk->nib && disk->nib->disk_type != CLEM_DISK_TYPE_5_25)
+            return NULL;
     } else if (disk->disk_type == CLEM_WOZ_DISK_3_5) {
-        if (disk->nib)
-            disk->nib->disk_type = CLEM_DISK_TYPE_3_5;
+        if (disk->nib && disk->nib->disk_type != CLEM_DISK_TYPE_3_5)
+            return NULL;
     }
     if (disk->nib)
         disk->nib->bit_timing_ns = disk->bit_timing_ns;

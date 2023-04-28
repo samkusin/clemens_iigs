@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cassert>
 #include <filesystem>
+#include <optional>
 #include <variant>
 
 #include "external/mpack.h"
@@ -312,9 +313,14 @@ bool ClemensDiskAsset::serialize(mpack_writer_t *writer) {
     mpack_write_cstr(writer, "path");
     mpack_write_cstr(writer, path_.c_str());
     mpack_write_cstr(writer, "data");
-    mpack_write_bytes(writer, (const char *)data_.data(), (unsigned)data_.size());
+    if (data_.size()) {
+        mpack_write_bytes(writer, (const char *)data_.data(), (unsigned)data_.size());
+    } else {
+        mpack_write_nil(writer);
+    }
     mpack_write_cstr(writer, "metadata");
-    if (std::holds_alternative<ClemensWOZDisk>(metadata_)) {
+    mpack_build_map(writer);
+    if (imageType_ == ImageWOZ) {
         auto &woz = std::get<ClemensWOZDisk>(metadata_);
         mpack_write_cstr(writer, "type");
         mpack_write_cstr(writer, "woz");
@@ -338,7 +344,7 @@ bool ClemensDiskAsset::serialize(mpack_writer_t *writer) {
         mpack_write_u16(writer, woz.largest_flux_track);
         mpack_write_cstr(writer, "woz.creator");
         mpack_write_bin(writer, woz.creator, sizeof(woz.creator));
-    } else if (std::holds_alternative<Clemens2IMGDisk>(metadata_)) {
+    } else if (imageType_ != ImageNone) {
         auto &disk = std::get<Clemens2IMGDisk>(metadata_);
         mpack_write_cstr(writer, "type");
         mpack_write_cstr(writer, "2img");
@@ -362,6 +368,7 @@ bool ClemensDiskAsset::serialize(mpack_writer_t *writer) {
         mpack_write_cstr(writer, "type");
         mpack_write_cstr(writer, "none");
     }
+    mpack_complete_map(writer);
 
     mpack_complete_map(writer);
     return true;
@@ -369,61 +376,67 @@ bool ClemensDiskAsset::serialize(mpack_writer_t *writer) {
 
 bool ClemensDiskAsset::unserialize(mpack_reader_t *reader) {
     char tmp[1024];
-
+    std::optional<ImageType> imageType;
+    std::optional<DiskType> diskType;
+    std::optional<ErrorType> errorType;
     mpack_expect_map(reader);
 
     mpack_expect_cstr_match(reader, "image_type");
     mpack_expect_cstr(reader, tmp, sizeof(tmp));
-    imageType_ = ImageInvalid;
     for (unsigned i = 0; kImageTypeNames[i] != NULL; ++i) {
         if (strncmp(tmp, kImageTypeNames[i], sizeof(tmp)) == 0) {
-            imageType_ = static_cast<ImageType>(i);
+            imageType = static_cast<ImageType>(i);
             break;
         }
     }
-    if (imageType_ == ImageInvalid) {
+    if (!imageType.has_value()) {
         mpack_done_map(reader);
         return false;
     }
+    imageType_ = *imageType;
     mpack_expect_cstr_match(reader, "disk_type");
     mpack_expect_cstr(reader, tmp, sizeof(tmp));
-    diskType_ = DiskInvalid;
     for (unsigned i = 0; kDiskTypeNames[i] != NULL; ++i) {
         if (strncmp(tmp, kDiskTypeNames[i], sizeof(tmp)) == 0) {
-            diskType_ = static_cast<DiskType>(i);
+            diskType = static_cast<DiskType>(i);
             break;
         }
     }
-    if (diskType_ == DiskInvalid) {
+    if (!diskType.has_value()) {
         mpack_done_map(reader);
         return false;
     }
+    diskType_ = *diskType;
     mpack_expect_cstr_match(reader, "error_type");
     mpack_expect_cstr(reader, tmp, sizeof(tmp));
-    errorType_ = ErrorInvalid;
     for (unsigned i = 0; kErrorTypeNames[i] != NULL; ++i) {
         if (strncmp(tmp, kErrorTypeNames[i], sizeof(tmp)) == 0) {
-            errorType_ = static_cast<ErrorType>(i);
+            errorType = static_cast<ErrorType>(i);
             break;
         }
     }
-    if (errorType_ == ErrorInvalid) {
+    if (!errorType.has_value()) {
         mpack_done_map(reader);
         return false;
     }
-
+    errorType_ = *errorType;
     mpack_expect_cstr_match(reader, "estimated_encoded_size");
     estimatedEncodedSize_ = mpack_expect_u32(reader);
     mpack_expect_cstr_match(reader, "path");
     mpack_expect_cstr(reader, tmp, sizeof(tmp));
     path_ = tmp;
     mpack_expect_cstr_match(reader, "data");
-    unsigned sz = mpack_expect_bin(reader);
     data_.clear();
-    data_.resize(sz);
-    mpack_read_bytes(reader, (char *)data_.data(), sz);
+    if (mpack_peek_tag(reader).type == mpack_type_nil) {
+        mpack_expect_nil(reader);
+    } else {
+        unsigned sz = mpack_expect_bin(reader);
+        data_.resize(sz);
+        mpack_read_bytes(reader, (char *)data_.data(), sz);
+    }
     mpack_expect_cstr_match(reader, "metadata");
-    mpack_read_bytes(reader, (char *)data_.data(), sz);
+
+    mpack_expect_map(reader);
     mpack_expect_cstr_match(reader, "type");
     mpack_expect_cstr(reader, tmp, 16);
     if (strncmp(tmp, "woz", 16) == 0) {
@@ -468,10 +481,8 @@ bool ClemensDiskAsset::unserialize(mpack_reader_t *reader) {
         mpack_expect_cstr_match(reader, "is_write_protected");
         disk.is_write_protected = mpack_expect_bool(reader);
         metadata_ = disk;
-    } else if (strncmp(tmp, "none", 16) != 0) {
-        mpack_done_map(reader);
-        return false;
     }
+    mpack_done_map(reader);
 
     mpack_done_map(reader);
     return true;

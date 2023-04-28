@@ -21,12 +21,18 @@ class ClemensAppleIIGS {
 
   public:
     struct Config {
+        //  RAM in Kilobytes, not counting Mega 2 memory
         unsigned memory;
+        //  Usually 48000 or equivalent to the target mix rate
         unsigned audioSamplesPerSecond;
+        //  Path to ROM - if empty, a placeholder minimal ROM will be loaded
         std::string romPath;
+        //  Baterry RAM as laid out on the IIGS
         uint8_t bram[CLEM_RTC_BRAM_SIZE];
+        //  Drive images (can be empty)
         std::array<std::string, kClemensDrive_Count> diskImagePaths;
         std::array<std::string, CLEM_SMARTPORT_DRIVE_LIMIT> smartPortImagePaths;
+        //  Card namaes
         std::array<std::string, CLEM_CARD_SLOT_COUNT> cardNames;
     };
 

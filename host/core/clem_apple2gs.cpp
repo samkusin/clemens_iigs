@@ -251,7 +251,7 @@ ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener
 
     componentName = "mmio";
     mpack_expect_cstr_match(reader, componentName.c_str());
-    clemens_unserialize_mmio(reader, &mmio_, unserializerAllocateHook, this);
+    clemens_unserialize_mmio(reader, &mmio_, &machine_, unserializerAllocateHook, this);
     if (mpack_reader_error(reader) != mpack_ok)
         goto load_done;
 
@@ -327,10 +327,10 @@ uint8_t *ClemensAppleIIGS::unserializerAllocateHook(unsigned type, unsigned sz, 
         bytesSize = sz * CLEM_IIGS_BANK_SIZE;
         break;
     case CLEM_EMULATOR_ALLOCATION_DISK_NIB_3_5:
-        bytesSize = sz * CLEM_DISK_35_MAX_DATA_SIZE;
+        bytesSize = sz;
         break;
     case CLEM_EMULATOR_ALLOCATION_DISK_NIB_5_25:
-        bytesSize = sz * CLEM_DISK_525_MAX_DATA_SIZE;
+        bytesSize = sz;
         break;
     case CLEM_EMULATOR_ALLOCATION_CARD_BUFFER:
         bytesSize = sz * 2048;

@@ -389,6 +389,8 @@ typedef struct ClemensMMIO {
      *  memory with the correct IO instructions.  Each area should be 2K in
      *  size.  As with card slot memory, slot 3 is ignored */
     uint8_t *card_slot_expansion_memory[CLEM_CARD_SLOT_COUNT];
+
+    /* Page maps are always generated; never serialized/unserialized */
     /* pointer to the array of bank page map pointers initialized by the
        parent machine
     */
@@ -411,6 +413,7 @@ typedef struct ClemensMMIO {
     */
     uint8_t *e0_bank;
     uint8_t *e1_bank;
+    /* end non-serialized attribute block */
 
     /* All devices */
     struct ClemensDeviceDebugger *dev_debug;
@@ -426,6 +429,8 @@ typedef struct ClemensMMIO {
 
     /* Registers that do not fall easily within a device struct */
     enum ClemensMMIOStateType state_type;
+    uint32_t fpi_ram_bank_count;
+    uint32_t fpi_rom_bank_count;
     uint32_t mmap_register;     // memory map flags- CLEM_MEM_IO_MMAP_
     uint32_t last_data_address; // used for c08x switches
     uint32_t emulator_detect;   // used for the c04f emulator test (state)
