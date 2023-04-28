@@ -272,7 +272,7 @@ void ClemensBackend::ejectAllDisks() {
     }
 }
 
-uint8_t *ClemensBackend::unserializeAllocate(unsigned sz, void *context) {
+uint8_t *ClemensBackend::unserializeAllocate(unsigned type, unsigned sz, void *context) {
     //  TODO: allocation from a slab that doesn't reset may cause problems if the
     //        snapshots require allocation per load - take a look at how to fix
     //        this (like a separate slab for data that is unserialized requiring

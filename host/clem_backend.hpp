@@ -135,7 +135,7 @@ class ClemensBackend : public ClemensCommandQueueListener {
     static void emulatorLog(int log_level, ClemensMachine *machine, const char *msg);
     static void emulatorOpcodeCallback(struct ClemensInstruction *inst, const char *operand,
                                        void *this_ptr);
-    static uint8_t *unserializeAllocate(unsigned sz, void *context);
+    static uint8_t *unserializeAllocate(unsigned type, unsigned sz, void *context);
 
   private:
     Config config_;
@@ -157,7 +157,6 @@ class ClemensBackend : public ClemensCommandQueueListener {
 
     std::array<ClemensWOZDisk, kClemensDrive_Count> diskContainers_; // TODO rem
     std::array<ClemensNibbleDisk, kClemensDrive_Count> disks_;       // TODO rem
-    std::array<ClemensNibbleDisk, kClemensDrive_Count> nibbleDisks_;
     std::array<ClemensDiskAsset, kClemensDrive_Count> diskAssets_;
     std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives_; // TODO rem
     std::array<ClemensBackendDiskDriveState, CLEM_SMARTPORT_DRIVE_LIMIT>

@@ -472,7 +472,7 @@ void ClemensAppleIIGS::reset() {
 }
 
 //  Queues an input event from the host
-void ClemensAppleIIGS::input(const ClemensInputEvent &input) {}
+void ClemensAppleIIGS::input(const ClemensInputEvent &input) { clemens_input(&mmio_, &input); }
 
 auto ClemensAppleIIGS::stepMachine() -> ResultFlags {
     auto resultFlags = ResultFlags::None;
