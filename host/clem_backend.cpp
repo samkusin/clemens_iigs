@@ -970,40 +970,45 @@ void ClemensBackend::onCommandInputEvent(const ClemensInputEvent &inputEvent) {
 }
 
 bool ClemensBackend::onCommandInsertDisk(ClemensDriveType driveType, std::string diskPath) {
-    diskDrives_[driveType].imagePath = diskPath;
-    return mountDisk(driveType, false);
+    return false;
+    // diskDrives_[driveType].imagePath = diskPath;
+    // return mountDisk(driveType, false);
 }
 
 bool ClemensBackend::onCommandInsertBlankDisk(ClemensDriveType driveType, std::string diskPath) {
-    diskDrives_[driveType].imagePath = diskPath;
-    return mountDisk(driveType, true);
+    return false;
+    // diskDrives_[driveType].imagePath = diskPath;
+    // return mountDisk(driveType, true);
 }
 
 void ClemensBackend::onCommandEjectDisk(ClemensDriveType driveType) {
-    diskDrives_[driveType].isEjecting = true;
+    // diskDrives_[driveType].isEjecting = true;
 }
 
 bool ClemensBackend::onCommandWriteProtectDisk(ClemensDriveType driveType, bool wp) {
-    auto *drive = clemens_drive_get(&mmio_, driveType);
-    if (!drive || !drive->has_disk)
-        return false;
-    drive->disk.is_write_protected = wp;
-    return true;
+    return false;
+    // auto *drive = clemens_drive_get(&mmio_, driveType);
+    // if (!drive || !drive->has_disk)
+    //     return false;
+    // drive->disk.is_write_protected = wp;
+    // return true;
 }
 
 bool ClemensBackend::onCommandInsertSmartPortDisk(unsigned driveIndex, std::string diskPath) {
-    smartPortDrives_[driveIndex].imagePath = diskPath;
-    return mountSmartPortDisk(driveIndex, false);
+    return false;
+    // smartPortDrives_[driveIndex].imagePath = diskPath;
+    // return mountSmartPortDisk(driveIndex, false);
 }
 
 bool ClemensBackend::onCommandInsertBlankSmartPortDisk(unsigned driveIndex, std::string diskPath) {
-    smartPortDrives_[driveIndex].imagePath = diskPath;
-    return mountSmartPortDisk(driveIndex, true);
+    return false;
+    // smartPortDrives_[driveIndex].imagePath = diskPath;
+    // return mountSmartPortDisk(driveIndex, true);
 }
 
 void ClemensBackend::onCommandEjectSmartPortDisk(unsigned driveIndex) {
-    smartPortDrives_[driveIndex].isEjecting = true;
-    //  TODO: handle this in the main loop like we do for regular drives
+    // smartPortDrives_[driveIndex].isEjecting = true;
+    //   TODO: handle this in the main loop like we do for regular drives
 }
 
 void ClemensBackend::onCommandDebugMemoryPage(uint8_t pageIndex) { debugMemoryPage_ = pageIndex; }
