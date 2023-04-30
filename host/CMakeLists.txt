@@ -18,13 +18,17 @@ set(FMT_SOURCES
 set(EXT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/ini.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/miniz.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ext/stb.c")
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/stb.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/spdlog/spdlog.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/spdlog/async.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/spdlog/color_sinks.cpp")
 
 add_library(clemens_host_shared
     ${CINEK_SOURCES}
     ${FMT_SOURCES}
     ${EXT_SOURCES})
 target_compile_features(clemens_host_shared PUBLIC cxx_std_17)
+target_compile_definitions(clemens_host_shared PUBLIC SPDLOG_COMPILED_LIB)
 target_include_directories(clemens_host_shared
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ext)
 

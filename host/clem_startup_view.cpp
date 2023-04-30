@@ -6,6 +6,7 @@
 #include "fmt/core.h"
 #include "fmt/format.h"
 #include "imgui.h"
+#include "spdlog/spdlog.h"
 
 #include "imgui_filedialog/ImGuiFileDialog.h"
 
@@ -20,6 +21,7 @@ namespace {
 //
 ClemensConfiguration createConfiguration(const std::filesystem::path defaultDataDirectory) {
     auto configPath = defaultDataDirectory / "config.ini";
+    spdlog::info("Configuration created at {}", defaultDataDirectory.string());
     return ClemensConfiguration(configPath.string(), defaultDataDirectory.string());
 }
 
@@ -33,21 +35,22 @@ ClemensConfiguration findConfiguration() {
         if (strnlen(localpath, CLEMENS_PATH_MAX - 1) >= sizeof(localpath) - 1) {
             //  If this is a problem, later code will determine whether the path
             //  was actually truncated
-            printf("Warning: discovered configuration pathname is likely truncated!\n");
+            spdlog::warn("Discovered configuration pathname is likely truncated!");
         }
         auto dataDirectory = std::filesystem::path(localpath).parent_path();
         auto configPath = dataDirectory / "config.ini";
+        spdlog::info("Checking for configuration in {}", configPath.string());
         if (std::filesystem::exists(configPath)) {
             return createConfiguration(dataDirectory);
         }
     } else {
         //  TODO: handle systems that support dynamic path sizes (i.e. localpathSize !=
         //  sizeof(localpath))
-        printf("Warning: unable to obtain our local executable path. Falling back to user data "
-               "paths.\n");
+        spdlog::warn("Unable to obtain our local executable path. Falling back to user data paths");
     }
     if (!get_local_user_data_directory(localpath, sizeof(localpath), CLEM_HOST_COMPANY_NAME,
                                        CLEM_HOST_APPLICATION_NAME)) {
+        spdlog::error("Unable to obtain the OS specific user data directory.");
         return ClemensConfiguration();
     }
     return createConfiguration(std::filesystem::path(localpath));
@@ -266,6 +269,7 @@ auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
     case Mode::SetupError: {
         if (!ImGui::IsPopupOpen("Error")) {
             ImGui::OpenPopup("Error");
+            spdlog::error("Startup failure - {}", setupError_);
         }
 
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
@@ -295,24 +299,24 @@ auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
         break;
 
     case Mode::Finished:
-        if (config_.ramSizeKB < CLEM_EMULATOR_RAM_MINIMUM ||
-            config_.ramSizeKB > CLEM_EMULATOR_RAM_MAXIMUM) {
+        if (config_.gs.memory < CLEM_EMULATOR_RAM_MINIMUM ||
+            config_.gs.memory > CLEM_EMULATOR_RAM_MAXIMUM) {
             auto reconfiguredKB =
-                std::clamp(config_.ramSizeKB, CLEM_EMULATOR_RAM_MINIMUM, CLEM_EMULATOR_RAM_MAXIMUM);
-            fmt::print(stderr,
-                       "Configured emulator RAM of {}K is not supported.  Clamping to supported "
-                       "value {}K\n",
-                       config_.ramSizeKB, reconfiguredKB);
-            config_.ramSizeKB = reconfiguredKB;
+                std::clamp(config_.gs.memory, CLEM_EMULATOR_RAM_MINIMUM, CLEM_EMULATOR_RAM_MAXIMUM);
+            config_.gs.memory = reconfiguredKB;
+            spdlog::error("Configured emulator RAM of {}K is not supported.  Clamping to supported "
+                          "value {}K\n",
+                          config_.gs.memory, reconfiguredKB);
         }
-        if ((config_.ramSizeKB % 64) != 0) {
-            auto reconfiguredKB = (config_.ramSizeKB / 64) * 64;
-            fmt::print(stderr, "Configured emulator RAM {}K must be bank-aligned, clamping to {}\n",
-                       config_.ramSizeKB, reconfiguredKB);
-            config_.ramSizeKB = reconfiguredKB;
+        if ((config_.gs.memory % 64) != 0) {
+            auto reconfiguredKB = (config_.gs.memory / 64) * 64;
+            config_.gs.memory = reconfiguredKB;
+            spdlog::error("Configured emulator RAM {}K must be bank-aligned, clamping to {}\n",
+                          config_.gs.memory, reconfiguredKB);
         }
         config_.save();
         nextView = ViewType::Main;
+        spdlog::info("Startup completed");
         break;
     }
 

@@ -21,6 +21,9 @@
         }
     },
     {
+        "act": "frame"
+    },
+    {
         "act": "save",
         "param": "sample.clemens-sav"
     },

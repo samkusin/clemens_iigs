@@ -24,6 +24,7 @@
 #include "sokol/sokol_glue.h"
 #include "sokol/sokol_imgui.h"
 #include "sokol/sokol_time.h"
+#include "spdlog/spdlog.h"
 
 #include "fonts/font_bloada1024.h"
 #include "fonts/font_printchar21.h"
@@ -235,7 +236,7 @@ static sapp_keycode onKeyUp(const sapp_event *evt, bool *doDownEvent) {
 
 std::array<int16_t, 512> g_sokolToADBKey;
 
-cinek::ByteBuffer loadFont(const char *pathname) {
+static cinek::ByteBuffer loadFont(const char *pathname) {
     cinek::ByteBuffer buffer;
     if (!strcasecmp(pathname, "fonts/PrintChar21.ttf")) {
         buffer = cinek::ByteBuffer(PrintChar21_ttf, PrintChar21_ttf_len, PrintChar21_ttf_len);
@@ -254,6 +255,9 @@ static void onInit(void *userdata) {
 #if defined(CLEMENS_PLATFORM_WINDOWS)
     CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #endif
+
+    spdlog::set_level(spdlog::level::info);
+    spdlog::info("Setting up host frameworks");
 
     sg_desc desc = {};
     desc.context = sapp_sgcontext();

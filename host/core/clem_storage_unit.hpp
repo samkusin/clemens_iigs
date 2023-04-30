@@ -6,6 +6,7 @@
 #include "cinek/fixedstack.hpp"
 #include "clem_disk.h"
 #include "core/clem_disk_asset.hpp"
+#include "core/clem_disk_status.hpp"
 #include "core/clem_prodos_disk.hpp"
 
 #include <array>
@@ -34,6 +35,7 @@ class ClemensStorageUnit {
     bool assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex, const std::string &imagePath);
     bool insertDisk(ClemensMMIO &mmio, ClemensDriveType driveType, const std::string &path);
     bool ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType);
+    void ejectAllDisks(ClemensMMIO &mmio);
     void update(ClemensMMIO &mmio);
     bool serialize(ClemensMMIO &mmio, mpack_writer_t *writer);
     bool unserialize(ClemensMMIO &mmio, mpack_reader_t *reader, ClemensUnserializerContext context);

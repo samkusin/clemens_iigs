@@ -149,13 +149,28 @@ bool ClemensStorageUnit::insertDisk(ClemensMMIO &mmio, ClemensDriveType driveTyp
 bool ClemensStorageUnit::ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType) {
     if (!clemens_drive_get(&mmio, driveType)->has_disk || !diskStatuses_[driveType].isMounted())
         return false;
-    if (diskStatuses_[driveType].isEjecting)
-        return true;
 
-    //  save immediately - this can be done again when fully ejected
     struct ClemensNibbleDisk *disk = clemens_eject_disk(&mmio, driveType);
     saveDisk(driveType, *disk);
+    diskStatuses_[driveType].unmount();
     return true;
+}
+
+void ClemensStorageUnit::ejectAllDisks(ClemensMMIO &mmio) {
+    ejectDisk(mmio, kClemensDrive_3_5_D1);
+    ejectDisk(mmio, kClemensDrive_3_5_D2);
+    ejectDisk(mmio, kClemensDrive_5_25_D1);
+    ejectDisk(mmio, kClemensDrive_5_25_D2);
+
+    for (unsigned i = 0; i < (unsigned)hardDisks_.size(); ++i) {
+        if (!hardDiskStatuses_[i].isMounted())
+            continue;
+
+        struct ClemensSmartPortDevice device {};
+        clemens_remove_smartport_disk(&mmio, i, &device);
+        hardDisks_[i].release(device);
+        hardDiskStatuses_[i].unmount();
+    }
 }
 
 void ClemensStorageUnit::update(ClemensMMIO &mmio) {
@@ -180,6 +195,7 @@ void ClemensStorageUnit::update(ClemensMMIO &mmio) {
                 struct ClemensNibbleDisk *disk = clemens_eject_disk(&mmio, driveType);
                 assert(disk);
                 saveDisk(driveType, *disk);
+                diskStatuses_[driveType].unmount();
             }
         }
     }

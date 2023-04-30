@@ -1,9 +1,9 @@
 #ifndef CLEM_HOST_APPLE2GS_HPP
 #define CLEM_HOST_APPLE2GS_HPP
 
-#include "clem_defs.h"
+#include "core/clem_apple2gs_config.hpp"
+
 #include "clem_disk.h"
-#include "clem_mmio_types.h"
 #include "clem_storage_unit.hpp"
 #include "clem_types.h"
 
@@ -20,21 +20,8 @@ class ClemensSystemListener;
 class ClemensAppleIIGS {
 
   public:
-    struct Config {
-        //  RAM in Kilobytes, not counting Mega 2 memory
-        unsigned memory;
-        //  Usually 48000 or equivalent to the target mix rate
-        unsigned audioSamplesPerSecond;
-        //  Path to ROM - if empty, a placeholder minimal ROM will be loaded
-        std::string romPath;
-        //  Baterry RAM as laid out on the IIGS
-        uint8_t bram[CLEM_RTC_BRAM_SIZE];
-        //  Drive images (can be empty)
-        std::array<std::string, kClemensDrive_Count> diskImagePaths;
-        std::array<std::string, CLEM_SMARTPORT_DRIVE_LIMIT> smartPortImagePaths;
-        //  Card namaes
-        std::array<std::string, CLEM_CARD_SLOT_COUNT> cardNames;
-    };
+    using Config = ClemensAppleIIGSConfig;
+    using Frame = ClemensAppleIIGSFrame;
 
     enum class Status {
         Offline,
@@ -48,25 +35,14 @@ class ClemensAppleIIGS {
 
     enum class ResultFlags { None = 0, VerticalBlank = 1 << 0, Resetting = 1 << 1 };
 
-    struct Frame {
-        ClemensMonitor monitor;
-        ClemensVideo graphics;
-        ClemensVideo text;
-        ClemensAudio audio;
-        std::array<ClemensDiskDriveStatus, kClemensDrive_Count> diskDriveStatuses;
-        std::array<ClemensDiskDriveStatus, CLEM_SMARTPORT_DRIVE_LIMIT> smartPortStatuses;
-        uint8_t e0bank[CLEM_IIGS_BANK_SIZE];
-        uint8_t e1bank[CLEM_IIGS_BANK_SIZE];
-        uint16_t rgb[3200];
-    };
-
     static constexpr const char *kClemensCardMockingboardName = "mockingboard_c";
 
     using OnWriteConfigCallback = std::function<void(const Config &)>;
     using OnLocalLogCallback = std::function<void(int, const char *)>;
 
     //  Initialize a new machine
-    ClemensAppleIIGS(const Config &config, ClemensSystemListener &listener);
+    ClemensAppleIIGS(const std::string &romPath, const Config &config,
+                     ClemensSystemListener &listener);
     //  Initialize a machine from the input stream
     ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener &listener);
     //  Destructor (saves state)
@@ -93,8 +69,12 @@ class ClemensAppleIIGS {
     void input(const ClemensInputEvent &input);
     //  Executes a single emulation step
     ResultFlags stepMachine();
-    //  Retrieves
+    //  Retrieves frame information for display/audio/disks
     Frame &getFrame(Frame &frame);
+    //  Finishes the frame
+    void finishFrame(Frame &frame);
+    //  Forces the trigger for saving the config
+    void saveConfig();
 
     //  Direct access to emulator state
     ClemensStorageUnit &getStorage() { return storage_; }
@@ -104,8 +84,6 @@ class ClemensAppleIIGS {
   private:
     static void loggerHook(int logLevel, ClemensMachine *machine, const char *msg);
     static uint8_t *unserializerAllocateHook(unsigned type, unsigned sz, void *context);
-
-    void saveConfig();
 
     template <typename... Args> void localLog(int log_level, const char *msg, Args... args);
 
@@ -124,7 +102,6 @@ class ClemensAppleIIGS {
     // Persisted configuration attributes
     unsigned configMemory_;
     unsigned configAudioSamplesPerSecond_;
-    std::string configROMPath_;
     std::array<std::string, CLEM_CARD_SLOT_COUNT> cardNames_;
 };
 
@@ -137,5 +114,23 @@ class ClemensSystemListener {
     virtual void onClemensSystemLocalLog(int logLevel, const char *msg) = 0;
     virtual void onClemensSystemWriteConfig(const ClemensAppleIIGS::Config &config) = 0;
 };
+
+inline ClemensAppleIIGS::ResultFlags operator|(ClemensAppleIIGS::ResultFlags l,
+                                               ClemensAppleIIGS::ResultFlags r) {
+    return static_cast<ClemensAppleIIGS::ResultFlags>(
+        static_cast<std::underlying_type<ClemensAppleIIGS::ResultFlags>::type>(l) |
+        static_cast<std::underlying_type<ClemensAppleIIGS::ResultFlags>::type>(r));
+}
+
+inline ClemensAppleIIGS::ResultFlags operator&(ClemensAppleIIGS::ResultFlags l,
+                                               ClemensAppleIIGS::ResultFlags r) {
+    return static_cast<ClemensAppleIIGS::ResultFlags>(
+        static_cast<std::underlying_type<ClemensAppleIIGS::ResultFlags>::type>(l) &
+        static_cast<std::underlying_type<ClemensAppleIIGS::ResultFlags>::type>(r));
+}
+
+inline bool test(ClemensAppleIIGS::ResultFlags l, ClemensAppleIIGS::ResultFlags r) {
+    return ((l & r) == r);
+}
 
 #endif

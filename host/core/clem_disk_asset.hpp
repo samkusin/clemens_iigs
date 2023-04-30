@@ -1,7 +1,7 @@
 #ifndef CLEM_HOST_DISK_STATE_HPP
 #define CLEM_HOST_DISK_STATE_HPP
 
-#include "cinek/buffer.hpp"
+#include "cinek/buffertypes.hpp"
 #include "clem_2img.h"
 #include "clem_disk.h"
 #include "clem_woz.h"
@@ -31,7 +31,7 @@ struct ClemensDiskAsset {
     ClemensDiskAsset(const std::string &assetPath);
     ClemensDiskAsset(const std::string &assetPath, ClemensDriveType driveType);
     ClemensDiskAsset(const std::string &assetPath, ClemensDriveType driveType,
-                     cinek::ByteBuffer::ConstRange source, ClemensNibbleDisk &nib);
+                     cinek::ConstRange<uint8_t> source, ClemensNibbleDisk &nib);
     operator bool() const { return imageType_ != ImageNone; }
     ErrorType errorType() const { return errorType_; }
     ImageType imageType() const { return imageType_; }
@@ -57,22 +57,6 @@ struct ClemensDiskAsset {
     std::string path_;
     std::vector<uint8_t> data_;
     std::variant<ClemensWOZDisk, Clemens2IMGDisk> metadata_;
-};
-
-struct ClemensDiskDriveStatus {
-    enum class Error { None, MountFailed, SaveFailed };
-    std::string assetPath;
-    bool isWriteProtected = false;
-    bool isSpinning = false;
-    bool isEjecting = false;
-    bool isSaved = false;
-    Error error = Error::None;
-
-    void mount(const std::string &path);
-    void saveFailed();
-    void mountFailed();
-    void saved();
-    bool isMounted() const;
 };
 
 #endif

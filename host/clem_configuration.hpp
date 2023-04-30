@@ -2,6 +2,7 @@
 #define CLEM_HOST_CONFIGURATION_HPP
 
 #include "clem_host_platform.h"
+#include "core/clem_apple2gs_config.hpp"
 
 #if defined(CLEMENS_PLATFORM_WINDOWS)
 #define CLEM_HOST_COMPANY_NAME     "Cinekine"
@@ -15,15 +16,17 @@
 #define CLEM_EMULATOR_RAM_DEFAULT 4096U
 #define CLEM_EMULATOR_RAM_MAXIMUM 8192U
 
+#include <array>
 #include <string>
 
 struct ClemensConfiguration {
     std::string iniPathname;
-    std::string dataDirectory;
-    std::string romFilename;
     unsigned majorVersion;
     unsigned minorVersion;
-    unsigned ramSizeKB;
+    std::string dataDirectory;
+    std::string romFilename;
+
+    ClemensAppleIIGSConfig gs;
 
     bool hybridInterfaceEnabled;
     bool fastEmulationEnabled;

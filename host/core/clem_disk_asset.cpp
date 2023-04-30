@@ -1,6 +1,7 @@
 #include "clem_disk_asset.hpp"
 #include "clem_2img.h"
 #include "clem_disk.h"
+#include "clem_disk_status.hpp"
 #include "clem_woz.h"
 
 #include <algorithm>
@@ -21,6 +22,8 @@ void ClemensDiskDriveStatus::mount(const std::string &path) {
     isSaved = false;
     error = Error::None;
 }
+
+void ClemensDiskDriveStatus::unmount() { mount(""); }
 
 void ClemensDiskDriveStatus::saveFailed() {
     error = Error::SaveFailed;
@@ -79,7 +82,7 @@ ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveTyp
 }
 
 ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveType driveType,
-                                   cinek::ByteBuffer::ConstRange source, ClemensNibbleDisk &nib)
+                                   cinek::ConstRange<uint8_t> source, ClemensNibbleDisk &nib)
     : ClemensDiskAsset(assetPath, driveType) {
 
     estimatedEncodedSize_ = cinek::length(source);

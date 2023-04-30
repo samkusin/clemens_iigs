@@ -55,6 +55,8 @@ bool ClemensTestHarness::run(nlohmann::json &command) {
         return save(params);
     } else if (actionName == "load") {
         return load(params);
+    } else if (actionName == "frame") {
+        return getFrame(params);
     }
     return false;
 }
@@ -201,6 +203,12 @@ bool ClemensTestHarness::load(nlohmann::json params) {
     return true;
 }
 
+bool ClemensTestHarness::getFrame(nlohmann::json) {
+    ClemensAppleIIGS::Frame frame;
+    a2gs_->getFrame(frame);
+    return true;
+}
+
 void ClemensTestHarness::step(unsigned cnt, unsigned statusStepRate) {
     if (failed_)
         return;
@@ -217,6 +225,8 @@ void ClemensTestHarness::step(unsigned cnt, unsigned statusStepRate) {
             clemens_opcode_callback(&a2gs_->getMachine(), NULL);
         }
     }
+    //  normally this is done inside a2gs_->getFrame()
+    a2gs_->getStorage().update(a2gs_->getMMIO());
 }
 
 void ClemensTestHarness::printStatus() {

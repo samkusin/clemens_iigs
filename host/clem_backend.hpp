@@ -1,29 +1,28 @@
 #ifndef CLEM_HOST_BACKEND_HPP
 #define CLEM_HOST_BACKEND_HPP
 
+#include "cinek/fixedstack.hpp"
 #include "clem_command_queue.hpp"
-#include "clem_disk.h"
 #include "clem_host_shared.hpp"
 #include "clem_interpreter.hpp"
-#include "clem_smartport_disk.hpp"
-#include "core/clem_disk_asset.hpp"
-#include "core/clem_storage_unit.hpp"
 
-#include "cinek/buffer.hpp"
-#include "cinek/fixedstack.hpp"
-#include "clem_woz.h"
+#include "cinek/circular_buffer.hpp"
+#include "core/clem_apple2gs.hpp"
 
-#include <array>
+#include "clem_shared.h"
+
 #include <chrono>
-#include <condition_variable>
-#include <deque>
-#include <functional>
+#include <optional>
 #include <string>
-#include <string_view>
 #include <vector>
 
+//  Forward Decls
 class ClemensProgramTrace;
 
+//
+//  ClemensRunSampler controls the execution rate of and provides metrics for the
+//  underlying machine.
+//
 struct ClemensRunSampler {
     std::chrono::microseconds referenceFrameTimer;
     std::chrono::microseconds actualFrameTimer;
@@ -55,22 +54,72 @@ struct ClemensRunSampler {
     void disableFastMode();
 };
 
-//  TODO: Machine type logic could be subclassed into an Apple2GS backend, etc.
-class ClemensBackend : public ClemensCommandQueueListener {
+struct ClemensBackendState {
+    ClemensMachine *machine;
+    ClemensMMIO *mmio;
+    double fps;
+    bool isRunning;
+    bool isTracing;
+    bool isIWMTracing;
+    bool mmioWasInitialized;
+
+    ClemensAppleIIGS::Frame *frame;
+
+    unsigned hostCPUID;
+    int logLevel;
+    const ClemensBackendOutputText *logBufferStart;
+    const ClemensBackendOutputText *logBufferEnd;
+    const ClemensBackendBreakpoint *bpBufferStart;
+    const ClemensBackendBreakpoint *bpBufferEnd;
+    std::optional<unsigned> bpHitIndex;
+    const ClemensBackendExecutedInstruction *logInstructionStart;
+    const ClemensBackendExecutedInstruction *logInstructionEnd;
+
+    uint8_t ioPageValues[256]; // 0xc000 - 0xc0ff
+    uint8_t debugMemoryPage;
+
+    float machineSpeedMhz;
+    float avgVBLsPerFrame;
+    bool fastEmulationOn;
+
+    // valid if a debugMessage() command was issued from the frontend
+    std::optional<std::string> message;
+};
+
+struct ClemensBackendConfig {
+    int logLevel;
+    std::string dataRootPath;
+    std::string snapshotRootPath;
+    std::string traceRootPath;
+    std::vector<ClemensBackendBreakpoint> breakpoints;
+    bool enableFastEmulation;
+
+    enum class Type { Apple2GS };
+    Type type;
+    ClemensAppleIIGS::Config GS;
+};
+
+//  ClemensBackend controls the emulator and publishes its state to the frontend.
+//      The ClemensAppleIIGS emulator module is constructed upon backend creation
+//      or when a snapshot is loaded.
+//      - The backend funnels frontend requests to ClemensAppleIIGS.
+//      - In turn the backend reports ClemensAppleIIGS state to the frontend in
+//        regular intervals.
+//      - The backend also implements debugger functionality that controls and
+//        views ClemensAppleIIGS state as well.
+//
+class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener {
   public:
     using Config = ClemensBackendConfig;
 
-    //  The PublishStateDelegate provides backend state to the front end GUI
-    //  Data passed through the delegate is guaranteed to be valid within its
-    //    scope.  The front-end should copy what it needs for its display during
-    //    the delegate's scope. Once the delegate has finished, the data in
-    //    ClemensBackendState should be considered invalid/undefined.
+    ClemensBackend(std::string romPath, const Config &config);
+    virtual ~ClemensBackend();
+
     using PublishStateDelegate =
         std::function<void(ClemensCommandQueue &, const ClemensCommandQueue::ResultBuffer &,
                            const ClemensBackendState &)>;
-    ClemensBackend(std::string romPathname, const Config &config);
-    ~ClemensBackend();
 
+    //  Executes a single emulator timeslice
     ClemensCommandQueue::DispatchResult
     main(ClemensBackendState &backendState, const ClemensCommandQueue::ResultBuffer &commandResults,
          PublishStateDelegate delegate);
@@ -84,6 +133,13 @@ class ClemensBackend : public ClemensCommandQueueListener {
     void assignPropertyToU32(MachineProperty property, uint32_t value);
 
   private:
+    // ClemensSystemListener
+    void onClemensSystemMachineLog(int logLevel, const ClemensMachine *machine,
+                                   const char *msg) final;
+    void onClemensSystemLocalLog(int logLevel, const char *msg) final;
+    void onClemensSystemWriteConfig(const ClemensAppleIIGS::Config &config) final;
+
+    //  ClemensCommandQueueListener
     void onCommandReset() final;
     void onCommandRun() final;
     void onCommandBreakExecution() final;
@@ -108,63 +164,14 @@ class ClemensBackend : public ClemensCommandQueueListener {
     void onCommandFastDiskEmulation(bool enabled) final;
     std::string onCommandDebugMessage(std::string msg) final;
 
-    std::optional<unsigned> checkHitBreakpoint();
     bool isRunning() const;
-
-    void initEmulatedDiskLocalStorage();
-
-    bool mountDisk(ClemensDriveType driveType, bool blankDisk);
-    bool saveDisk(ClemensDriveType driveType);
-    bool unmountDisk(ClemensDriveType driveType);
-
-    bool mountSmartPortDisk(unsigned driveindex, bool blankDisk);
-    bool saveSmartPortDisk(unsigned driveIndex);
-    bool unmountSmartPortDisk(unsigned driveIndex);
-    void ejectAllDisks();
-
-    cinek::ByteBuffer loadROM(const char *romPathname);
-
-    //  TODO: These methods could be moved into a subclass as they are specific
-    //        to machine type
-    void initApple2GS(const std::string &romPathname);
-    void loadBRAM();
-    void saveBRAM();
-
+    std::optional<unsigned> checkHitBreakpoint();
     template <typename... Args> void localLog(int log_level, const char *msg, Args... args);
-
-    static void emulatorLog(int log_level, ClemensMachine *machine, const char *msg);
-    static void emulatorOpcodeCallback(struct ClemensInstruction *inst, const char *operand,
-                                       void *this_ptr);
-    static uint8_t *unserializeAllocate(unsigned type, unsigned sz, void *context);
 
   private:
     Config config_;
+    std::unique_ptr<ClemensAppleIIGS> GS_;
 
-    //  TODO: Move into an actual "AppleIIGS" object to separate the machine
-    //        from the emulator backend.  THis way, we can load a machine
-    //        without trampling on the existing machine state (which we'd want
-    //        in case loading a snapshot fails.)
-    //  {
-    //  memory allocated once for the machine
-    cinek::FixedStack slabMemory_;
-    //  the actual machine object
-    cinek::ByteBuffer diskBuffer_;
-    ClemensMachine machine_;
-    ClemensMMIO mmio_;
-    ClemensCard *mockingboard_;
-
-    ClemensStorageUnit storageUnit_;
-
-    std::array<ClemensWOZDisk, kClemensDrive_Count> diskContainers_; // TODO rem
-    std::array<ClemensNibbleDisk, kClemensDrive_Count> disks_;       // TODO rem
-    std::array<ClemensDiskAsset, kClemensDrive_Count> diskAssets_;
-    std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives_; // TODO rem
-    std::array<ClemensBackendDiskDriveState, CLEM_SMARTPORT_DRIVE_LIMIT>
-        smartPortDrives_; // TODO rem
-    std::array<ClemensSmartPortDisk, CLEM_SMARTPORT_DRIVE_LIMIT> smartPortDisks_;
-    // }
-
-    //  Actual Emulator Backend State vs machine state
     ClemensInterpreter interpreter_;
     std::vector<ClemensBackendOutputText> logOutput_;
     std::vector<ClemensBackendBreakpoint> breakpoints_;

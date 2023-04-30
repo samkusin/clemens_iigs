@@ -22,7 +22,7 @@ void ClemensSettingsUI::start(const ClemensConfiguration &config) {
     romFilename_[cnt] = '\0';
     //  effectively support only our selectable values
     //  and disable the radio button otherwise
-    ramSizeKB_ = config_.ramSizeKB;
+    ramSizeKB_ = config_.gs.memory;
     nonstandardRAMSize_ = true;
     for (int i = 0; i < kSupportedRAMSizeCount; ++i) {
         if (ramSizeKB_ == s_supportedRAMSizes[i]) {
@@ -187,11 +187,11 @@ bool ClemensSettingsUI::frame(float width, float height) {
 }
 
 bool ClemensSettingsUI::willRequireRestart() const {
-    return (config_.ramSizeKB != (unsigned)(ramSizeKB_)) || (config_.romFilename != romFilename_);
+    return (config_.gs.memory != (unsigned)(ramSizeKB_)) || (config_.romFilename != romFilename_);
 }
 
 void ClemensSettingsUI::updateConfig() {
-    config_.ramSizeKB = ramSizeKB_;
+    config_.gs.memory = ramSizeKB_;
     config_.romFilename = romFilename_;
 }
 

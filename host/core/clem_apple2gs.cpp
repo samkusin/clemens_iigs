@@ -73,21 +73,8 @@ void destroyCard(ClemensCard *card) {
 
 } // namespace
 
-ClemensAppleIIGS::ResultFlags operator|(ClemensAppleIIGS::ResultFlags l,
-                                        ClemensAppleIIGS::ResultFlags r) {
-    return static_cast<ClemensAppleIIGS::ResultFlags>(
-        static_cast<std::underlying_type<ClemensAppleIIGS::ResultFlags>::type>(l) |
-        static_cast<std::underlying_type<ClemensAppleIIGS::ResultFlags>::type>(r));
-}
-
-ClemensAppleIIGS::ResultFlags operator&(ClemensAppleIIGS::ResultFlags l,
-                                        ClemensAppleIIGS::ResultFlags r) {
-    return static_cast<ClemensAppleIIGS::ResultFlags>(
-        static_cast<std::underlying_type<ClemensAppleIIGS::ResultFlags>::type>(l) &
-        static_cast<std::underlying_type<ClemensAppleIIGS::ResultFlags>::type>(r));
-}
-
-ClemensAppleIIGS::ClemensAppleIIGS(const Config &config, ClemensSystemListener &listener)
+ClemensAppleIIGS::ClemensAppleIIGS(const std::string &romPath, const Config &config,
+                                   ClemensSystemListener &listener)
     : listener_(listener), status_(Status::Offline),
       slab_(calculateSlabMemoryRequirements(config),
             malloc(calculateSlabMemoryRequirements(config))),
@@ -98,8 +85,8 @@ ClemensAppleIIGS::ClemensAppleIIGS(const Config &config, ClemensSystemListener &
     // Ensure a valid ROM buffer regardless of whether a valid ROM was loaded
     // In the error case, we'll want to have a placeholder ROM.
     cinek::ByteBuffer romBuffer;
-    if (!config.romPath.empty()) {
-        std::ifstream romFileStream(config.romPath, std::ios::binary | std::ios::ate);
+    if (!romPath.empty()) {
+        std::ifstream romFileStream(romPath, std::ios::binary | std::ios::ate);
         unsigned romMemorySize = 0;
         if (romFileStream.is_open()) {
             romMemorySize = unsigned(romFileStream.tellg());
@@ -164,7 +151,7 @@ ClemensAppleIIGS::ClemensAppleIIGS(const Config &config, ClemensSystemListener &
         }
     }
     //  Update bram and save off configuration (Extended BRAM)
-    memcpy(mmio_.dev_rtc.bram, config.bram, CLEM_RTC_BRAM_SIZE);
+    memcpy(mmio_.dev_rtc.bram, config.bram.data(), CLEM_RTC_BRAM_SIZE);
     clemens_rtc_set_bram_dirty(&mmio_);
 
     //  And insert the disks!
@@ -200,7 +187,6 @@ ClemensAppleIIGS::ClemensAppleIIGS(const Config &config, ClemensSystemListener &
     //  Finally save out the final config
     configMemory_ = (kFPIRAMBankCount * CLEM_IIGS_BANK_SIZE) / 1024;
     configAudioSamplesPerSecond_ = config.audioSamplesPerSecond;
-    configROMPath_ = config.romPath;
     cardNames_ = config.cardNames;
     saveConfig();
 }
@@ -232,9 +218,6 @@ ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener
     configMemory_ = mpack_expect_uint(reader);
     mpack_expect_cstr_match(reader, "config.audio.samples");
     configAudioSamplesPerSecond_ = mpack_expect_uint(reader);
-    mpack_expect_cstr_match(reader, "config.rompath");
-    mpack_expect_cstr(reader, buf, sizeof(buf));
-    configROMPath_ = buf;
 
     mpack_expect_cstr_match(reader, "slab");
     slabSize = mpack_expect_uint_max(reader, kMachineSlabMaximumSize);
@@ -305,6 +288,7 @@ load_done:
 }
 
 ClemensAppleIIGS::~ClemensAppleIIGS() {
+    storage_.ejectAllDisks(mmio_);
     for (int i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
         destroyCard(mmio_.card_slot[i]);
         mmio_.card_slot[i] = NULL;
@@ -368,8 +352,7 @@ std::pair<std::string, bool> ClemensAppleIIGS::save(mpack_writer_t *writer) {
     mpack_write_uint(writer, configMemory_);
     mpack_write_cstr(writer, "config.audio.samples");
     mpack_write_uint(writer, configAudioSamplesPerSecond_);
-    mpack_write_cstr(writer, "config.rompath");
-    mpack_write_cstr(writer, configROMPath_.c_str());
+
     //  card names are serialized in the "cards" section
     //  save slab requirements
     mpack_write_cstr(writer, "slab");
@@ -435,8 +418,8 @@ void ClemensAppleIIGS::saveConfig() {
 
     finalConfig.memory = configMemory_;
     finalConfig.audioSamplesPerSecond = configAudioSamplesPerSecond_;
-    finalConfig.romPath = configROMPath_;
-    memcpy(finalConfig.bram, clemens_rtc_get_bram(&mmio_, NULL), CLEM_RTC_BRAM_SIZE);
+
+    memcpy(finalConfig.bram.data(), clemens_rtc_get_bram(&mmio_, NULL), CLEM_RTC_BRAM_SIZE);
     for (unsigned driveIndex = 0; driveIndex < (unsigned)finalConfig.diskImagePaths.size();
          ++driveIndex) {
         auto status = storage_.getDriveStatus(static_cast<ClemensDriveType>(driveIndex));
@@ -493,7 +476,9 @@ auto ClemensAppleIIGS::stepMachine() -> ResultFlags {
 }
 
 auto ClemensAppleIIGS::getFrame(Frame &frame) -> Frame & {
-
+    if (!isOk())
+        return frame;
+    storage_.update(mmio_);
     clemens_get_monitor(&frame.monitor, &mmio_);
     clemens_get_text_video(&frame.text, &mmio_);
     clemens_get_graphics_video(&frame.graphics, &machine_, &mmio_);
@@ -508,8 +493,6 @@ auto ClemensAppleIIGS::getFrame(Frame &frame) -> Frame & {
     }
     clemens_out_bin_data(&machine_, frame.e0bank, CLEM_IIGS_BANK_SIZE, 0xe0, 0x0000);
     clemens_out_bin_data(&machine_, frame.e1bank, CLEM_IIGS_BANK_SIZE, 0xe1, 0x0000);
-    assert(frame.graphics.rgb_buffer_size == sizeof(frame.rgb));
-    memcpy(frame.rgb, frame.graphics.rgb, frame.graphics.rgb_buffer_size);
 
     for (unsigned i = 0; i < (unsigned)frame.diskDriveStatuses.size(); ++i) {
         auto driveType = static_cast<ClemensDriveType>(i);
@@ -520,4 +503,10 @@ auto ClemensAppleIIGS::getFrame(Frame &frame) -> Frame & {
     }
 
     return frame;
+}
+
+void ClemensAppleIIGS::finishFrame(Frame &frame) {
+    if (!isOk())
+        return;
+    clemens_audio_next_frame(&mmio_, frame.audio.frame_count);
 }
