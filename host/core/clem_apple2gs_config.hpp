@@ -28,8 +28,6 @@ struct ClemensAppleIIGSFrame {
     ClemensAudio audio;
     std::array<ClemensDiskDriveStatus, kClemensDrive_Count> diskDriveStatuses;
     std::array<ClemensDiskDriveStatus, CLEM_SMARTPORT_DRIVE_LIMIT> smartPortStatuses;
-    uint8_t e0bank[CLEM_IIGS_BANK_SIZE];
-    uint8_t e1bank[CLEM_IIGS_BANK_SIZE];
 };
 
 #endif

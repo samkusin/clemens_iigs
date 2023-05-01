@@ -5,6 +5,7 @@
 #include "cinek/fixedstack.hpp"
 #include "clem_assets.hpp"
 #include "clem_backend.hpp"
+#include "clem_defs.h"
 #include "clem_disk.h"
 #include "clem_host_platform.h"
 #include "clem_host_shared.hpp"
@@ -877,6 +878,11 @@ void ClemensFrontend::FrameState::copyState(const ClemensBackendState &state,
         memcpy(frame.graphics.rgb, state.frame->graphics.rgb,
                state.frame->graphics.rgb_buffer_size);
     }
+    e0bank = frameMemory.allocateArray<uint8_t>(CLEM_IIGS_BANK_SIZE);
+    clemens_out_bin_data(state.machine, e0bank, CLEM_IIGS_BANK_SIZE, 0xe0, 0x0000);
+    e1bank = frameMemory.allocateArray<uint8_t>(CLEM_IIGS_BANK_SIZE);
+    clemens_out_bin_data(state.machine, e1bank, CLEM_IIGS_BANK_SIZE, 0xe1, 0x0000);
+
     //  audio data - note, that the actual buffer and some fixed attributes like
     //  stride are all that's needed by the frontend to render audio
     //  frames are accumulated into an audio buffer residing in "last command state"
@@ -1173,8 +1179,8 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     //  monitor are stored in screenUVs
     float screenUVs[2]{0.0f, 0.0f};
     if (frameReadState_.mmioWasInitialized && isEmulatorActive()) {
-        const uint8_t *e0mem = frameReadState_.frame.e0bank;
-        const uint8_t *e1mem = frameReadState_.frame.e1bank;
+        const uint8_t *e0mem = frameReadState_.e0bank;
+        const uint8_t *e1mem = frameReadState_.e1bank;
         bool altCharSet = frameReadState_.vgcModeFlags & CLEM_VGC_ALTCHARSET;
         bool text80col = frameReadState_.vgcModeFlags & CLEM_VGC_80COLUMN_TEXT;
         display_.start(frameReadState_.frame.monitor, kClemensScreenWidth, kClemensScreenHeight);
@@ -1621,7 +1627,7 @@ void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
     }
     if (ImGui::CollapsingHeader("Cards", ImGuiTreeNodeFlags_DefaultOpen)) {
         for (unsigned slot = 0; slot < CLEM_CARD_SLOT_COUNT; ++slot) {
-            if (frameWriteState_.cards[slot].empty())
+            if (frameReadState_.cards[slot].empty())
                 continue;
             ImGui::Spacing();
             ImGui::Image(ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kCard),
@@ -1630,7 +1636,7 @@ void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
             ImGui::BeginGroup();
             ImGui::Text("Slot %u", slot + 1);
             ImGui::Spacing();
-            ImGui::TextUnformatted(frameWriteState_.cards[slot].c_str());
+            ImGui::TextUnformatted(frameReadState_.cards[slot].c_str());
             ImGui::EndGroup();
             ImGui::Separator();
         }

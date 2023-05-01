@@ -21,7 +21,8 @@ set(EXT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/stb.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/spdlog/spdlog.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/spdlog/async.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ext/spdlog/color_sinks.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/spdlog/color_sinks.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ext/spdlog/file_sinks.cpp")
 
 add_library(clemens_host_shared
     ${CINEK_SOURCES}

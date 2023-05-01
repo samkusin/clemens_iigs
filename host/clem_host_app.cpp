@@ -257,6 +257,7 @@ static void onInit(void *userdata) {
 #endif
 
     spdlog::set_level(spdlog::level::info);
+    spdlog::flush_on(spdlog::level::err);
     spdlog::info("Setting up host frameworks");
 
     sg_desc desc = {};
@@ -531,6 +532,8 @@ static void onCleanup(void *userdata) {
     delete appdata;
 
     ClemensHostAssets::terminate();
+
+    spdlog::shutdown();
 
     simgui_shutdown();
     sg_shutdown();

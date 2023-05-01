@@ -6,11 +6,15 @@
 #include "fmt/core.h"
 #include "fmt/format.h"
 #include "imgui.h"
+#include "spdlog/common.h"
+#include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
 
 #include "imgui_filedialog/ImGuiFileDialog.h"
 
 #include <filesystem>
+#include <memory>
 #include <system_error>
 
 namespace {
@@ -54,6 +58,20 @@ ClemensConfiguration findConfiguration() {
         return ClemensConfiguration();
     }
     return createConfiguration(std::filesystem::path(localpath));
+}
+
+void setupLogger(const std::string &logDirectory) {
+    auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    console_sink->set_level(spdlog::level::info);
+
+    auto logPath = std::filesystem::path(logDirectory) / "clem_host.log";
+    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(logPath.string(), true);
+    file_sink->set_level(spdlog::level::info);
+
+    std::vector<spdlog::sink_ptr> sinks{console_sink, file_sink};
+    auto main_logger = std::make_shared<spdlog::logger>("clemens", sinks.begin(), sinks.end());
+    spdlog::set_default_logger(main_logger);
+    spdlog::info("Log file at {}", logPath.string());
 }
 
 } // namespace
@@ -160,6 +178,7 @@ auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
     case Mode::Preamble:
         if (!preamble_) {
             if (validateDirectories()) {
+                setupLogger(config_.dataDirectory);
                 preamble_ = std::make_unique<ClemensPreamble>(config_);
             } else {
                 mode_ = Mode::SetupError;

@@ -69,11 +69,13 @@ bool ClemensConfiguration::save() {
         fmt::print(fp,
                    "gs.bram{:02X}={:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} "
                    "{:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X}\n",
-                   gs.bram[i + 0x0], gs.bram[i + 0x1], gs.bram[i + 0x2], gs.bram[i + 0x3],
+                   i, gs.bram[i + 0x0], gs.bram[i + 0x1], gs.bram[i + 0x2], gs.bram[i + 0x3],
                    gs.bram[i + 0x4], gs.bram[i + 0x5], gs.bram[i + 0x6], gs.bram[i + 0x7],
                    gs.bram[i + 0x8], gs.bram[i + 0x9], gs.bram[i + 0xa], gs.bram[i + 0xb],
                    gs.bram[i + 0xc], gs.bram[i + 0xd], gs.bram[i + 0xe], gs.bram[i + 0xf]);
     }
+
+    fclose(fp);
 
     return true;
 }
@@ -117,6 +119,7 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
                         partial = NULL;
                         continue;
                     }
+                    partial += 2;
                     config->gs.bram[offset++] = byte;
                 }
             } else {

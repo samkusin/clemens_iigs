@@ -227,6 +227,8 @@ class ClemensFrontend : public ClemensHostView {
         uint8_t *docRAM = nullptr;
         uint8_t *ioPage = nullptr;
         uint8_t *bram = nullptr;
+        uint8_t *e0bank = nullptr;
+        uint8_t *e1bank = nullptr;
 
         ClemensBackendBreakpoint *breakpoints = nullptr;
         unsigned breakpointCount = 0;

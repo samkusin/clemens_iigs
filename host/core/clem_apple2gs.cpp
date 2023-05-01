@@ -491,8 +491,6 @@ auto ClemensAppleIIGS::getFrame(Frame &frame) -> Frame & {
                                  audio.frame_stride / sizeof(float), configAudioSamplesPerSecond_);
         }
     }
-    clemens_out_bin_data(&machine_, frame.e0bank, CLEM_IIGS_BANK_SIZE, 0xe0, 0x0000);
-    clemens_out_bin_data(&machine_, frame.e1bank, CLEM_IIGS_BANK_SIZE, 0xe1, 0x0000);
 
     for (unsigned i = 0; i < (unsigned)frame.diskDriveStatuses.size(); ++i) {
         auto driveType = static_cast<ClemensDriveType>(i);
