@@ -27,6 +27,9 @@ struct ClemensDiskAsset {
         ErrorVersionNotSupported
     };
 
+    static DiskType diskTypeFromDriveType(ClemensDriveType driveType);
+    static ClemensDriveType driveTypefromDiskType(DiskType diskType, unsigned driveIndex);
+
     ClemensDiskAsset() = default;
     ClemensDiskAsset(const std::string &assetPath);
     ClemensDiskAsset(const std::string &assetPath, ClemensDriveType driveType);

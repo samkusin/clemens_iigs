@@ -49,6 +49,7 @@ class ClemensDiskBrowser {
     Record selectedRecord_;
     std::vector<Record> records_;
     BrowserFinishedStatus finishedStatus_;
+    std::chrono::steady_clock::time_point nextRefreshTime_;
 };
 
 #endif

@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "spdlog/spdlog.h"
+
 #include "fmt/core.h"
 
 //  TODO: optimize when needed per platform
@@ -30,8 +32,8 @@ void ClemensAudioDevice::start() {
         queuedFrameStride_ = 2 * sizeof(float);
         queuedFrameLimit_ = saudio_sample_rate() / 2;
         queuedFrameBuffer_ = new uint8_t[queuedFrameLimit_ * queuedFrameStride_];
-        fmt::print("ClemensAudioDevice queuedFrameBuffer {} khz, frame limit = {}, stride = {}\n",
-                   audioDesc.sample_rate / 1000.0f, queuedFrameLimit_, queuedFrameStride_);
+        spdlog::info("ClemensAudioDevice queuedFrameBuffer {} khz, frame limit = {}, stride = {}",
+                     audioDesc.sample_rate / 1000.0f, queuedFrameLimit_, queuedFrameStride_);
     } else {
         queuedFrameStride_ = 0;
         queuedFrameLimit_ = 0;
@@ -125,8 +127,8 @@ unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float /*deltaTime */) {
         audioInAvailable -= framesOutCount;
         audioInUsed += framesOutCount;
         if (audioInAvailable > 0) {
-            fmt::print("ClemensAudioDevice: {} frames not queued for playback, output = {}\n",
-                       audioInAvailable, framesOutCount);
+            spdlog::info("ClemensAudioDevice: {} frames not queued for playback, output = {}",
+                         audioInAvailable, framesOutCount);
         }
     }
 

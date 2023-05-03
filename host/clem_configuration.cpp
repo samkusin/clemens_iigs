@@ -4,13 +4,15 @@
 #include "clem_disk.h"
 #include "fmt/format.h"
 #include "ini.h"
+#include "spdlog/spdlog.h"
 
 #include <charconv>
 #include <cstdio>
 #include <cstring>
 
 ClemensConfiguration::ClemensConfiguration()
-    : majorVersion(0), minorVersion(0), hybridInterfaceEnabled(false), fastEmulationEnabled(true) {
+    : majorVersion(0), minorVersion(0), hybridInterfaceEnabled(false), fastEmulationEnabled(true),
+      isDirty(true) {
     gs.audioSamplesPerSecond = 0;
     gs.memory = CLEM_EMULATOR_RAM_DEFAULT;
 }
@@ -33,12 +35,16 @@ void ClemensConfiguration::copyFrom(const ClemensConfiguration &other) {
     gs = other.gs;
     hybridInterfaceEnabled = other.hybridInterfaceEnabled;
     fastEmulationEnabled = other.fastEmulationEnabled;
+    isDirty = true;
 }
 
 bool ClemensConfiguration::save() {
+    if (!isDirty)
+        return true;
+
     FILE *fp = fopen(iniPathname.c_str(), "w");
     if (fp == NULL) {
-        fmt::print(stderr, "ClemensConfiguration: failed to write {}\n", iniPathname);
+        spdlog::error("ClemensConfiguration: failed to write {}", iniPathname);
         return false;
     }
     fmt::print(fp,
@@ -77,8 +83,14 @@ bool ClemensConfiguration::save() {
 
     fclose(fp);
 
+    spdlog::info("Configuration saved.");
+
+    isDirty = false;
+
     return true;
 }
+
+void ClemensConfiguration::setDirty() { isDirty = true; }
 
 int ClemensConfiguration::handler(void *user, const char *section, const char *name,
                                   const char *value) {

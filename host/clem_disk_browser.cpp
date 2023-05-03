@@ -159,6 +159,8 @@ auto getRecordsFromDirectory(std::string directoryPathname, ClemensDiskAsset::Di
                 (diskType == ClemensDiskAsset::Disk525 && driveType == kClemensDrive_5_25_D1)) {
                 ClemensDiskBrowser::Record record{};
                 record.asset = ClemensDiskAsset(entry.path().string(), driveType);
+                record.size = fileSize;
+                record.fileTime = to_time_t(std::filesystem::last_write_time(entry.path()));
                 records.emplace_back(record);
             } else if (diskType == ClemensDiskAsset::DiskHDD && isSmartPortDrive) {
                 // TODO: add HDD disk asset which needs a constructor in ClemensDiskAsset
@@ -183,6 +185,7 @@ void ClemensDiskBrowser::open(ClemensDiskAsset::DiskType diskType, const std::st
     selectedRecord_ = Record();
     finishedStatus_ = BrowserFinishedStatus::Active;
     cwdName_ = browsePath;
+    nextRefreshTime_ = std::chrono::steady_clock::now();
 }
 
 bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
@@ -199,13 +202,14 @@ bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
         cwdPath = std::filesystem::canonical(cwdPath);
     }
 
-    if (!getRecordsResult_.valid()) {
+    if (!getRecordsResult_.valid() && std::chrono::steady_clock::now() >= nextRefreshTime_) {
         getRecordsResult_ =
             std::async(std::launch::async, &getRecordsFromDirectory, cwdPath.string(), diskType_);
     }
     if (getRecordsResult_.valid()) {
         if (getRecordsResult_.wait_for(std::chrono::milliseconds(1)) == std::future_status::ready) {
             records_ = getRecordsResult_.get();
+            nextRefreshTime_ = std::chrono::steady_clock::now() + std::chrono::seconds(1);
         }
     }
 
@@ -280,6 +284,7 @@ bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
                 selectedRecord_ = record;
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                     selectionMade = true;
+                    nextRefreshTime_ = std::chrono::steady_clock::now();
                 }
             }
             ImGui::TableSetColumnIndex(2);
@@ -310,6 +315,7 @@ bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
     if (ImGui::Button("Select") || selectionMade || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
         if (selectedRecord_.isDirectory()) {
             cwdName_ = selectedRecord_.asset.path();
+            nextRefreshTime_ = std::chrono::steady_clock::now();
         } else {
             finishedStatus_ = BrowserFinishedStatus::Selected;
         }

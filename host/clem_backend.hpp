@@ -10,6 +10,7 @@
 #include "core/clem_apple2gs.hpp"
 
 #include "clem_shared.h"
+#include "core/clem_apple2gs_config.hpp"
 
 #include <chrono>
 #include <optional>
@@ -84,6 +85,8 @@ struct ClemensBackendState {
 
     // valid if a debugMessage() command was issued from the frontend
     std::optional<std::string> message;
+    // valid if the configuration changed (i.e BRAM, disk status)
+    std::optional<ClemensAppleIIGSConfig> config;
 };
 
 struct ClemensBackendConfig {
@@ -132,6 +135,10 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     //  value is truncated by masking/downcast from 32-bit accordingly.
     void assignPropertyToU32(MachineProperty property, uint32_t value);
 
+    //  this method will poll the machine for the config and return it here
+    //  for saving if necessary
+    bool queryConfig(ClemensAppleIIGSConfig &config);
+
   private:
     // ClemensSystemListener
     void onClemensSystemMachineLog(int logLevel, const ClemensMachine *machine,
@@ -170,7 +177,10 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
 
   private:
     Config config_;
+    ClemensAppleIIGSConfig gsConfig_;
+
     std::unique_ptr<ClemensAppleIIGS> GS_;
+    bool gsConfigUpdated_;
 
     ClemensInterpreter interpreter_;
     std::vector<ClemensBackendOutputText> logOutput_;

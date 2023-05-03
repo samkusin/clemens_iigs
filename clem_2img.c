@@ -250,6 +250,7 @@ bool clem_2img_parse_header(struct Clemens2IMGDisk *disk, const uint8_t *data,
 
 unsigned clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uint8_t *image_end) {
     uint8_t *image_cur = image;
+    uint8_t *data_tmp;
     size_t image_size = image_end - image;
     size_t source_size = disk->data_end - disk->data;
     size_t creator_size = disk->creator_data_end - disk->creator_data;
@@ -282,6 +283,8 @@ unsigned clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uin
     } else {
         return 0;
     }
+
+    disk->image_buffer = image;
 
     _encode_mem(&image_cur, (uint8_t *)"2IMG", 4, overlapped);
     _encode_mem(&image_cur, (uint8_t *)"CLEM", 4, overlapped);
@@ -322,12 +325,16 @@ unsigned clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uin
     _encode_u32(&image_cur, 0);
     if (image_cur - image != CLEM_2IMG_HEADER_BYTE_SIZE)
         return 0;
-
+    data_tmp = image_cur;
     _encode_mem(&image_cur, disk->data, source_size, overlapped);
+    disk->data = data_tmp;
+    disk->data_end = image_cur;
     _encode_mem(&image_cur, (uint8_t *)disk->creator_data, creator_size, overlapped);
     _encode_mem(&image_cur, (uint8_t *)disk->comment, comment_size, overlapped);
 
-    return (unsigned)(image_cur - image);
+    disk->image_buffer_length = (unsigned)(image_cur - image);
+
+    return disk->image_buffer_length;
 }
 
 bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, const uint8_t *image,
@@ -394,8 +401,10 @@ static bool _clem_2img_nibblize_data_35(struct Clemens2IMGDisk *disk) {
     if (disk->block_count > 0) {
         if (disk->block_count == CLEM_DISK_35_PRODOS_BLOCK_COUNT) {
             is_double_sided = false;
+            disk->nib->track_count = 80;
         } else if (disk->block_count == CLEM_DISK_35_DOUBLE_PRODOS_BLOCK_COUNT) {
             is_double_sided = true;
+            disk->nib->track_count = 160;
         } else {
             return false;
         }
@@ -438,18 +447,25 @@ bool clem_2img_nibblize_data(struct Clemens2IMGDisk *disk) {
 bool _clem_2img_decode_nibblized_disk_35(struct Clemens2IMGDisk *disk, uint8_t *data_start,
                                          uint8_t *data_end, const struct ClemensNibbleDisk *nib) {
     disk->is_write_protected = nib->is_write_protected;
-    return clem_disk_nib_decode_35(nib, disk->format, data_start, data_end);
+    disk->data = data_start;
+    disk->data_end = clem_disk_nib_decode_35(nib, disk->format, data_start, data_end);
+    if (!disk->data_end)
+        return false;
+    return true;
 }
 
 bool _clem_2img_decode_nibblized_disk_525(struct Clemens2IMGDisk *disk, uint8_t *data_start,
                                           uint8_t *data_end, const struct ClemensNibbleDisk *nib) {
     disk->is_write_protected = nib->is_write_protected;
-    return clem_disk_nib_decode_525(nib, disk->format, data_start, data_end);
+    disk->data = data_start;
+    disk->data_end = clem_disk_nib_decode_525(nib, disk->format, data_start, data_end);
+    if (!disk->data_end)
+        return false;
+    return true;
 }
 
 bool clem_2img_decode_nibblized_disk(struct Clemens2IMGDisk *disk, uint8_t *data_start,
                                      uint8_t *data_end, const struct ClemensNibbleDisk *nib) {
-
     // The nibblized data is converted back to practical bytes for storage into
     // DOS or ProDOS images, removing the sync bytes, headers, and data is
     // converted from GCR to real bytes.

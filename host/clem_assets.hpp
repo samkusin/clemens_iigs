@@ -21,6 +21,10 @@ enum ImageId {
     kCard,
     kFastEmulate,
     kFolder,
+    kDisk35,
+    kDisk525,
+    kLockDisk,
+    kEjectDisk,
     kFirstNamedImage,
     kLastNamedImage = kFirstNamedImage + 64,
     kImageCount

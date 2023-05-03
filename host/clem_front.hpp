@@ -12,7 +12,7 @@
 #include "cinek/fixedstack.hpp"
 #include "clem_audio.hpp"
 #include "clem_configuration.hpp"
-#include "clem_disk_library.hpp"
+#include "clem_disk_browser.hpp"
 #include "clem_display.hpp"
 #include "clem_host_shared.hpp"
 #include "clem_ui_load_snapshot.hpp"
@@ -75,7 +75,7 @@ class ClemensFrontend : public ClemensHostView {
     void doMachineDiskDisplay(float width);
     void doMachineDiskStatus(ClemensDriveType driveType, float width);
     void doMachineDiskSelection(ClemensDriveType driveType, float width, bool showLabel);
-    void doMachineDiskMotorStatus(float circleRadius, bool isSpinning);
+    void doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size, bool isSpinning);
     void doMachineSmartDriveStatus(unsigned driveIndex, float width);
     void doMachineCPUInfoDisplay();
     void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU, float screenV);
@@ -202,6 +202,7 @@ class ClemensFrontend : public ClemensHostView {
         std::vector<ClemensBackendResult> results;
         std::optional<unsigned> hitBreakpoint;
         std::optional<std::string> message;
+        std::optional<ClemensAppleIIGSConfig> gsConfig;
         LogOutputNode *logNode = nullptr;
         LogOutputNode *logNodeTail = nullptr;
         LogInstructionNode *logInstructionNode = nullptr;
@@ -325,6 +326,7 @@ class ClemensFrontend : public ClemensHostView {
         SaveSnapshot,
         Settings,
         Help,
+        DiskBrowser,
         RebootEmulator,
         StartingEmulator,
         ShutdownEmulator
@@ -339,6 +341,9 @@ class ClemensFrontend : public ClemensHostView {
     ClemensLoadSnapshotUI loadSnapshotMode_;
     ClemensSaveSnapshotUI saveSnapshotMode_;
     ClemensSettingsUI settingsMode_;
+    ClemensDiskBrowser diskBrowserMode_;
+
+    std::optional<ClemensDriveType> browseDriveType_;
 
     std::optional<float> delayRebootTimer_;
 };

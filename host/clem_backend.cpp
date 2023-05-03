@@ -6,6 +6,7 @@
 
 #include "clem_device.h"
 #include "clem_mem.h"
+#include "core/clem_apple2gs_config.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 
@@ -143,7 +144,7 @@ void ClemensRunSampler::update(clem_clocks_duration_t clocksSpent, unsigned cycl
 }
 
 ClemensBackend::ClemensBackend(std::string romPath, const Config &config)
-    : config_(config),
+    : config_(config), gsConfigUpdated_(false),
       interpreter_(cinek::FixedStack(kInterpreterMemorySize, malloc(kInterpreterMemorySize))),
       breakpoints_(std::move(config_.breakpoints)), logLevel_(config_.logLevel),
       debugMemoryPage_(0x00), areInstructionsLogged_(false), stepsRemaining_(0),
@@ -154,15 +155,13 @@ ClemensBackend::ClemensBackend(std::string romPath, const Config &config)
     switch (config_.type) {
     case Config::Type::Apple2GS:
         GS_ = std::make_unique<ClemensAppleIIGS>(romPath, config_.GS, *this);
+        gsConfig_ = config_.GS;
+        gsConfigUpdated_ = false;
         break;
     }
 }
 
-ClemensBackend::~ClemensBackend() {
-    if (GS_) {
-        GS_->saveConfig();
-    }
-}
+ClemensBackend::~ClemensBackend() {}
 
 bool ClemensBackend::isRunning() const {
     return !stepsRemaining_.has_value() || *stepsRemaining_ > 0;
@@ -273,7 +272,9 @@ ClemensBackend::main(ClemensBackendState &backendState,
     backendState.mmioWasInitialized = clemens_is_mmio_initialized(&mmio);
 
     backendState.frame = &GS_->getFrame(frame);
-
+    if (gsConfigUpdated_) {
+        backendState.config = gsConfig_;
+    }
     backendState.hostCPUID = clem_host_get_processor_number();
     backendState.logLevel = logLevel_;
     backendState.logBufferStart = logOutput_.data();
@@ -433,6 +434,14 @@ void ClemensBackend::assignPropertyToU32(MachineProperty property, uint32_t valu
     };
 }
 
+bool ClemensBackend::queryConfig(ClemensAppleIIGSConfig &config) {
+    if (!GS_)
+        return false;
+    GS_->saveConfig();
+    config = gsConfig_;
+    return true;
+}
+
 template <typename... Args>
 void ClemensBackend::localLog(int log_level, const char *msg, Args... args) {
     if (logOutput_.size() >= kLogOutputLineLimit)
@@ -465,7 +474,10 @@ void ClemensBackend::onClemensSystemLocalLog(int logLevel, const char *msg) {
     logOutput_.emplace_back(logLine);
 }
 
-void ClemensBackend::onClemensSystemWriteConfig(const ClemensAppleIIGS::Config &config) {}
+void ClemensBackend::onClemensSystemWriteConfig(const ClemensAppleIIGS::Config &config) {
+    gsConfig_ = config;
+    gsConfigUpdated_ = true;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 void ClemensBackend::onCommandReset() { GS_->reset(); }
@@ -513,9 +525,7 @@ void ClemensBackend::onCommandInputEvent(const ClemensInputEvent &inputEvent) {
 }
 
 bool ClemensBackend::onCommandInsertDisk(ClemensDriveType driveType, std::string diskPath) {
-    return false;
-    // diskDrives_[driveType].imagePath = diskPath;
-    // return mountDisk(driveType, false);
+    return GS_->getStorage().insertDisk(GS_->getMMIO(), driveType, diskPath);
 }
 
 bool ClemensBackend::onCommandInsertBlankDisk(ClemensDriveType driveType, std::string diskPath) {
@@ -525,16 +535,12 @@ bool ClemensBackend::onCommandInsertBlankDisk(ClemensDriveType driveType, std::s
 }
 
 void ClemensBackend::onCommandEjectDisk(ClemensDriveType driveType) {
-    // diskDrives_[driveType].isEjecting = true;
+    GS_->getStorage().ejectDisk(GS_->getMMIO(), driveType);
 }
 
 bool ClemensBackend::onCommandWriteProtectDisk(ClemensDriveType driveType, bool wp) {
-    return false;
-    // auto *drive = clemens_drive_get(&GS_->getMMIO(), driveType);
-    // if (!drive || !drive->has_disk)
-    //     return false;
-    // drive->disk.is_write_protected = wp;
-    // return true;
+    GS_->getStorage().writeProtectDisk(GS_->getMMIO(), driveType, wp);
+    return true;
 }
 
 bool ClemensBackend::onCommandInsertSmartPortDisk(unsigned driveIndex, std::string diskPath) {

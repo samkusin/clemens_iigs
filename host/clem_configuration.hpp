@@ -41,11 +41,15 @@ struct ClemensConfiguration {
 
     bool isNewInstall() const { return majorVersion == 0 && minorVersion == 0; }
 
+    // clears the dirty flag
     bool save();
+    // sets the dirty flag
+    void setDirty();
 
   private:
     void copyFrom(const ClemensConfiguration &other);
     static int handler(void *user, const char *section, const char *name, const char *value);
+    bool isDirty;
 };
 
 #endif

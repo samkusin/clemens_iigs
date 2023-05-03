@@ -370,11 +370,11 @@ bool clem_disk_nib_encode_35(struct ClemensNibbleDisk *nib, unsigned format, boo
 bool clem_disk_nib_encode_525(struct ClemensNibbleDisk *nib, unsigned format, unsigned dos_volume,
                               const uint8_t *data_start, const uint8_t *data_end);
 
-bool clem_disk_nib_decode_35(const struct ClemensNibbleDisk *nib, unsigned format,
-                             uint8_t *data_start, uint8_t *data_end);
+uint8_t *clem_disk_nib_decode_35(const struct ClemensNibbleDisk *nib, unsigned format,
+                                 uint8_t *data_start, uint8_t *data_end);
 
-bool clem_disk_nib_decode_525(const struct ClemensNibbleDisk *nib, unsigned format,
-                              uint8_t *data_start, uint8_t *data_end);
+uint8_t *clem_disk_nib_decode_525(const struct ClemensNibbleDisk *nib, unsigned format,
+                                  uint8_t *data_start, uint8_t *data_end);
 
 #ifdef __cplusplus
 }

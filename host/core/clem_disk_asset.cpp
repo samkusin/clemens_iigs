@@ -55,6 +55,41 @@ static void clear2IMGBuffers(Clemens2IMGDisk &disk, unsigned creatorDataSize,
     disk.image_data_offset = 0;
 }
 
+auto ClemensDiskAsset::diskTypeFromDriveType(ClemensDriveType driveType) -> DiskType {
+    switch (driveType) {
+    case kClemensDrive_3_5_D1:
+    case kClemensDrive_3_5_D2:
+        return Disk35;
+    case kClemensDrive_5_25_D1:
+    case kClemensDrive_5_25_D2:
+        return Disk525;
+        break;
+    default:
+        break;
+    }
+    return DiskNone;
+}
+
+ClemensDriveType ClemensDiskAsset::driveTypefromDiskType(DiskType diskType, unsigned driveIndex) {
+    switch (diskType) {
+    case Disk35:
+        if (driveIndex == 0)
+            return kClemensDrive_3_5_D1;
+        else if (driveIndex == 1)
+            return kClemensDrive_3_5_D2;
+        break;
+    case Disk525:
+        if (driveIndex == 0)
+            return kClemensDrive_5_25_D1;
+        else if (driveIndex == 1)
+            return kClemensDrive_5_25_D2;
+        break;
+    default:
+        break;
+    }
+    return kClemensDrive_Invalid;
+}
+
 ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath)
     : ClemensDiskAsset(assetPath, kClemensDrive_Invalid) {
     diskType_ = DiskHDD;
@@ -127,6 +162,8 @@ ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveTyp
                     std::copy(disk.creator_data, disk.creator_data_end, std::back_inserter(data_));
                     std::copy(disk.comment, disk.comment_end, std::back_inserter(data_));
                     clear2IMGBuffers(disk, creatorDataSize, commentDataSize);
+                } else {
+                    clear2IMGBuffers(disk, 0, 0);
                 }
                 sourceDataPtrTail = sourceDataPtrEnd;
                 metadata_ = disk;
@@ -219,7 +256,7 @@ std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
     // convert nibblized disk into the asset's image type and output the results
     // onto the out/outEnd buffer
     std::pair<size_t, bool> result{0, false};
-    uint8_t *outStart = out;
+    uint8_t *outTail = out;
 
     //  WOZ images are the easiest to reconstruct - EXCEPT WRIT and FLUX
     //  Our recommendation is to preserve any WOZ files so that you have a fixed
@@ -242,8 +279,20 @@ std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
         if (std::holds_alternative<ClemensWOZDisk>(metadata_)) {
             auto disk = std::get<ClemensWOZDisk>(metadata_);
             disk.nib = const_cast<ClemensNibbleDisk *>(&nib);
-            size_t outSize = outEnd - out;
-            out = clem_woz_serialize(&disk, out, &outSize);
+            size_t outSize = outEnd - outTail;
+            outTail = clem_woz_serialize(&disk, outTail, &outSize);
+            //  append other WOZ chunks that weren't used (WRIT, META)
+            //  TODO: this may be problematic if the WOZ bits data was altered
+            //        will WRIT change?
+            if (data_.size() > 0) {
+                if ((size_t)(outEnd - outTail) >= data_.size()) {
+                    outTail = std::copy(data_.begin(), data_.end(), outTail);
+                } else {
+                    //  at this point, some data will be lost - but not essential data
+                    //  and so allow this image to be serialized - but should we warn?
+                    assert(false);
+                }
+            }
         }
         break;
     case Image2IMG:
@@ -259,10 +308,15 @@ std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
             if (clem_2img_decode_nibblized_disk(&disk, encodedBuffer.data(),
                                                 encodedBuffer.data() + encodedBuffer.size(),
                                                 &nib)) {
-                clem_2img_build_image(&disk, out, outEnd);
+                if (clem_2img_build_image(&disk, outTail, outEnd) > 0) {
+                    outTail += disk.image_buffer_length;
+                } else {
+                    outTail = nullptr;
+                }
             } else {
-                out = nullptr;
+                outTail = nullptr;
             }
+            data_.clear();
         }
         break;
     case ImageProDOS:
@@ -282,15 +336,8 @@ std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
         break;
     }
 
-    if (out) {
-        if ((size_t)(outEnd - out) >= data_.size()) {
-            out = std::copy(data_.begin(), data_.end(), out);
-        } else {
-            //  at this point, some data will be lost - but not essential data
-            //  and so allow this image to be serialized - but should we warn?
-            assert(false);
-        }
-        result.first = (size_t)(out - outStart);
+    if (outTail) {
+        result.first = (size_t)(outTail - out);
         result.second = true;
     }
 

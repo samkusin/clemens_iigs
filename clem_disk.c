@@ -1065,16 +1065,19 @@ bool clem_disk_nib_encode_525(struct ClemensNibbleDisk *nib, unsigned format, un
     return true;
 }
 
-bool clem_disk_nib_decode_35(const struct ClemensNibbleDisk *nib, unsigned format,
-                             uint8_t *data_start, uint8_t *data_end) {
+uint8_t *clem_disk_nib_decode_35(const struct ClemensNibbleDisk *nib, unsigned format,
+                                 uint8_t *data_start, uint8_t *data_end) {
     _ClemensPhysicalSectorMap to_logical_sector_map;
     unsigned track_index, bits_track_index;
     unsigned logical_sector_index;
     unsigned disk_bytes_cnt;
     unsigned disk_region;
+    unsigned cnt, total;
     uint8_t disk_bytes[640];
 
     logical_sector_index = 0;
+    cnt = 0;
+    total = 0;
     for (track_index = 0, bits_track_index = 0xff; track_index < CLEM_DISK_LIMIT_QTR_TRACKS;
          ++track_index) {
 
@@ -1088,28 +1091,33 @@ bool clem_disk_nib_decode_35(const struct ClemensNibbleDisk *nib, unsigned forma
 
         to_logical_sector_map = get_physical_to_logical_sector_map(nib->disk_type, format);
         disk_region = clem_disk_nib_get_region_from_track(nib->disk_type, track_index);
-        if (!clem_disk_nib_decode_nibblized_track_35(nib, to_logical_sector_map[disk_region],
-                                                     bits_track_index, logical_sector_index,
-                                                     data_start, data_end)) {
-            return false; // ERROR!
+        cnt = clem_disk_nib_decode_nibblized_track_35(nib, to_logical_sector_map[disk_region],
+                                                      bits_track_index, logical_sector_index,
+                                                      data_start, data_end);
+        if (!cnt) {
+            return NULL; // ERROR!
         }
 
+        total += cnt;
         logical_sector_index += g_clem_max_sectors_per_region_35[disk_region];
     }
 
-    return true;
+    return data_start + total;
 }
 
-bool clem_disk_nib_decode_525(const struct ClemensNibbleDisk *nib, unsigned format,
-                              uint8_t *data_start, uint8_t *data_end) {
+uint8_t *clem_disk_nib_decode_525(const struct ClemensNibbleDisk *nib, unsigned format,
+                                  uint8_t *data_start, uint8_t *data_end) {
     _ClemensPhysicalSectorMap to_logical_sector_map;
     unsigned track_index, bits_track_index;
     unsigned logical_sector_index;
     unsigned disk_bytes_cnt;
     unsigned disk_region;
+    unsigned cnt, total;
     uint8_t disk_bytes[640];
 
     logical_sector_index = 0;
+    cnt = 0;
+    total = 0;
     for (track_index = 0, bits_track_index = 0xff; track_index < CLEM_DISK_LIMIT_QTR_TRACKS;
          ++track_index) {
 
@@ -1124,15 +1132,17 @@ bool clem_disk_nib_decode_525(const struct ClemensNibbleDisk *nib, unsigned form
             continue;
         to_logical_sector_map = get_physical_to_logical_sector_map(nib->disk_type, format);
         disk_region = clem_disk_nib_get_region_from_track(nib->disk_type, track_index);
-        if (!clem_disk_nib_decode_nibblized_track_525(nib, to_logical_sector_map[disk_region],
-                                                      bits_track_index, logical_sector_index,
-                                                      data_start, data_end)) {
-            return false; // ERROR!
+        cnt = clem_disk_nib_decode_nibblized_track_525(nib, to_logical_sector_map[disk_region],
+                                                       bits_track_index, logical_sector_index,
+                                                       data_start, data_end);
+        if (!cnt) {
+            return NULL; // ERROR!
         }
+        total += cnt;
         logical_sector_index += CLEM_DISK_525_NUM_SECTORS_PER_TRACK;
     }
 
-    return true;
+    return data_start + total;
 }
 
 #if defined(CLEM_SAMPLE_APP)
@@ -1155,9 +1165,9 @@ static bool sample_decode_disk(uint8_t *data, uint8_t *data_end, struct ClemensN
                                unsigned format) {
     switch (nib_disk->disk_type) {
     case CLEM_DISK_TYPE_3_5:
-        return clem_disk_nib_decode_35(nib_disk, format, data, data_end);
+        return clem_disk_nib_decode_35(nib_disk, format, data, data_end) != NULL;
     case CLEM_DISK_TYPE_5_25:
-        return clem_disk_nib_decode_525(nib_disk, format, data, data_end);
+        return clem_disk_nib_decode_525(nib_disk, format, data, data_end) != NULL;
     }
     return false;
 }
