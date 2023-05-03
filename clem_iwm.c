@@ -1007,7 +1007,7 @@ void clem_iwm_speed_disk_gate(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) 
     }
     if (iwm->disk_motor_on) {
         if (!old_disk_motor_on) {
-            CLEM_LOG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
+            CLEM_DEBUG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
         }
         tspec->clocks_step = CLEM_CLOCKS_PHI0_CYCLE;
         return;
@@ -1016,12 +1016,12 @@ void clem_iwm_speed_disk_gate(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) 
         tspec->clocks_step = tspec->clocks_step_fast;
 
         if (old_disk_motor_on) {
-            CLEM_LOG("SPEED FAST Disk: %02X", iwm->disk_motor_on);
+            CLEM_DEBUG("SPEED FAST Disk: %02X", iwm->disk_motor_on);
         }
     } else {
         tspec->clocks_step = CLEM_CLOCKS_PHI0_CYCLE;
         if (old_disk_motor_on) {
-            CLEM_LOG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
+            CLEM_DEBUG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
         }
     }
 }

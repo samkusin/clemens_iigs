@@ -44,7 +44,6 @@ namespace ClemensHostStyle {
 
 static constexpr float kSideBarMinWidth = 200.0f;
 static constexpr float kMachineStateViewMinWidth = 480.0f;
-static constexpr float kDiskStatusLongMinWidth = 430.0f;
 
 // monochromatic "platinum" classic CACAC8
 //                          middle  969695
@@ -742,15 +741,11 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
     debugMemoryEditor_.WriteFn = &ClemensFrontend::imguiMemoryEditorWrite;
     CLEM_TERM_COUT.format(TerminalLine::Info, "Welcome to the Clemens IIgs Emulator {}.{}",
                           CLEM_HOST_VERSION_MAJOR, CLEM_HOST_VERSION_MINOR);
+    spdlog::info("Clemens IIGS Emulator {}.{}", CLEM_HOST_VERSION_MAJOR, CLEM_HOST_VERSION_MINOR);
 }
 
 ClemensFrontend::~ClemensFrontend() {
     stopBackend();
-    if (lastCommandState_.gsConfig.has_value()) {
-        config_.gs = *lastCommandState_.gsConfig;
-        config_.setDirty();
-        config_.save();
-    }
     audio_.stop();
     clem_joystick_close_devices();
     delete[] thisFrameAudioBuffer_.getHead();
@@ -802,7 +797,7 @@ void ClemensFrontend::createBackend() {
     backendConfig.GS = config_.gs;
     backendConfig.GS.cardNames[3] = ClemensAppleIIGS::kClemensCardMockingboardName;
 
-    fmt::print("Creating new backend emulator.\n");
+    spdlog::info("Starting new emulator backend");
     auto backend = std::make_unique<ClemensBackend>(romPath.string(), backendConfig);
     backendThread_ = std::thread(&ClemensFrontend::runBackend, this, std::move(backend));
 
@@ -863,6 +858,12 @@ void ClemensFrontend::stopBackend() {
         backendThread_.join();
     }
     backendThread_ = std::thread();
+    if (lastCommandState_.gsConfig.has_value()) {
+        config_.gs = *lastCommandState_.gsConfig;
+        config_.setDirty();
+        config_.save();
+    }
+    spdlog::info("Terminated emulator backend");
 }
 
 bool ClemensFrontend::isBackendRunning() const { return backendThread_.joinable(); }
@@ -1984,12 +1985,10 @@ void ClemensFrontend::doMachineDiagnosticsDisplay() {
     ImGui::EndTable();
 }
 
-static const char *sDriveName[] = {"S5,D1", "S5,D2", "S6,D1", "S6,D2"};
 static const char *sDriveDescriptionShort[] = {"3.5\" disk", "3.5\" disk", "5.25\" disk",
                                                "5.25\" disk"};
 static const char *sDriveDescription[] = {"3.5 inch 800K", "3.5 inch 800K", "5.25 inch 140K",
                                           "5.25 inch 140K"};
-static const char *sSmartDriveName[] = {"Smart,D1"};
 
 void ClemensFrontend::doMachineDiskDisplay(float width) {
     ImGui::PushStyleColor(ImGuiCol_Button, ClemensHostStyle::getWidgetColor(*this));
@@ -2183,7 +2182,6 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
 
 void ClemensFrontend::doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size,
                                                bool isSpinning) {
-    const ImGuiStyle &style = ImGui::GetStyle();
     const ImColor kRed(255, 0, 0, 255);
     const ImColor kDark(64, 64, 64, 255);
     auto lt = ImVec2(pos.x, pos.y);

@@ -148,6 +148,7 @@ bool ClemensStorageUnit::ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType
 
     struct ClemensNibbleDisk *disk = clemens_eject_disk(&mmio, driveType);
     saveDisk(driveType, *disk);
+    spdlog::info("{}: ejected", ClemensDiskUtilities::getDriveName(driveType));
     diskStatuses_[driveType].unmount();
     return true;
 }
@@ -201,6 +202,7 @@ void ClemensStorageUnit::update(ClemensMMIO &mmio) {
                 assert(disk);
                 saveDisk(driveType, *disk);
                 diskStatuses_[driveType].unmount();
+                spdlog::info("{}: auto ejected", ClemensDiskUtilities::getDriveName(driveType));
             }
         }
     }

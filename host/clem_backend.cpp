@@ -6,11 +6,14 @@
 
 #include "clem_device.h"
 #include "clem_mem.h"
+#include "clem_shared.h"
 #include "core/clem_apple2gs_config.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 
 #include "fmt/format.h"
+#include "spdlog/common.h"
+#include "spdlog/spdlog.h"
 
 #include <charconv>
 #include <ctime>
@@ -456,10 +459,17 @@ void ClemensBackend::localLog(int log_level, const char *msg, Args... args) {
 
 void ClemensBackend::onClemensSystemMachineLog(int logLevel, const ClemensMachine *machine,
                                                const char *msg) {
+    spdlog::level::level_enum levelEnums[] = {spdlog::level::debug, spdlog::level::info,
+                                              spdlog::level::warn, spdlog::level::warn,
+                                              spdlog::level::err};
     if (logLevel_ > logLevel)
         return;
     if (logOutput_.size() >= kLogOutputLineLimit)
         return;
+
+    if (logLevel >= CLEM_DEBUG_LOG_INFO) {
+        spdlog::log(levelEnums[logLevel], "[a2gs] {}", msg);
+    }
 
     logOutput_.emplace_back(ClemensBackendOutputText{logLevel, msg});
 }

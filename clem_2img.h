@@ -120,6 +120,10 @@ bool clem_2img_nibblize_data(struct Clemens2IMGDisk *disk);
  * Encodes nibbles into GCR encoded data bytes for DOS or ProDOS compliant images.
  * This will not work correctly for corrupted images and will return false.
  *
+ * The result data buffer is returned inside the supplied Clemens2IMGDisk record
+ * via the data and data_end attributes, which will point to areas between the supplied
+ * data_start and data_end
+ *
  * @param disk
  * @param data_start
  * @param data_end

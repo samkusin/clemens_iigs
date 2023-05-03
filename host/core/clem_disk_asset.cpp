@@ -320,16 +320,28 @@ std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
         }
         break;
     case ImageProDOS:
-        if (std::holds_alternative<Clemens2IMGDisk>(metadata_)) {
-            auto disk = std::get<Clemens2IMGDisk>(metadata_);
-#pragma message("TODO: ProDOS save")
-        }
-        break;
     case ImageDOS:
     case ImageDSK:
         if (std::holds_alternative<Clemens2IMGDisk>(metadata_)) {
+            //  sector ordering is contained inside the stored metadata object
+            //  that was generated on load
             auto disk = std::get<Clemens2IMGDisk>(metadata_);
-#pragma message("TODO: DOS save")
+            std::vector<uint8_t> encodedBuffer(nib.bits_data_end - nib.bits_data);
+            if (clem_2img_decode_nibblized_disk(&disk, encodedBuffer.data(),
+                                                encodedBuffer.data() + encodedBuffer.size(),
+                                                &nib)) {
+                auto dataSize = disk.data_end - disk.data;
+                if (dataSize <= outEnd - out) {
+                    memcpy(out, disk.data, dataSize);
+                    outTail += dataSize;
+                } else {
+                    outTail = nullptr;
+                }
+
+            } else {
+                outTail = nullptr;
+            }
+            data_.clear();
         }
         break;
     case ImageNone:
