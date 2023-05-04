@@ -539,9 +539,7 @@ bool ClemensBackend::onCommandInsertDisk(ClemensDriveType driveType, std::string
 }
 
 bool ClemensBackend::onCommandInsertBlankDisk(ClemensDriveType driveType, std::string diskPath) {
-    return false;
-    // diskDrives_[driveType].imagePath = diskPath;
-    // return mountDisk(driveType, true);
+    return GS_->getStorage().createDisk(GS_->getMMIO(), driveType, diskPath);
 }
 
 void ClemensBackend::onCommandEjectDisk(ClemensDriveType driveType) {

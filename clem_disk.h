@@ -104,6 +104,11 @@ extern "C" {
     3: (24) somewhere between 16-28
 
    3.5" Disks are documented earlier in this header.
+
+   TODO: clem_woz.h defines the v1 max 5.25 disk track size to be 6646
+         while the below calculates it as 6528 - likely due to our gaps?
+         this may be a point to look at if the disk track size ends up being too
+         small.
 */
 #define CLEM_NIB_ENCODE_525_6_2_RIGHT_BUFFER_SIZE 86
 #define CLEM_DISK_525_BYTES_TRACK_GAP_1           64

@@ -380,9 +380,12 @@ static void _clem_iwm_reset_drive(struct ClemensDeviceIWM *iwm, struct ClemensDr
 #define CLEM_IWM_WRITE_REG_LATCH_QA       0x80000000
 
 static void _clem_iwm_async_write_log(struct ClemensDeviceIWM *iwm, const char *prefix) {
-    CLEM_LOG("IWM: [%s] write latch %08X, flags=%08X, counter=%u", prefix, iwm->latch,
-             iwm->write_state & CLEM_IWM_WRITE_REG_STATUS_MASK,
-             iwm->write_state & CLEM_IWM_WRITE_REG_COUNTER_MASK);
+    int logLevel = iwm->debug_level > 1 ? CLEM_DEBUG_LOG_INFO : CLEM_DEBUG_LOG_DEBUG;
+    //  this can happen when writing 10-bit self-sync bytes - so it's not really an issue
+    //  in certain cases - hard to tell which ones are legit without further debugging
+    clem_debug_log(logLevel, "IWM: [%s] write latch %08X, flags=%08X, counter=%u", prefix,
+                   iwm->latch, iwm->write_state & CLEM_IWM_WRITE_REG_STATUS_MASK,
+                   iwm->write_state & CLEM_IWM_WRITE_REG_COUNTER_MASK);
 }
 
 static void _clem_iwm_drive_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
@@ -399,7 +402,8 @@ static void _clem_iwm_drive_switch(struct ClemensDeviceIWM *iwm, struct ClemensD
 
 static void _clem_drive_off(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives) {
     _clem_iwm_drive_switch(iwm, drives, iwm->io_flags & ~CLEM_IWM_FLAG_DRIVE_ON);
-    CLEM_DEBUG("IWM: turning drive off now");
+    int logLevel = iwm->debug_level > 1 ? CLEM_DEBUG_LOG_INFO : CLEM_DEBUG_LOG_DEBUG;
+    clem_debug_log(logLevel, "IWM: turning drive off now");
 }
 
 static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM *iwm) {
@@ -699,7 +703,7 @@ static void _clem_iwm_step(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
     if (iwm->drive_hold_ns > 0) {
         iwm->drive_hold_ns = clem_util_timer_decrement(iwm->drive_hold_ns, delta_ns);
         if (iwm->drive_hold_ns == 0 || iwm->timer_1sec_disabled) {
-            CLEM_LOG("IWM: turning drive off in sync");
+            CLEM_DEBUG("IWM: turning drive off in sync");
             _clem_drive_off(iwm, drives);
         }
     }

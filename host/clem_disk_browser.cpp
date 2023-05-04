@@ -1,5 +1,6 @@
 #include "clem_disk_browser.hpp"
 
+#include "core/clem_disk_asset.hpp"
 #include "imgui.h"
 
 #include <algorithm>
@@ -186,6 +187,8 @@ void ClemensDiskBrowser::open(ClemensDiskAsset::DiskType diskType, const std::st
     finishedStatus_ = BrowserFinishedStatus::Active;
     cwdName_ = browsePath;
     nextRefreshTime_ = std::chrono::steady_clock::now();
+    createDiskFilename_[0] = '\0';
+    createDiskImageType_ = ClemensDiskAsset::ImageNone;
 }
 
 bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
@@ -312,7 +315,7 @@ bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
     }
 
     ImGui::Spacing();
-    if (ImGui::Button("Select") || selectionMade || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+    if (ImGui::Button("Select") || selectionMade) {
         if (selectedRecord_.isDirectory()) {
             cwdName_ = selectedRecord_.asset.path();
             nextRefreshTime_ = std::chrono::steady_clock::now();
@@ -321,8 +324,114 @@ bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
         }
     }
     ImGui::SameLine();
-    if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    if (ImGui::Button("Cancel") ||
+        (ImGui::IsKeyPressed(ImGuiKey_Escape) && ImGui::IsWindowFocused())) {
         finishedStatus_ = BrowserFinishedStatus::Cancelled;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Create Disk")) {
+        ImGui::OpenPopup("Create Disk");
+        createDiskFilename_[0] = '\0';
+        if (diskType_ == ClemensDiskAsset::Disk35) {
+            createDiskImageType_ = ClemensDiskAsset::Image2IMG;
+        } else if (diskType_ == ClemensDiskAsset::Disk525) {
+            createDiskImageType_ = ClemensDiskAsset::ImageProDOS;
+        } else {
+            createDiskImageType_ = ClemensDiskAsset::ImageNone;
+        }
+    }
+
+    //  Permit DSK, DO, PO, 2MG, WOZ for 5.25 disks
+    //  Permit PO,2MG,WOZ for 3.5 disks
+    if (ImGui::IsPopupOpen("Create Disk")) {
+        ImVec2 popupSize(std::max(640.0f, maxSize.x * 0.66f), 0.0f);
+        ImGui::SetNextWindowSize(popupSize);
+        if (ImGui::BeginPopupModal("Create Disk", NULL,
+                                   ImGuiWindowFlags_Modal | ImGuiWindowFlags_NoScrollbar |
+                                       ImGuiWindowFlags_AlwaysAutoResize)) {
+
+            ImGui::InputText("Filename", createDiskFilename_, sizeof(createDiskFilename_));
+            if (ImGui::BeginCombo("Type", ClemensDiskAsset::imageName(createDiskImageType_))) {
+                switch (diskType_) {
+                case ClemensDiskAsset::Disk35:
+                    if (ImGui::Selectable(
+                            ClemensDiskAsset::imageName(ClemensDiskAsset::ImageProDOS))) {
+                        createDiskImageType_ = ClemensDiskAsset::ImageProDOS;
+                    }
+                    if (ImGui::Selectable(
+                            ClemensDiskAsset::imageName(ClemensDiskAsset::Image2IMG))) {
+                        createDiskImageType_ = ClemensDiskAsset::Image2IMG;
+                    }
+                    if (ImGui::Selectable(
+                            ClemensDiskAsset::imageName(ClemensDiskAsset::ImageWOZ))) {
+                        createDiskImageType_ = ClemensDiskAsset::ImageWOZ;
+                    }
+                    break;
+                case ClemensDiskAsset::Disk525:
+                    if (ImGui::Selectable(
+                            ClemensDiskAsset::imageName(ClemensDiskAsset::ImageProDOS))) {
+                        createDiskImageType_ = ClemensDiskAsset::ImageProDOS;
+                    }
+                    if (ImGui::Selectable(
+                            ClemensDiskAsset::imageName(ClemensDiskAsset::ImageDSK))) {
+                        createDiskImageType_ = ClemensDiskAsset::ImageDSK;
+                    }
+                    if (ImGui::Selectable(
+                            ClemensDiskAsset::imageName(ClemensDiskAsset::ImageDOS))) {
+                        createDiskImageType_ = ClemensDiskAsset::ImageDOS;
+                    }
+                    if (ImGui::Selectable(
+                            ClemensDiskAsset::imageName(ClemensDiskAsset::ImageWOZ))) {
+                        createDiskImageType_ = ClemensDiskAsset::ImageWOZ;
+                    }
+                    if (ImGui::Selectable(
+                            ClemensDiskAsset::imageName(ClemensDiskAsset::Image2IMG))) {
+                        createDiskImageType_ = ClemensDiskAsset::Image2IMG;
+                    }
+                    break;
+                default:
+                    ImGui::Selectable(ClemensDiskAsset::imageName(ClemensDiskAsset::ImageNone));
+                    break;
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::Spacing();
+            ImGui::Separator();
+            if (ImGui::Button("OK")) {
+                std::filesystem::path fileName = createDiskFilename_;
+                finishedStatus_ = BrowserFinishedStatus::Selected;
+                switch (createDiskImageType_) {
+                case ClemensDiskAsset::Image2IMG:
+                    fileName.replace_extension(".2mg");
+                    break;
+                case ClemensDiskAsset::ImageDSK:
+                    fileName.replace_extension(".dsk");
+                    break;
+                case ClemensDiskAsset::ImageDOS:
+                    fileName.replace_extension(".do");
+                    break;
+                case ClemensDiskAsset::ImageProDOS:
+                    fileName.replace_extension(".po");
+                    break;
+                case ClemensDiskAsset::ImageWOZ:
+                    fileName.replace_extension(".woz");
+                    break;
+                default:
+                    fileName.clear();
+                    break;
+                }
+                if (!fileName.empty()) {
+                    selectedRecord_.asset = (std::filesystem::path(cwdName_) / fileName).string();
+                }
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                createDiskImageType_ = ClemensDiskAsset::ImageNone;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
     }
 
     if (finishedStatus_ != BrowserFinishedStatus::Active) {

@@ -1,4 +1,5 @@
 #include "clem_disk_asset.hpp"
+#include "cinek/buffertypes.hpp"
 #include "clem_2img.h"
 #include "clem_disk.h"
 #include "clem_disk_status.hpp"
@@ -8,6 +9,7 @@
 #include <cassert>
 #include <filesystem>
 #include <optional>
+#include <string_view>
 #include <variant>
 
 #include "external/mpack.h"
@@ -90,6 +92,140 @@ ClemensDriveType ClemensDiskAsset::driveTypefromDiskType(DiskType diskType, unsi
     return kClemensDrive_Invalid;
 }
 
+const char *ClemensDiskAsset::imageName(ImageType imageType) {
+    static const char *imageNames[] = {"None",
+                                       "DSK - Disk Image",
+                                       "PO - ProDOS Order Image",
+                                       "DO - DOS Order Image",
+                                       "2MG - IIGS Image",
+                                       "WOZ - v2 Applesauce"};
+    return imageNames[static_cast<int>(imageType)];
+}
+
+auto ClemensDiskAsset::fromAssetPathUsingExtension(const std::string &assetPath) -> ImageType {
+    ImageType imageType = ImageNone;
+    auto extension = std::filesystem::path(assetPath).extension().string();
+    if (extension == ".po" || extension == ".PO") {
+        imageType = ImageProDOS;
+    } else if (extension == ".do" || extension == ".DO") {
+        imageType = ImageDOS;
+    } else if (extension == ".dsk" || extension == ".DSK") {
+        imageType = ImageDSK;
+    } else if (extension == ".2mg" || extension == ".2MG") {
+        imageType = Image2IMG;
+    } else if (extension == ".woz" || extension == ".WOZ") {
+        imageType = ImageWOZ;
+    }
+    return imageType;
+}
+
+cinek::ConstRange<uint8_t> ClemensDiskAsset::createBlankDiskImage(ImageType imageType,
+                                                                  DiskType diskType,
+                                                                  bool isDoubleSided,
+                                                                  cinek::Range<uint8_t> buffer) {
+    cinek::Range<uint8_t> serializeBuffer{buffer.first, buffer.first};
+    unsigned decodedRawSize;
+    if (diskType == Disk35) {
+        decodedRawSize = (isDoubleSided ? CLEM_DISK_35_DOUBLE_PRODOS_BLOCK_COUNT
+                                        : CLEM_DISK_35_PRODOS_BLOCK_COUNT) *
+                         512;
+    } else if (diskType == Disk525) {
+        decodedRawSize = CLEM_DISK_525_PRODOS_BLOCK_COUNT * 512;
+    } else {
+        return serializeBuffer;
+    }
+    serializeBuffer.second += decodedRawSize;
+    if (imageType == Image2IMG) {
+        serializeBuffer.second += CLEM_2IMG_HEADER_BYTE_SIZE;
+    }
+    memset(serializeBuffer.first, 0, cinek::length(serializeBuffer));
+
+    //  Setup the serializeBuffer, which will contain all decoded data
+    //  WOZ has some extra handling logic, which uses decoded data to encode to nibble
+    //      format and serialize that instead.
+    bool error = false;
+    switch (imageType) {
+    //  generate the header metadata for these file types
+    case ImageWOZ: {
+        //  generates a nib to serialize using part of the incoming buffer
+        struct ClemensWOZDisk disk {};
+        struct ClemensNibbleDisk nib;
+        const char *creatorName = "Clemens v0";
+        std::vector<uint8_t> nibBuffer;
+        uint8_t *bits_data;
+        uint8_t *bits_data_end;
+
+        disk.flags = CLEM_WOZ_IMAGE_CLEANED | CLEM_WOZ_IMAGE_SYNCHRONIZED;
+        disk.version = CLEM_WOZ_SUPPORTED_VERSION;
+        memset(disk.creator, 0x20, sizeof(disk.creator));
+        memcpy(disk.creator, creatorName, strnlen(creatorName, sizeof(disk.creator)));
+
+        if (diskType == Disk35) {
+            disk.disk_type = CLEM_DISK_TYPE_3_5;
+            if (isDoubleSided) {
+                disk.flags |= CLEM_WOZ_IMAGE_DOUBLE_SIDED;
+            }
+            disk.max_track_size_bytes = CLEM_WOZ_DISK_3_5_TRACK_SIZE_MAX;
+            disk.bit_timing_ns = CLEM_DISK_3_5_BIT_TIMING_NS;
+        } else {
+            disk.disk_type = CLEM_DISK_TYPE_5_25;
+            disk.max_track_size_bytes = CLEM_WOZ_DISK_5_25_TRACK_SIZE_MAX;
+            disk.bit_timing_ns = CLEM_DISK_5_25_BIT_TIMING_NS;
+        }
+        //  fill out creator string with spaces per spec
+        nibBuffer.resize(clem_disk_calculate_nib_storage_size(disk.disk_type));
+        bits_data = nibBuffer.data();
+        bits_data_end = bits_data + nibBuffer.size();
+        nib.disk_type = disk.disk_type;
+        if (disk.disk_type == CLEM_DISK_TYPE_3_5) {
+            clem_nib_reset_tracks(&nib, isDoubleSided ? 160 : 80, bits_data, bits_data_end);
+            if (!clem_disk_nib_encode_35(&nib, CLEM_DISK_FORMAT_PRODOS, isDoubleSided,
+                                         serializeBuffer.first, serializeBuffer.second)) {
+                error = true;
+            }
+        } else {
+            clem_nib_reset_tracks(&nib, 35, bits_data, bits_data_end);
+            if (!clem_disk_nib_encode_525(&nib, CLEM_DISK_FORMAT_PRODOS, 1, serializeBuffer.first,
+                                          serializeBuffer.second)) {
+                error = true;
+            }
+        }
+        //  The WOZ serialization code will now use nibBuffer as the source to
+        //  output serialized nibbles to the buffer - so clear it
+        serializeBuffer = buffer;
+        if (!error) {
+            size_t writeSize = cinek::length(serializeBuffer);
+            disk.nib = &nib;
+            serializeBuffer.second = clem_woz_serialize(&disk, serializeBuffer.first, &writeSize);
+            if (!serializeBuffer.second)
+                error = true;
+        }
+        break;
+    }
+    case Image2IMG: {
+        struct Clemens2IMGDisk disk {};
+        if (clem_2img_generate_header(&disk, CLEM_DISK_FORMAT_PRODOS, serializeBuffer.first,
+                                      serializeBuffer.second, CLEM_2IMG_HEADER_BYTE_SIZE)) {
+            clem_2img_build_image(&disk, serializeBuffer.first, serializeBuffer.second);
+        } else {
+            error = true;
+        }
+        break;
+    }
+    case ImageDOS:
+    case ImageDSK:
+    case ImageProDOS:
+        break;
+    case ImageNone:
+        error = true;
+        break;
+    }
+    if (error) {
+        return cinek::ConstRange<uint8_t>(buffer.first, buffer.first);
+    }
+    return serializeBuffer;
+}
+
 ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath)
     : ClemensDiskAsset(assetPath, kClemensDrive_Invalid) {
     diskType_ = DiskHDD;
@@ -98,18 +234,7 @@ ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath)
 ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveType driveType)
     : ClemensDiskAsset() {
     path_ = assetPath;
-    auto extension = std::filesystem::path(path_).extension().string();
-    if (extension == ".po" || extension == ".PO") {
-        imageType_ = ImageProDOS;
-    } else if (extension == ".do" || extension == ".DO") {
-        imageType_ = ImageDOS;
-    } else if (extension == ".dsk" || extension == ".DSK") {
-        imageType_ = ImageDSK;
-    } else if (extension == ".2mg" || extension == ".2MG") {
-        imageType_ = Image2IMG;
-    } else if (extension == ".woz" || extension == ".WOZ") {
-        imageType_ = ImageWOZ;
-    }
+    imageType_ = fromAssetPathUsingExtension(path_);
     if (driveType == kClemensDrive_3_5_D1 || driveType == kClemensDrive_3_5_D2)
         diskType_ = Disk35;
     else if (driveType == kClemensDrive_5_25_D1 || driveType == kClemensDrive_5_25_D2)

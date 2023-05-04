@@ -22,6 +22,8 @@
 #define CLEM_WOZ_UNSUPPORTED_VERSION (-2)
 #define CLEM_WOZ_NO_NIB              (-3) // if nib was NULL
 
+#define CLEM_WOZ_SUPPORTED_VERSION 2
+
 #define CLEM_WOZ_CHUNK_INFO     0
 #define CLEM_WOZ_CHUNK_TMAP     1
 #define CLEM_WOZ_CHUNK_TRKS     2
@@ -52,8 +54,15 @@
 #define CLEM_WOZ_IMAGE_SYNCHRONIZED  0x40000000
 #define CLEM_WOZ_IMAGE_WRITE_PROTECT 0x80000000
 
-#define CLEM_WOZ_OFFSET_TRACK_DATA_V1 256
-#define CLEM_WOZ_OFFSET_TRACK_DATA_V2 1536
+#define CLEM_WOZ_OFFSET_TRACK_DATA_V1     256
+#define CLEM_WOZ_OFFSET_TRACK_DATA_V2     1536
+#define CLEM_WOZ_DISK_5_25_TRACK_SIZE_MAX 6646
+/* this appears to be the upper limit of all tracks on 3.5" disks
+   based on the value from clem_disk.h which should be instead
+   included from a common header, which does not exist yet!
+   (CLEM_DISK_35_CALC_BYTES_FROM_SECTORS(12))
+*/
+#define CLEM_WOZ_DISK_3_5_TRACK_SIZE_MAX 9830
 
 #ifdef __cplusplus
 extern "C" {

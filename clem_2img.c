@@ -376,7 +376,7 @@ bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, co
     } else {
         disk->dos_volume = 0x00;
     }
-    disk->is_write_protected = true;
+    disk->is_write_protected = false;
     return true;
 }
 

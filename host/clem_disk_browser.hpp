@@ -28,6 +28,9 @@ class ClemensDiskBrowser {
     bool isCancel() const { return finishedStatus_ == BrowserFinishedStatus::Cancelled; }
 
     ClemensDiskAsset acquireSelectedFilePath() { return std::move(selectedRecord_.asset); }
+    bool isSelectedFilePathNewFile() const {
+        return createDiskImageType_ != ClemensDiskAsset::ImageNone;
+    }
 
   private:
     struct Record {
@@ -50,6 +53,9 @@ class ClemensDiskBrowser {
     std::vector<Record> records_;
     BrowserFinishedStatus finishedStatus_;
     std::chrono::steady_clock::time_point nextRefreshTime_;
+
+    char createDiskFilename_[128];
+    ClemensDiskAsset::ImageType createDiskImageType_;
 };
 
 #endif

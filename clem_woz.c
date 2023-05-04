@@ -249,13 +249,10 @@ const uint8_t *clem_woz_parse_info_chunk(struct ClemensWOZDisk *disk,
     } else {
         if (disk->disk_type == CLEM_WOZ_DISK_5_25) {
             disk->bit_timing_ns = 4 * 1000;
-            disk->max_track_size_bytes = 6646; /* v1 max track size */
+            disk->max_track_size_bytes = CLEM_WOZ_DISK_5_25_TRACK_SIZE_MAX; /* v1 max track size */
         } else if (disk->disk_type == CLEM_WOZ_DISK_3_5) {
             disk->bit_timing_ns = 2 * 1000;
-            /* this appears to be the upper limit of all tracks on 3.5" disks
-               according to experiments with WOZ files - may be overkill
-            */
-            disk->max_track_size_bytes = 19 * 512;
+            disk->max_track_size_bytes = CLEM_WOZ_DISK_3_5_TRACK_SIZE_MAX;
         }
         disk->boot_type = CLEM_WOZ_BOOT_UNDEFINED;
         disk->flux_block = 0;
@@ -553,7 +550,9 @@ uint8_t *clem_woz_serialize(struct ClemensWOZDisk *disk, uint8_t *out, size_t *o
 
     /* INFO min version 2, otherwise maintain 2.1 or later */
     _clem_woz_write_chunk_start(&iter, &iter_chunk_start, kChunkINFO);
-    _clem_woz_write_u8(&iter, disk->version < 2 ? 2 : disk->version);
+    _clem_woz_write_u8(&iter, disk->version < CLEM_WOZ_SUPPORTED_VERSION
+                                  ? CLEM_WOZ_SUPPORTED_VERSION
+                                  : disk->version);
     _clem_woz_write_u8(&iter, (uint8_t)(disk->disk_type));
     _clem_woz_write_u8(&iter, (disk->flags & CLEM_WOZ_IMAGE_WRITE_PROTECT) ? 1 : 0);
     _clem_woz_write_u8(&iter, (disk->flags & CLEM_WOZ_IMAGE_SYNCHRONIZED) ? 1 : 0);

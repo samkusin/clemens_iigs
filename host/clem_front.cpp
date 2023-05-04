@@ -12,7 +12,6 @@
 #include "clem_host_shared.hpp"
 #include "clem_host_utils.hpp"
 #include "clem_imgui.hpp"
-#include "clem_import_disk.hpp"
 #include "clem_l10n.hpp"
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
@@ -1312,7 +1311,11 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
             if (diskBrowserMode_.display(browserSize)) {
                 if (diskBrowserMode_.isOk()) {
                     auto asset = diskBrowserMode_.acquireSelectedFilePath();
-                    backendQueue_.insertDisk(*browseDriveType_, asset.path());
+                    if (diskBrowserMode_.isSelectedFilePathNewFile()) {
+                        backendQueue_.insertBlankDisk(*browseDriveType_, asset.path());
+                    } else {
+                        backendQueue_.insertDisk(*browseDriveType_, asset.path());
+                    }
                 }
                 diskBrowserMode_.close();
                 browseDriveType_ = std::nullopt;
@@ -2113,7 +2116,7 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
                 cursorPos.x += rightSectionWidth;
             }
 
-            if (!driveStatus.isWriteProtected) {
+            if (driveStatus.isWriteProtected) {
                 ImGui::PushStyleColor(ImGuiCol_Button,
                                       ClemensHostStyle::getWidgetToggleOnColor(*this));
             } else {

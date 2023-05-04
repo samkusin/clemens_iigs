@@ -84,6 +84,36 @@ bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIn
     return clemens_assign_smartport_disk(&mmio, driveIndex, &device);
 }
 
+bool ClemensStorageUnit::createDisk(ClemensMMIO &mmio, ClemensDriveType driveType,
+                                    const std::string &path) {
+    ClemensDrive *drive = clemens_drive_get(&mmio, driveType);
+    if (!drive)
+        return false;
+    if (diskStatuses_[driveType].isMounted()) {
+        spdlog::error("ClemensStorageUnit::createDisk - Drive type {} is already mounted",
+                      ClemensDiskUtilities::getDriveName(driveType));
+        return false;
+    }
+
+    //  Use the decode buffer to generate a blank image and leverage the utilities
+    //  in ClemensDiskAsset to generate the underlying nib (basically, generate a
+    //  blank image...)
+    decodeBuffer_.reset();
+    auto imageBuffer = decodeBuffer_.forwardSize(decodeBuffer_.getCapacity());
+    auto imageGeneratedSource = ClemensDiskAsset::createBlankDiskImage(
+        ClemensDiskAsset::fromAssetPathUsingExtension(path),
+        ClemensDiskAsset::diskTypeFromDriveType(driveType), true, imageBuffer);
+    if (cinek::length(imageGeneratedSource) == 0)
+        return false;
+
+    bool mounted = mountDisk(mmio, path, driveType, imageGeneratedSource);
+    if (mounted) {
+        //  save the new disk NOW
+        saveDisk(driveType, drive->disk);
+    }
+    return mounted;
+}
+
 bool ClemensStorageUnit::insertDisk(ClemensMMIO &mmio, ClemensDriveType driveType,
                                     const std::string &path) {
     ClemensDrive *drive = clemens_drive_get(&mmio, driveType);
@@ -126,11 +156,15 @@ bool ClemensStorageUnit::insertDisk(ClemensMMIO &mmio, ClemensDriveType driveTyp
     }
     input.close();
 
+    return mountDisk(mmio, path, driveType, decodeBuffer_.getRange());
+}
+
+bool ClemensStorageUnit::mountDisk(ClemensMMIO &mmio, const std::string &path,
+                                   ClemensDriveType driveType, cinek::ConstRange<uint8_t> source) {
     struct ClemensNibbleDisk *disk = clemens_insert_disk(&mmio, driveType);
     if (!disk)
         return false;
-
-    diskAssets_[driveType] = ClemensDiskAsset(path, driveType, decodeBuffer_.getRange(), *disk);
+    diskAssets_[driveType] = ClemensDiskAsset(path, driveType, source, *disk);
     if (diskAssets_[driveType].errorType() != ClemensDiskAsset::ErrorNone) {
         diskAssets_[driveType] = ClemensDiskAsset();
         clemens_eject_disk(&mmio, driveType);
@@ -138,7 +172,8 @@ bool ClemensStorageUnit::insertDisk(ClemensMMIO &mmio, ClemensDriveType driveTyp
         return false;
     }
     diskStatuses_[driveType].mount(path);
-    spdlog::info("{}: {} mounted", ClemensDiskUtilities::getDriveName(driveType), path);
+    spdlog::info("ClemensStorageUnit - {}: {} mounted",
+                 ClemensDiskUtilities::getDriveName(driveType), path);
     return true;
 }
 
@@ -148,7 +183,7 @@ bool ClemensStorageUnit::ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType
 
     struct ClemensNibbleDisk *disk = clemens_eject_disk(&mmio, driveType);
     saveDisk(driveType, *disk);
-    spdlog::info("{}: ejected", ClemensDiskUtilities::getDriveName(driveType));
+    spdlog::info("ClemensStorageUnit - {}: ejected", ClemensDiskUtilities::getDriveName(driveType));
     diskStatuses_[driveType].unmount();
     return true;
 }
@@ -202,7 +237,8 @@ void ClemensStorageUnit::update(ClemensMMIO &mmio) {
                 assert(disk);
                 saveDisk(driveType, *disk);
                 diskStatuses_[driveType].unmount();
-                spdlog::info("{}: auto ejected", ClemensDiskUtilities::getDriveName(driveType));
+                spdlog::info("ClemensStorageUnit - {}: auto ejected",
+                             ClemensDiskUtilities::getDriveName(driveType));
             }
         }
     }
@@ -244,7 +280,8 @@ void ClemensStorageUnit::saveDisk(ClemensDriveType driveType, ClemensNibbleDisk 
             out.write((char *)writeOut.first, decodedDisk.first);
             if (!out.fail() && !out.bad()) {
                 diskStatuses_[driveType].saved();
-                spdlog::info("{}: {} saved", ClemensDiskUtilities::getDriveName(driveType),
+                spdlog::info("ClemensStorageUnit - {}: {} saved",
+                             ClemensDiskUtilities::getDriveName(driveType),
                              diskStatuses_[driveType].assetPath);
                 return;
             }
@@ -259,12 +296,13 @@ void ClemensStorageUnit::saveHardDisk(unsigned driveIndex, ClemensProDOSDisk &di
     if (!hardDiskStatuses_[driveIndex].isMounted())
         return;
     if (!disk.save()) {
-        spdlog::error("Smart{}: {} failed to save", driveIndex,
+        spdlog::error("ClemensStorageUnit - Smart{}: {} failed to save", driveIndex,
                       hardDiskStatuses_[driveIndex].assetPath);
         hardDiskStatuses_[driveIndex].saveFailed();
         return;
     }
-    spdlog::error("Smart{}: {} saved", driveIndex, hardDiskStatuses_[driveIndex].assetPath);
+    spdlog::error("ClemensStorageUnit - Smart{}: {} saved", driveIndex,
+                  hardDiskStatuses_[driveIndex].assetPath);
     hardDiskStatuses_[driveIndex].saved();
 }
 
