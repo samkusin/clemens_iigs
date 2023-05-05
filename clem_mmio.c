@@ -144,8 +144,6 @@ static inline void _clem_mmio_newvideo_c029_set(ClemensMMIO *mmio, uint8_t value
              implementation
     */
     if (setflags & CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY) {
-        CLEM_LOG("clem_mem: c029 linearize 0x2000-0x9fff bank 01 = %u",
-                 (value & CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY) != 0);
         setflags ^= CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY;
     }
     CLEM_ASSERT(setflags == 0);
@@ -253,9 +251,9 @@ static void _clem_mmio_speed_c036_set(ClemensMMIO *mmio, struct ClemensTimeSpec 
     }
     if (setflags & CLEM_MMIO_SPEED_POWERED_ON) {
         if (value & CLEM_MMIO_SPEED_POWERED_ON) {
-            CLEM_LOG("C036: Powered On SET");
+            CLEM_DEBUG("C036: Powered On SET");
         } else {
-            CLEM_LOG("C036: Powered On CLEARED");
+            CLEM_DEBUG("C036: Powered On CLEARED");
         }
     }
     /*
@@ -721,6 +719,10 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     case CLEM_MMIO_REG_NEWVIDEO:
         result = _clem_mmio_newvideo_c029(mmio);
         break;
+    case CLEM_MMIO_REG_NEWVIDEO + 1:
+        // to avoid the uimpl read warning since GS/OS will often set/query NEWVIDEO as a 16-bit (2
+        // byte) operation
+        break;
     case CLEM_MMIO_REG_LANGSEL:
         result = clem_vgc_get_region(&mmio->vgc);
         break;
@@ -1037,6 +1039,10 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
         break;
     case CLEM_MMIO_REG_NEWVIDEO:
         _clem_mmio_newvideo_c029_set(mmio, data);
+        break;
+    case CLEM_MMIO_REG_NEWVIDEO + 1:
+        // to avoid the uimpl read warning since GS/OS will often set/query NEWVIDEO as a 16-bit (2
+        // byte) operation
         break;
     case CLEM_MMIO_REG_LANGSEL:
         clem_vgc_set_region(&mmio->vgc, data);
@@ -1712,7 +1718,7 @@ void _clem_mmio_init_page_maps(ClemensMMIO *mmio, struct ClemensMemoryPageMap **
         mmio->bank_page_map[bank_idx] = &mmio->fpi_direct_page_map;
     }
     /* TODO: handle expansion RAM */
-    for (bank_idx = mmio->fpi_rom_bank_count; bank_idx < 0x80; ++bank_idx) {
+    for (bank_idx = mmio->fpi_ram_bank_count; bank_idx < 0x80; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->empty_page_map;
     }
     /* Handles unavailable banks beyond the 0x80 bank IIgs hard RAM limit */

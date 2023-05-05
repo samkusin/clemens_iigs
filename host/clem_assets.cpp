@@ -14,6 +14,7 @@ namespace ClemensHostAssets {
 #include "images/eject_png.h"
 #include "images/fast_emulate_png.h"
 #include "images/folder_solid_png.h"
+#include "images/hdd_png.h"
 #include "images/help_png.h"
 #include "images/joystick_png.h"
 #include "images/load_png.h"
@@ -80,6 +81,7 @@ void initialize() {
     g_allImages[kFolder] = loadImageFromPNG(folder_solid_png, folder_solid_png_len);
     g_allImages[kDisk35] = loadImageFromPNG(disk_35_png, disk_35_png_len);
     g_allImages[kDisk525] = loadImageFromPNG(disk_525_png, disk_525_png_len);
+    g_allImages[kDiskHDD] = loadImageFromPNG(hdd_png, hdd_png_len);
     g_allImages[kLockDisk] = loadImageFromPNG(lock_png, lock_png_len);
     g_allImages[kEjectDisk] = loadImageFromPNG(eject_png, eject_png_len);
 

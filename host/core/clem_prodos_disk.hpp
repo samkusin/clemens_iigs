@@ -28,6 +28,7 @@ class ClemensProDOSDisk {
     ClemensProDOSDisk();
     ClemensProDOSDisk(cinek::ByteBuffer backingBuffer);
 
+    bool create(ClemensSmartPortDevice &device, const ClemensDiskAsset &asset);
     bool bind(ClemensSmartPortDevice &device, const ClemensDiskAsset &asset);
     bool save();
     void release(ClemensSmartPortDevice &device);
@@ -45,6 +46,7 @@ class ClemensProDOSDisk {
     static uint8_t doFlush(void *userContext, unsigned driveIndex);
 
     cinek::ByteBuffer storage_;
+    cinek::Range<uint8_t> blocks_;
     ClemensProdosHDD32 interface_;
 
     std::string assetPath_;

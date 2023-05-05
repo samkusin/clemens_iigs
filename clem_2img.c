@@ -145,8 +145,7 @@ bool clem_2img_parse_header(struct Clemens2IMGDisk *disk, const uint8_t *data,
                     if (param32 & 0x100) {
                         disk->dos_volume = param32 & 0xff;
                     } else {
-                        disk->dos_volume = 254;
-                        ;
+                        disk->dos_volume = CLEM_DISK_FORMAT_DOS_VOLUME_DEFAULT;
                     }
                     disk->dos_volume = param32 & 0xff;
                 } else {

@@ -19,6 +19,7 @@
 #include "clem_ui_disk_unit.hpp"
 #include "core/clem_apple2gs_config.hpp"
 #include "core/clem_disk_asset.hpp"
+#include "core/clem_disk_status.hpp"
 #include "core/clem_disk_utils.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
@@ -2147,40 +2148,128 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
 }
 
 void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width) {
-    /*
-    const ClemensBackendDiskDriveState &drive = frameReadState_.smartDrives[driveIndex];
+    const auto &driveStatus = frameReadState_.frame.smartPortStatuses[driveIndex];
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const bool shortForm = !config_.hybridInterfaceEnabled;
+    const float height = shortForm ? 48.0f : 32.0f;
+    const float iconSize = shortForm ? 32.0f : 24.0f;
+    const auto clemensDiskIcon = ClemensHostAssets::kDiskHDD;
+    ImVec4 uiColor;
 
-    ImGui::PushID("SmartPort");
+    char driveName[32];
+    fmt::format_to_n(driveName, sizeof(driveName), "SmartHDD{}", driveIndex);
+
+    ImGui::PushID(driveName);
+    ImVec2 buttonSize(width, height);
     ImGui::BeginGroup();
     {
+        const float rightButtonSize = 16;
+        const float rightSectionWidth = (rightButtonSize + style.ItemInnerSpacing.x * 2);
 
-        ImGuiStyle &style = ImGui::GetStyle();
-        const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
-        const float motorStatusWidth = (circleRadius + style.ItemSpacing.x) * 2;
-        ImVec2 columnPos = ImGui::GetCursorPos();
-        if (width < ClemensHostStyle::kDiskStatusLongMinWidth) {
-            ImGui::Text("SmartD%d", driveIndex + 1);
-            ImGui::SameLine(width - motorStatusWidth);
-            doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
-            smartportUnit_.frame(width, 0, backendQueue_, frameReadState_.smartDrives[0],
-                                 sSmartDriveName[driveIndex], false);
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        ImVec2 anchorCursorPos = cursorPos;
+        ImVec2 tailCursorPos = cursorPos;
+
+        // body
+        if (shortForm) {
+            tailCursorPos.x += width - style.FramePadding.x - rightSectionWidth;
         } else {
-            smartportUnit_.frame(width - columnPos.x - motorStatusWidth, 0, backendQueue_,
-                                 frameReadState_.smartDrives[0], sSmartDriveName[0], true);
-            ImGui::SameLine(width - motorStatusWidth);
-            doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
+            tailCursorPos.x += width - style.FramePadding.x - rightSectionWidth * 2;
         }
+        tailCursorPos.y += height;
+
+        ImGui::Dummy(buttonSize);
+
+        ImGui::PushClipRect(anchorCursorPos, tailCursorPos, false);
+
+        ImDrawList *drawList = ImGui::GetWindowDrawList();
+
+        if (ImGui::IsItemActive()) {
+            uiColor = style.Colors[ImGuiCol_ButtonActive];
+        } else if (ImGui::IsItemHovered()) {
+            uiColor = style.Colors[ImGuiCol_ButtonHovered];
+        } else {
+            uiColor = style.Colors[ImGuiCol_Button];
+        }
+        drawList->AddRectFilled(cursorPos, tailCursorPos, (ImU32)ImColor(uiColor));
+
+        //  icon
+        auto texId = ClemensHostStyle::getImTextureOfAsset(clemensDiskIcon);
+        ImVec2 rbCursorPos;
+        cursorPos.y += (height - iconSize) * 0.5f;
+        cursorPos.x += style.FramePadding.x;
+        rbCursorPos.x = cursorPos.x + iconSize;
+        rbCursorPos.y = cursorPos.y + iconSize;
+        if (driveStatus.isMounted()) {
+            uiColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        } else {
+            uiColor = ImVec4(1.0f, 1.0f, 1.0f, 0.5f);
+        }
+        drawList->AddImage(texId, cursorPos, rbCursorPos, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                           IM_COL32_WHITE);
+
+        cursorPos.x += iconSize + style.ItemInnerSpacing.x;
+        doMachineDiskMotorStatus(cursorPos, ImVec2(6.0f, iconSize), driveStatus.isSpinning);
+        auto title = driveStatus.isMounted()
+                         ? std::filesystem::path(driveStatus.assetPath).filename().stem()
+                         : "No Disk";
+
+        cursorPos.x += style.ItemSpacing.x;
+        cursorPos.y += (iconSize - ImGui::GetFontSize()) * 0.5f;
+
+        drawList->AddText(cursorPos, (ImU32)ImColor(uiColor), title.c_str());
+
+        ImGui::PopClipRect();
+        /*
+        if (driveStatus.isMounted()) {
+            rbCursorPos = tailCursorPos;
+            ImVec2 buttonSize(rightButtonSize, rightButtonSize);
+            cursorPos.x = rbCursorPos.x + style.ItemInnerSpacing.x;
+            cursorPos.y = anchorCursorPos.y + style.FramePadding.y;
+            ImGui::SetCursorScreenPos(cursorPos);
+            if (ClemensHostImGui::IconButton(
+                    "Eject", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kEjectDisk),
+                    buttonSize)) {
+                if (driveStatus.isMounted()) {
+                    backendQueue_.ejectDisk(driveType);
+                }
+            }
+
+            if (shortForm) {
+                cursorPos.x = rbCursorPos.x + style.ItemInnerSpacing.x;
+                cursorPos.y += rightButtonSize + style.ItemSpacing.y;
+            } else {
+                cursorPos.x += rightSectionWidth;
+            }
+
+            if (driveStatus.isWriteProtected) {
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ClemensHostStyle::getWidgetToggleOnColor(*this));
+            } else {
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ClemensHostStyle::getWidgetToggleOffColor(*this));
+            }
+
+            ImGui::SetCursorScreenPos(cursorPos);
+            if (ClemensHostImGui::IconButton(
+                    "Lock", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kLockDisk),
+                    buttonSize)) {
+                backendQueue_.writeProtectDisk(driveType, !driveStatus.isWriteProtected);
+            }
+
+            ImGui::PopStyleColor();
+        }
+        */
     }
     ImGui::EndGroup();
     ImGui::PopID();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-        if (!drive.imagePath.empty()) {
-            ImGui::SetTooltip("Smartport (%s)", drive.imagePath.c_str());
+        if (driveStatus.isMounted()) {
+            ImGui::SetTooltip("Smartport HDD (%u) %s", driveIndex, driveStatus.assetPath.c_str());
         } else {
-            ImGui::SetTooltip("Smartport (No Drive)");
+            ImGui::SetTooltip("Smartport");
         }
     }
-    */
 }
 
 void ClemensFrontend::doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size,

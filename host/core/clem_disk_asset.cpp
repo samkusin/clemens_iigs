@@ -124,6 +124,7 @@ cinek::ConstRange<uint8_t> ClemensDiskAsset::createBlankDiskImage(ImageType imag
                                                                   bool isDoubleSided,
                                                                   cinek::Range<uint8_t> buffer) {
     cinek::Range<uint8_t> serializeBuffer{buffer.first, buffer.first};
+    unsigned format = CLEM_DISK_FORMAT_PRODOS;
     unsigned decodedRawSize;
     if (diskType == Disk35) {
         decodedRawSize = (isDoubleSided ? CLEM_DISK_35_DOUBLE_PRODOS_BLOCK_COUNT
@@ -133,6 +134,16 @@ cinek::ConstRange<uint8_t> ClemensDiskAsset::createBlankDiskImage(ImageType imag
         decodedRawSize = CLEM_DISK_525_PRODOS_BLOCK_COUNT * 512;
     } else {
         return serializeBuffer;
+    }
+
+    if (imageType == ImageDSK || imageType == ImageDOS) {
+        //  NOTE: this isn't used as no processing occurs on these images.  From
+        //        my understanding of how data is stored in these images, for
+        //        blank disks this shouldn't matter.
+        //        so it's really here to explicitly tie imageType with format type
+        //        though practically it'll do nothing as format is only included
+        //        in 2mg files which should always be ProDOS (in the field.)
+        format = CLEM_DISK_FORMAT_DOS;
     }
     serializeBuffer.second += decodedRawSize;
     if (imageType == Image2IMG) {
@@ -184,9 +195,13 @@ cinek::ConstRange<uint8_t> ClemensDiskAsset::createBlankDiskImage(ImageType imag
                 error = true;
             }
         } else {
+            //  though we specify the dos volume for this blank disk, disk
+            //  programs will detect this disk as a "non prodos/dos" format
+            //  and any formatting will wipe this information anyway
             clem_nib_reset_tracks(&nib, 35, bits_data, bits_data_end);
-            if (!clem_disk_nib_encode_525(&nib, CLEM_DISK_FORMAT_PRODOS, 1, serializeBuffer.first,
-                                          serializeBuffer.second)) {
+            if (!clem_disk_nib_encode_525(&nib, CLEM_DISK_FORMAT_PRODOS,
+                                          CLEM_DISK_FORMAT_DOS_VOLUME_DEFAULT,
+                                          serializeBuffer.first, serializeBuffer.second)) {
                 error = true;
             }
         }
@@ -204,8 +219,8 @@ cinek::ConstRange<uint8_t> ClemensDiskAsset::createBlankDiskImage(ImageType imag
     }
     case Image2IMG: {
         struct Clemens2IMGDisk disk {};
-        if (clem_2img_generate_header(&disk, CLEM_DISK_FORMAT_PRODOS, serializeBuffer.first,
-                                      serializeBuffer.second, CLEM_2IMG_HEADER_BYTE_SIZE)) {
+        if (clem_2img_generate_header(&disk, format, serializeBuffer.first, serializeBuffer.second,
+                                      CLEM_2IMG_HEADER_BYTE_SIZE)) {
             clem_2img_build_image(&disk, serializeBuffer.first, serializeBuffer.second);
         } else {
             error = true;

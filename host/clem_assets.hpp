@@ -23,6 +23,7 @@ enum ImageId {
     kFolder,
     kDisk35,
     kDisk525,
+    kDiskHDD,
     kLockDisk,
     kEjectDisk,
     kFirstNamedImage,

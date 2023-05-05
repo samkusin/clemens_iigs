@@ -552,15 +552,11 @@ bool ClemensBackend::onCommandWriteProtectDisk(ClemensDriveType driveType, bool 
 }
 
 bool ClemensBackend::onCommandInsertSmartPortDisk(unsigned driveIndex, std::string diskPath) {
-    return false;
-    // smartPortDrives_[driveIndex].imagePath = diskPath;
-    // return mountSmartPortDisk(driveIndex, false);
+    return GS_->getStorage().assignSmartPortDisk(GS_->getMMIO(), driveIndex, diskPath);
 }
 
 bool ClemensBackend::onCommandInsertBlankSmartPortDisk(unsigned driveIndex, std::string diskPath) {
-    return false;
-    // smartPortDrives_[driveIndex].imagePath = diskPath;
-    // return mountSmartPortDisk(driveIndex, true);
+    return GS_->getStorage().createSmartPortDisk(GS_->getMMIO(), driveIndex, diskPath);
 }
 
 void ClemensBackend::onCommandEjectSmartPortDisk(unsigned driveIndex) {

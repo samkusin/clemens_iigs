@@ -10,15 +10,20 @@
 #include <ios>
 
 #include "external/mpack.h"
+#include "spdlog/spdlog.h"
+
+//  storage_ will contain g
 
 ClemensProDOSDisk::ClemensProDOSDisk() {}
 
 ClemensProDOSDisk::ClemensProDOSDisk(cinek::ByteBuffer backingBuffer)
     : storage_(std::move(backingBuffer)), disk_{} {}
 
+bool ClemensProDOSDisk::create(ClemensSmartPortDevice &device, const ClemensDiskAsset &asset) {
+    return false;
+}
+
 bool ClemensProDOSDisk::bind(ClemensSmartPortDevice &device, const ClemensDiskAsset &asset) {
-    //  load 2IMG or PO.
-    //  DO IT! (look at clem_smartport_disk.hpp)
     if (asset.diskType() != ClemensDiskAsset::DiskHDD)
         return false;
     save();
@@ -45,6 +50,7 @@ bool ClemensProDOSDisk::bind(ClemensSmartPortDevice &device, const ClemensDiskAs
         fsin.read((char *)storage_.getHead(), sz);
         if (fsin.bad() || fsin.eof())
             return false;
+        blocks_ = input;
         break;
     }
     case ClemensDiskAsset::ImageProDOS: {
@@ -62,6 +68,7 @@ bool ClemensProDOSDisk::bind(ClemensSmartPortDevice &device, const ClemensDiskAs
         if (!clem_2img_generate_header(&disk_, CLEM_DISK_FORMAT_PRODOS, input.first, input.second,
                                        CLEM_2IMG_HEADER_BYTE_SIZE))
             return false;
+        blocks_ = cinek::Range<uint8_t>(input.first + CLEM_2IMG_HEADER_BYTE_SIZE, input.second);
         break;
     }
     default:
@@ -86,18 +93,42 @@ bool ClemensProDOSDisk::save() {
     if (assetPath_.empty())
         return true;
     assert(!storage_.isEmpty());
+    const uint8_t *dataStart = nullptr;
+    const uint8_t *dataEnd = nullptr;
+
+    auto imageType = ClemensDiskAsset::fromAssetPathUsingExtension(assetPath_);
+    switch (imageType) {
+    case ClemensDiskAsset::Image2IMG:
+        clem_2img_build_image(&disk_, storage_.getHead(), storage_.getTail());
+        dataStart = storage_.getHead();
+        dataEnd = dataStart + disk_.image_buffer_length;
+        break;
+    case ClemensDiskAsset::ImageProDOS:
+        dataStart = disk_.data;
+        dataEnd = disk_.data_end;
+        break;
+    default:
+        assert(false);
+        return false;
+    }
+    assert(dataStart && dataEnd);
+
     std::ofstream out(assetPath_, std::ios_base::out | std::ios_base::binary);
     if (out.fail())
         return false;
-    //  TODO: write 2IMG out or PO out
-    // out.write((char *)storage_.getHead(), disk.image_buffer_length);
+    out.write((char *)dataStart, dataEnd - dataStart);
     if (out.fail() || out.bad())
         return false;
+
+    spdlog::info("ClemensProDOSDisk - {} saved", assetPath_);
     return true;
 }
 
 void ClemensProDOSDisk::release(ClemensSmartPortDevice &device) {
-    save();
+    if (!save()) {
+        spdlog::error("ClemensProDOSDisk - cannot save {}", assetPath_);
+        return;
+    }
     assert(device.device_data == &interface_);
     clem_smartport_prodos_hdd32_uninitialize(&device);
     memset(&interface_, 0, sizeof(interface_));
@@ -108,7 +139,7 @@ void ClemensProDOSDisk::release(ClemensSmartPortDevice &device) {
 uint8_t ClemensProDOSDisk::doReadBlock(void *userContext, unsigned /*driveIndex */,
                                        unsigned blockIndex, uint8_t *buffer) {
     auto *self = reinterpret_cast<ClemensProDOSDisk *>(userContext);
-    const uint8_t *data_head = (uint8_t *)self->storage_.getHead();
+    const uint8_t *data_head = self->blocks_.first;
     if (blockIndex >= self->interface_.block_limit)
         return CLEM_SMARTPORT_STATUS_CODE_INVALID_BLOCK;
     memcpy(buffer, data_head + blockIndex * 512, 512);
@@ -118,7 +149,7 @@ uint8_t ClemensProDOSDisk::doReadBlock(void *userContext, unsigned /*driveIndex 
 uint8_t ClemensProDOSDisk::doWriteBlock(void *userContext, unsigned /*driveIndex*/,
                                         unsigned blockIndex, const uint8_t *buffer) {
     auto *self = reinterpret_cast<ClemensProDOSDisk *>(userContext);
-    uint8_t *data_head = (uint8_t *)self->storage_.getHead();
+    uint8_t *data_head = self->blocks_.first;
     if (blockIndex >= self->interface_.block_limit)
         return CLEM_SMARTPORT_STATUS_CODE_INVALID_BLOCK;
     memcpy(data_head + blockIndex * 512, buffer, 512);
@@ -188,5 +219,10 @@ bool ClemensProDOSDisk::unserialize(mpack_reader_t *reader, ClemensSmartPortDevi
     }
 
     mpack_done_map(reader);
+
+    if (!clem_2img_parse_header(&disk_, storage_.getHead(),
+                                storage_.getHead() + storage_.getSize()))
+        return false;
+
     return true;
 }

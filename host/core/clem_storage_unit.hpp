@@ -16,6 +16,8 @@
 typedef struct mpack_reader_t mpack_reader_t;
 typedef struct mpack_writer_t mpack_writer_t;
 
+struct ClemensDrive;
+
 struct ClemensMMIO;
 
 //  Covers all emulated disk operations between the host and emulator (MMIO)
@@ -32,7 +34,9 @@ class ClemensStorageUnit {
     ClemensStorageUnit();
     ~ClemensStorageUnit();
 
+    bool createSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex, const std::string &imagePath);
     bool assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex, const std::string &imagePath);
+    bool ejectSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex);
     bool createDisk(ClemensMMIO &mmio, ClemensDriveType driveType, const std::string &path);
     bool insertDisk(ClemensMMIO &mmio, ClemensDriveType driveType, const std::string &path);
     bool ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType);
@@ -54,6 +58,9 @@ class ClemensStorageUnit {
                    cinek::ConstRange<uint8_t> source);
     void saveDisk(ClemensDriveType driveType, ClemensNibbleDisk &disk);
     void saveHardDisk(unsigned driveIndex, ClemensProDOSDisk &disk);
+
+    ClemensDrive *getDrive(ClemensMMIO &mmio, ClemensDriveType driveType);
+    ClemensSmartPortUnit *getSmartPortUnit(ClemensMMIO &mmio, unsigned driveIndex);
 
   private:
     std::array<ClemensDiskAsset, kClemensDrive_Count> diskAssets_;

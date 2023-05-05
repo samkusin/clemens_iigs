@@ -40,7 +40,7 @@ void ClemensStorageUnit::allocateBuffers() {
 
     // create empty backing ProDOS buffer for SmartPort disk
     hardDisks_[0] = ClemensProDOSDisk(cinek::ByteBuffer(
-        slab_.allocateArray<uint8_t>(kSmartPortDiskSize + 128), kSmartPortDiskSize));
+        slab_.allocateArray<uint8_t>(kSmartPortDiskSize + 128), kSmartPortDiskSize + 128));
 
     // create empty decode scratchpad for saving images to the host's filesystem
     decodeBuffer_ =
@@ -50,24 +50,38 @@ void ClemensStorageUnit::allocateBuffers() {
     hardDiskStatuses_.fill(ClemensDiskDriveStatus{});
 }
 
-bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex,
-                                             const std::string &imagePath) {
+ClemensSmartPortUnit *ClemensStorageUnit::getSmartPortUnit(ClemensMMIO &mmio, unsigned driveIndex) {
     ClemensSmartPortUnit *unit = clemens_smartport_unit_get(&mmio, driveIndex);
     if (!unit) {
         spdlog::error(
             "ClemensStorageUnit::assignSmartPortDisk - Invalid smartport unit {} specified",
             driveIndex);
-        return false;
+        return NULL;
     }
     if (hardDiskStatuses_[driveIndex].isMounted()) {
         spdlog::error("ClemensStorageUnit::assignSmartPortDisk - Drive unit {} is already mounted",
                       driveIndex);
-        return false;
+        return NULL;
     }
+    return unit;
+}
+
+bool ClemensStorageUnit::createSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex,
+                                             const std::string &imagePath) {
+    ClemensSmartPortUnit *unit = getSmartPortUnit(mmio, driveIndex);
+    if (!unit)
+        return false;
+}
+
+bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex,
+                                             const std::string &imagePath) {
+    ClemensSmartPortUnit *unit = getSmartPortUnit(mmio, driveIndex);
+    if (!unit)
+        return false;
 
     auto asset = ClemensDiskAsset(imagePath);
     if (asset.imageType() != ClemensDiskAsset::Image2IMG &&
-        asset.imageType() != ClemensDiskAsset::ImageWOZ) {
+        asset.imageType() != ClemensDiskAsset::ImageProDOS) {
         hardDiskStatuses_[driveIndex].mountFailed();
         return false;
     }
@@ -81,19 +95,39 @@ bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIn
         return false;
     }
     hardDiskStatuses_[driveIndex].mount(imagePath);
+    spdlog::info("ClemensStorageUnit - smart{}: {} mounted", driveIndex, imagePath);
     return clemens_assign_smartport_disk(&mmio, driveIndex, &device);
+}
+
+bool ClemensStorageUnit::ejectSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex) {
+    if (!hardDiskStatuses_[driveIndex].isMounted())
+        return false;
+
+    struct ClemensSmartPortDevice device {};
+    clemens_remove_smartport_disk(&mmio, driveIndex, &device);
+    hardDisks_[driveIndex].release(device);
+    hardDiskStatuses_[driveIndex].unmount();
+    spdlog::info("ClemensStorageUnit - smart{}: ejected", driveIndex);
+    return true;
+}
+
+ClemensDrive *ClemensStorageUnit::getDrive(ClemensMMIO &mmio, ClemensDriveType driveType) {
+    ClemensDrive *drive = clemens_drive_get(&mmio, driveType);
+    if (!drive)
+        return NULL;
+    if (diskStatuses_[driveType].isMounted()) {
+        spdlog::error("ClemensStorageUnit::createDisk - Drive type {} is already mounted",
+                      ClemensDiskUtilities::getDriveName(driveType));
+        return NULL;
+    }
+    return drive;
 }
 
 bool ClemensStorageUnit::createDisk(ClemensMMIO &mmio, ClemensDriveType driveType,
                                     const std::string &path) {
-    ClemensDrive *drive = clemens_drive_get(&mmio, driveType);
+    ClemensDrive *drive = getDrive(mmio, driveType);
     if (!drive)
         return false;
-    if (diskStatuses_[driveType].isMounted()) {
-        spdlog::error("ClemensStorageUnit::createDisk - Drive type {} is already mounted",
-                      ClemensDiskUtilities::getDriveName(driveType));
-        return false;
-    }
 
     //  Use the decode buffer to generate a blank image and leverage the utilities
     //  in ClemensDiskAsset to generate the underlying nib (basically, generate a
@@ -193,15 +227,9 @@ void ClemensStorageUnit::ejectAllDisks(ClemensMMIO &mmio) {
     ejectDisk(mmio, kClemensDrive_3_5_D2);
     ejectDisk(mmio, kClemensDrive_5_25_D1);
     ejectDisk(mmio, kClemensDrive_5_25_D2);
-
+    ejectSmartPortDisk(mmio, 0);
     for (unsigned i = 0; i < (unsigned)hardDisks_.size(); ++i) {
-        if (!hardDiskStatuses_[i].isMounted())
-            continue;
-
-        struct ClemensSmartPortDevice device {};
-        clemens_remove_smartport_disk(&mmio, i, &device);
-        hardDisks_[i].release(device);
-        hardDiskStatuses_[i].unmount();
+        ejectSmartPortDisk(mmio, i);
     }
 }
 
