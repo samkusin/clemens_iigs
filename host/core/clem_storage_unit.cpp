@@ -71,6 +71,7 @@ bool ClemensStorageUnit::createSmartPortDisk(ClemensMMIO &mmio, unsigned driveIn
     ClemensSmartPortUnit *unit = getSmartPortUnit(mmio, driveIndex);
     if (!unit)
         return false;
+    return false;
 }
 
 bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex,
@@ -116,9 +117,7 @@ ClemensDrive *ClemensStorageUnit::getDrive(ClemensMMIO &mmio, ClemensDriveType d
     if (!drive)
         return NULL;
     if (diskStatuses_[driveType].isMounted()) {
-        spdlog::error("ClemensStorageUnit::createDisk - Drive type {} is already mounted",
-                      ClemensDiskUtilities::getDriveName(driveType));
-        return NULL;
+        ejectDisk(mmio, driveType);
     }
     return drive;
 }
@@ -150,14 +149,9 @@ bool ClemensStorageUnit::createDisk(ClemensMMIO &mmio, ClemensDriveType driveTyp
 
 bool ClemensStorageUnit::insertDisk(ClemensMMIO &mmio, ClemensDriveType driveType,
                                     const std::string &path) {
-    ClemensDrive *drive = clemens_drive_get(&mmio, driveType);
+    ClemensDrive *drive = getDrive(mmio, driveType);
     if (!drive)
         return false;
-    if (diskStatuses_[driveType].isMounted()) {
-        spdlog::error("ClemensStorageUnit::insertDisk - Drive type {} is already mounted",
-                      ClemensDiskUtilities::getDriveName(driveType));
-        return false;
-    }
 
     std::ifstream input(path, std::ios_base::in | std::ios_base::binary);
     if (!input.is_open()) {
