@@ -11,6 +11,14 @@
 
 //  TODO: optimize when needed per platform
 
+void sokolLogger(const char *tag,              // e.g. 'sg'
+                 uint32_t log_level,           // 0=panic, 1=error, 2=warn, 3=info
+                 uint32_t,                     // SG_LOGITEM_*
+                 const char *message_or_null,  // a message string, may be nullptr in release mode
+                 uint32_t line_nr,             // line number in sokol_gfx.h
+                 const char *filename_or_null, // source filename, may be nullptr in release mode
+                 void *);
+
 ClemensAudioDevice::ClemensAudioDevice()
     : queuedFrameBuffer_(nullptr), queuedFrameHead_(0), queuedFrameTail_(0), queuedFrameLimit_(0),
       queuedFrameStride_(0) {}
@@ -24,6 +32,7 @@ void ClemensAudioDevice::start() {
     audioDesc.buffer_frames = 2048;
     audioDesc.stream_userdata_cb = &ClemensAudioDevice::mixAudio;
     audioDesc.user_data = this;
+    audioDesc.logger.func = sokolLogger;
     saudio_setup(audioDesc);
 
     queuedFrameHead_ = 0;
