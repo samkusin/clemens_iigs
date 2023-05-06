@@ -11,17 +11,21 @@
 #include "emulator.h"
 #include "emulator_mmio.h"
 
+#include "external/cross_endian.h"
+#include "external/mpack.h"
 #include "fmt/format.h"
 #include "spdlog/common.h"
 #include "spdlog/spdlog.h"
 
 #include <charconv>
+#include <chrono>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
 
 namespace {
 
+constexpr uint32_t kClemensSnapshotVersion = 1;
 constexpr unsigned kInterpreterMemorySize = 1 * 1024 * 1024;
 constexpr unsigned kLogOutputLineLimit = 1024;
 
@@ -457,6 +461,71 @@ void ClemensBackend::localLog(int log_level, const char *msg, Args... args) {
     logOutput_.emplace_back(logLine);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//  Serialization blocks
+//
+//  {
+//    # Header is 16 bytes
+//      CLEM
+//      SNAP,
+//      version (4 bytes)
+//      pad (4 bytes)
+//    # Begin Mpack
+//      metadata: {
+//          timestamp:
+//          disks: []
+//          smart_disks: []
+//      },
+//      debugger: {
+//          breakpoints: []
+//      },
+//      machine_gs: {
+//          ClemensAppleIIGS
+//      }
+//  }
+//
+bool ClemensBackend::serialize(const std::string &path) const {
+    FILE *fp = fopen(path.c_str(), "wb");
+    if (!fp) {
+        spdlog::error("Failed to open {} - stream init", path);
+        return false;
+    }
+    //  validation header
+    spdlog::info("Creating snapshot @{}", path);
+
+    uint32_t version = htole32(kClemensSnapshotVersion);
+    uint32_t mpackVersion = htole32(MPACK_VERSION);
+    unsigned writeCount = 0;
+    writeCount += fwrite("CLEM", 4, 1, fp);
+    writeCount += fwrite("SNAP", 4, 1, fp);
+    writeCount += fwrite(&version, sizeof(version), 1, fp);
+    writeCount += fwrite(&mpackVersion, sizeof(mpackVersion), 1, fp);
+    if (writeCount != 4) {
+        spdlog::error("serialize() - failed to write header (count: {})", writeCount);
+        fclose(fp);
+        return false;
+    }
+
+    //  begin mpack
+    mpack_writer_t writer{};
+    mpack_writer_init_stdfile(&writer, fp, true);
+    if (mpack_writer_error(&writer) != mpack_ok) {
+        spdlog::error("serialize() - Failed to initialize writer", path);
+        fclose(fp);
+        return false;
+    }
+    //  metadata
+    // mpack_build_map(&writer);
+    // mpack_write_cstr(&writer, "timestamp");
+    // mpack_complete_map(&writer);
+    return false;
+}
+
+bool ClemensBackend::unserialize(const std::string *path) { return false; }
+
+////////////////////////////////////////////////////////////////////////////////
+//  ClemensAppleIIGS events
+//
 void ClemensBackend::onClemensSystemMachineLog(int logLevel, const ClemensMachine *machine,
                                                const char *msg) {
     spdlog::level::level_enum levelEnums[] = {spdlog::level::debug, spdlog::level::info,
@@ -490,6 +559,8 @@ void ClemensBackend::onClemensSystemWriteConfig(const ClemensAppleIIGS::Config &
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// ClemensCommandQueue handlers
+//
 void ClemensBackend::onCommandReset() { GS_->reset(); }
 
 void ClemensBackend::onCommandRun() { stepsRemaining_ = std::nullopt; }
@@ -619,6 +690,8 @@ bool ClemensBackend::onCommandDebugProgramTrace(std::string_view op, std::string
 
 bool ClemensBackend::onCommandSaveMachine(std::string path) {
     auto outputPath = std::filesystem::path(config_.snapshotRootPath) / path;
+
+    return serialize(outputPath);
     /*
     saveBRAM();
     return ClemensSerializer::save(outputPath.string(), &GS_->getMachine(), &GS_->getMMIO(),

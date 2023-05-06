@@ -16,7 +16,6 @@
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
 #include "clem_mmio_types.h"
-#include "clem_ui_disk_unit.hpp"
 #include "core/clem_apple2gs_config.hpp"
 #include "core/clem_disk_asset.hpp"
 #include "core/clem_disk_status.hpp"

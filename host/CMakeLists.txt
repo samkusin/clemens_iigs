@@ -144,9 +144,7 @@ set(PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_load_snapshot.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_save_snapshot.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_settings.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/clem_serializer.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/clem_startup_view.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/clem_smartport_disk.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_startup_view.cpp")
 
 add_executable(clemens_iigs ${PROJECT_SOURCES})
 target_link_libraries(clemens_iigs

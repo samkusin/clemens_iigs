@@ -171,9 +171,13 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     void onCommandFastDiskEmulation(bool enabled) final;
     std::string onCommandDebugMessage(std::string msg) final;
 
+    //  internal
     bool isRunning() const;
     std::optional<unsigned> checkHitBreakpoint();
     template <typename... Args> void localLog(int log_level, const char *msg, Args... args);
+
+    bool serialize(const std::string &path) const;
+    bool unserialize(const std::string *path);
 
   private:
     Config config_;

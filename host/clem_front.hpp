@@ -18,7 +18,6 @@
 #include "clem_ui_load_snapshot.hpp"
 #include "clem_ui_save_snapshot.hpp"
 #include "clem_ui_settings.hpp"
-#include "clem_ui_smartport_unit.hpp"
 
 #include "imgui.h"
 #include "imgui_memory_editor.h"
