@@ -389,22 +389,6 @@ uint64_t clemens_clocks_per_second(ClemensMMIO *mmio, bool *is_slow_speed) {
     return CLEM_CLOCKS_PHI0_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND;
 }
 
-static void _clem_mmio_write_hook(struct ClemensMemory *mem, struct ClemensTimeSpec *tspec,
-                                  uint8_t data, uint16_t addr, uint8_t flags,
-                                  bool *is_slow_access) {
-    clem_mmio_write((ClemensMMIO *)mem->mmio_context, tspec, data, addr, flags, is_slow_access);
-}
-
-static uint8_t _clem_mmio_read_hook(struct ClemensMemory *mem, struct ClemensTimeSpec *tspec,
-                                    uint16_t addr, uint8_t flags, bool *is_slow_access) {
-    return clem_mmio_read((ClemensMMIO *)mem->mmio_context, tspec, addr, flags, is_slow_access);
-}
-
-static bool _clem_mmio_niolc(struct ClemensMemory *mem) {
-    ClemensMMIO *mmio = (ClemensMMIO *)mem->mmio_context;
-    return (mmio->mmap_register & CLEM_MEM_IO_MMAP_NIOLC) != 0;
-}
-
 bool clemens_is_mmio_initialized(const ClemensMMIO *mmio) {
     return mmio->state_type == kClemensMMIOStateType_Active;
 }
@@ -424,10 +408,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
         return;
     }
     if (mmio->state_type == kClemensMMIOStateType_Reset) {
-        clem->mem.mmio_context = mmio;
-        clem->mem.mmio_write = _clem_mmio_write_hook;
-        clem->mem.mmio_read = _clem_mmio_read_hook;
-        clem->mem.mmio_niolc = _clem_mmio_niolc;
+        clem_mmio_bind_machine(clem, mmio);
         clem_disk_reset_drives(&mmio->active_drives);
         clem_mmio_reset(mmio, &clem->tspec);
         /* extension cards reset handling */

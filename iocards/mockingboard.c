@@ -5,6 +5,7 @@
 #include <float.h>
 #include <math.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 
 /*
@@ -759,11 +760,10 @@ typedef struct {
     struct ClemensClock last_clocks;
 } ClemensMockingboardContext;
 
-static ClemensMockingboardContext s_context;
-
-static inline struct ClemensVIA6522 *_mmio_via_addr_parse(uint8_t ioreg, unsigned *reg) {
-    *reg = (ioreg & 0xf);                       /* 0 = ORx/IRxg, 2 = DDRx, etc */
-    return &s_context.via[(ioreg & 0x80) >> 7]; /* chip select */
+static inline struct ClemensVIA6522 *_mmio_via_addr_parse(ClemensMockingboardContext *context,
+                                                          uint8_t ioreg, unsigned *reg) {
+    *reg = (ioreg & 0xf);                      /* 0 = ORx/IRxg, 2 = DDRx, etc */
+    return &context->via[(ioreg & 0x80) >> 7]; /* chip select */
 }
 
 static inline bool _mmio_via_irq_active(struct ClemensVIA6522 *via) {
@@ -859,7 +859,7 @@ static void io_reset(struct ClemensClock *clock, void *context) {
 
 static uint32_t io_sync(struct ClemensClock *clock, void *context) {
     ClemensMockingboardContext *board = (ClemensMockingboardContext *)context;
-    clem_clocks_duration_t dt_clocks = clock->ts - s_context.last_clocks.ts;
+    clem_clocks_duration_t dt_clocks = clock->ts - board->last_clocks.ts;
 
     board->sync_time_budget += dt_clocks;
 
@@ -885,6 +885,7 @@ static uint32_t io_sync(struct ClemensClock *clock, void *context) {
 
 static void io_read(struct ClemensClock *clock, uint8_t *data, uint8_t addr, uint8_t flags,
                     void *context) {
+    ClemensMockingboardContext *board = (ClemensMockingboardContext *)context;
     unsigned reg;
     struct ClemensVIA6522 *via;
 
@@ -893,7 +894,7 @@ static void io_read(struct ClemensClock *clock, uint8_t *data, uint8_t addr, uin
         return;
     }
 
-    via = _mmio_via_addr_parse(addr, &reg);
+    via = _mmio_via_addr_parse(board, addr, &reg);
 
     switch (reg) {
     case CLEM_VIA_6522_PORT_A_ALT:
@@ -964,13 +965,14 @@ static void io_read(struct ClemensClock *clock, uint8_t *data, uint8_t addr, uin
 
 static void io_write(struct ClemensClock *clock, uint8_t data, uint8_t addr, uint8_t flags,
                      void *context) {
+    ClemensMockingboardContext *board = (ClemensMockingboardContext *)context;
     struct ClemensVIA6522 *via;
     unsigned reg;
 
     if (!(flags & CLEM_OP_IO_DEVSEL))
         return;
 
-    via = _mmio_via_addr_parse(addr, &reg);
+    via = _mmio_via_addr_parse(board, addr, &reg);
 
     switch (reg) {
     case CLEM_VIA_6522_PORT_A_ALT:
@@ -1108,7 +1110,7 @@ struct ClemensSerializerRecord kCard[] = {
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 void clem_card_mockingboard_initialize(ClemensCard *card) {
-    card->context = &s_context;
+    card->context = (ClemensMockingboardContext *)calloc(1, sizeof(ClemensMockingboardContext));
     card->io_reset = &io_reset;
     card->io_sync = &io_sync;
     card->io_read = &io_read;
@@ -1117,6 +1119,9 @@ void clem_card_mockingboard_initialize(ClemensCard *card) {
 }
 
 void clem_card_mockingboard_uninitialize(ClemensCard *card) {
+    if (card->context) {
+        free(card->context);
+    }
     memset(card, 0, sizeof(ClemensCard));
 }
 

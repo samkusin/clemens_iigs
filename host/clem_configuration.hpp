@@ -25,6 +25,7 @@ struct ClemensConfiguration {
     unsigned minorVersion;
     std::string dataDirectory;
     std::string romFilename;
+    int logLevel;
 
     ClemensAppleIIGSConfig gs;
 

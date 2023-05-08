@@ -29,7 +29,8 @@ add_library(clemens_host_shared
     ${FMT_SOURCES}
     ${EXT_SOURCES})
 target_compile_features(clemens_host_shared PUBLIC cxx_std_17)
-target_compile_definitions(clemens_host_shared PUBLIC SPDLOG_COMPILED_LIB)
+target_compile_definitions(clemens_host_shared PUBLIC SPDLOG_COMPILED_LIB
+                        $<$<CONFIG:Debug>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG>)
 target_include_directories(clemens_host_shared
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ext)
 
@@ -72,6 +73,7 @@ add_library(clemens_host_core
     "${CMAKE_CURRENT_SOURCE_DIR}/core/clem_disk_asset.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/clem_disk_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/clem_prodos_disk.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/clem_snapshot.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/clem_storage_unit.cpp")
 target_compile_features( clemens_host_core PUBLIC cxx_std_17 )
 target_link_libraries(clemens_host_core

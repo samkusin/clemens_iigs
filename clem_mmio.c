@@ -1745,11 +1745,6 @@ void _clem_mmio_init_page_maps(ClemensMMIO *mmio, struct ClemensMemoryPageMap **
     _clem_mmio_restore_mappings(mmio);
 }
 
-void clem_mmio_restore(ClemensMMIO *mmio, struct ClemensMemoryPageMap **bank_page_map,
-                       uint8_t *e0_bank, uint8_t *e1_bank) {
-    _clem_mmio_init_page_maps(mmio, bank_page_map, e0_bank, e1_bank, mmio->mmap_register);
-}
-
 void clem_mmio_reset(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) {
     clem_timer_reset(&mmio->dev_timer);
     clem_rtc_reset(&mmio->dev_rtc, CLEM_CLOCKS_PHI0_CYCLE);
@@ -1795,4 +1790,34 @@ void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
                                   CLEM_MEM_IO_MMAP_LCBANK2);
 
     clem_mmio_reset(mmio, tspec);
+}
+
+static void _clem_mmio_write_hook(struct ClemensMemory *mem, struct ClemensTimeSpec *tspec,
+                                  uint8_t data, uint16_t addr, uint8_t flags,
+                                  bool *is_slow_access) {
+    clem_mmio_write((ClemensMMIO *)mem->mmio_context, tspec, data, addr, flags, is_slow_access);
+}
+
+static uint8_t _clem_mmio_read_hook(struct ClemensMemory *mem, struct ClemensTimeSpec *tspec,
+                                    uint16_t addr, uint8_t flags, bool *is_slow_access) {
+    return clem_mmio_read((ClemensMMIO *)mem->mmio_context, tspec, addr, flags, is_slow_access);
+}
+
+static bool _clem_mmio_niolc(struct ClemensMemory *mem) {
+    ClemensMMIO *mmio = (ClemensMMIO *)mem->mmio_context;
+    return (mmio->mmap_register & CLEM_MEM_IO_MMAP_NIOLC) != 0;
+}
+
+void clem_mmio_bind_machine(ClemensMachine *clem, ClemensMMIO *mmio) {
+    clem->mem.mmio_context = mmio;
+    clem->mem.mmio_write = _clem_mmio_write_hook;
+    clem->mem.mmio_read = _clem_mmio_read_hook;
+    clem->mem.mmio_niolc = _clem_mmio_niolc;
+}
+
+void clem_mmio_restore(ClemensMachine *clem, ClemensMMIO *mmio) {
+    clem_mmio_bind_machine(clem, mmio);
+    _clem_mmio_init_page_maps(mmio, clem->mem.bank_page_map, clem->mem.mega2_bank_map[0],
+                              clem->mem.mega2_bank_map[1], mmio->mmap_register);
+    clem_vgc_reset_scanlines(&mmio->vgc);
 }

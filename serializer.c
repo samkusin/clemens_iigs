@@ -877,8 +877,7 @@ mpack_reader_t *clemens_unserialize_mmio(mpack_reader_t *reader, ClemensMMIO *mm
         return NULL;
     }
 
-    clem_mmio_restore(mmio, machine->mem.bank_page_map, machine->mem.mega2_bank_map[0],
-                      machine->mem.mega2_bank_map[1]);
+    clem_mmio_restore(machine, mmio);
 
     return reader;
 }

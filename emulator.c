@@ -718,21 +718,21 @@ void clemens_create_page_mapping(struct ClemensMemoryPageInfo *page, uint8_t pag
 }
 
 int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks_step, void *rom,
-                 unsigned int fpiROMBankCount, void *e0bank, void *e1bank, void *fpiRAM,
-                 unsigned int fpiRAMBankCount) {
+                 unsigned int fpi_rom_bank_count, void *e0bank, void *e1bank, void *fpiRAM,
+                 unsigned int fpi_ram_bank_count) {
     unsigned idx, rom_bank_idx;
 
-    clemens_simple_init(machine, speed_factor, clocks_step, fpiRAM, fpiRAMBankCount);
+    clemens_simple_init(machine, speed_factor, clocks_step, fpiRAM, fpi_ram_bank_count);
 
     if (rom == NULL) {
         return -1;
     }
-    if (fpiRAMBankCount < 2 || fpiRAM == NULL || e0bank == NULL || e1bank == NULL) {
+    if (fpi_ram_bank_count < 2 || fpiRAM == NULL || e0bank == NULL || e1bank == NULL) {
         return -2;
     }
     /* memory organization for the FPI */
     /* TODO: Support ROM 01 */
-    rom_bank_idx = 0x100 - fpiROMBankCount;
+    rom_bank_idx = 0x100 - fpi_rom_bank_count;
     for (idx = rom_bank_idx; idx < 0x100; ++idx) {
         machine->mem.fpi_bank_used[idx] = true;
         machine->mem.fpi_bank_map[idx] =
@@ -742,6 +742,7 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks
        the IIgs
     */
     machine->mem.fpi_bank_map[CLEM_IIGS_EMPTY_RAM_BANK] = s_empty_ram;
+    machine->mem.fpi_bank_used[CLEM_IIGS_EMPTY_RAM_BANK] = true;
     machine->mem.mega2_bank_map[0x00] = (uint8_t *)e0bank;
     memset(machine->mem.mega2_bank_map[0x00], 0, CLEM_IIGS_BANK_SIZE);
     machine->mem.mega2_bank_map[0x01] = (uint8_t *)e1bank;
@@ -751,14 +752,14 @@ int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks
 }
 
 void clemens_simple_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks_step,
-                         void *fpiRAM, unsigned int fpiRAMBankCount) {
+                         void *fpiRAM, unsigned int fpi_ram_bank_count) {
     machine->cpu.pins.resbIn = true;
     machine->cpu.pins.irqbIn = true;
     _clem_timespec_init(&machine->tspec, clocks_step);
 
-    if (fpiRAMBankCount > 256)
-        fpiRAMBankCount = 256;
-    for (unsigned i = 0; i < fpiRAMBankCount; ++i) {
+    if (fpi_ram_bank_count > 256)
+        fpi_ram_bank_count = 256;
+    for (unsigned i = 0; i < fpi_ram_bank_count; ++i) {
         machine->mem.fpi_bank_used[i] = true;
         machine->mem.fpi_bank_map[i] = ((uint8_t *)fpiRAM) + (i * CLEM_IIGS_BANK_SIZE);
         memset(machine->mem.fpi_bank_map[i], 0, CLEM_IIGS_BANK_SIZE);
@@ -768,13 +769,15 @@ void clemens_simple_init(ClemensMachine *machine, uint32_t speed_factor, uint32_
        (clemens_init)
     */
     memset(s_empty_ram, 0, CLEM_IIGS_BANK_SIZE);
-    for (unsigned i = fpiRAMBankCount; i < 0xff; ++i) {
+    for (unsigned i = fpi_ram_bank_count; i < 0xff; ++i) {
         machine->mem.fpi_bank_used[i] = false;
         machine->mem.fpi_bank_map[i] = s_empty_ram;
     }
 
     memset(&machine->mem.bank_page_map, 0, sizeof(machine->mem.bank_page_map));
+}
 
+void clemens_register() {
     /* internal tables used to define opcode attributes */
     for (unsigned i = 0; i < 256; ++i) {
         _opcode_description((uint8_t)i, "...", kClemensCPUAddrMode_None);

@@ -100,6 +100,12 @@ bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIn
     return clemens_assign_smartport_disk(&mmio, driveIndex, &device);
 }
 
+void ClemensStorageUnit::saveSmartPortDisk(ClemensMMIO &, unsigned driveIndex) {
+    if (!hardDiskStatuses_[driveIndex].isMounted())
+        return;
+    hardDisks_[driveIndex].save();
+}
+
 bool ClemensStorageUnit::ejectSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex) {
     if (!hardDiskStatuses_[driveIndex].isMounted())
         return false;
@@ -205,6 +211,13 @@ bool ClemensStorageUnit::mountDisk(ClemensMMIO &mmio, const std::string &path,
     return true;
 }
 
+void ClemensStorageUnit::saveDisk(ClemensMMIO &mmio, ClemensDriveType driveType) {
+    ClemensDrive *drive = clemens_drive_get(&mmio, driveType);
+    if (!drive->has_disk)
+        return;
+    saveDisk(driveType, drive->disk);
+}
+
 bool ClemensStorageUnit::ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType) {
     if (!clemens_drive_get(&mmio, driveType)->has_disk || !diskStatuses_[driveType].isMounted())
         return false;
@@ -216,12 +229,21 @@ bool ClemensStorageUnit::ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType
     return true;
 }
 
+void ClemensStorageUnit::saveAllDisks(ClemensMMIO &mmio) {
+    saveDisk(mmio, kClemensDrive_3_5_D1);
+    saveDisk(mmio, kClemensDrive_3_5_D2);
+    saveDisk(mmio, kClemensDrive_5_25_D1);
+    saveDisk(mmio, kClemensDrive_5_25_D2);
+    for (unsigned i = 0; i < (unsigned)hardDisks_.size(); ++i) {
+        saveSmartPortDisk(mmio, i);
+    }
+}
+
 void ClemensStorageUnit::ejectAllDisks(ClemensMMIO &mmio) {
     ejectDisk(mmio, kClemensDrive_3_5_D1);
     ejectDisk(mmio, kClemensDrive_3_5_D2);
     ejectDisk(mmio, kClemensDrive_5_25_D1);
     ejectDisk(mmio, kClemensDrive_5_25_D2);
-    ejectSmartPortDisk(mmio, 0);
     for (unsigned i = 0; i < (unsigned)hardDisks_.size(); ++i) {
         ejectSmartPortDisk(mmio, i);
     }

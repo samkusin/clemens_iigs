@@ -12,6 +12,12 @@ extern "C" {
 /**
  * @brief
  *
+ */
+void clemens_register();
+
+/**
+ * @brief
+ *
  * @param machine
  * @param speed_factor
  * @param clocks_step

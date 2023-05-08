@@ -1,6 +1,7 @@
 #ifndef CLEM_HOST_APPLE2GS_HPP
 #define CLEM_HOST_APPLE2GS_HPP
 
+#include "clem_smartport.h"
 #include "core/clem_apple2gs_config.hpp"
 
 #include "clem_disk.h"
@@ -29,6 +30,8 @@ class ClemensAppleIIGS {
         UnsupportedSnapshotVersion,
         CorruptedSnapshot,
         Initialized,
+        Loaded,
+        Ready,
         Online,
         Stopped
     };
@@ -51,10 +54,18 @@ class ClemensAppleIIGS {
     //  If construction was successful, returns true.  This should be checked
     //  after creating the object.
     bool isOk() const {
-        return status_ == Status::Initialized || status_ == Status::Online ||
-               status_ == Status::Stopped;
+        return status_ == Status::Initialized || status_ == Status::Loaded || isMounted();
+    }
+    bool isMounted() const {
+        return status_ == Status::Ready || status_ == Status::Online || status_ == Status::Stopped;
     }
 
+    //  This makes the machine instance the active machine
+    //  which is important to ensure one machine has access to disks and
+    //  any system resources
+    void mount();
+    //  Forces eject and save of all disks
+    void unmount();
     //  Get details of any failure or more detailed status
     Status getStatus() const;
 
@@ -75,6 +86,8 @@ class ClemensAppleIIGS {
     void finishFrame(Frame &frame);
     //  Forces the trigger for saving the config
     void saveConfig();
+    //  Enables opcode logging
+    void enableOpcodeLogging(bool enable);
 
     //  Direct access to emulator state
     ClemensStorageUnit &getStorage() { return storage_; }
@@ -84,6 +97,8 @@ class ClemensAppleIIGS {
   private:
     static void loggerHook(int logLevel, ClemensMachine *machine, const char *msg);
     static uint8_t *unserializerAllocateHook(unsigned type, unsigned sz, void *context);
+    static void emulatorOpcodeCallback(struct ClemensInstruction *inst, const char *operand,
+                                       void *this_ptr);
 
     template <typename... Args> void localLog(int log_level, const char *msg, Args... args);
 
@@ -103,6 +118,8 @@ class ClemensAppleIIGS {
     unsigned configMemory_;
     unsigned configAudioSamplesPerSecond_;
     std::array<std::string, CLEM_CARD_SLOT_COUNT> cardNames_;
+    std::array<std::string, kClemensDrive_Count> diskNames_;
+    std::array<std::string, CLEM_SMARTPORT_DRIVE_LIMIT> smartDiskNames_;
 };
 
 class ClemensSystemListener {
@@ -113,6 +130,7 @@ class ClemensSystemListener {
                                            const char *msg) = 0;
     virtual void onClemensSystemLocalLog(int logLevel, const char *msg) = 0;
     virtual void onClemensSystemWriteConfig(const ClemensAppleIIGS::Config &config) = 0;
+    virtual void onClemensInstruction(struct ClemensInstruction *inst, const char *operand) = 0;
 };
 
 inline ClemensAppleIIGS::ResultFlags operator|(ClemensAppleIIGS::ResultFlags l,

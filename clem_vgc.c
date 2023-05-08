@@ -61,26 +61,17 @@ static void _clem_vgc_scanline_build_rgb_palette(struct ClemensVGC *vgc, unsigne
     }
 }
 
-void clem_vgc_reset(struct ClemensVGC *vgc) {
+void clem_vgc_reset_scanlines(struct ClemensVGC *vgc) {
     /* setup scanline maps for all of the different modes */
-    ClemensVideo *video;
     struct ClemensScanline *line;
     unsigned offset;
     unsigned row, inner;
-
-    vgc->mode_flags = CLEM_VGC_INIT;
-    vgc->text_fg_color = CLEM_VGC_COLOR_WHITE;
-    vgc->text_bg_color = CLEM_VGC_COLOR_MEDIUM_BLUE;
-    vgc->scanline_irq_enable = false;
-    vgc->vbl_started = false;
-    vgc->vbl_counter = 0;
-
     /*  text page 1 $0400-$07FF, page 2 = $0800-$0BFF
 
-        rows (0, 8, 16), (1, 9, 17), (2, 10, 18), etc.. increment by 40, for
-        every row in the tuple.  When advancing to next tuple of rows, account
-        for 8 byte 'hole' (so row 0 = +0, row 1 = +128, row 2 = +256)
-    */
+       rows (0, 8, 16), (1, 9, 17), (2, 10, 18), etc.. increment by 40, for
+       every row in the tuple.  When advancing to next tuple of rows, account
+       for 8 byte 'hole' (so row 0 = +0, row 1 = +128, row 2 = +256)
+   */
     line = &vgc->text_1_scanlines[0];
     offset = 0x400;
     for (row = 0; row < 8; ++row, ++line) {
@@ -148,9 +139,23 @@ void clem_vgc_reset(struct ClemensVGC *vgc) {
         line->control = 0;
         offset += 160;
     }
-    for (row = 0; row < CLEM_VGC_SHGR_SCANLINE_COUNT * 16; ++row, ++line) {
+}
+
+void clem_vgc_reset(struct ClemensVGC *vgc) {
+    unsigned row;
+
+    vgc->mode_flags = CLEM_VGC_INIT;
+    vgc->text_fg_color = CLEM_VGC_COLOR_WHITE;
+    vgc->text_bg_color = CLEM_VGC_COLOR_MEDIUM_BLUE;
+    vgc->scanline_irq_enable = false;
+    vgc->vbl_started = false;
+    vgc->vbl_counter = 0;
+
+    for (row = 0; row < CLEM_VGC_SHGR_SCANLINE_COUNT * 16; ++row) {
         vgc->shgr_palettes[row] = 0x0000;
     }
+
+    clem_vgc_reset_scanlines(vgc);
 }
 
 void clem_vgc_set_mode(struct ClemensVGC *vgc, unsigned mode_flags) {

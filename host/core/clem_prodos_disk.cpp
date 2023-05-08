@@ -163,6 +163,9 @@ uint8_t ClemensProDOSDisk::doFlush(void * /*userContext*/, unsigned /*driveIndex
 bool ClemensProDOSDisk::serialize(mpack_writer_t *writer, ClemensSmartPortDevice &device) {
     mpack_build_map(writer);
 
+    mpack_write_cstr(writer, "path");
+    mpack_write_cstr(writer, assetPath_.c_str());
+
     mpack_write_cstr(writer, "impl");
     {
         if (interface_.block_limit > 0) {
@@ -194,7 +197,12 @@ bool ClemensProDOSDisk::serialize(mpack_writer_t *writer, ClemensSmartPortDevice
 
 bool ClemensProDOSDisk::unserialize(mpack_reader_t *reader, ClemensSmartPortDevice &device,
                                     ClemensUnserializerContext context) {
+    char buf[1024];
     mpack_expect_map(reader);
+
+    mpack_expect_cstr_match(reader, "path");
+    mpack_expect_cstr(reader, buf, sizeof(buf));
+    assetPath_ = buf;
 
     mpack_expect_cstr_match(reader, "impl");
     if (mpack_peek_tag(reader).type == mpack_type_nil) {
@@ -203,6 +211,7 @@ bool ClemensProDOSDisk::unserialize(mpack_reader_t *reader, ClemensSmartPortDevi
         clem_smartport_prodos_hdd32_unserialize(reader, &device, &interface_, context.allocCb,
                                                 context.allocUserPtr);
     }
+
     mpack_expect_cstr_match(reader, "pages");
     {
         unsigned pageCount = mpack_expect_array(reader);
@@ -220,9 +229,25 @@ bool ClemensProDOSDisk::unserialize(mpack_reader_t *reader, ClemensSmartPortDevi
 
     mpack_done_map(reader);
 
-    if (!clem_2img_parse_header(&disk_, storage_.getHead(),
-                                storage_.getHead() + storage_.getSize()))
+    auto imageType = ClemensDiskAsset::fromAssetPathUsingExtension(assetPath_);
+    if (imageType == ClemensDiskAsset::Image2IMG) {
+        if (!clem_2img_parse_header(&disk_, storage_.getHead(),
+                                    storage_.getHead() + storage_.getSize()))
+            return false;
+    } else if (imageType == ClemensDiskAsset::ImageProDOS) {
+        if (!clem_2img_generate_header(&disk_, CLEM_DISK_FORMAT_PRODOS, storage_.getHead(),
+                                       storage_.getTail(), CLEM_2IMG_HEADER_BYTE_SIZE))
+            return false;
+    } else {
+        spdlog::error("ClemensProDOSDisk - unsupported asset {}", assetPath_);
         return false;
+    }
+
+    //  This may be unnecessary if bind() was not called
+    interface_.read_block = &ClemensProDOSDisk::doReadBlock;
+    interface_.write_block = &ClemensProDOSDisk::doWriteBlock;
+    interface_.flush = &ClemensProDOSDisk::doFlush;
+    interface_.user_context = this;
 
     return true;
 }

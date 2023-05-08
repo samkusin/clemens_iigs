@@ -87,6 +87,8 @@ struct ClemensBackendState {
     std::optional<std::string> message;
     // valid if the configuration changed (i.e BRAM, disk status)
     std::optional<ClemensAppleIIGSConfig> config;
+
+    void reset();
 };
 
 struct ClemensBackendConfig {
@@ -145,6 +147,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
                                    const char *msg) final;
     void onClemensSystemLocalLog(int logLevel, const char *msg) final;
     void onClemensSystemWriteConfig(const ClemensAppleIIGS::Config &config) final;
+    void onClemensInstruction(struct ClemensInstruction *inst, const char *operand);
 
     //  ClemensCommandQueueListener
     void onCommandReset() final;
@@ -177,7 +180,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     template <typename... Args> void localLog(int log_level, const char *msg, Args... args);
 
     bool serialize(const std::string &path) const;
-    bool unserialize(const std::string *path);
+    bool unserialize(const std::string &path);
 
   private:
     Config config_;

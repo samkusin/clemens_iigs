@@ -438,6 +438,7 @@ std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
     case Image2IMG:
         if (std::holds_alternative<Clemens2IMGDisk>(metadata_)) {
             auto disk = std::get<Clemens2IMGDisk>(metadata_);
+            disk.nib = const_cast<ClemensNibbleDisk *>(&nib);
             //  write encoded data first
             disk.creator_data = (const char *)data_.data() + (size_t)disk.creator_data;
             disk.creator_data_end = (const char *)data_.data() + (size_t)disk.creator_data_end;
@@ -466,6 +467,7 @@ std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
             //  sector ordering is contained inside the stored metadata object
             //  that was generated on load
             auto disk = std::get<Clemens2IMGDisk>(metadata_);
+            disk.nib = const_cast<ClemensNibbleDisk *>(&nib);
             std::vector<uint8_t> encodedBuffer(nib.bits_data_end - nib.bits_data);
             if (clem_2img_decode_nibblized_disk(&disk, encodedBuffer.data(),
                                                 encodedBuffer.data() + encodedBuffer.size(),
@@ -522,7 +524,11 @@ bool ClemensDiskAsset::serialize(mpack_writer_t *writer) {
     }
     mpack_write_cstr(writer, "metadata");
     mpack_build_map(writer);
-    if (imageType_ == ImageWOZ) {
+    bool imageTypeHasContainer = true;
+    if (diskType_ == DiskHDD || diskType_ == DiskNone) {
+        imageTypeHasContainer = false;
+    }
+    if (imageType_ == ImageWOZ && imageTypeHasContainer) {
         auto &woz = std::get<ClemensWOZDisk>(metadata_);
         mpack_write_cstr(writer, "type");
         mpack_write_cstr(writer, "woz");
@@ -546,7 +552,7 @@ bool ClemensDiskAsset::serialize(mpack_writer_t *writer) {
         mpack_write_u16(writer, woz.largest_flux_track);
         mpack_write_cstr(writer, "woz.creator");
         mpack_write_bin(writer, woz.creator, sizeof(woz.creator));
-    } else if (imageType_ != ImageNone) {
+    } else if (imageType_ != ImageNone && imageTypeHasContainer) {
         auto &disk = std::get<Clemens2IMGDisk>(metadata_);
         mpack_write_cstr(writer, "type");
         mpack_write_cstr(writer, "2img");

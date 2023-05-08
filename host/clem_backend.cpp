@@ -1,17 +1,22 @@
 #include "clem_backend.hpp"
 
-#include "cinek/buffer.hpp"
+#include "core/clem_apple2gs.hpp"
+#include "core/clem_apple2gs_config.hpp"
+#include "core/clem_disk_asset.hpp"
+#include "core/clem_snapshot.hpp"
+
+#include "clem_disk.h"
 #include "clem_host_platform.h"
 #include "clem_program_trace.hpp"
 
 #include "clem_device.h"
 #include "clem_mem.h"
 #include "clem_shared.h"
-#include "core/clem_apple2gs_config.hpp"
+
 #include "emulator.h"
 #include "emulator_mmio.h"
 
-#include "external/cross_endian.h"
+#include "cinek/buffer.hpp"
 #include "external/mpack.h"
 #include "fmt/format.h"
 #include "spdlog/common.h"
@@ -25,7 +30,6 @@
 
 namespace {
 
-constexpr uint32_t kClemensSnapshotVersion = 1;
 constexpr unsigned kInterpreterMemorySize = 1 * 1024 * 1024;
 constexpr unsigned kLogOutputLineLimit = 1024;
 
@@ -150,6 +154,11 @@ void ClemensRunSampler::update(clem_clocks_duration_t clocksSpent, unsigned cycl
     avgVBLsPerFrame = (double)sampledVblsSpent / vblsBuffer.size();
 }
 
+void ClemensBackendState::reset() {
+    config.reset();
+    message.reset();
+}
+
 ClemensBackend::ClemensBackend(std::string romPath, const Config &config)
     : config_(config), gsConfigUpdated_(false),
       interpreter_(cinek::FixedStack(kInterpreterMemorySize, malloc(kInterpreterMemorySize))),
@@ -159,11 +168,12 @@ ClemensBackend::ClemensBackend(std::string romPath, const Config &config)
 
     loggedInstructions_.reserve(10000);
 
+    clemens_register();
+
     switch (config_.type) {
     case Config::Type::Apple2GS:
         GS_ = std::make_unique<ClemensAppleIIGS>(romPath, config_.GS, *this);
-        gsConfig_ = config_.GS;
-        gsConfigUpdated_ = false;
+        GS_->mount();
         break;
     }
 }
@@ -209,7 +219,9 @@ ClemensBackend::main(ClemensBackendState &backendState,
         //  wait for commands from the frontend
         //
         areInstructionsLogged_ = stepsRemaining_.has_value() && (*stepsRemaining_ > 0);
-
+        if (areInstructionsLogged_ || programTrace_) {
+            GS_->enableOpcodeLogging(true);
+        }
         // TODO: this should be an adaptive scalar to support a variety of devices.
         // Though if the emulator runs hot (cannot execute the desired cycles in enough time),
         // that shouldn't matter too much given that this 'speed boost' is meant to be
@@ -258,6 +270,8 @@ ClemensBackend::main(ClemensBackendState &backendState,
             areInstructionsLogged_ = false;
         }
 
+        GS_->enableOpcodeLogging(false);
+
         runSampler_.update((clem_clocks_duration_t)(machine.tspec.clocks_spent - lastClocksSpent),
                            machine.cpu.cycles_spent);
     }
@@ -281,6 +295,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
     backendState.frame = &GS_->getFrame(frame);
     if (gsConfigUpdated_) {
         backendState.config = gsConfig_;
+        gsConfigUpdated_ = false;
     }
     backendState.hostCPUID = clem_host_get_processor_number();
     backendState.logLevel = logLevel_;
@@ -316,6 +331,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
 
     logOutput_.clear();
     loggedInstructions_.clear();
+    backendState.reset();
 
     auto result = commands.dispatchAll(*this);
     //  if we're starting a run, reset the sampler so framerate can be calculated correctly
@@ -461,67 +477,25 @@ void ClemensBackend::localLog(int log_level, const char *msg, Args... args) {
     logOutput_.emplace_back(logLine);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-//  Serialization blocks
-//
-//  {
-//    # Header is 16 bytes
-//      CLEM
-//      SNAP,
-//      version (4 bytes)
-//      pad (4 bytes)
-//    # Begin Mpack
-//      metadata: {
-//          timestamp:
-//          disks: []
-//          smart_disks: []
-//      },
-//      debugger: {
-//          breakpoints: []
-//      },
-//      machine_gs: {
-//          ClemensAppleIIGS
-//      }
-//  }
-//
 bool ClemensBackend::serialize(const std::string &path) const {
-    FILE *fp = fopen(path.c_str(), "wb");
-    if (!fp) {
-        spdlog::error("Failed to open {} - stream init", path);
-        return false;
-    }
-    //  validation header
-    spdlog::info("Creating snapshot @{}", path);
+    ClemensSnapshot snapshot(path);
 
-    uint32_t version = htole32(kClemensSnapshotVersion);
-    uint32_t mpackVersion = htole32(MPACK_VERSION);
-    unsigned writeCount = 0;
-    writeCount += fwrite("CLEM", 4, 1, fp);
-    writeCount += fwrite("SNAP", 4, 1, fp);
-    writeCount += fwrite(&version, sizeof(version), 1, fp);
-    writeCount += fwrite(&mpackVersion, sizeof(mpackVersion), 1, fp);
-    if (writeCount != 4) {
-        spdlog::error("serialize() - failed to write header (count: {})", writeCount);
-        fclose(fp);
-        return false;
-    }
-
-    //  begin mpack
-    mpack_writer_t writer{};
-    mpack_writer_init_stdfile(&writer, fp, true);
-    if (mpack_writer_error(&writer) != mpack_ok) {
-        spdlog::error("serialize() - Failed to initialize writer", path);
-        fclose(fp);
-        return false;
-    }
-    //  metadata
-    // mpack_build_map(&writer);
-    // mpack_write_cstr(&writer, "timestamp");
-    // mpack_complete_map(&writer);
-    return false;
+    return snapshot.serialize(
+        *GS_, [this](mpack_writer_t *writer, ClemensAppleIIGS &gs) -> bool { return true; });
 }
 
-bool ClemensBackend::unserialize(const std::string *path) { return false; }
+bool ClemensBackend::unserialize(const std::string &path) {
+    ClemensSnapshot snapshot(path);
+
+    auto gs = snapshot.unserialize(
+        *this, [this](mpack_reader_t *reader, ClemensAppleIIGS &gs) -> bool { return true; });
+    if (!gs)
+        return false;
+    GS_->unmount();
+    GS_ = std::move(gs);
+    GS_->mount();
+    return true;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //  ClemensAppleIIGS events
@@ -556,6 +530,21 @@ void ClemensBackend::onClemensSystemLocalLog(int logLevel, const char *msg) {
 void ClemensBackend::onClemensSystemWriteConfig(const ClemensAppleIIGS::Config &config) {
     gsConfig_ = config;
     gsConfigUpdated_ = true;
+}
+
+//  If enabled, this emulator issues this callback per instruction
+//  This is great for debugging but should be disabled otherwise (see TODO)
+void ClemensBackend::onClemensInstruction(struct ClemensInstruction *inst, const char *operand) {
+    if (programTrace_) {
+        programTrace_->addExecutedInstruction(nextTraceSeq_++, *inst, operand, GS_->getMachine());
+    }
+    if (!areInstructionsLogged_)
+        return;
+    loggedInstructions_.emplace_back();
+    auto &loggedInst = loggedInstructions_.back();
+    loggedInst.data = *inst;
+    strncpy(loggedInst.operand, operand, sizeof(loggedInst.operand) - 1);
+    loggedInst.operand[sizeof(loggedInst.operand) - 1] = '\0';
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -692,36 +681,11 @@ bool ClemensBackend::onCommandSaveMachine(std::string path) {
     auto outputPath = std::filesystem::path(config_.snapshotRootPath) / path;
 
     return serialize(outputPath);
-    /*
-    saveBRAM();
-    return ClemensSerializer::save(outputPath.string(), &GS_->getMachine(), &GS_->getMMIO(),
-                                   diskContainers_.size(), diskContainers_.data(),
-                                   diskDrives_.data(), CLEM_SMARTPORT_DRIVE_LIMIT,
-                                   smartPortDisks_.data(), smartPortDrives_.data(), breakpoints_);
-                                   */
-    return false;
 }
 
 bool ClemensBackend::onCommandLoadMachine(std::string path) {
     auto snapshotPath = std::filesystem::path(config_.snapshotRootPath) / path;
-
-    /*
-    //  Save all disks and begin the load
-    //  TODO: when we separate machine state out, we can delay saving all disks
-    //        for the current emulator state until we're sure load() has succeeded
-    //        so we don't lose the emulator state from before the load
-    ejectAllDisks();
-
-    bool res = ClemensSerializer::load(
-        snapshotPath.string(), &GS_->getMachine(), &GS_->getMMIO(), diskContainers_.size(),
-        diskContainers_.data(), diskDrives_.data(), CLEM_SMARTPORT_DRIVE_LIMIT,
-        smartPortDisks_.data(), smartPortDrives_.data(), breakpoints_,
-        &ClemensBackend::unserializeAllocate, this);
-    mockingboard_ = findMockingboardCard(&GS_->getMMIO());
-
-    saveBRAM();
-    */
-    return false;
+    return unserialize(snapshotPath);
 }
 
 bool ClemensBackend::onCommandRunScript(std::string command) {

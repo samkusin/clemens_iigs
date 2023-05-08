@@ -18,6 +18,7 @@ ClemensTestHarness::ClemensTestHarness() : execCounter_(0), failed_(false) {
     config.audioSamplesPerSecond = 48000;
     config.memory = 256;
     a2gs_ = std::make_unique<ClemensAppleIIGS>(config, *this);
+    a2gs_->mount();
     if (a2gs_->isOk()) {
         localLog(CLEM_DEBUG_LOG_INFO, "STAT", "Machine created.");
     } else {
@@ -26,7 +27,11 @@ ClemensTestHarness::ClemensTestHarness() : execCounter_(0), failed_(false) {
     }
 }
 
-ClemensTestHarness::~ClemensTestHarness() {}
+ClemensTestHarness::~ClemensTestHarness() {
+    if (a2gs_) {
+        a2gs_->unmount();
+    }
+}
 
 bool ClemensTestHarness::run(nlohmann::json &command) {
     if (!a2gs_->isOk())

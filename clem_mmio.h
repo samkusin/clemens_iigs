@@ -20,8 +20,8 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
 void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t data, uint16_t addr,
                      uint8_t flags, bool *mega2_access);
 
-void clem_mmio_restore(ClemensMMIO *mmio, struct ClemensMemoryPageMap **bank_page_map,
-                       uint8_t *e0_bank, uint8_t *e1_bank);
+void clem_mmio_restore(ClemensMachine *clem, ClemensMMIO *mmio);
+void clem_mmio_bind_machine(ClemensMachine *clem, ClemensMMIO *mmio);
 
 #ifdef __cplusplus
 }

@@ -1,4 +1,5 @@
 #include "clem_startup_view.hpp"
+#include "clem_configuration.hpp"
 #include "clem_host_platform.h"
 #include "clem_imgui.hpp"
 #include "clem_preamble.hpp"
@@ -60,17 +61,22 @@ ClemensConfiguration findConfiguration() {
     return createConfiguration(std::filesystem::path(localpath));
 }
 
-void setupLogger(const std::string &logDirectory) {
+void setupLogger(const ClemensConfiguration &config) {
+    static spdlog::level::level_enum levels[] = {spdlog::level::debug, spdlog::level::info,
+                                                 spdlog::level::warn, spdlog::level::err,
+                                                 spdlog::level::err};
+    auto logLevel = levels[std::clamp(config.logLevel, 0, CLEM_DEBUG_LOG_FATAL)];
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-    console_sink->set_level(spdlog::level::info);
+    console_sink->set_level(logLevel);
 
-    auto logPath = std::filesystem::path(logDirectory) / "clem_host.log";
+    auto logPath = std::filesystem::path(config.dataDirectory) / "clem_host.log";
     auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(logPath.string(), true);
-    file_sink->set_level(spdlog::level::info);
+    file_sink->set_level(logLevel);
 
     std::vector<spdlog::sink_ptr> sinks{console_sink, file_sink};
     auto main_logger = std::make_shared<spdlog::logger>("clemens", sinks.begin(), sinks.end());
     spdlog::set_default_logger(main_logger);
+    spdlog::set_level(logLevel);
     spdlog::info("Log file at {}", logPath.string());
 }
 
@@ -178,7 +184,7 @@ auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
     case Mode::Preamble:
         if (!preamble_) {
             if (validateDirectories()) {
-                setupLogger(config_.dataDirectory);
+                setupLogger(config_);
                 preamble_ = std::make_unique<ClemensPreamble>(config_);
             } else {
                 mode_ = Mode::SetupError;

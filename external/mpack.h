@@ -1048,7 +1048,7 @@ void mpack_assert_fail(const char* message);
 
 // If we don't have support for float or double, we poison the identifiers to
 // make sure we don't define anything related to them.
-#if MPACK_INTERNAL
+#if MPACK_INTERNAL && defined(MPACK_UNIT_TESTS) && defined(__GNUC__)
     #ifdef __GNUC__
         #if !MPACK_FLOAT
             #pragma GCC poison float

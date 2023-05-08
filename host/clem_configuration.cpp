@@ -1,4 +1,5 @@
 #include "clem_configuration.hpp"
+#include "clem_shared.h"
 #include "core/clem_disk_utils.hpp"
 
 #include "clem_disk.h"
@@ -11,8 +12,8 @@
 #include <cstring>
 
 ClemensConfiguration::ClemensConfiguration()
-    : majorVersion(0), minorVersion(0), hybridInterfaceEnabled(false), fastEmulationEnabled(true),
-      isDirty(true) {
+    : majorVersion(0), minorVersion(0), logLevel(CLEM_DEBUG_LOG_INFO),
+      hybridInterfaceEnabled(false), fastEmulationEnabled(true), isDirty(true) {
     gs.audioSamplesPerSecond = 0;
     gs.memory = CLEM_EMULATOR_RAM_DEFAULT;
 }
@@ -32,7 +33,10 @@ void ClemensConfiguration::copyFrom(const ClemensConfiguration &other) {
     romFilename = other.romFilename;
     majorVersion = other.majorVersion;
     minorVersion = other.minorVersion;
+    logLevel = other.logLevel;
+
     gs = other.gs;
+
     hybridInterfaceEnabled = other.hybridInterfaceEnabled;
     fastEmulationEnabled = other.fastEmulationEnabled;
     isDirty = true;
@@ -53,8 +57,9 @@ bool ClemensConfiguration::save() {
                "minor={}\n"
                "data={}\n"
                "hybrid={}\n"
+               "logger={}\n"
                "\n",
-               majorVersion, minorVersion, dataDirectory, hybridInterfaceEnabled ? 1 : 0);
+               majorVersion, minorVersion, dataDirectory, hybridInterfaceEnabled ? 1 : 0, logLevel);
     fmt::print(fp,
                "[emulator]\n"
                "romfile={}\n"
@@ -104,6 +109,8 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
             config->dataDirectory = value;
         } else if (strncmp(name, "hybrid", 16) == 0) {
             config->hybridInterfaceEnabled = atoi(value) > 0 ? true : false;
+        } else if (strncmp(name, "logger", 16) == 0) {
+            config->logLevel = atoi(value);
         }
     } else if (strncmp(section, "emulator", 16) == 0) {
         if (strncmp(name, "romfile", 16) == 0) {

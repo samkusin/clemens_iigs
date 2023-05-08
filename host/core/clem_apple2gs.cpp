@@ -14,6 +14,8 @@
 #include "external/mpack.h"
 #include "fmt/core.h"
 #include "fmt/format.h"
+#include "spdlog/logger.h"
+#include "spdlog/spdlog.h"
 
 #include <cassert>
 #include <cstdlib>
@@ -25,19 +27,13 @@ namespace {
 //  objects have their own versions managed in their serializer.)
 //
 constexpr unsigned kSnapshotVersion = 1;
-constexpr unsigned kMachineSlabMaximumSize = 128 * 1024 * 1024;
+constexpr unsigned kMachineSlabMaximumSize = 32 * 1024 * 1024;
 
 unsigned calculateSlabMemoryRequirements(const ClemensAppleIIGS::Config &config) {
     unsigned bytesRequired = 0;
 
     bytesRequired += 2 * CLEM_DISK_525_MAX_DATA_SIZE;
     bytesRequired += 2 * CLEM_DISK_35_MAX_DATA_SIZE;
-
-    for (auto &smartPortPath : config.smartPortImagePaths) {
-        //  TODO: this 32MB limit may  be changed at some point - beware!
-        if (!smartPortPath.empty())
-            bytesRequired += 32 * 1024 * 1024;
-    }
 
     bytesRequired += config.memory * 1024;     // FPI Memory
     bytesRequired += 2 * CLEM_IIGS_BANK_SIZE;  // Mega 2 Memory
@@ -79,8 +75,6 @@ ClemensAppleIIGS::ClemensAppleIIGS(const std::string &romPath, const Config &con
       slab_(calculateSlabMemoryRequirements(config),
             malloc(calculateSlabMemoryRequirements(config))),
       machine_{}, mmio_{}, storage_(), mockingboard_(nullptr) {
-
-    clemens_host_setup(&machine_, loggerHook, this);
 
     // Ensure a valid ROM buffer regardless of whether a valid ROM was loaded
     // In the error case, we'll want to have a placeholder ROM.
@@ -168,27 +162,14 @@ ClemensAppleIIGS::ClemensAppleIIGS(const std::string &romPath, const Config &con
     clemens_assign_disk_buffer(&mmio_, kClemensDrive_3_5_D2, bits_data,
                                bits_data + CLEM_DISK_35_MAX_DATA_SIZE);
 
-    for (unsigned driveIndex = 0; driveIndex < (unsigned)config.diskImagePaths.size();
-         ++driveIndex) {
-        auto driveType = static_cast<ClemensDriveType>(driveIndex);
-        if (config.diskImagePaths[driveIndex].empty())
-            continue;
-        storage_.insertDisk(mmio_, driveType, config.diskImagePaths[driveIndex]);
-    }
-    for (unsigned driveIndex = 0; driveIndex < (unsigned)config.smartPortImagePaths.size();
-         ++driveIndex) {
-        if (config.smartPortImagePaths[driveIndex].empty())
-            continue;
-        storage_.assignSmartPortDisk(mmio_, driveIndex, config.smartPortImagePaths[driveIndex]);
-    }
-
     status_ = Status::Initialized;
 
     //  Finally save out the final config
     configMemory_ = (kFPIRAMBankCount * CLEM_IIGS_BANK_SIZE) / 1024;
     configAudioSamplesPerSecond_ = config.audioSamplesPerSecond;
     cardNames_ = config.cardNames;
-    saveConfig();
+    diskNames_ = config.diskImagePaths;
+    smartDiskNames_ = config.smartPortImagePaths;
 }
 
 ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener &listener)
@@ -204,6 +185,45 @@ ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener
     unsigned index;
     ClemensUnserializerContext unserializerContext;
 
+    /*
+    //  Initialize the Machine
+    const unsigned kFPIROMBankCount = 1;
+    const unsigned kFPIRAMBankCount = 64;
+    const uint32_t kClocksPerFastCycle = CLEM_CLOCKS_PHI2_FAST_CYCLE;
+    const uint32_t kClocksPerSlowCycle = CLEM_CLOCKS_PHI0_CYCLE;
+
+    slab_ = cinek::FixedStack(kMachineSlabMaximumSize, malloc(kMachineSlabMaximumSize));
+
+    cinek::ByteBuffer romBuffer{};
+    if (romBuffer.isEmpty()) {
+        //  TODO: load a dummy ROM, for a truly placeholder infinite loop ROM
+        romBuffer =
+            cinek::ByteBuffer((uint8_t *)slab_.allocate(CLEM_IIGS_BANK_SIZE), CLEM_IIGS_BANK_SIZE);
+        memset(romBuffer.forwardSize(CLEM_IIGS_BANK_SIZE).first, 0, CLEM_IIGS_BANK_SIZE);
+        auto *rom = romBuffer.getHead();
+        rom[CLEM_6502_RESET_VECTOR_LO_ADDR] = 0x62;
+        rom[CLEM_6502_RESET_VECTOR_HI_ADDR] = 0xfa;
+        //  BRA -2 (infinite loop)
+        rom[0xfa62] = 0x80;
+        rom[0xfa63] = 0xFE;
+    }
+
+    // slab_ = cinek::FixedStack(slabSize, malloc(slabSize));
+
+    int initResult = clemens_init(
+        &machine_, kClocksPerSlowCycle, kClocksPerFastCycle, romBuffer.getHead(), kFPIROMBankCount,
+        slab_.allocate(CLEM_IIGS_BANK_SIZE), slab_.allocate(CLEM_IIGS_BANK_SIZE),
+        slab_.allocate(kFPIRAMBankCount * CLEM_IIGS_BANK_SIZE), kFPIRAMBankCount);
+    if (initResult != 0) {
+        fmt::print(stderr, "Clemens library failed to initialize with err code ({})\n", initResult);
+        status_ = Status::Failed;
+        return;
+    }
+    clem_mmio_init(&mmio_, &machine_.dev_debug, machine_.mem.bank_page_map,
+                   slab_.allocate(2048 * CLEM_CARD_SLOT_COUNT), kFPIRAMBankCount, kFPIROMBankCount,
+                   machine_.mem.mega2_bank_map[0], machine_.mem.mega2_bank_map[1], &machine_.tspec);
+    clem_mmio_reset(&mmio_, &machine_.tspec);
+    */
     unserializerContext.allocCb = unserializerAllocateHook;
     unserializerContext.allocUserPtr = this;
 
@@ -247,10 +267,12 @@ ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener
             mpack_expect_cstr_match(reader, "name");
             mpack_expect_cstr(reader, buf, sizeof(buf));
             cardNames_[index] = buf;
+            mmio_.card_slot[index] = createCard(cardNames_[index].c_str());
             mpack_expect_cstr_match(reader, "card");
             if (mpack_peek_tag(reader).type == mpack_type_nil) {
                 mpack_expect_nil(reader);
             } else if (cardNames_[index] == kClemensCardMockingboardName) {
+
                 clem_card_mockingboard_unserialize(reader, mmio_.card_slot[index],
                                                    unserializerAllocateHook, this);
                 mockingboard_ = mmio_.card_slot[index];
@@ -271,28 +293,74 @@ ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener
     if (!storage_.unserialize(mmio_, reader, unserializerContext))
         goto load_done;
 
-    success = true;
+    for (unsigned driveIndex = 0; driveIndex < (unsigned)diskNames_.size(); ++driveIndex) {
+        auto driveType = static_cast<ClemensDriveType>(driveIndex);
+        diskNames_[driveIndex] = storage_.getDriveStatus(driveType).assetPath;
+    }
+    for (unsigned driveIndex = 0; driveIndex < (unsigned)smartDiskNames_.size(); ++driveIndex) {
+        smartDiskNames_[driveIndex] = storage_.getSmartPortStatus(driveIndex).assetPath;
+    }
 
+    success = true;
 load_done:
     if (status_ == Status::Offline) {
-        status_ = success ? Status::Initialized : Status::Failed;
+        status_ = success ? Status::Loaded : Status::Failed;
     }
-    if (status_ != Status::Initialized) {
+    if (status_ != Status::Loaded) {
         localLog(CLEM_DEBUG_LOG_WARN, "ClemensAppleIIGS(): Bad load in component '{}'",
                  componentName);
     }
     mpack_done_map(reader);
-
-    //  any follow up initialization goes here
-    clemens_host_setup(&machine_, loggerHook, this);
 }
 
 ClemensAppleIIGS::~ClemensAppleIIGS() {
-    storage_.ejectAllDisks(mmio_);
+    unmount();
     for (int i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
         destroyCard(mmio_.card_slot[i]);
         mmio_.card_slot[i] = NULL;
     }
+    free(slab_.getHead());
+}
+
+void ClemensAppleIIGS::mount() {
+    if (status_ == Status::Initialized) {
+        spdlog::info("ClemensAppleIIGS(): mounting new machine");
+        clemens_host_setup(&machine_, loggerHook, this);
+        for (unsigned driveIndex = 0; driveIndex < (unsigned)diskNames_.size(); ++driveIndex) {
+            auto driveType = static_cast<ClemensDriveType>(driveIndex);
+            if (diskNames_[driveIndex].empty())
+                continue;
+            storage_.insertDisk(mmio_, driveType, diskNames_[driveIndex]);
+        }
+        for (unsigned driveIndex = 0; driveIndex < (unsigned)smartDiskNames_.size(); ++driveIndex) {
+            if (smartDiskNames_[driveIndex].empty())
+                continue;
+            storage_.assignSmartPortDisk(mmio_, driveIndex, smartDiskNames_[driveIndex]);
+        }
+    } else if (status_ == Status::Loaded) {
+        spdlog::info("ClemensAppleIIGS(): mounting loaded snapshot");
+        clemens_host_setup(&machine_, loggerHook, this);
+        storage_.saveAllDisks(mmio_);
+    } else {
+        spdlog::error("ClemensAppleIIGS(): cannot mount as machine is already active.");
+        return;
+    }
+
+    //  any follow up initialization goes here
+    saveConfig();
+    status_ = Status::Ready;
+}
+
+void ClemensAppleIIGS::unmount() {
+    if (!isMounted())
+        return;
+    storage_.ejectAllDisks(mmio_);
+    //  detach logger and hackily clear the debug context here
+    //  since two machines cannot be mounted at once.
+    spdlog::info("ClemensAppleIIGS(): unmounting machine");
+    clemens_host_setup(&machine_, NULL, NULL);
+    clemens_debug_context(NULL);
+    status_ = Status::Initialized;
 }
 
 void ClemensAppleIIGS::loggerHook(int logLevel, ClemensMachine *machine, const char *msg) {
@@ -306,23 +374,30 @@ uint8_t *ClemensAppleIIGS::unserializerAllocateHook(unsigned type, unsigned sz, 
     switch (type) {
     case CLEM_EMULATOR_ALLOCATION_FPI_MEMORY_BANK:
         bytesSize = sz * CLEM_IIGS_BANK_SIZE;
+        SPDLOG_DEBUG("ClemensAppleIIGS() - FPI Bank was allocated {} bytes", bytesSize);
         break;
     case CLEM_EMULATOR_ALLOCATION_MEGA2_MEMORY_BANK:
         bytesSize = sz * CLEM_IIGS_BANK_SIZE;
+        SPDLOG_DEBUG("ClemensAppleIIGS() - Mega II Bank was allocated {} bytes", bytesSize);
         break;
     case CLEM_EMULATOR_ALLOCATION_DISK_NIB_3_5:
         bytesSize = sz;
+        SPDLOG_DEBUG("ClemensAppleIIGS() - Disk 3.5 buffer was allocated {} bytes", bytesSize);
         break;
     case CLEM_EMULATOR_ALLOCATION_DISK_NIB_5_25:
         bytesSize = sz;
+        SPDLOG_DEBUG("ClemensAppleIIGS() - Disk 5.25 buffer was allocated {} bytes", bytesSize);
         break;
     case CLEM_EMULATOR_ALLOCATION_CARD_BUFFER:
         bytesSize = sz * 2048;
+        SPDLOG_DEBUG("ClemensAppleIIGS() - Card buffer was allocated {} bytes", bytesSize);
         break;
     default:
         bytesSize = sz;
+        SPDLOG_DEBUG("ClemensAppleIIGS() - Generic buffer was allocated {} bytes", bytesSize);
         break;
     }
+
     return self->slab_.allocateArray<uint8_t>(bytesSize);
 }
 
@@ -341,7 +416,7 @@ std::pair<std::string, bool> ClemensAppleIIGS::save(mpack_writer_t *writer) {
 
     mpack_build_map(writer);
 
-    if (getStatus() != Status::Online && getStatus() != Status::Initialized)
+    if (getStatus() != Status::Online && getStatus() != Status::Ready)
         goto save_done;
 
     mpack_write_cstr(writer, "version");
@@ -507,4 +582,15 @@ void ClemensAppleIIGS::finishFrame(Frame &frame) {
     if (!isOk())
         return;
     clemens_audio_next_frame(&mmio_, frame.audio.frame_count);
+}
+
+void ClemensAppleIIGS::enableOpcodeLogging(bool enable) {
+    clemens_opcode_callback(&machine_, enable ? &ClemensAppleIIGS::emulatorOpcodeCallback : NULL);
+}
+
+void ClemensAppleIIGS::emulatorOpcodeCallback(struct ClemensInstruction *inst, const char *operand,
+                                              void *this_ptr) {
+
+    auto *host = reinterpret_cast<ClemensAppleIIGS *>(this_ptr);
+    host->listener_.onClemensInstruction(inst, operand);
 }
