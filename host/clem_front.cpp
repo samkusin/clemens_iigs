@@ -2085,7 +2085,7 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
         cursorPos.x += iconSize + style.ItemInnerSpacing.x;
         doMachineDiskMotorStatus(cursorPos, ImVec2(6.0f, iconSize), driveStatus.isSpinning);
         auto title = driveStatus.isMounted()
-                         ? std::filesystem::path(driveStatus.assetPath).filename().stem()
+                         ? std::filesystem::path(driveStatus.assetPath).filename().stem().string()
                          : "No Disk";
 
         cursorPos.x += style.ItemSpacing.x;
@@ -2210,7 +2210,7 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
         cursorPos.x += iconSize + style.ItemInnerSpacing.x;
         doMachineDiskMotorStatus(cursorPos, ImVec2(6.0f, iconSize), driveStatus.isSpinning);
         auto title = driveStatus.isMounted()
-                         ? std::filesystem::path(driveStatus.assetPath).filename().stem()
+                         ? std::filesystem::path(driveStatus.assetPath).filename().stem().string()
                          : "No Disk";
 
         cursorPos.x += style.ItemSpacing.x;

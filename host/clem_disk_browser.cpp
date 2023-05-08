@@ -21,6 +21,7 @@
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <Windows.h>
 static unsigned win32GetDriveLettersBitmask() { return ::GetLogicalDrives(); }
 static struct tm *getTimeSpecFromTime(struct tm *tspec, std::time_t timet) {
@@ -185,10 +186,14 @@ void ClemensDiskBrowser::open(ClemensDiskAsset::DiskType diskType, const std::st
     diskType_ = diskType;
     selectedRecord_ = Record();
     finishedStatus_ = BrowserFinishedStatus::Active;
-    cwdName_ = browsePath;
+    if (browsePath.empty()) {
+        cwdName_ = std::filesystem::current_path().string();
+    } else {
+        cwdName_ = browsePath;
+    }
     nextRefreshTime_ = std::chrono::steady_clock::now();
-    createDiskFilename_[0] = '\0';
     createDiskImageType_ = ClemensDiskAsset::ImageNone;
+    createDiskFilename_[0] = '\0';
 }
 
 bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {

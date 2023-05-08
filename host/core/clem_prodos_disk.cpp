@@ -17,7 +17,7 @@
 ClemensProDOSDisk::ClemensProDOSDisk() {}
 
 ClemensProDOSDisk::ClemensProDOSDisk(cinek::ByteBuffer backingBuffer)
-    : storage_(std::move(backingBuffer)), disk_{} {}
+    : storage_(std::move(backingBuffer)), blocks_{}, interface_{}, disk_{} {}
 
 bool ClemensProDOSDisk::create(ClemensSmartPortDevice &device, const ClemensDiskAsset &asset) {
     return false;
@@ -238,16 +238,18 @@ bool ClemensProDOSDisk::unserialize(mpack_reader_t *reader, ClemensSmartPortDevi
         if (!clem_2img_generate_header(&disk_, CLEM_DISK_FORMAT_PRODOS, storage_.getHead(),
                                        storage_.getTail(), CLEM_2IMG_HEADER_BYTE_SIZE))
             return false;
-    } else {
+    } else if (imageType != ClemensDiskAsset::ImageNone) {
         spdlog::error("ClemensProDOSDisk - unsupported asset {}", assetPath_);
         return false;
     }
 
     //  This may be unnecessary if bind() was not called
-    interface_.read_block = &ClemensProDOSDisk::doReadBlock;
-    interface_.write_block = &ClemensProDOSDisk::doWriteBlock;
-    interface_.flush = &ClemensProDOSDisk::doFlush;
-    interface_.user_context = this;
+    if (imageType != ClemensDiskAsset::ImageNone) {
+        interface_.read_block = &ClemensProDOSDisk::doReadBlock;
+        interface_.write_block = &ClemensProDOSDisk::doWriteBlock;
+        interface_.flush = &ClemensProDOSDisk::doFlush;
+        interface_.user_context = this;
+    }
 
     return true;
 }

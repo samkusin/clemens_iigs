@@ -786,6 +786,7 @@ static unsigned clemens_unserialize_custom(mpack_reader_t *reader, void *ptr, un
         for (v0 = 0; v0 < v1; ++v0) {
             unsigned cnt = mpack_expect_bin_max(reader, 2048);
             mpack_read_bytes(reader, (char *)card_memory_ptr[v0], cnt);
+            mpack_done_bin(reader);
         }
         mpack_done_array(reader);
         break;

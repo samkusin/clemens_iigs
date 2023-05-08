@@ -680,12 +680,12 @@ bool ClemensBackend::onCommandDebugProgramTrace(std::string_view op, std::string
 bool ClemensBackend::onCommandSaveMachine(std::string path) {
     auto outputPath = std::filesystem::path(config_.snapshotRootPath) / path;
 
-    return serialize(outputPath);
+    return serialize(outputPath.string());
 }
 
 bool ClemensBackend::onCommandLoadMachine(std::string path) {
     auto snapshotPath = std::filesystem::path(config_.snapshotRootPath) / path;
-    return unserialize(snapshotPath);
+    return unserialize(snapshotPath.string());
 }
 
 bool ClemensBackend::onCommandRunScript(std::string command) {

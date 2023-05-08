@@ -13,6 +13,7 @@
 #include "core/clem_apple2gs_config.hpp"
 
 #include <chrono>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
