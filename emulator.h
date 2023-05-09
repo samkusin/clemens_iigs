@@ -12,11 +12,17 @@ extern "C" {
 /**
  * @brief
  *
+ */
+void clemens_register();
+
+/**
+ * @brief
+ *
  * @param machine
  * @param speed_factor
  * @param clocks_step
  * @param rom
- * @param romSize
+ * @param fpiROMBankCount
  * @param e0bank
  * @param e1bank
  * @param fpiRAM
@@ -24,7 +30,7 @@ extern "C" {
  * @return int
  */
 int clemens_init(ClemensMachine *machine, uint32_t speed_factor, uint32_t clocks_step, void *rom,
-                 size_t romSize, void *e0bank, void *e1bank, void *fpiRAM,
+                 unsigned int fpiROMBankCount, void *e0bank, void *e1bank, void *fpiRAM,
                  unsigned int fpiRAMBankCount);
 
 /**
@@ -113,7 +119,7 @@ void clemens_emulate_cpu(ClemensMachine *clem);
  * @param logger
  * @param debug_user_ptr
  */
-void clemens_host_setup(ClemensMachine *clem, LoggerFn logger, void *debug_user_ptr);
+void clemens_host_setup(ClemensMachine *clem, ClemensLoggerFn logger, void *debug_user_ptr);
 
 /**
  * @brief
@@ -187,7 +193,7 @@ unsigned clemens_out_hex_data_from_memory(char *hex, const uint8_t *memory,
  * bank 0 reads the physical bank 0 and ignores settings such as RAMRD on the
  * //gs.
  *
- * Note, adr is almost always 0 unless copying a portial bank.   In that case
+ * Note, adr is almost always 0 unless copying a partial bank.   In that case
  * if adr + out_byte_cnt > 64K, this API will copy the data into the out buffer
  * sequentially (out = data at adr + out_byte_cnt, and the data in the bank
  * preceeding the data at adr will be copied after that - essentially wrapping

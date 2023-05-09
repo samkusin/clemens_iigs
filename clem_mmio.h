@@ -12,15 +12,16 @@ void clem_mmio_reset(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec);
 
 void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
                     struct ClemensMemoryPageMap **bank_page_map, void *slot_expansion_rom,
-                    unsigned int fpi_ram_bank_count, uint8_t *e0_bank, uint8_t *e1_bank,
-                    struct ClemensTimeSpec *tspec);
+                    unsigned int fpi_ram_bank_count, unsigned int fpi_rom_bank_count,
+                    uint8_t *e0_bank, uint8_t *e1_bank, struct ClemensTimeSpec *tspec);
 
 uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_t addr,
                        uint8_t flags, bool *mega2_access);
 void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t data, uint16_t addr,
                      uint8_t flags, bool *mega2_access);
 
-void clem_mmio_restore(ClemensMMIO *mmio);
+void clem_mmio_restore(ClemensMachine *clem, ClemensMMIO *mmio);
+void clem_mmio_bind_machine(ClemensMachine *clem, ClemensMMIO *mmio);
 
 #ifdef __cplusplus
 }

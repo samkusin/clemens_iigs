@@ -27,7 +27,6 @@ enum ClemensSerializerType {
     kClemensSerializerTypeDuration,
     kClemensSerializerTypeClocks,
     kClemensSerializerTypeClockObject,
-    kClemensSerializerTypeBlob,
     kClemensSerializerTypeArray,
     kClemensSerializerTypeObject,
     kClemensSerializerTypeCustom,
@@ -45,15 +44,11 @@ struct ClemensSerializerRecord {
 };
 
 #define CLEM_SERIALIZER_RECORD(_struct_, _type_, _name_)                                           \
-    {                                                                                              \
-#_name_, _type_, kClemensSerializerTypeEmpty, offsetof(_struct_, _name_), 0, 0, NULL       \
-    }
+    { #_name_, _type_, kClemensSerializerTypeEmpty, offsetof(_struct_, _name_), 0, 0, NULL }
 
 #define CLEM_SERIALIZER_RECORD_PARAM(_struct_, _type_, _arr_type_, _name_, _size_, _param_,        \
                                      _records_)                                                    \
-    {                                                                                              \
-#_name_, _type_, _arr_type_, offsetof(_struct_, _name_), _size_, _param_, _records_        \
-    }
+    { #_name_, _type_, _arr_type_, offsetof(_struct_, _name_), _size_, _param_, _records_ }
 
 #define CLEM_SERIALIZER_RECORD_ARRAY(_struct_, _type_, _name_, _size_, _param_)                    \
     CLEM_SERIALIZER_RECORD_PARAM(_struct_, kClemensSerializerTypeArray, _type_, _name_, _size_,    \
@@ -96,10 +91,6 @@ struct ClemensSerializerRecord {
 
 #define CLEM_SERIALIZER_RECORD_CLOCK_OBJECT(_struct_, _name_)                                      \
     CLEM_SERIALIZER_RECORD(_struct_, kClemensSerializerTypeClockObject, _name_)
-
-#define CLEM_SERIALIZER_RECORD_BLOB(_struct_, _name_, _size_)                                      \
-    CLEM_SERIALIZER_RECORD_PARAM(_struct_, kClemensSerializerTypeBlob,                             \
-                                 kClemensSerializerTypeEmpty, _name_, _size_, 0, NULL)
 
 #define CLEM_SERIALIZER_RECORD_OBJECT(_struct_, _name_, _object_type_, _records_)                  \
     CLEM_SERIALIZER_RECORD_PARAM(_struct_, kClemensSerializerTypeObject,                           \
@@ -152,6 +143,7 @@ mpack_writer_t *clemens_serialize_mmio(mpack_writer_t *writer, ClemensMMIO *mmio
  * @return mpack_reader_t*
  */
 mpack_reader_t *clemens_unserialize_mmio(mpack_reader_t *reader, ClemensMMIO *mmio,
+                                         ClemensMachine *machine,
                                          ClemensSerializerAllocateCb alloc_cb, void *context);
 
 /* The following APIs are provided for completeness, but they are typically

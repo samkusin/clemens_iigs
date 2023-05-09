@@ -1,6 +1,7 @@
 #ifndef CLEM_DEVICE_H
 #define CLEM_DEVICE_H
 
+#include "clem_disk.h"
 #include "clem_mmio_types.h"
 #include "clem_types.h"
 
@@ -176,33 +177,30 @@ void clem_iwm_reset(struct ClemensDeviceIWM *iwm, struct ClemensTimeSpec *tspec)
  * @brief
  *
  * @param iwm
- * @param drive_type
- * @param disk
+ * @param drive
+ * @return struct ClemensNibbleDisk*
  */
-void clem_iwm_insert_disk(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
-                          struct ClemensNibbleDisk *disk);
+struct ClemensNibbleDisk *clem_iwm_insert_disk(struct ClemensDeviceIWM *iwm,
+                                               struct ClemensDrive *drive);
 
 /**
- * @brief
+ * @brief For 3.5" disks, returns true if ejecting or ejected but not yet finished
  *
  * @param iwm
- * @param drive_type
- * @param disk
+ * @param drive
+ * @return unsigned See CLEM_EJECT_DISK_STATUS_XXX
  */
-void clem_iwm_eject_disk(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
-                         struct ClemensNibbleDisk *disk);
+unsigned clem_iwm_eject_disk_in_progress(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive);
 
 /**
- * @brief For 3.5" drives, issues the eject command and polls until complete
+ * @brief For 3.5" disks, returns true if ejecting or ejected but not yet finished
  *
  * @param iwm
- * @param drive_type
- * @param disk The output disk once eject is complete
- * @return true Disk has ejected
- * @return false Disk is still ejecting
+ * @param drive
+ * @return unsigned See CLEM_EJECT_DISK_STATUS_XXX
  */
-bool clem_iwm_eject_disk_async(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
-                               struct ClemensNibbleDisk *disk);
+struct ClemensNibbleDisk *clem_iwm_eject_disk(struct ClemensDeviceIWM *iwm,
+                                              struct ClemensDrive *drive);
 
 /**
  * @brief Executed frequently enough to emulate a IWM controller
@@ -322,6 +320,38 @@ void clem_scc_write_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t 
  * @return uint8_t
  */
 uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t flags);
+
+/**
+ * @brief
+ *
+ * @param iwm
+ * @param drive_type
+ * @param disk
+ */
+void clem_iwm_insert_disk_old(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
+                              struct ClemensNibbleDisk *disk);
+
+/**
+ * @brief
+ *
+ * @param iwm
+ * @param drive_type
+ * @param disk
+ */
+void clem_iwm_eject_disk_old(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
+                             struct ClemensNibbleDisk *disk);
+
+/**
+ * @brief For 3.5" drives, issues the eject command and polls until complete
+ *
+ * @param iwm
+ * @param drive_type
+ * @param disk The output disk once eject is complete
+ * @return true Disk has ejected
+ * @return false Disk is still ejecting
+ */
+bool clem_iwm_eject_disk_async_old(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
+                                   struct ClemensNibbleDisk *disk);
 
 #ifdef __cplusplus
 }

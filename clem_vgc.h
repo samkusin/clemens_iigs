@@ -13,6 +13,7 @@ extern "C" {
 #endif
 
 void clem_vgc_reset(struct ClemensVGC *vgc);
+void clem_vgc_reset_scanlines(struct ClemensVGC *vgc);
 
 void clem_vgc_sync(struct ClemensVGC *vgc, struct ClemensClock *clock, const uint8_t *mega2_bank0,
                    const uint8_t *mega2_bank1);

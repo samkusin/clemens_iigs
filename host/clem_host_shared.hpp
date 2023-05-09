@@ -1,7 +1,9 @@
 #ifndef CLEM_HOST_SHARED_HPP
 #define CLEM_HOST_SHARED_HPP
 
+#include "clem_disk.h"
 #include "clem_mmio_types.h"
+#include "clem_smartport.h"
 
 #include <array>
 #include <chrono>
@@ -37,23 +39,6 @@ struct ClemensBackendBreakpoint {
     enum Type { Undefined, Execute, DataRead, Write, IRQ, BRK };
     Type type;
     uint32_t address;
-};
-
-struct ClemensBackendConfig {
-    enum class Type { Apple2GS };
-    std::string dataRootPath;
-    std::string diskLibraryRootPath;
-    std::string snapshotRootPath;
-    std::string traceRootPath;
-    std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDriveStates;
-    std::array<ClemensBackendDiskDriveState, 1> smartPortDriveStates;
-    std::array<std::string, CLEM_CARD_SLOT_COUNT> cardNames;
-    std::vector<ClemensBackendBreakpoint> breakpoints;
-    unsigned audioSamplesPerSecond;
-    unsigned ramSizeKB;
-    int logLevel;
-    bool enableFastEmulation;
-    Type type;
 };
 
 enum class ClemensBackendMachineProperty {
@@ -133,43 +118,6 @@ struct ClemensBackendResult {
     ClemensBackendCommand cmd;
     enum Type { Succeeded, Failed };
     Type type;
-};
-
-struct ClemensBackendState {
-    ClemensMachine *machine;
-    ClemensMMIO *mmio;
-    double fps;
-    bool isRunning;
-    bool isTracing;
-    bool isIWMTracing;
-    bool mmioWasInitialized;
-
-    ClemensMonitor monitor;
-    ClemensVideo text;
-    ClemensVideo graphics;
-    ClemensAudio audio;
-
-    unsigned hostCPUID;
-    int logLevel;
-    const ClemensBackendOutputText *logBufferStart;
-    const ClemensBackendOutputText *logBufferEnd;
-    const ClemensBackendBreakpoint *bpBufferStart;
-    const ClemensBackendBreakpoint *bpBufferEnd;
-    std::optional<unsigned> bpHitIndex;
-    const ClemensBackendDiskDriveState *diskDrives;
-    const ClemensBackendDiskDriveState *smartDrives;
-    const ClemensBackendExecutedInstruction *logInstructionStart;
-    const ClemensBackendExecutedInstruction *logInstructionEnd;
-
-    uint8_t ioPageValues[256]; // 0xc000 - 0xc0ff
-    uint8_t debugMemoryPage;
-
-    float machineSpeedMhz;
-    float avgVBLsPerFrame;
-    bool fastEmulationOn;
-
-    // valid if a debugMessage() command was issued from the frontend
-    std::optional<std::string> message;
 };
 
 #endif

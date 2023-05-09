@@ -144,8 +144,6 @@ static inline void _clem_mmio_newvideo_c029_set(ClemensMMIO *mmio, uint8_t value
              implementation
     */
     if (setflags & CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY) {
-        CLEM_LOG("clem_mem: c029 linearize 0x2000-0x9fff bank 01 = %u",
-                 (value & CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY) != 0);
         setflags ^= CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY;
     }
     CLEM_ASSERT(setflags == 0);
@@ -253,9 +251,9 @@ static void _clem_mmio_speed_c036_set(ClemensMMIO *mmio, struct ClemensTimeSpec 
     }
     if (setflags & CLEM_MMIO_SPEED_POWERED_ON) {
         if (value & CLEM_MMIO_SPEED_POWERED_ON) {
-            CLEM_LOG("C036: Powered On SET");
+            CLEM_DEBUG("C036: Powered On SET");
         } else {
-            CLEM_LOG("C036: Powered On CLEARED");
+            CLEM_DEBUG("C036: Powered On CLEARED");
         }
     }
     /*
@@ -721,6 +719,10 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     case CLEM_MMIO_REG_NEWVIDEO:
         result = _clem_mmio_newvideo_c029(mmio);
         break;
+    case CLEM_MMIO_REG_NEWVIDEO + 1:
+        // to avoid the uimpl read warning since GS/OS will often set/query NEWVIDEO as a 16-bit (2
+        // byte) operation
+        break;
     case CLEM_MMIO_REG_LANGSEL:
         result = clem_vgc_get_region(&mmio->vgc);
         break;
@@ -1037,6 +1039,10 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
         break;
     case CLEM_MMIO_REG_NEWVIDEO:
         _clem_mmio_newvideo_c029_set(mmio, data);
+        break;
+    case CLEM_MMIO_REG_NEWVIDEO + 1:
+        // to avoid the uimpl read warning since GS/OS will often set/query NEWVIDEO as a 16-bit (2
+        // byte) operation
         break;
     case CLEM_MMIO_REG_LANGSEL:
         clem_vgc_set_region(&mmio->vgc, data);
@@ -1623,7 +1629,15 @@ static void _clem_mmio_memory_map(ClemensMMIO *mmio, uint32_t memory_flags) {
     mmio->mmap_register = memory_flags;
 }
 
-void _clem_mmio_init_page_maps(ClemensMMIO *mmio, uint32_t memory_flags) {
+void _clem_mmio_restore_mappings(ClemensMMIO *mmio) {
+    uint32_t memory_flags = mmio->mmap_register;
+    mmio->mmap_register = 0xffffffff;
+    _clem_mmio_memory_map(mmio, 0x0000000000);
+    _clem_mmio_memory_map(mmio, memory_flags);
+}
+
+void _clem_mmio_init_page_maps(ClemensMMIO *mmio, struct ClemensMemoryPageMap **bank_page_map,
+                               uint8_t *e0_bank, uint8_t *e1_bank, uint32_t memory_flags) {
     struct ClemensMemoryPageMap *page_map;
     struct ClemensMemoryPageInfo *page;
     unsigned page_idx;
@@ -1631,6 +1645,9 @@ void _clem_mmio_init_page_maps(ClemensMMIO *mmio, uint32_t memory_flags) {
 
     //  Bank 00, 01 as RAM
     //  TODO need to mask bank for main and aux page maps
+    mmio->e0_bank = e0_bank;
+    mmio->e1_bank = e1_bank;
+    mmio->bank_page_map = bank_page_map;
 
     page_map = &mmio->empty_page_map;
     page_map->shadow_map = NULL;
@@ -1712,10 +1729,10 @@ void _clem_mmio_init_page_maps(ClemensMMIO *mmio, uint32_t memory_flags) {
     mmio->bank_page_map[0xE0] = &mmio->mega2_main_page_map;
     mmio->bank_page_map[0xE1] = &mmio->mega2_aux_page_map;
     /* TODO: handle expansion ROM and 128K firmware ROM 01*/
-    for (bank_idx = 0xF0; bank_idx < 0xFC; ++bank_idx) {
+    for (bank_idx = 0xF0; bank_idx < 0x100; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->empty_page_map;
     }
-    for (bank_idx = 0xFC; bank_idx < 0x100; ++bank_idx) {
+    for (bank_idx = 0x100 - mmio->fpi_rom_bank_count; bank_idx < 0x100; ++bank_idx) {
         mmio->bank_page_map[bank_idx] = &mmio->fpi_rom_page_map;
     }
 
@@ -1725,7 +1742,7 @@ void _clem_mmio_init_page_maps(ClemensMMIO *mmio, uint32_t memory_flags) {
     /* brute force initialization of all page maps to ensure every option
        is executed on startup */
     mmio->mmap_register = memory_flags;
-    clem_mmio_restore(mmio);
+    _clem_mmio_restore_mappings(mmio);
 }
 
 void clem_mmio_reset(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) {
@@ -1738,17 +1755,10 @@ void clem_mmio_reset(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) {
     clem_scc_reset(&mmio->dev_scc);
 }
 
-void clem_mmio_restore(ClemensMMIO *mmio) {
-    uint32_t memory_flags = mmio->mmap_register;
-    mmio->mmap_register = 0xffffffff;
-    _clem_mmio_memory_map(mmio, 0x0000000000);
-    _clem_mmio_memory_map(mmio, memory_flags);
-}
-
 void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
                     struct ClemensMemoryPageMap **bank_page_map, void *slot_expansion_rom,
-                    unsigned int fpi_ram_bank_count, uint8_t *e0_bank, uint8_t *e1_bank,
-                    struct ClemensTimeSpec *tspec) {
+                    unsigned int fpi_ram_bank_count, unsigned int fpi_rom_bank_count,
+                    uint8_t *e0_bank, uint8_t *e1_bank, struct ClemensTimeSpec *tspec) {
     int idx;
     //  Memory map starts out without shadowing, but our call to
     //  init_page_maps will initialize the memory map on IIgs reset
@@ -1761,23 +1771,53 @@ void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
     mmio->speed_c036 = CLEM_MMIO_SPEED_FAST_ENABLED | CLEM_MMIO_SPEED_POWERED_ON;
     mmio->mega2_cycles = 0;
     mmio->last_data_address = 0xffffffff;
-    mmio->bank_page_map = bank_page_map;
     mmio->emulator_detect = CLEM_MMIO_EMULATOR_DETECT_IDLE;
-    mmio->fpi_ram_bank_count = fpi_ram_bank_count;
     mmio->card_expansion_rom_index = -1;
+    mmio->fpi_ram_bank_count = fpi_ram_bank_count;
+    mmio->fpi_rom_bank_count = fpi_rom_bank_count;
+
     //  TODO: look into making mega2 memory solely reside inside mmio to avoid this
     //        external dependency.
-    mmio->e0_bank = e0_bank;
-    mmio->e1_bank = e1_bank;
-
     for (idx = 0; idx < CLEM_CARD_SLOT_COUNT; ++idx) {
         mmio->card_slot[idx] = NULL;
         mmio->card_slot_expansion_memory[idx] = (((uint8_t *)slot_expansion_rom) + (idx * 2048));
     }
+    mmio->bank_page_map = bank_page_map;
 
     //  initial settings for memory map on reset/initr
-    _clem_mmio_init_page_maps(mmio, CLEM_MEM_IO_MMAP_NSHADOW_SHGR | CLEM_MEM_IO_MMAP_WRLCRAM |
-                                        CLEM_MEM_IO_MMAP_LCBANK2);
+    _clem_mmio_init_page_maps(mmio, bank_page_map, e0_bank, e1_bank,
+                              CLEM_MEM_IO_MMAP_NSHADOW_SHGR | CLEM_MEM_IO_MMAP_WRLCRAM |
+                                  CLEM_MEM_IO_MMAP_LCBANK2);
 
     clem_mmio_reset(mmio, tspec);
+}
+
+static void _clem_mmio_write_hook(struct ClemensMemory *mem, struct ClemensTimeSpec *tspec,
+                                  uint8_t data, uint16_t addr, uint8_t flags,
+                                  bool *is_slow_access) {
+    clem_mmio_write((ClemensMMIO *)mem->mmio_context, tspec, data, addr, flags, is_slow_access);
+}
+
+static uint8_t _clem_mmio_read_hook(struct ClemensMemory *mem, struct ClemensTimeSpec *tspec,
+                                    uint16_t addr, uint8_t flags, bool *is_slow_access) {
+    return clem_mmio_read((ClemensMMIO *)mem->mmio_context, tspec, addr, flags, is_slow_access);
+}
+
+static bool _clem_mmio_niolc(struct ClemensMemory *mem) {
+    ClemensMMIO *mmio = (ClemensMMIO *)mem->mmio_context;
+    return (mmio->mmap_register & CLEM_MEM_IO_MMAP_NIOLC) != 0;
+}
+
+void clem_mmio_bind_machine(ClemensMachine *clem, ClemensMMIO *mmio) {
+    clem->mem.mmio_context = mmio;
+    clem->mem.mmio_write = _clem_mmio_write_hook;
+    clem->mem.mmio_read = _clem_mmio_read_hook;
+    clem->mem.mmio_niolc = _clem_mmio_niolc;
+}
+
+void clem_mmio_restore(ClemensMachine *clem, ClemensMMIO *mmio) {
+    clem_mmio_bind_machine(clem, mmio);
+    _clem_mmio_init_page_maps(mmio, clem->mem.bank_page_map, clem->mem.mega2_bank_map[0],
+                              clem->mem.mega2_bank_map[1], mmio->mmap_register);
+    clem_vgc_reset_scanlines(&mmio->vgc);
 }

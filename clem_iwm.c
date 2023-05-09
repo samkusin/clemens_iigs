@@ -257,13 +257,57 @@ void clem_iwm_reset(struct ClemensDeviceIWM *iwm, struct ClemensTimeSpec *tspec)
     iwm->debug_level = 1;
 }
 
-void clem_iwm_insert_disk(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
-                          struct ClemensNibbleDisk *disk) {
+struct ClemensNibbleDisk *clem_iwm_insert_disk(struct ClemensDeviceIWM *iwm,
+                                               struct ClemensDrive *drive) {
+    if (drive->has_disk)
+        return NULL;
+
+    drive->pulse_clocks_dt = 0;
+
+    if (drive->disk.disk_type == CLEM_DISK_TYPE_5_25) {
+        drive->pulse_clocks_dt = CLEM_IWM_SYNC_CLOCKS_NORMAL;
+    } else if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
+        drive->pulse_clocks_dt = CLEM_IWM_SYNC_CLOCKS_FAST;
+    } else {
+        return NULL;
+    }
+    drive->has_disk = true;
+
+    return &drive->disk;
+}
+
+struct ClemensNibbleDisk *clem_iwm_eject_disk(struct ClemensDeviceIWM *iwm,
+                                              struct ClemensDrive *drive) {
+    if (!drive->has_disk)
+        return NULL;
+
+    if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
+        drive->status_mask_35 &=
+            ~(CLEM_IWM_DISK35_STATUS_EJECTING | CLEM_IWM_DISK35_STATUS_EJECTED);
+    }
+    drive->has_disk = false;
+    return &drive->disk;
+}
+
+unsigned clem_iwm_eject_disk_in_progress(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive) {
+    if (drive->has_disk) {
+        if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
+            if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)
+                return CLEM_EJECT_DISK_STATUS_IN_PROGRESS;
+            if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTED)
+                return CLEM_EJECT_DISK_STATUS_EJECTED;
+        }
+    }
+    return CLEM_EJECT_DISK_STATUS_NONE;
+}
+
+void clem_iwm_insert_disk_old(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
+                              struct ClemensNibbleDisk *disk) {
     drive->has_disk = disk->track_count > 0;
     drive->pulse_clocks_dt = 0;
-    if (disk->bit_timing_ns == 4000) {
+    if (disk->bit_timing_ns == CLEM_DISK_5_25_BIT_TIMING_NS) {
         drive->pulse_clocks_dt = CLEM_IWM_SYNC_CLOCKS_NORMAL;
-    } else if (disk->bit_timing_ns == 2000) {
+    } else if (disk->bit_timing_ns == CLEM_DISK_3_5_BIT_TIMING_NS) {
         drive->pulse_clocks_dt = CLEM_IWM_SYNC_CLOCKS_FAST;
     }
     if (drive->pulse_clocks_dt > 0) {
@@ -274,8 +318,26 @@ void clem_iwm_insert_disk(struct ClemensDeviceIWM *iwm, struct ClemensDrive *dri
     }
 }
 
-void clem_iwm_eject_disk(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
-                         struct ClemensNibbleDisk *disk) {
+bool clem_iwm_eject_disk_async_old(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
+                                   struct ClemensNibbleDisk *disk) {
+
+    if (drive->has_disk) {
+        memcpy(disk, &drive->disk, sizeof(drive->disk));
+        if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
+            if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {
+                clem_disk_35_start_eject(drive);
+            }
+            if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTED)) {
+                return false;
+            }
+        }
+    }
+    clem_iwm_eject_disk_old(iwm, drive, disk);
+    return true;
+}
+
+void clem_iwm_eject_disk_old(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
+                             struct ClemensNibbleDisk *disk) {
     if (drive->disk.disk_type != CLEM_DISK_TYPE_NONE) {
         memcpy(disk, &drive->disk, sizeof(drive->disk));
         if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
@@ -285,21 +347,6 @@ void clem_iwm_eject_disk(struct ClemensDeviceIWM *iwm, struct ClemensDrive *driv
         drive->has_disk = false;
     }
     memset(&drive->disk, 0, sizeof(drive->disk));
-}
-
-bool clem_iwm_eject_disk_async(struct ClemensDeviceIWM *iwm, struct ClemensDrive *drive,
-                               struct ClemensNibbleDisk *disk) {
-
-    if (drive->has_disk) {
-        if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
-            if (!(drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)) {
-                clem_disk_35_start_eject(drive);
-                return false;
-            }
-        }
-    }
-    clem_iwm_eject_disk(iwm, drive, disk);
-    return true;
 }
 
 bool clem_iwm_is_active(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives) {
@@ -333,9 +380,12 @@ static void _clem_iwm_reset_drive(struct ClemensDeviceIWM *iwm, struct ClemensDr
 #define CLEM_IWM_WRITE_REG_LATCH_QA       0x80000000
 
 static void _clem_iwm_async_write_log(struct ClemensDeviceIWM *iwm, const char *prefix) {
-    CLEM_LOG("IWM: [%s] write latch %08X, flags=%08X, counter=%u", prefix, iwm->latch,
-             iwm->write_state & CLEM_IWM_WRITE_REG_STATUS_MASK,
-             iwm->write_state & CLEM_IWM_WRITE_REG_COUNTER_MASK);
+    int logLevel = iwm->debug_level > 1 ? CLEM_DEBUG_LOG_INFO : CLEM_DEBUG_LOG_DEBUG;
+    //  this can happen when writing 10-bit self-sync bytes - so it's not really an issue
+    //  in certain cases - hard to tell which ones are legit without further debugging
+    clem_debug_log(logLevel, "IWM: [%s] write latch %08X, flags=%08X, counter=%u", prefix,
+                   iwm->latch, iwm->write_state & CLEM_IWM_WRITE_REG_STATUS_MASK,
+                   iwm->write_state & CLEM_IWM_WRITE_REG_COUNTER_MASK);
 }
 
 static void _clem_iwm_drive_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives,
@@ -352,7 +402,8 @@ static void _clem_iwm_drive_switch(struct ClemensDeviceIWM *iwm, struct ClemensD
 
 static void _clem_drive_off(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay *drives) {
     _clem_iwm_drive_switch(iwm, drives, iwm->io_flags & ~CLEM_IWM_FLAG_DRIVE_ON);
-    CLEM_DEBUG("IWM: turning drive off now");
+    int logLevel = iwm->debug_level > 1 ? CLEM_DEBUG_LOG_INFO : CLEM_DEBUG_LOG_DEBUG;
+    clem_debug_log(logLevel, "IWM: turning drive off now");
 }
 
 static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM *iwm) {
@@ -454,12 +505,12 @@ static void _clem_iwm_write_step(struct ClemensDeviceIWM *iwm) {
     }
 }
 
-#define CLEM_IWM_READ_REG_STATE_MASK  0xffff0000
 #define CLEM_IWM_READ_REG_STATE_LATCH 0x0000ffff
-#define CLEM_IWM_READ_REG_STATE_START 0x00000000
-#define CLEM_IWM_READ_REG_STATE_QA0   0x00010000
-#define CLEM_IWM_READ_REG_STATE_QA1   0x00020000
-#define CLEM_IWM_READ_REG_STATE_QA1_1 0x00030000
+#define CLEM_IWM_READ_REG_STATE_MASK  CLEM_DISK_READ_STATE_MASK
+#define CLEM_IWM_READ_REG_STATE_START CLEM_DISK_READ_STATE_START
+#define CLEM_IWM_READ_REG_STATE_QA0   CLEM_DISK_READ_STATE_QA0
+#define CLEM_IWM_READ_REG_STATE_QA1   CLEM_DISK_READ_STATE_QA1
+#define CLEM_IWM_READ_REG_STATE_QA1_1 CLEM_DISK_READ_STATE_QA1_1
 
 static bool _clem_iwm_read_step(struct ClemensDeviceIWM *iwm) {
     //  This procedure covers a whole bit cell cycle
@@ -488,6 +539,7 @@ static bool _clem_iwm_read_step(struct ClemensDeviceIWM *iwm) {
         iwm->data_r = iwm->latch;
         read_latch_hold = 0; // no read latching when reading status
     }
+    //  TODO: see if we can leverage clem_disk_read_latch
     switch (iwm->read_state & CLEM_IWM_READ_REG_STATE_MASK) {
     case CLEM_IWM_READ_REG_STATE_START:
         if (iwm->io_flags & CLEM_IWM_FLAG_READ_DATA) {
@@ -598,8 +650,8 @@ static void _clem_iwm_step(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
         assert(iwm->cur_clocks_ts <= end_clocks_ts);
 
         //  process the IWM using the accumulated clocks
-        //  BUT, only if the drive is ON - by here we've determined everything needed to calculate
-        //  the next time step
+        //  BUT, only if the drive is ON - by here we've determined everything needed to
+        //  calculate the next time step
         if (!(iwm->io_flags & CLEM_IWM_FLAG_DRIVE_ON)) {
             continue;
         }
@@ -607,8 +659,8 @@ static void _clem_iwm_step(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
 
         //  obtain write signal from IWM -> io_flags, motor is implied as on
         if (iwm->state & CLEM_IWM_STATE_WRITE_MASK) {
-            // force 5.25" drives to use synchronous mode (IWM doesn't support this mode for Disk II
-            // devices)
+            // force 5.25" drives to use synchronous mode (IWM doesn't support this mode for
+            // Disk II devices)
 
             CLEM_IWM_DEBUG_EVENT(iwm, drives, "DATA_W", iwm->cur_clocks_ts, 2);
             _clem_iwm_write_step(iwm);
@@ -651,7 +703,7 @@ static void _clem_iwm_step(struct ClemensDeviceIWM *iwm, struct ClemensDriveBay 
     if (iwm->drive_hold_ns > 0) {
         iwm->drive_hold_ns = clem_util_timer_decrement(iwm->drive_hold_ns, delta_ns);
         if (iwm->drive_hold_ns == 0 || iwm->timer_1sec_disabled) {
-            CLEM_LOG("IWM: turning drive off in sync");
+            CLEM_DEBUG("IWM: turning drive off in sync");
             _clem_drive_off(iwm, drives);
         }
     }
@@ -911,8 +963,8 @@ uint8_t clem_iwm_read_switch(struct ClemensDeviceIWM *iwm, struct ClemensDriveBa
                     if (!is_noop) {
                         if ((iwm->read_state & CLEM_IWM_READ_REG_STATE_MASK) ==
                             CLEM_IWM_READ_REG_STATE_QA0) {
-                            //  exceptional case, when reading before the next bit cell is processed
-                            //  in sync()
+                            //  exceptional case, when reading before the next bit cell is
+                            //  processed in sync()
                             if (!(iwm->read_state & CLEM_IWM_READ_REG_STATE_LATCH)) {
                                 //  but don't reset the data register if we're latch hold is
                                 //  enabled
@@ -959,7 +1011,7 @@ void clem_iwm_speed_disk_gate(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) 
     }
     if (iwm->disk_motor_on) {
         if (!old_disk_motor_on) {
-            CLEM_LOG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
+            CLEM_DEBUG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
         }
         tspec->clocks_step = CLEM_CLOCKS_PHI0_CYCLE;
         return;
@@ -968,12 +1020,12 @@ void clem_iwm_speed_disk_gate(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) 
         tspec->clocks_step = tspec->clocks_step_fast;
 
         if (old_disk_motor_on) {
-            CLEM_LOG("SPEED FAST Disk: %02X", iwm->disk_motor_on);
+            CLEM_DEBUG("SPEED FAST Disk: %02X", iwm->disk_motor_on);
         }
     } else {
         tspec->clocks_step = CLEM_CLOCKS_PHI0_CYCLE;
         if (old_disk_motor_on) {
-            CLEM_LOG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
+            CLEM_DEBUG("SPEED SLOW Disk: %02X", iwm->disk_motor_on);
         }
     }
 }

@@ -9,11 +9,16 @@ namespace ClemensHostAssets {
 
 #include "images/card_png.h"
 #include "images/debugger_png.h"
+#include "images/disk35_png.h"
+#include "images/disk525_png.h"
+#include "images/eject_png.h"
 #include "images/fast_emulate_png.h"
 #include "images/folder_solid_png.h"
+#include "images/hdd_png.h"
 #include "images/help_png.h"
 #include "images/joystick_png.h"
 #include "images/load_png.h"
+#include "images/lock_png.h"
 #include "images/play_run_png.h"
 #include "images/power_png.h"
 #include "images/reboot_png.h"
@@ -74,6 +79,11 @@ void initialize() {
     g_allImages[kCard] = loadImageFromPNG(card_icon_png, card_icon_png_len);
     g_allImages[kFastEmulate] = loadImageFromPNG(fast_emulate_png, fast_emulate_png_len);
     g_allImages[kFolder] = loadImageFromPNG(folder_solid_png, folder_solid_png_len);
+    g_allImages[kDisk35] = loadImageFromPNG(disk_35_png, disk_35_png_len);
+    g_allImages[kDisk525] = loadImageFromPNG(disk_525_png, disk_525_png_len);
+    g_allImages[kDiskHDD] = loadImageFromPNG(hdd_png, hdd_png_len);
+    g_allImages[kLockDisk] = loadImageFromPNG(lock_png, lock_png_len);
+    g_allImages[kEjectDisk] = loadImageFromPNG(eject_png, eject_png_len);
 
     int lastNamedImageId = kFirstNamedImage;
     // g_allImages[lastNamedImageId] = loadImageFromPNG()

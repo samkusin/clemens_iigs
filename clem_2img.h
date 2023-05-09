@@ -14,10 +14,6 @@
 
 #include "clem_disk.h"
 
-#define CLEM_2IMG_FORMAT_DOS    0U
-#define CLEM_2IMG_FORMAT_PRODOS 1U
-#define CLEM_2IMG_FORMAT_RAW    2U
-
 /** Per spec, the header size preceding the disk data must be this length.  This value can be used
  * to allocate a backing buffer for a custom 2img file. */
 #define CLEM_2IMG_HEADER_BYTE_SIZE 64
@@ -36,20 +32,19 @@ extern "C" {
 struct Clemens2IMGDisk {
     char creator[4];
     uint16_t version;
-    uint32_t format;      /**< See CLEM_2IMG_FORMAT_XXX */
+    uint32_t format;      /**< See CLEM_DISK_FORMAT_XXX */
     uint32_t dos_volume;  /**< DOS Volume */
     uint32_t block_count; /**< Block count (ProDOS only) */
-    char *creator_data;
-    char *creator_data_end;
-    char *comment;
-    char *comment_end;
-    uint8_t *data;
-    uint8_t *data_end;
-    uint8_t *image_buffer;        /**< Backing memory buffer owned by caller */
+    const uint8_t *data;  /**< The disk data within the 2IMG image */
+    const uint8_t *data_end;
+    const char *creator_data; /**< Guaranteed to exist after data_end */
+    const char *creator_data_end;
+    const char *comment;
+    const char *comment_end;
+    const uint8_t *image_buffer;  /**< Backing memory buffer owned by caller */
     uint32_t image_buffer_length; /**< Length of the original memory buffer */
     uint32_t image_data_offset;   /**< Offset to original track data */
     bool is_write_protected;      /**< Write protected image */
-    bool is_nibblized;            /**< See the clem_2img_nibblize_data call */
 
     /* This is provided by the caller.  At the very least the nib->bits_data and
        nib->bits_data_end byte vector must be defined before calling
@@ -57,13 +52,6 @@ struct Clemens2IMGDisk {
        by said call.
     */
     struct ClemensNibbleDisk *nib;
-};
-
-struct ClemensNibEncoder {
-    uint8_t *begin;
-    uint8_t *end;
-    unsigned bit_index;
-    unsigned bit_index_end;
 };
 
 /**
@@ -80,7 +68,8 @@ struct ClemensNibEncoder {
  * @return true
  * @return false
  */
-bool clem_2img_parse_header(struct Clemens2IMGDisk *disk, uint8_t *image, uint8_t *image_end);
+bool clem_2img_parse_header(struct Clemens2IMGDisk *disk, const uint8_t *image,
+                            const uint8_t *image_end);
 
 /**
  * @brief Generates a 2IMG disk container from either ProDOS or DOS images.
@@ -91,15 +80,15 @@ bool clem_2img_parse_header(struct Clemens2IMGDisk *disk, uint8_t *image, uint8_
  * data.
  *
  * @param disk
- * @param format See CLEM_2IMG_FORMAT_XXX
+ * @param format See CLEM_DISK_FORMAT_XXX
  * @param image Logical sectors based on the sector format
  * @param image_end End of the raw post-nibblized logical sector input buffer
  * @param image_data_offset Indicates where in the input image the disk data resides
  * @return true
  * @return false
  */
-bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, uint8_t *image,
-                               uint8_t *image_end, uint32_t image_data_offset);
+bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, const uint8_t *image,
+                               const uint8_t *image_end, uint32_t image_data_offset);
 
 /**
  * @brief Create a 2IMG disk buffer to serialize into a 2img file.
@@ -107,10 +96,9 @@ bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, ui
  * @param disk The populated Clemens2IMGDisk struct
  * @param image The backing buffer
  * @param image_end
- * @return true
- * @return false
+ * @return Image size or 0 if build failed
  */
-bool clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uint8_t *image_end);
+unsigned clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uint8_t *image_end);
 
 /**
  * @brief Runs the nibbilization pass on the disk image.
@@ -125,6 +113,25 @@ bool clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uint8_t
  *      the source 2IMG (DSK, PO) data.
  */
 bool clem_2img_nibblize_data(struct Clemens2IMGDisk *disk);
+
+/**
+ * @brief Encodes the nibbilized data into bytes that conform to the disk format
+ *
+ * Encodes nibbles into GCR encoded data bytes for DOS or ProDOS compliant images.
+ * This will not work correctly for corrupted images and will return false.
+ *
+ * The result data buffer is returned inside the supplied Clemens2IMGDisk record
+ * via the data and data_end attributes, which will point to areas between the supplied
+ * data_start and data_end
+ *
+ * @param disk
+ * @param data_start
+ * @param data_end
+ * @param nib
+ * @return false if decoding to a DOS/ProDOS flat image failed.
+ */
+bool clem_2img_decode_nibblized_disk(struct Clemens2IMGDisk *disk, uint8_t *data_start,
+                                     uint8_t *data_end, const struct ClemensNibbleDisk *nib);
 
 #ifdef __cplusplus
 }

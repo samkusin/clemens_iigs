@@ -1,4 +1,5 @@
 
+#include "spdlog/common.h"
 #include <cinttypes>
 
 #ifdef _WIN32
@@ -24,6 +25,7 @@
 #include "sokol/sokol_glue.h"
 #include "sokol/sokol_imgui.h"
 #include "sokol/sokol_time.h"
+#include "spdlog/spdlog.h"
 
 #include "fonts/font_bloada1024.h"
 #include "fonts/font_printchar21.h"
@@ -235,7 +237,22 @@ static sapp_keycode onKeyUp(const sapp_event *evt, bool *doDownEvent) {
 
 std::array<int16_t, 512> g_sokolToADBKey;
 
-cinek::ByteBuffer loadFont(const char *pathname) {
+void sokolLogger(const char *tag,              // e.g. 'sg'
+                 uint32_t log_level,           // 0=panic, 1=error, 2=warn, 3=info
+                 uint32_t,                     // SG_LOGITEM_*
+                 const char *message_or_null,  // a message string, may be nullptr in release mode
+                 uint32_t line_nr,             // line number in sokol_gfx.h
+                 const char *filename_or_null, // source filename, may be nullptr in release mode
+                 void *) {
+    static spdlog::level::level_enum levels[] = {spdlog::level::critical, spdlog::level::err,
+                                                 spdlog::level::warn, spdlog::level::info};
+    if (!message_or_null)
+        return;
+    spdlog::log(levels[log_level], "[{}] {}({}) {}", tag, filename_or_null, line_nr,
+                message_or_null);
+}
+
+static cinek::ByteBuffer loadFont(const char *pathname) {
     cinek::ByteBuffer buffer;
     if (!strcasecmp(pathname, "fonts/PrintChar21.ttf")) {
         buffer = cinek::ByteBuffer(PrintChar21_ttf, PrintChar21_ttf_len, PrintChar21_ttf_len);
@@ -255,8 +272,13 @@ static void onInit(void *userdata) {
     CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #endif
 
+    spdlog::set_level(spdlog::level::info);
+    spdlog::flush_on(spdlog::level::err);
+    spdlog::info("Setting up host frameworks");
+
     sg_desc desc = {};
     desc.context = sapp_sgcontext();
+    desc.logger.func = sokolLogger;
     sg_setup(desc);
 
     g_sgPassAction.colors[0].action = SG_ACTION_CLEAR;
@@ -528,12 +550,12 @@ static void onCleanup(void *userdata) {
 
     ClemensHostAssets::terminate();
 
+    spdlog::shutdown();
+
     simgui_shutdown();
     sg_shutdown();
     clem_host_platform_terminate();
 }
-
-static void onFail(const char *msg, void *) { printf("app failure: %s", msg); }
 
 sapp_desc sokol_main(int argc, char *argv[]) {
     sapp_desc sapp = {};
@@ -545,10 +567,10 @@ sapp_desc sokol_main(int argc, char *argv[]) {
     sapp.frame_userdata_cb = &onFrame;
     sapp.cleanup_userdata_cb = &onCleanup;
     sapp.event_userdata_cb = &onEvent;
-    sapp.fail_userdata_cb = &onFail;
     sapp.window_title = "Clemens IIGS";
     sapp.win32_console_create = true;
     sapp.win32_console_attach = true;
+    sapp.logger.func = sokolLogger;
 
     return sapp;
 }

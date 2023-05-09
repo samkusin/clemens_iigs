@@ -5,9 +5,19 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "spdlog/spdlog.h"
+
 #include "fmt/core.h"
 
 //  TODO: optimize when needed per platform
+
+void sokolLogger(const char *tag,              // e.g. 'sg'
+                 uint32_t log_level,           // 0=panic, 1=error, 2=warn, 3=info
+                 uint32_t,                     // SG_LOGITEM_*
+                 const char *message_or_null,  // a message string, may be nullptr in release mode
+                 uint32_t line_nr,             // line number in sokol_gfx.h
+                 const char *filename_or_null, // source filename, may be nullptr in release mode
+                 void *);
 
 ClemensAudioDevice::ClemensAudioDevice()
     : queuedFrameBuffer_(nullptr), queuedFrameHead_(0), queuedFrameTail_(0), queuedFrameLimit_(0),
@@ -22,6 +32,7 @@ void ClemensAudioDevice::start() {
     audioDesc.buffer_frames = 2048;
     audioDesc.stream_userdata_cb = &ClemensAudioDevice::mixAudio;
     audioDesc.user_data = this;
+    audioDesc.logger.func = sokolLogger;
     saudio_setup(audioDesc);
 
     queuedFrameHead_ = 0;
@@ -30,8 +41,8 @@ void ClemensAudioDevice::start() {
         queuedFrameStride_ = 2 * sizeof(float);
         queuedFrameLimit_ = saudio_sample_rate() / 2;
         queuedFrameBuffer_ = new uint8_t[queuedFrameLimit_ * queuedFrameStride_];
-        fmt::print("ClemensAudioDevice queuedFrameBuffer {} khz, frame limit = {}, stride = {}\n",
-                   audioDesc.sample_rate / 1000.0f, queuedFrameLimit_, queuedFrameStride_);
+        spdlog::info("ClemensAudioDevice queuedFrameBuffer {} khz, frame limit = {}, stride = {}",
+                     audioDesc.sample_rate / 1000.0f, queuedFrameLimit_, queuedFrameStride_);
     } else {
         queuedFrameStride_ = 0;
         queuedFrameLimit_ = 0;
@@ -125,8 +136,8 @@ unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float /*deltaTime */) {
         audioInAvailable -= framesOutCount;
         audioInUsed += framesOutCount;
         if (audioInAvailable > 0) {
-            fmt::print("ClemensAudioDevice: {} frames not queued for playback, output = {}\n",
-                       audioInAvailable, framesOutCount);
+            spdlog::info("ClemensAudioDevice: {} frames not queued for playback, output = {}",
+                         audioInAvailable, framesOutCount);
         }
     }
 

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "clem_disk.h"
 #include "clem_mmio_defs.h"
 
 #include "emulator.h"
@@ -64,6 +65,21 @@ struct ClemensSmartPortUnit *clemens_smartport_unit_get(ClemensMMIO *mmio, unsig
     return &mmio->active_drives.smartport[unit_index];
 }
 
+//  TODO:
+//  1. 'disk' is no longer passed in
+//  2. assign and eject no longer take a disk pointer
+//  3. drive->has_disk determines whether the disk is mounted
+//  4. clemens_insert_disk returns the disk pointer for apps to
+//     write to
+//  5. clemens_eject_disk returns the disk pointer for apps to read from
+//  6. there will be no memcpys in assign and eject since the pointers
+//     to drive->disk are the ones used for reading and writing disks
+//  7. clemens_assign_disk_buffer(mmio, drive_type, bits, bits_end)
+//     called by application on init()
+//  8. this means clem_storage_unit.cpp doesn't allocate any nibble buffers
+//     this means clem_storage_unit constructor takes as input the hard disk
+//     buffer, and so does unserialize()
+//          - clem_storage_unit does not handle allocation of disk buffers anymore
 bool clemens_assign_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
                          struct ClemensNibbleDisk *disk) {
     struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
@@ -94,12 +110,12 @@ bool clemens_assign_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
     if (disk->disk_type != CLEM_DISK_TYPE_NONE) {
         CLEM_LOG("%s inserting disk", s_drive_names[drive_type]);
     }
-    clem_iwm_insert_disk(&mmio->dev_iwm, drive, disk);
+    clem_iwm_insert_disk_old(&mmio->dev_iwm, drive, disk);
     return true;
 }
 
-void clemens_eject_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
-                        struct ClemensNibbleDisk *disk) {
+void clemens_eject_disk_old(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
+                            struct ClemensNibbleDisk *disk) {
     struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
     if (!drive)
         return;
@@ -107,25 +123,71 @@ void clemens_eject_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
     if (drive->disk.disk_type != CLEM_DISK_TYPE_NONE) {
         CLEM_LOG("%s ejecting disk", s_drive_names[drive_type]);
     }
-    clem_iwm_eject_disk(&mmio->dev_iwm, drive, disk);
+    clem_iwm_eject_disk_old(&mmio->dev_iwm, drive, disk);
 }
 
-bool clemens_eject_disk_async(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
-                              struct ClemensNibbleDisk *disk) {
+bool clemens_eject_disk_async_old(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
+                                  struct ClemensNibbleDisk *disk) {
     struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
     if (drive) {
         if (drive->disk.disk_type != CLEM_DISK_TYPE_NONE) {
             CLEM_LOG("%s ejecting disk", s_drive_names[drive_type]);
         }
-        return clem_iwm_eject_disk_async(&mmio->dev_iwm, drive, disk);
+        return clem_iwm_eject_disk_async_old(&mmio->dev_iwm, drive, disk);
     }
-    clem_iwm_eject_disk(&mmio->dev_iwm, drive, disk);
+    clem_iwm_eject_disk_old(&mmio->dev_iwm, drive, disk);
     return true;
+}
+
+void clemens_assign_disk_buffer(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
+                                uint8_t *bits_data, uint8_t *bits_data_end) {
+    struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
+    if (!drive)
+        return;
+    if (drive_type == kClemensDrive_3_5_D1 || drive_type == kClemensDrive_3_5_D2) {
+        drive->disk.disk_type = CLEM_DISK_TYPE_3_5;
+    } else if (drive_type == kClemensDrive_5_25_D1 || drive_type == kClemensDrive_5_25_D2) {
+        drive->disk.disk_type = CLEM_DISK_TYPE_5_25;
+    } else {
+        drive->disk.disk_type = CLEM_DISK_TYPE_NONE;
+    }
+    drive->disk.bits_data = bits_data;
+    drive->disk.bits_data_end = bits_data_end;
+}
+
+struct ClemensNibbleDisk *clemens_insert_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type) {
+    struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
+    struct ClemensNibbleDisk *disk = NULL;
+    if (drive) {
+        disk = clem_iwm_insert_disk(&mmio->dev_iwm, drive);
+        if (disk) {
+            CLEM_LOG("%s inserting disk", s_drive_names[drive_type]);
+        }
+    }
+    return disk;
+}
+
+unsigned clemens_eject_disk_in_progress(ClemensMMIO *mmio, enum ClemensDriveType drive_type) {
+    struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
+    if (!drive)
+        return CLEM_EJECT_DISK_STATUS_NONE;
+
+    return clem_iwm_eject_disk_in_progress(&mmio->dev_iwm, drive);
+}
+
+struct ClemensNibbleDisk *clemens_eject_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type) {
+    struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
+    if (!drive)
+        return NULL;
+    return clem_iwm_eject_disk(&mmio->dev_iwm, drive);
 }
 
 bool clemens_assign_smartport_disk(ClemensMMIO *mmio, unsigned drive_index,
                                    struct ClemensSmartPortDevice *device) {
     if (drive_index >= CLEM_SMARTPORT_DRIVE_LIMIT)
+        return false;
+    if (mmio->active_drives.smartport[drive_index].device.device_id !=
+        CLEM_SMARTPORT_DEVICE_ID_NONE)
         return false;
     memcpy(&mmio->active_drives.smartport[drive_index].device, device,
            sizeof(struct ClemensSmartPortDevice));
@@ -144,7 +206,7 @@ void clemens_remove_smartport_disk(ClemensMMIO *mmio, unsigned drive_index,
            sizeof(struct ClemensSmartPortDevice));
     memset(&mmio->active_drives.smartport[drive_index].device, 0,
            sizeof(struct ClemensSmartPortDevice));
-    mmio->active_drives.smartport[drive_index].unit_id = 0;
+    mmio->active_drives.smartport[drive_index].unit_id = CLEM_SMARTPORT_DEVICE_ID_NONE;
 }
 
 bool clemens_is_drive_io_active(ClemensMMIO *mmio) {
@@ -327,23 +389,7 @@ uint64_t clemens_clocks_per_second(ClemensMMIO *mmio, bool *is_slow_speed) {
     return CLEM_CLOCKS_PHI0_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND;
 }
 
-static void _clem_mmio_write_hook(struct ClemensMemory *mem, struct ClemensTimeSpec *tspec,
-                                  uint8_t data, uint16_t addr, uint8_t flags,
-                                  bool *is_slow_access) {
-    clem_mmio_write((ClemensMMIO *)mem->mmio_context, tspec, data, addr, flags, is_slow_access);
-}
-
-static uint8_t _clem_mmio_read_hook(struct ClemensMemory *mem, struct ClemensTimeSpec *tspec,
-                                    uint16_t addr, uint8_t flags, bool *is_slow_access) {
-    return clem_mmio_read((ClemensMMIO *)mem->mmio_context, tspec, addr, flags, is_slow_access);
-}
-
-static bool _clem_mmio_niolc(struct ClemensMemory *mem) {
-    ClemensMMIO *mmio = (ClemensMMIO *)mem->mmio_context;
-    return (mmio->mmap_register & CLEM_MEM_IO_MMAP_NIOLC) != 0;
-}
-
-bool clemens_is_mmio_initialized(ClemensMMIO *mmio) {
+bool clemens_is_mmio_initialized(const ClemensMMIO *mmio) {
     return mmio->state_type == kClemensMMIOStateType_Active;
 }
 
@@ -362,10 +408,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
         return;
     }
     if (mmio->state_type == kClemensMMIOStateType_Reset) {
-        clem->mem.mmio_context = mmio;
-        clem->mem.mmio_write = _clem_mmio_write_hook;
-        clem->mem.mmio_read = _clem_mmio_read_hook;
-        clem->mem.mmio_niolc = _clem_mmio_niolc;
+        clem_mmio_bind_machine(clem, mmio);
         clem_disk_reset_drives(&mmio->active_drives);
         clem_mmio_reset(mmio, &clem->tspec);
         /* extension cards reset handling */

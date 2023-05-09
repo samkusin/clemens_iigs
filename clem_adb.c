@@ -1557,12 +1557,16 @@ static void _clem_adb_glu_set_mode_flags(struct ClemensDeviceADB *adb, unsigned 
 
 static void _clem_adb_glu_clear_mode_flags(struct ClemensDeviceADB *adb, unsigned mode_flags) {
     if (mode_flags & 0x01) {
-        adb->mode_flags |= CLEM_ADB_MODE_AUTOPOLL_KEYB;
-        CLEM_LOG("ADB: Enable Keyboard Autopoll");
+        if (!(adb->mode_flags & CLEM_ADB_MODE_AUTOPOLL_KEYB)) {
+            adb->mode_flags |= CLEM_ADB_MODE_AUTOPOLL_KEYB;
+            CLEM_LOG("ADB: Enable Keyboard Autopoll");
+        }
     }
     if (mode_flags & 0x02) {
-        adb->mode_flags |= CLEM_ADB_MODE_AUTOPOLL_MOUSE;
-        CLEM_LOG("ADB: Enable Mouse Autopoll");
+        if (!(adb->mode_flags & CLEM_ADB_MODE_AUTOPOLL_MOUSE)) {
+            adb->mode_flags |= CLEM_ADB_MODE_AUTOPOLL_MOUSE;
+            CLEM_LOG("ADB: Enable Mouse Autopoll");
+        }
     }
     if (mode_flags & 0x000000fc) {
         CLEM_WARN("ADB: ClearMode %02X Unimplemented", mode_flags & 0x000000fc);
@@ -1572,18 +1576,18 @@ static void _clem_adb_glu_clear_mode_flags(struct ClemensDeviceADB *adb, unsigne
 static void _clem_adb_glu_set_config(struct ClemensDeviceADB *adb, uint8_t keyb_mouse_adr,
                                      uint8_t keyb_setup, uint8_t keyb_repeat) {
     /* unsure what if anything there's to do for setting the adb addresses */
-    CLEM_LOG("ADB: setting keyb and mouse addr to %02X", keyb_mouse_adr);
+    CLEM_DEBUG("ADB: setting keyb and mouse addr to %02X", keyb_mouse_adr);
     /* TODO: language settings for keyboard */
-    CLEM_LOG("ADB: setting keyb language character set to %02X", (keyb_setup & 0xf0) >> 4);
-    CLEM_LOG("ADB: setting keyb language layout to %02X", (keyb_setup & 0x0f));
+    CLEM_DEBUG("ADB: setting keyb language character set to %02X", (keyb_setup & 0xf0) >> 4);
+    CLEM_DEBUG("ADB: setting keyb language layout to %02X", (keyb_setup & 0x0f));
 
     adb->keyb.delay_ms = g_key_delay_ms[(keyb_repeat & 0x70) >> 4];
     adb->keyb.rate_per_sec = g_key_rate_per_sec[keyb_repeat & 0x7];
 
-    CLEM_LOG("ADB: setting keyb event delay/repeat to %d ms/%d per sec", adb->keyb.delay_ms,
-             adb->keyb.rate_per_sec);
+    CLEM_DEBUG("ADB: setting keyb event delay/repeat to %d ms/%d per sec", adb->keyb.delay_ms,
+               adb->keyb.rate_per_sec);
 
-    CLEM_WARN("Unimplemented ADB GLU Set Config");
+    CLEM_WARN("Partially implemented ADB GLU Set Config");
 }
 
 static void _clem_adb_glu_enable_srq(struct ClemensDeviceADB *adb, unsigned device_address,
@@ -1663,7 +1667,7 @@ void _clem_adb_glu_set_register(struct ClemensDeviceADB *adb, unsigned device_re
                           "0x03: %0X",
                           hi);
             }
-            CLEM_LOG("ADB: keyb device handler to %0X", lo);
+            CLEM_DEBUG("ADB: keyb device handler to %0X", lo);
         }
         adb->keyb_reg[device_register % 4] = ((unsigned)hi << 8) | lo;
         break;
@@ -1675,7 +1679,7 @@ void _clem_adb_glu_set_register(struct ClemensDeviceADB *adb, unsigned device_re
                           "address: %0X",
                           hi);
             }
-            CLEM_LOG("ADB: mouse device handler to %0X", lo);
+            CLEM_DEBUG("ADB: mouse device handler to %0X", lo);
         }
         adb->mouse_reg[device_register % 4] = ((unsigned)hi << 8) | lo;
         break;
@@ -1692,56 +1696,56 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
 
     switch (adb->cmd_reg) {
     case CLEM_ADB_CMD_ABORT:
-        CLEM_LOG("ADB: ABORT");
+        CLEM_DEBUG("ADB: ABORT");
         _clem_adb_glu_command_done(adb);
         return;
     case CLEM_ADB_CMD_SET_MODES:
-        CLEM_LOG("ADB: SET_MODES %02X", adb->cmd_data[0]);
+        CLEM_DEBUG("ADB: SET_MODES %02X", adb->cmd_data[0]);
         _clem_adb_glu_set_mode_flags(adb, adb->cmd_data[0]);
         _clem_adb_glu_command_done(adb);
         break;
     case CLEM_ADB_CMD_CLEAR_MODES:
-        CLEM_LOG("ADB: CLEAR_MODES %02X", adb->cmd_data[0]);
+        CLEM_DEBUG("ADB: CLEAR_MODES %02X", adb->cmd_data[0]);
         _clem_adb_glu_clear_mode_flags(adb, adb->cmd_data[0]);
         _clem_adb_glu_command_done(adb);
         break;
     case CLEM_ADB_CMD_SET_CONFIG:
-        CLEM_LOG("ADB: CONFIG: %02X %02X %02X", adb->cmd_data[0], adb->cmd_data[1],
-                 adb->cmd_data[2]);
+        CLEM_DEBUG("ADB: CONFIG: %02X %02X %02X", adb->cmd_data[0], adb->cmd_data[1],
+                   adb->cmd_data[2]);
         _clem_adb_glu_set_config(adb, adb->cmd_data[0], adb->cmd_data[1], adb->cmd_data[2]);
         _clem_adb_glu_command_done(adb);
         return;
     case CLEM_ADB_CMD_SYNC:
-        CLEM_LOG("ADB: SYNC: %02X %02X %02X %02X", adb->cmd_data[0], adb->cmd_data[1],
-                 adb->cmd_data[2], adb->cmd_data[3]);
-        CLEM_LOG("ADB: SYNC ROM03: %02X %02X %02X %02X", adb->cmd_data[4], adb->cmd_data[5],
-                 adb->cmd_data[6], adb->cmd_data[7]);
+        CLEM_DEBUG("ADB: SYNC: %02X %02X %02X %02X", adb->cmd_data[0], adb->cmd_data[1],
+                   adb->cmd_data[2], adb->cmd_data[3]);
+        CLEM_DEBUG("ADB: SYNC ROM03: %02X %02X %02X %02X", adb->cmd_data[4], adb->cmd_data[5],
+                   adb->cmd_data[6], adb->cmd_data[7]);
         _clem_adb_glu_set_mode_flags(adb, adb->cmd_data[0]);
         _clem_adb_glu_set_config(adb, adb->cmd_data[0], adb->cmd_data[1], adb->cmd_data[2]);
         _clem_adb_glu_command_done(adb);
         return;
     case CLEM_ADB_CMD_WRITE_RAM:
-        CLEM_LOG("ADB: WRITE RAM: %02X:%02X", adb->cmd_data[0], adb->cmd_data[1]);
+        CLEM_DEBUG("ADB: WRITE RAM: %02X:%02X", adb->cmd_data[0], adb->cmd_data[1]);
         adb->ram[adb->cmd_data[0]] = adb->cmd_data[1];
         _clem_adb_glu_command_done(adb);
         return;
     case CLEM_ADB_CMD_READ_MEM:
-        CLEM_LOG("ADB: READ RAM: %02X:%02X", adb->cmd_data[0], adb->cmd_data[1]);
+        CLEM_DEBUG("ADB: READ RAM: %02X:%02X", adb->cmd_data[0], adb->cmd_data[1]);
         _clem_adb_glu_result_init(adb, 1);
         _clem_adb_glu_result_data(
             adb, _clem_adb_glu_read_memory(adb, adb->cmd_data[0], adb->cmd_data[1]));
         return;
     case CLEM_ADB_CMD_VERSION:
-        CLEM_LOG("ADB: GET VERSION (%02X)", adb->version);
+        CLEM_DEBUG("ADB: GET VERSION (%02X)", adb->version);
         _clem_adb_glu_result_init(adb, 1);
         _clem_adb_glu_result_data(adb, (uint8_t)adb->version);
         return;
     case CLEM_ADB_CMD_UNDOCUMENTED_12:
-        CLEM_LOG("ADB: UNDOC 12: %02X, %02X", adb->cmd_data[0], adb->cmd_data[1]);
+        CLEM_DEBUG("ADB: UNDOC 12: %02X, %02X", adb->cmd_data[0], adb->cmd_data[1]);
         _clem_adb_glu_command_done(adb);
         break;
     case CLEM_ADB_CMD_UNDOCUMENTED_13:
-        CLEM_LOG("ADB: UNDOC 13: %02X, %02X", adb->cmd_data[0], adb->cmd_data[1]);
+        CLEM_DEBUG("ADB: UNDOC 13: %02X, %02X", adb->cmd_data[0], adb->cmd_data[1]);
         _clem_adb_glu_command_done(adb);
         break;
     default:
@@ -1752,7 +1756,7 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
 
     switch (device_command) {
     case CLEM_ADB_CMD_DEVICE_ENABLE_SRQ:
-        CLEM_LOG("ADB: ENABLE SRQ: %0X", device_address);
+        CLEM_DEBUG("ADB: ENABLE SRQ: %0X", device_address);
         _clem_adb_glu_enable_srq(adb, device_address, true);
         _clem_adb_glu_device_response(adb, 0);
         break;
@@ -1763,7 +1767,7 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
         break;
 
     case CLEM_ADB_CMD_DEVICE_DISABLE_SRQ:
-        CLEM_LOG("ADB: DISABLE SRQ: %0X", device_address);
+        CLEM_DEBUG("ADB: DISABLE SRQ: %0X", device_address);
         _clem_adb_glu_enable_srq(adb, device_address, false);
         _clem_adb_glu_device_response(adb, 0);
         break;
@@ -1772,7 +1776,7 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
     case CLEM_ADB_CMD_DEVICE_XMIT_2_R1:
     case CLEM_ADB_CMD_DEVICE_XMIT_2_R2:
     case CLEM_ADB_CMD_DEVICE_XMIT_2_R3:
-        CLEM_LOG("ADB: XMIT2 ADR: %0X", device_address);
+        CLEM_DEBUG("ADB: XMIT2 ADR: %0X", device_address);
         _clem_adb_glu_set_register(adb, (device_command & 0x80) >> 4, device_address,
                                    adb->cmd_data[0], adb->cmd_data[1]);
         _clem_adb_glu_device_response(adb, 0);
@@ -2114,7 +2118,7 @@ static void _clem_adb_write_cmd(struct ClemensDeviceADB *adb, uint8_t value) {
         _clem_adb_start_cmd(adb, value);
         break;
     case CLEM_ADB_STATE_CMD_DATA:
-        CLEM_LOG("ADB: Command Data [%02X]:%02X", adb->cmd_data_sent, value);
+        CLEM_DEBUG("ADB: Command Data [%02X]:%02X", adb->cmd_data_sent, value);
         adb->cmd_status |= CLEM_ADB_C027_CMD_FULL;
         _clem_adb_add_data(adb, value);
         break;

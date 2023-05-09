@@ -2,6 +2,7 @@
 #define CLEM_HOST_CONFIGURATION_HPP
 
 #include "clem_host_platform.h"
+#include "core/clem_apple2gs_config.hpp"
 
 #if defined(CLEMENS_PLATFORM_WINDOWS)
 #define CLEM_HOST_COMPANY_NAME     "Cinekine"
@@ -15,15 +16,18 @@
 #define CLEM_EMULATOR_RAM_DEFAULT 4096U
 #define CLEM_EMULATOR_RAM_MAXIMUM 8192U
 
+#include <array>
 #include <string>
 
 struct ClemensConfiguration {
     std::string iniPathname;
-    std::string dataDirectory;
-    std::string romFilename;
     unsigned majorVersion;
     unsigned minorVersion;
-    unsigned ramSizeKB;
+    std::string dataDirectory;
+    std::string romFilename;
+    int logLevel;
+
+    ClemensAppleIIGSConfig gs;
 
     bool hybridInterfaceEnabled;
     bool fastEmulationEnabled;
@@ -38,11 +42,15 @@ struct ClemensConfiguration {
 
     bool isNewInstall() const { return majorVersion == 0 && minorVersion == 0; }
 
+    // clears the dirty flag
     bool save();
+    // sets the dirty flag
+    void setDirty();
 
   private:
     void copyFrom(const ClemensConfiguration &other);
     static int handler(void *user, const char *section, const char *name, const char *value);
+    bool isDirty;
 };
 
 #endif

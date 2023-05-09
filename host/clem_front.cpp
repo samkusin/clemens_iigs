@@ -1,22 +1,30 @@
 #include "clem_front.hpp"
+
+#include "clem_backend.hpp"
+
+#include "cinek/fixedstack.hpp"
 #include "clem_assets.hpp"
 #include "clem_backend.hpp"
+#include "clem_defs.h"
 #include "clem_disk.h"
-#include "clem_disk_utils.hpp"
+#include "clem_disk_browser.hpp"
 #include "clem_host_platform.h"
 #include "clem_host_shared.hpp"
 #include "clem_host_utils.hpp"
 #include "clem_imgui.hpp"
-#include "clem_import_disk.hpp"
 #include "clem_l10n.hpp"
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
 #include "clem_mmio_types.h"
-#include "clem_ui_disk_unit.hpp"
+#include "core/clem_apple2gs_config.hpp"
+#include "core/clem_disk_asset.hpp"
+#include "core/clem_disk_status.hpp"
+#include "core/clem_disk_utils.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "spdlog/spdlog.h"
 #include "version.h"
 
 #include "cinek/encode.h"
@@ -27,6 +35,7 @@
 #include <charconv>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <tuple>
 
 //  Style
@@ -34,16 +43,25 @@ namespace ClemensHostStyle {
 
 static constexpr float kSideBarMinWidth = 200.0f;
 static constexpr float kMachineStateViewMinWidth = 480.0f;
-static constexpr float kDiskStatusLongMinWidth = 430.0f;
 
 // monochromatic "platinum" classic CACAC8
 //                          middle  969695
 // monochromatic "platinum" dark    4A4A33
 static ImU32 kDarkFrameColor = IM_COL32(0x4a, 0x4a, 0x33, 0xff);
 static ImU32 kDarkInsetColor = IM_COL32(0x3a, 0x3a, 0x22, 0xff);
+static ImU32 kWidgetToggleOnColor = IM_COL32(0xFF, 0xFF, 0xFF, 0xff);
+static ImU32 kWidgetActiveColor = IM_COL32(0xCA, 0xCA, 0xC8, 0xff);
+static ImU32 kWidgetHoverColor = IM_COL32(0xAA, 0xAA, 0xA8, 0xff);
+static ImU32 kWidgetColor = IM_COL32(0x96, 0x96, 0x95, 0xff);
+static ImU32 kWidgetToggleOffColor = IM_COL32(0x22, 0x22, 0x22, 0xff);
 
 ImU32 getFrameColor(const ClemensFrontend &) { return kDarkFrameColor; }
 ImU32 getInsetColor(const ClemensFrontend &) { return kDarkInsetColor; }
+ImU32 getWidgetColor(const ClemensFrontend &) { return kWidgetColor; }
+ImU32 getWidgetHoverColor(const ClemensFrontend &) { return kWidgetHoverColor; }
+ImU32 getWidgetActiveColor(const ClemensFrontend &) { return kWidgetActiveColor; }
+ImU32 getWidgetToggleOnColor(const ClemensFrontend &) { return kWidgetToggleOnColor; }
+ImU32 getWidgetToggleOffColor(const ClemensFrontend &) { return kWidgetToggleOffColor; }
 
 ImTextureID getImTextureOfAsset(ClemensHostAssets::ImageId id) {
     return (ImTextureID)(ClemensHostAssets::getImage(id));
@@ -571,7 +589,6 @@ void initDebugIODescriptors() {
     FormatView<decltype(ClemensFrontend::terminalLines_)>(terminalLines_, terminalChanged_)
 
 static constexpr size_t kFrameMemorySize = 4 * 1024 * 1024;
-static constexpr size_t kLogMemorySize = 4 * 1024 * 1024;
 
 static std::string getCommandTypeName(ClemensBackendCommand::Type type) {
     switch (type) {
@@ -596,12 +613,92 @@ static std::string getCommandTypeName(ClemensBackendCommand::Type type) {
     }
 }
 
+void ClemensFrontend::IWMStatus::copyFrom(ClemensMMIO &mmio, const ClemensDeviceIWM &iwm) {
+    const ClemensDrive *iwmDrive = nullptr;
+    status = 0;
+    if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
+        status |= kIWMStatusDriveOn;
+    }
+    if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_35) {
+        status |= kIWMStatusDrive35;
+        iwmDrive = clemens_drive_get(&mmio, kClemensDrive_3_5_D1);
+    } else {
+        iwmDrive = clemens_drive_get(&mmio, kClemensDrive_5_25_D1);
+    }
+    if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_2) {
+        status |= kIWMStatusDriveAlt;
+        ++iwmDrive; // HACKY!
+    }
+    if (iwm.q6_switch) {
+        status |= kIWMStatusIWMQ6;
+    }
+    if (iwm.q7_switch) {
+        status |= kIWMStatusIWMQ7;
+    }
+    if (iwmDrive->is_spindle_on) {
+        status |= kIWMStatusDriveSpin;
+    }
+
+    qtr_track_index = iwmDrive->qtr_track_index;
+    track_byte_index = iwmDrive->track_byte_index;
+    track_bit_shift = iwmDrive->track_bit_shift;
+    track_bit_length = iwmDrive->track_bit_length;
+    data = iwm.data_r;
+    latch = iwm.latch;
+    ph03 = (uint8_t)(iwm.out_phase & 0xff);
+
+    constexpr auto diskBufferSize = sizeof(buffer);
+    memset(buffer, 0, diskBufferSize);
+
+    const uint8_t *diskBits = iwmDrive->disk.bits_data;
+    unsigned diskTrackIndex = qtr_track_index;
+
+    if (iwmDrive->disk.meta_track_map[diskTrackIndex] != 0xff) {
+        diskTrackIndex = iwmDrive->disk.meta_track_map[diskTrackIndex];
+
+        if (iwmDrive->disk.track_initialized[diskTrackIndex]) {
+            unsigned trackByteCount = iwmDrive->disk.track_byte_count[diskTrackIndex];
+            unsigned left, right;
+            if (iwmDrive->track_byte_index > 0) {
+                left = iwmDrive->track_byte_index - 1;
+            } else {
+                left = trackByteCount - 1;
+            }
+            right = left + diskBufferSize - 1;
+            if (right >= trackByteCount) {
+                right = right - trackByteCount;
+            }
+            diskBits += iwmDrive->disk.track_byte_offset[diskTrackIndex];
+            unsigned bufferIndex = 0;
+            if (left > right) {
+                for (; left < trackByteCount && bufferIndex < 4; ++left, ++bufferIndex) {
+                    buffer[bufferIndex] = diskBits[left];
+                }
+                left = 0;
+            }
+            //  TODO: Buggy - seems that using a blank disk and then inserting a non blank disk
+            //  causes a crash
+            for (; left <= right; ++left, ++bufferIndex) {
+                assert(bufferIndex < 4);
+                buffer[bufferIndex] = diskBits[left];
+            }
+        }
+    }
+}
+
 void ClemensFrontend::DOCStatus::copyFrom(const ClemensDeviceEnsoniq &doc) {
     memcpy(voice, doc.voice, sizeof(voice));
     memcpy(reg, doc.reg, sizeof(reg));
     memcpy(acc, doc.acc, sizeof(acc));
     memcpy(ptr, doc.ptr, sizeof(ptr));
     memcpy(osc_flags, doc.osc_flags, sizeof(osc_flags));
+}
+
+void ClemensFrontend::ADBStatus::copyFrom(ClemensMMIO &mmio) {
+    mod_states = clemens_get_adb_key_modifier_states(&mmio);
+    for (int i = 0; i < 4; ++i) {
+        mouse_reg[i] = mmio.dev_adb.mouse_reg[i];
+    }
 }
 
 const uint64_t ClemensFrontend::kFrameSeqNoInvalid = std::numeric_limits<uint64_t>::max();
@@ -613,23 +710,13 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       display_(displayProvider_), audio_(), logLevel_(CLEM_DEBUG_LOG_INFO), uiFrameTimeDelta_(0.0),
       frameSeqNo_(kFrameSeqNoInvalid), frameLastSeqNo_(kFrameSeqNoInvalid),
       frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
-      frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
-      frameMemory_(kLogMemorySize, malloc(kLogMemorySize)), lastFrameCPUPins_{},
+      frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)), lastFrameCPUPins_{},
       lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0), lastFrameNMIs_(0),
       emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false), terminalChanged_(false),
-      consoleChanged_(false), terminalMode_(TerminalMode::Command),
-      diskLibraryRootPath_{
-          (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_LIBRARY_DIR).string()},
-      diskTracesRootPath_{
-          (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_TRACES_DIR).string()},
-      diskLibrary_(diskLibraryRootPath_, CLEM_DISK_TYPE_NONE, 256, 512),
-      debugIOMode_(DebugIOMode::Core), vgcDebugMinScanline_(0), vgcDebugMaxScanline_(0),
-      joystickSlotCount_(0), guiMode_(GUIMode::RebootEmulator),
-      guiPrevMode_(GUIMode::RebootEmulator), diskUnit_{{diskLibrary_, kClemensDrive_3_5_D1},
-                                                       {diskLibrary_, kClemensDrive_3_5_D2},
-                                                       {diskLibrary_, kClemensDrive_5_25_D1},
-                                                       {diskLibrary_, kClemensDrive_5_25_D2}},
-      smartportUnit_(0, diskLibrary_.getLibraryRootPath()) {
+      consoleChanged_(false), terminalMode_(TerminalMode::Command), debugIOMode_(DebugIOMode::Core),
+      vgcDebugMinScanline_(0), vgcDebugMaxScanline_(0), joystickSlotCount_(0),
+      guiMode_(GUIMode::RebootEmulator), guiPrevMode_(GUIMode::RebootEmulator),
+      diskBrowserMode_("diskBrowser") {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -637,24 +724,23 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
     clem_joystick_open_devices(CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT);
 
     audio_.start();
-    backendConfig_.type = ClemensBackend::Config::Type::Apple2GS;
-    backendConfig_.audioSamplesPerSecond = audio_.getAudioFrequency();
+    if (config_.gs.audioSamplesPerSecond == 0) {
+        config_.gs.audioSamplesPerSecond = audio_.getAudioFrequency();
+    }
 
-    auto audioBufferSize = backendConfig_.audioSamplesPerSecond * audio_.getBufferStride() / 2;
+    auto audioBufferSize = config_.gs.audioSamplesPerSecond * audio_.getBufferStride() / 2;
     lastCommandState_.audioBuffer =
         cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
     thisFrameAudioBuffer_ = cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
 
-    backendConfig_.dataRootPath = config_.dataDirectory;
-    backendConfig_.diskLibraryRootPath = diskLibraryRootPath_;
-    backendConfig_.traceRootPath = diskTracesRootPath_;
-    backendConfig_.snapshotRootPath =
+    snapshotRootPath_ =
         (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_SNAPSHOT_DIR).string();
 
     debugMemoryEditor_.ReadFn = &ClemensFrontend::imguiMemoryEditorRead;
     debugMemoryEditor_.WriteFn = &ClemensFrontend::imguiMemoryEditorWrite;
     CLEM_TERM_COUT.format(TerminalLine::Info, "Welcome to the Clemens IIgs Emulator {}.{}",
                           CLEM_HOST_VERSION_MAJOR, CLEM_HOST_VERSION_MINOR);
+    spdlog::info("Clemens IIGS Emulator {}.{}", CLEM_HOST_VERSION_MAJOR, CLEM_HOST_VERSION_MINOR);
 }
 
 ClemensFrontend::~ClemensFrontend() {
@@ -663,6 +749,7 @@ ClemensFrontend::~ClemensFrontend() {
     clem_joystick_close_devices();
     delete[] thisFrameAudioBuffer_.getHead();
     delete[] lastCommandState_.audioBuffer.getHead();
+
     free(frameWriteMemory_.getHead());
     free(frameReadMemory_.getHead());
 }
@@ -695,20 +782,27 @@ void ClemensFrontend::lostFocus() {
 void ClemensFrontend::createBackend() {
     auto romPath = std::filesystem::path(config_.dataDirectory) / config_.romFilename;
 
-    backendConfig_.cardNames[3] = kClemensCardMockingboardName; // load the mockingboard
-    backendConfig_.ramSizeKB = config_.ramSizeKB;
-    backendConfig_.enableFastEmulation = config_.fastEmulationEnabled;
-    backendConfig_.logLevel = logLevel_;
+    ClemensBackendConfig backendConfig{};
 
-    auto backend = std::make_unique<ClemensBackend>(romPath.string(), backendConfig_);
+    backendConfig.dataRootPath = config_.dataDirectory;
+    backendConfig.snapshotRootPath = snapshotRootPath_;
+    backendConfig.traceRootPath =
+        (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_TRACES_DIR).string();
+    backendConfig.enableFastEmulation = config_.fastEmulationEnabled;
+    backendConfig.logLevel = logLevel_;
+    backendConfig.type = ClemensBackendConfig::Type::Apple2GS;
+    backendConfig.breakpoints = breakpoints_;
+
+    backendConfig.GS = config_.gs;
+    backendConfig.GS.cardNames[3] = ClemensAppleIIGS::kClemensCardMockingboardName;
+
+    spdlog::info("Starting new emulator backend");
+    auto backend = std::make_unique<ClemensBackend>(romPath.string(), backendConfig);
+    backendThread_ = std::thread(&ClemensFrontend::runBackend, this, std::move(backend));
 
     uiFrameTimeDelta_ = 0.0;
     backendQueue_.reset();
     backendQueue_.run();
-
-    fmt::print("Creating new backend emulator.\n");
-
-    backendThread_ = std::thread(&ClemensFrontend::runBackend, this, std::move(backend));
 }
 
 void ClemensFrontend::runBackend(std::unique_ptr<ClemensBackend> backend) {
@@ -737,6 +831,18 @@ void ClemensFrontend::runBackend(std::unique_ptr<ClemensBackend> backend) {
                                     // frameTimeLag += uiFrameTimeDelta_;
                                     uiFrameTimeDelta_ = 0.0;
                                 });
+        if (results.second) {
+            std::lock_guard<std::mutex> lk(frameMutex_);
+            ClemensAppleIIGSConfig config;
+            if (backend->queryConfig(config)) {
+                lastCommandState_.gsConfig = config;
+            } else {
+                spdlog::warn("Configuration was not retrieved on termination of emulated machine!");
+            }
+        }
+        //  TODO: check for config change
+        //        mutex configuration
+        //        save it!
     }
 }
 
@@ -751,6 +857,12 @@ void ClemensFrontend::stopBackend() {
         backendThread_.join();
     }
     backendThread_ = std::thread();
+    if (lastCommandState_.gsConfig.has_value()) {
+        config_.gs = *lastCommandState_.gsConfig;
+        config_.setDirty();
+        config_.save();
+    }
+    spdlog::info("Terminated emulator backend");
 }
 
 bool ClemensFrontend::isBackendRunning() const { return backendThread_.joinable(); }
@@ -761,241 +873,175 @@ void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state,
     //  prevent reallocation of the results vector
     std::copy(results.begin(), results.end(), std::back_inserter(lastCommandState_.results));
 
-    copyState(state);
+    frameWriteState_.copyState(state, lastCommandState_, frameWriteMemory_);
 }
 
-void ClemensFrontend::copyState(const ClemensBackendState &state) {
-    frameWriteMemory_.reset();
+void ClemensFrontend::FrameState::copyState(const ClemensBackendState &state,
+                                            LastCommandState &commandState,
+                                            cinek::FixedStack &frameMemory) {
+    frameMemory.reset();
 
-    frameWriteState_.mark = 0xdeadbeef;
-    frameWriteState_.cpu = state.machine->cpu;
-    frameWriteState_.monitorFrame = state.monitor;
+    emulatorClock.ts = state.machine->tspec.clocks_spent;
+    emulatorClock.ref_step = CLEM_CLOCKS_PHI0_CYCLE;
+    cpu = state.machine->cpu;
 
+    ////////////////////////////////////////////////////////////////////////////
+    //  Mega 2 state replicated from the backend
+    //      This code could be moved into a separate module just to make this
+    //      rather lengthy block of code more maintainable.
+    //
+    frame.monitor = state.frame->monitor;
     //  copy scanlines as this data may become invalid on a frame-to-frame
     //  basis
-    frameWriteState_.textFrame = state.text;
-    if (frameWriteState_.textFrame.format != kClemensVideoFormat_None) {
-        frameWriteState_.textFrame.scanlines =
-            frameWriteMemory_.allocateArray<ClemensScanline>(state.text.scanline_limit);
-        memcpy(frameWriteState_.textFrame.scanlines, state.text.scanlines,
-               sizeof(ClemensScanline) * state.text.scanline_limit);
+    frame.text = state.frame->text;
+    if (frame.text.format != kClemensVideoFormat_None) {
+        frame.text.scanlines =
+            frameMemory.allocateArray<ClemensScanline>(state.frame->text.scanline_limit);
+        memcpy(frame.text.scanlines, state.frame->text.scanlines,
+               sizeof(ClemensScanline) * state.frame->text.scanline_limit);
     }
-    frameWriteState_.graphicsFrame = state.graphics;
-    if (frameWriteState_.graphicsFrame.format != kClemensVideoFormat_None) {
-        frameWriteState_.graphicsFrame.scanlines =
-            frameWriteMemory_.allocateArray<ClemensScanline>(state.graphics.scanline_limit);
-        memcpy(frameWriteState_.graphicsFrame.scanlines, state.graphics.scanlines,
-               sizeof(ClemensScanline) * state.graphics.scanline_limit);
-        frameWriteState_.graphicsFrame.rgb = frameWriteMemory_.allocateArray<uint16_t>(
-            frameWriteState_.graphicsFrame.rgb_buffer_size);
-        memcpy(frameWriteState_.graphicsFrame.rgb, state.graphics.rgb,
-               state.graphics.rgb_buffer_size);
+    frame.graphics = state.frame->graphics;
+    if (frame.graphics.format != kClemensVideoFormat_None) {
+        frame.graphics.scanlines =
+            frameMemory.allocateArray<ClemensScanline>(state.frame->graphics.scanline_limit);
+        memcpy(frame.graphics.scanlines, state.frame->graphics.scanlines,
+               sizeof(ClemensScanline) * state.frame->graphics.scanline_limit);
+        // need to save off the rgb color buffer since the original memory belongs
+        // to the backend
+        frame.graphics.rgb = frameMemory.allocateArray<uint16_t>(frame.graphics.rgb_buffer_size);
+        memcpy(frame.graphics.rgb, state.frame->graphics.rgb,
+               state.frame->graphics.rgb_buffer_size);
     }
-    frameWriteState_.audioFrame = state.audio;
-    frameWriteState_.backendCPUID = state.hostCPUID;
-    frameWriteState_.fps = state.fps;
-    frameWriteState_.mmioWasInitialized = state.mmioWasInitialized;
-    frameWriteState_.isTracing = state.isTracing;
-    frameWriteState_.isRunning = state.isRunning;
-    frameWriteState_.machineSpeedMhz = state.machineSpeedMhz;
-    frameWriteState_.avgVBLsPerFrame = state.avgVBLsPerFrame;
-    frameWriteState_.emulatorClock.ts = state.machine->tspec.clocks_spent;
-    frameWriteState_.emulatorClock.ref_step = CLEM_CLOCKS_PHI0_CYCLE;
-    //  copy over component state as needed
-    frameWriteState_.vgcModeFlags = state.mmio->vgc.mode_flags;
-    frameWriteState_.irqs = state.mmio->irq_line;
-    frameWriteState_.nmis = state.mmio->nmi_line;
+    frame.diskDriveStatuses = state.frame->diskDriveStatuses;
+    frame.smartPortStatuses = state.frame->smartPortStatuses;
 
-    const ClemensDeviceIWM &iwm = state.mmio->dev_iwm;
-    const ClemensDrive *iwmDrive = nullptr;
-    frameWriteState_.iwm.status = 0;
-    if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
-        frameWriteState_.iwm.status |= kIWMStatusDriveOn;
-    }
-    if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_35) {
-        frameWriteState_.iwm.status |= kIWMStatusDrive35;
-        iwmDrive = clemens_drive_get(state.mmio, kClemensDrive_3_5_D1);
+    e0bank = frameMemory.allocateArray<uint8_t>(CLEM_IIGS_BANK_SIZE);
+    clemens_out_bin_data(state.machine, e0bank, CLEM_IIGS_BANK_SIZE, 0xe0, 0x0000);
+    e1bank = frameMemory.allocateArray<uint8_t>(CLEM_IIGS_BANK_SIZE);
+    clemens_out_bin_data(state.machine, e1bank, CLEM_IIGS_BANK_SIZE, 0xe1, 0x0000);
+
+    //  audio data - note, that the actual buffer and some fixed attributes like
+    //  stride are all that's needed by the frontend to render audio
+    //  frames are accumulated into an audio buffer residing in "last command state"
+    //  just in case the front-end refresh rate ends up being slower than the
+    //  backend
+    frame.audio = state.frame->audio;
+    if (frame.audio.data) {
+        auto audioBufferSize = int32_t(frame.audio.frame_count * frame.audio.frame_stride);
+        auto audioBufferRange = commandState.audioBuffer.forwardSize(audioBufferSize);
+        memcpy(audioBufferRange.first, frame.audio.data, cinek::length(audioBufferRange));
+        frame.audio.data = NULL;
     } else {
-        iwmDrive = clemens_drive_get(state.mmio, kClemensDrive_5_25_D1);
+        commandState.audioBuffer.reset();
     }
-    if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_2) {
-        frameWriteState_.iwm.status |= kIWMStatusDriveAlt;
-        ++iwmDrive;
-    }
-    if (iwm.q6_switch) {
-        frameWriteState_.iwm.status |= kIWMStatusIWMQ6;
-    }
-    if (iwm.q7_switch) {
-        frameWriteState_.iwm.status |= kIWMStatusIWMQ7;
-    }
-    if (iwmDrive->is_spindle_on) {
-        frameWriteState_.iwm.status |= kIWMStatusDriveSpin;
-    }
-
-    frameWriteState_.iwm.qtr_track_index = iwmDrive->qtr_track_index;
-    frameWriteState_.iwm.track_byte_index = iwmDrive->track_byte_index;
-    frameWriteState_.iwm.track_bit_shift = iwmDrive->track_bit_shift;
-    frameWriteState_.iwm.track_bit_length = iwmDrive->track_bit_length;
-    frameWriteState_.iwm.data = iwm.data_r;
-    frameWriteState_.iwm.latch = iwm.latch;
-    frameWriteState_.iwm.ph03 = (uint8_t)(iwm.out_phase & 0xff);
-
-    constexpr auto diskBufferSize = sizeof(frameWriteState_.iwm.buffer);
-    memset(frameWriteState_.iwm.buffer, 0, diskBufferSize);
-
-    const uint8_t *diskBits = iwmDrive->disk.bits_data;
-    unsigned diskTrackIndex = frameWriteState_.iwm.qtr_track_index;
-
-    frameWriteState_.adb.mod_states = clemens_get_adb_key_modifier_states(state.mmio);
-    for (int i = 0; i < 4; ++i) {
-        frameWriteState_.adb.mouse_reg[i] = state.mmio->dev_adb.mouse_reg[i];
-    }
-
-    if (iwmDrive->disk.meta_track_map[diskTrackIndex] != 0xff) {
-        diskTrackIndex = iwmDrive->disk.meta_track_map[diskTrackIndex];
-
-        if (iwmDrive->disk.track_initialized[diskTrackIndex]) {
-            unsigned trackByteCount = iwmDrive->disk.track_byte_count[diskTrackIndex];
-            unsigned left, right;
-            if (iwmDrive->track_byte_index > 0) {
-                left = iwmDrive->track_byte_index - 1;
-            } else {
-                left = trackByteCount - 1;
-            }
-            right = left + diskBufferSize - 1;
-            if (right >= trackByteCount) {
-                right = right - trackByteCount;
-            }
-            diskBits += iwmDrive->disk.track_byte_offset[diskTrackIndex];
-            unsigned bufferIndex = 0;
-            if (left > right) {
-                for (; left < trackByteCount && bufferIndex < 4; ++left, ++bufferIndex) {
-                    frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];
-                }
-                left = 0;
-            }
-            //  TODO: Buggy - seems that using a blank disk and then inserting a non blank disk
-            //  causes a crash
-            for (; left <= right; ++left, ++bufferIndex) {
-                assert(bufferIndex < 4);
-                frameWriteState_.iwm.buffer[bufferIndex] = diskBits[left];
-            }
-        }
-    }
-
-    //  copy over memory banks as needed
-    frameWriteState_.bankE0 = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
-    memcpy(frameWriteState_.bankE0, state.machine->mem.mega2_bank_map[0], CLEM_IIGS_BANK_SIZE);
-    frameWriteState_.bankE1 = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
-    memcpy(frameWriteState_.bankE1, state.machine->mem.mega2_bank_map[1], CLEM_IIGS_BANK_SIZE);
-
-    frameWriteState_.ioPage = (uint8_t *)frameWriteMemory_.allocate(256);
-    memcpy(frameWriteState_.ioPage, state.ioPageValues, 256);
-
-    frameWriteState_.bram = (uint8_t *)frameWriteMemory_.allocate(CLEM_RTC_BRAM_SIZE);
-    memcpy(frameWriteState_.bram, state.mmio->dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
-
-    frameWriteState_.memoryViewBank = state.debugMemoryPage;
-    if (!state.isRunning && state.mmioWasInitialized) {
-        frameWriteState_.memoryView = (uint8_t *)frameWriteMemory_.allocate(CLEM_IIGS_BANK_SIZE);
-        //  read every byte from the memory controller - which can be 'slow' enough
-        //  to effect framerate on some systems.   so we only update memory state
-        //  when the emulator isn't actively running instructions
-        uint8_t *memoryView = reinterpret_cast<uint8_t *>(frameWriteState_.memoryView);
-        for (unsigned addr = 0; addr < 0x10000; ++addr) {
-            clem_read(state.machine, &memoryView[addr], addr, state.debugMemoryPage,
-                      CLEM_MEM_FLAG_NULL);
-        }
-
-        constexpr size_t kDOCRAMSize = 65536;
-
-        frameWriteState_.docRAM = (uint8_t *)frameWriteMemory_.allocate(kDOCRAMSize);
-        memcpy(frameWriteState_.docRAM, &state.mmio->dev_audio.doc.sound_ram, kDOCRAMSize);
-    } else {
-        frameWriteState_.memoryView = nullptr;
-        frameWriteState_.docRAM = nullptr;
-    }
-    frameWriteState_.doc.copyFrom(state.mmio->dev_audio.doc);
-
-    const ClemensBackendDiskDriveState *driveState = state.diskDrives;
-    for (auto &diskDrive : frameWriteState_.diskDrives) {
-        diskDrive = *driveState;
-        ++driveState;
-    }
-    driveState = state.smartDrives;
-    for (auto &smartDrive : frameWriteState_.smartDrives) {
-        smartDrive = *driveState;
-        ++driveState;
-    }
+    //  replicate card states needed by the frontend
     for (unsigned slotIndex = 0; slotIndex < CLEM_CARD_SLOT_COUNT; ++slotIndex) {
         if (state.mmio->card_slot[slotIndex]) {
             const char *cardName = state.mmio->card_slot[slotIndex]->io_name(
                 state.mmio->card_slot[slotIndex]->context);
-            frameWriteState_.cards[slotIndex] = cardName;
+            cards[slotIndex] = cardName;
         } else {
-            frameWriteState_.cards[slotIndex].clear();
+            cards[slotIndex].clear();
         }
     }
 
-    frameWriteState_.breakpoints = frameWriteMemory_.allocateArray<ClemensBackendBreakpoint>(
-        state.bpBufferEnd - state.bpBufferStart);
-    frameWriteState_.breakpointCount = (unsigned)(state.bpBufferEnd - state.bpBufferStart);
-    auto *bpDest = frameWriteState_.breakpoints;
+    //  Mega 2 Component subsystems
+    iwm.copyFrom(*state.mmio, state.mmio->dev_iwm);
+    doc.copyFrom(state.mmio->dev_audio.doc);
+    adb.copyFrom(*state.mmio);
+
+    ////////////////////////////////////////////////////////////////////////////
+    //  Memory buffers to inspect
+    //
+    memoryViewBank = state.debugMemoryPage;
+    if (!state.isRunning && state.mmioWasInitialized) {
+        memoryView = (uint8_t *)frameMemory.allocate(CLEM_IIGS_BANK_SIZE);
+        //  read every byte from the memory controller - which can be 'slow' enough
+        //  to effect framerate on some systems.   so we only update memory state
+        //  when the emulator isn't actively running instructions
+        for (unsigned addr = 0; addr < 0x10000; ++addr) {
+            clem_read(state.machine, &memoryView[addr], addr, state.debugMemoryPage,
+                      CLEM_MEM_FLAG_NULL);
+        }
+        constexpr size_t kDOCRAMSize = sizeof(state.mmio->dev_audio.doc.sound_ram);
+        docRAM = (uint8_t *)frameMemory.allocate(kDOCRAMSize);
+        memcpy(docRAM, &state.mmio->dev_audio.doc.sound_ram, kDOCRAMSize);
+    } else {
+        memoryView = nullptr;
+        docRAM = nullptr;
+    }
+    ioPage = (uint8_t *)frameMemory.allocate(256);
+    memcpy(ioPage, state.ioPageValues, 256);
+    bram = (uint8_t *)frameMemory.allocate(CLEM_RTC_BRAM_SIZE);
+    memcpy(bram, state.mmio->dev_rtc.bram, CLEM_RTC_BRAM_SIZE);
+
+    breakpointCount = (unsigned)(state.bpBufferEnd - state.bpBufferStart);
+    breakpoints = frameMemory.allocateArray<ClemensBackendBreakpoint>(breakpointCount);
+
+    auto *bpDest = breakpoints;
     for (auto *bpCur = state.bpBufferStart; bpCur != state.bpBufferEnd; ++bpCur, ++bpDest) {
         *bpDest = *bpCur;
-        if (state.bpHitIndex.has_value() && !lastCommandState_.hitBreakpoint.has_value()) {
+        if (state.bpHitIndex.has_value() && !commandState.hitBreakpoint.has_value()) {
             if (unsigned(bpCur - state.bpBufferStart) == *state.bpHitIndex) {
-                lastCommandState_.hitBreakpoint = *state.bpHitIndex;
+                commandState.hitBreakpoint = *state.bpHitIndex;
             }
         }
     }
 
-    if (state.audio.data) {
-        auto audioBufferSize = int32_t(state.audio.frame_count * state.audio.frame_stride);
-        auto audioBufferRange = lastCommandState_.audioBuffer.forwardSize(audioBufferSize);
-        memcpy(audioBufferRange.first, state.audio.data, cinek::length(audioBufferRange));
-    } else {
-        lastCommandState_.audioBuffer.reset();
-    }
-    frameWriteState_.logLevel = state.logLevel;
+    logLevel = state.logLevel;
     for (auto *logItem = state.logBufferStart; logItem != state.logBufferEnd; ++logItem) {
-        LogOutputNode *logMemory = reinterpret_cast<LogOutputNode *>(frameMemory_.allocate(
+        LogOutputNode *logMemory = reinterpret_cast<LogOutputNode *>(frameMemory.allocate(
             sizeof(LogOutputNode) + CK_ALIGN_SIZE_TO_ARCH(logItem->text.size())));
         logMemory->logLevel = logItem->level;
         logMemory->sz = unsigned(logItem->text.size());
         logItem->text.copy(reinterpret_cast<char *>(logMemory) + sizeof(LogOutputNode),
                            std::string::npos);
         logMemory->next = nullptr;
-        if (!lastCommandState_.logNode) {
-            lastCommandState_.logNode = logMemory;
+        if (!commandState.logNode) {
+            commandState.logNode = logMemory;
         } else {
-            lastCommandState_.logNodeTail->next = logMemory;
+            commandState.logNodeTail->next = logMemory;
         }
-        lastCommandState_.logNodeTail = logMemory;
+        commandState.logNodeTail = logMemory;
     }
 
     if (state.logInstructionStart != state.logInstructionEnd) {
         size_t instructionCount = state.logInstructionEnd - state.logInstructionStart;
         LogInstructionNode *logInstMemory = reinterpret_cast<LogInstructionNode *>(
-            frameMemory_.allocate(sizeof(LogInstructionNode)));
+            frameMemory.allocate(sizeof(LogInstructionNode)));
         logInstMemory->begin =
-            frameMemory_.allocateArray<ClemensBackendExecutedInstruction>(instructionCount);
+            frameMemory.allocateArray<ClemensBackendExecutedInstruction>(instructionCount);
         logInstMemory->end = logInstMemory->begin + instructionCount;
         logInstMemory->next = nullptr;
         memcpy(logInstMemory->begin, state.logInstructionStart,
                instructionCount * sizeof(ClemensBackendExecutedInstruction));
-        if (!lastCommandState_.logInstructionNode) {
-            lastCommandState_.logInstructionNode = logInstMemory;
+        if (!commandState.logInstructionNode) {
+            commandState.logInstructionNode = logInstMemory;
         } else {
-            lastCommandState_.logInstructionNodeTail->next = logInstMemory;
+            commandState.logInstructionNodeTail->next = logInstMemory;
         }
-        lastCommandState_.logInstructionNodeTail = logInstMemory;
+        commandState.logInstructionNodeTail = logInstMemory;
     }
 
-    lastCommandState_.isFastEmulationOn = state.fastEmulationOn;
+    commandState.isFastEmulationOn = state.fastEmulationOn;
+
+    machineSpeedMhz = state.machineSpeedMhz;
+    avgVBLsPerFrame = state.avgVBLsPerFrame;
+    vgcModeFlags = state.mmio->vgc.mode_flags;
+    irqs = state.mmio->irq_line;
+    nmis = state.mmio->nmi_line;
+
+    backendCPUID = state.hostCPUID;
+    fps = state.fps;
+    mmioWasInitialized = state.mmioWasInitialized;
+    isTracing = state.isTracing;
+    isRunning = state.isRunning;
 
     if (state.message.has_value()) {
         fmt::print("debug message: {}\n", *state.message);
+    }
+    if (state.config.has_value()) {
+        commandState.gsConfig = state.config;
     }
 }
 
@@ -1144,9 +1190,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
             breakpoints_.clear();
             for (unsigned bpIndex = 0; bpIndex < frameReadState_.breakpointCount; ++bpIndex) {
                 breakpoints_.emplace_back(frameReadState_.breakpoints[bpIndex]);
-                backendConfig_.breakpoints.push_back(breakpoints_.back());
             }
-            backendConfig_.breakpoints = breakpoints_;
 
             if (!lastCommandState_.results.empty()) {
                 for (auto &result : lastCommandState_.results) {
@@ -1163,21 +1207,16 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
                 lastCommandState_.hitBreakpoint = std::nullopt;
             }
 
-            for (size_t driveIndex = 0; driveIndex < frameReadState_.diskDrives.size();
-                 ++driveIndex) {
-                backendConfig_.diskDriveStates[driveIndex] = frameReadState_.diskDrives[driveIndex];
-            }
-            for (size_t driveIndex = 0; driveIndex < frameReadState_.smartDrives.size();
-                 ++driveIndex) {
-                backendConfig_.smartPortDriveStates[driveIndex] =
-                    frameReadState_.smartDrives[driveIndex];
-            }
-
-            frameMemory_.reset();
-
             std::swap(lastCommandState_.audioBuffer, thisFrameAudioBuffer_);
         }
         uiFrameTimeDelta_ = deltaTime;
+
+        if (lastCommandState_.gsConfig.has_value()) {
+            config_.gs = *lastCommandState_.gsConfig;
+            lastCommandState_.gsConfig = std::nullopt;
+            config_.setDirty();
+        }
+
         stagedBackendQueue_.queue(backendQueue_);
     }
     readyForFrame_.notify_one();
@@ -1187,19 +1226,19 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     //  monitor are stored in screenUVs
     float screenUVs[2]{0.0f, 0.0f};
     if (frameReadState_.mmioWasInitialized && isEmulatorActive()) {
-        const uint8_t *e0mem = frameReadState_.bankE0;
-        const uint8_t *e1mem = frameReadState_.bankE1;
+        const uint8_t *e0mem = frameReadState_.e0bank;
+        const uint8_t *e1mem = frameReadState_.e1bank;
         bool altCharSet = frameReadState_.vgcModeFlags & CLEM_VGC_ALTCHARSET;
         bool text80col = frameReadState_.vgcModeFlags & CLEM_VGC_80COLUMN_TEXT;
-        display_.start(frameReadState_.monitorFrame, kClemensScreenWidth, kClemensScreenHeight);
-        display_.renderTextGraphics(frameReadState_.textFrame, frameReadState_.graphicsFrame, e0mem,
-                                    e1mem, text80col, altCharSet);
-        if (frameReadState_.graphicsFrame.format == kClemensVideoFormat_Double_Hires) {
-            display_.renderDoubleHiresGraphics(frameReadState_.graphicsFrame, e0mem, e1mem);
-        } else if (frameReadState_.graphicsFrame.format == kClemensVideoFormat_Hires) {
-            display_.renderHiresGraphics(frameReadState_.graphicsFrame, e0mem);
-        } else if (frameReadState_.graphicsFrame.format == kClemensVideoFormat_Super_Hires) {
-            display_.renderSuperHiresGraphics(frameReadState_.graphicsFrame, e1mem);
+        display_.start(frameReadState_.frame.monitor, kClemensScreenWidth, kClemensScreenHeight);
+        display_.renderTextGraphics(frameReadState_.frame.text, frameReadState_.frame.graphics,
+                                    e0mem, e1mem, text80col, altCharSet);
+        if (frameReadState_.frame.graphics.format == kClemensVideoFormat_Double_Hires) {
+            display_.renderDoubleHiresGraphics(frameReadState_.frame.graphics, e0mem, e1mem);
+        } else if (frameReadState_.frame.graphics.format == kClemensVideoFormat_Hires) {
+            display_.renderHiresGraphics(frameReadState_.frame.graphics, e0mem);
+        } else if (frameReadState_.frame.graphics.format == kClemensVideoFormat_Super_Hires) {
+            display_.renderSuperHiresGraphics(frameReadState_.frame.graphics, e1mem);
         }
         display_.finish(screenUVs);
     }
@@ -1208,7 +1247,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     if (isNewFrame && thisFrameAudioBuffer_.getSize() > 0) {
         ClemensAudio audioFrame;
         audioFrame.data = thisFrameAudioBuffer_.getHead();
-        audioFrame.frame_stride = frameReadState_.audioFrame.frame_stride;
+        audioFrame.frame_stride = frameReadState_.frame.audio.frame_stride;
         audioFrame.frame_start = 0;
         audioFrame.frame_count = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
         audioFrame.frame_total = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
@@ -1240,8 +1279,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         break;
     case GUIMode::LoadSnapshot:
         if (!loadSnapshotMode_.isStarted()) {
-            loadSnapshotMode_.start(backendQueue_, backendConfig_.snapshotRootPath,
-                                    frameReadState_.isRunning);
+            loadSnapshotMode_.start(backendQueue_, snapshotRootPath_, frameReadState_.isRunning);
         }
         if (loadSnapshotMode_.frame(width, height, backendQueue_)) {
             loadSnapshotMode_.stop(backendQueue_);
@@ -1255,7 +1293,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         if (settingsMode_.frame(width, height)) {
             if (settingsMode_.shouldBeCommitted()) {
                 config_ = settingsMode_.getConfiguration();
-                config_.save();
                 backendQueue_.enableFastDiskEmulation(config_.fastEmulationEnabled);
             }
             settingsMode_.stop();
@@ -1264,6 +1301,27 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         break;
     case GUIMode::Help:
         doHelpScreen(width, height);
+        break;
+    case GUIMode::DiskBrowser:
+        if (!diskBrowserMode_.isOpen()) {
+            diskBrowserMode_.open(ClemensDiskAsset::diskTypeFromDriveType(*browseDriveType_));
+        }
+        if (diskBrowserMode_.isOpen()) {
+            ImVec2 browserSize(std::max(640.0f, width * 0.66f), std::max(512.0f, height * 0.5f));
+            if (diskBrowserMode_.display(browserSize)) {
+                if (diskBrowserMode_.isOk()) {
+                    auto asset = diskBrowserMode_.acquireSelectedFilePath();
+                    if (diskBrowserMode_.isSelectedFilePathNewFile()) {
+                        backendQueue_.insertBlankDisk(*browseDriveType_, asset.path());
+                    } else {
+                        backendQueue_.insertDisk(*browseDriveType_, asset.path());
+                    }
+                }
+                diskBrowserMode_.close();
+                browseDriveType_ = std::nullopt;
+                setGUIMode(GUIMode::Emulator);
+            }
+        }
         break;
     case GUIMode::RebootEmulator:
         if (!isBackendRunning()) {
@@ -1320,10 +1378,12 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
                 emulatorHasMouseFocus_ = false;
             } else if (ImGui::IsKeyPressed(ImGuiKey_F11)) {
                 config_.hybridInterfaceEnabled = !config_.hybridInterfaceEnabled;
-                config_.save();
+                config_.setDirty();
             }
         }
     }
+
+    config_.save();
 
     interop.mouseLock = emulatorHasMouseFocus_;
 
@@ -1441,6 +1501,8 @@ void ClemensFrontend::doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions) {
     ImVec2 sidebarSize(dimensions.x, dimensions.y - quickBarSize.y);
     ImGui::SetNextWindowPos(anchor);
     ImGui::SetNextWindowSize(sidebarSize);
+    sidebarSize.x -= 2 * style.FramePadding.x;
+
     ImGui::Begin("SidePanel", nullptr,
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus);
     doUserMenuDisplay(sidebarSize.x);
@@ -1553,7 +1615,7 @@ void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     if (ImGui::CollapsingHeader("Motherboard", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Indent();
-        ImGui::Text("Memory: %uK", backendConfig_.ramSizeKB);
+        ImGui::Text("Memory: %uK", config_.gs.memory);
         ImGui::Unindent();
     }
     ImGui::Separator();
@@ -1636,7 +1698,7 @@ void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
     }
     if (ImGui::CollapsingHeader("Cards", ImGuiTreeNodeFlags_DefaultOpen)) {
         for (unsigned slot = 0; slot < CLEM_CARD_SLOT_COUNT; ++slot) {
-            if (frameWriteState_.cards[slot].empty())
+            if (frameReadState_.cards[slot].empty())
                 continue;
             ImGui::Spacing();
             ImGui::Image(ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kCard),
@@ -1645,7 +1707,7 @@ void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
             ImGui::BeginGroup();
             ImGui::Text("Slot %u", slot + 1);
             ImGui::Spacing();
-            ImGui::TextUnformatted(frameWriteState_.cards[slot].c_str());
+            ImGui::TextUnformatted(frameReadState_.cards[slot].c_str());
             ImGui::EndGroup();
             ImGui::Separator();
         }
@@ -1782,7 +1844,7 @@ void ClemensFrontend::doDebuggerQuickbar(float /*width */) {
                 "Debugger", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kDebugger),
                 kIconSize)) {
             config_.hybridInterfaceEnabled = true;
-            config_.save();
+            config_.setDirty();
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
             ImGui::SetTooltip("Enter debugger mode");
@@ -1926,14 +1988,16 @@ void ClemensFrontend::doMachineDiagnosticsDisplay() {
     ImGui::EndTable();
 }
 
-static const char *sDriveName[] = {"S5,D1", "S5,D2", "S6,D1", "S6,D2"};
 static const char *sDriveDescriptionShort[] = {"3.5\" disk", "3.5\" disk", "5.25\" disk",
                                                "5.25\" disk"};
 static const char *sDriveDescription[] = {"3.5 inch 800K", "3.5 inch 800K", "5.25 inch 140K",
                                           "5.25 inch 140K"};
-static const char *sSmartDriveName[] = {"Smart,D1"};
 
 void ClemensFrontend::doMachineDiskDisplay(float width) {
+    ImGui::PushStyleColor(ImGuiCol_Button, ClemensHostStyle::getWidgetColor(*this));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ClemensHostStyle::getWidgetHoverColor(*this));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ClemensHostStyle::getWidgetActiveColor(*this));
+
     ImGui::Spacing();
     doMachineDiskStatus(kClemensDrive_3_5_D1, width);
     ImGui::Separator();
@@ -1950,72 +2014,132 @@ void ClemensFrontend::doMachineDiskDisplay(float width) {
     doMachineSmartDriveStatus(0, width);
     ImGui::Separator();
     ImGui::Spacing();
+
+    ImGui::PopStyleColor(3);
 }
 
 void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float width) {
-    const ClemensBackendDiskDriveState &drive = frameReadState_.diskDrives[driveType];
-    bool isDiskInDrive = !drive.imagePath.empty();
+    const ClemensDiskDriveStatus &driveStatus = frameReadState_.frame.diskDriveStatuses[driveType];
+    auto driveName = ClemensDiskUtilities::getDriveName(driveType);
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const bool shortForm = !config_.hybridInterfaceEnabled;
+    const float height = shortForm ? 48.0f : 32.0f;
+    const float iconSize = shortForm ? 32.0f : 24.0f;
+    const auto clemensDiskIcon =
+        (driveType == kClemensDrive_3_5_D1 || driveType == kClemensDrive_3_5_D2)
+            ? ClemensHostAssets::kDisk35
+            : ClemensHostAssets::kDisk525;
+    ImVec4 uiColor;
 
-    ImGui::PushID(sDriveName[driveType]);
+    ImGui::PushID(driveName.data(), driveName.data() + driveName.size());
+    ImVec2 buttonSize(width, height);
     ImGui::BeginGroup();
     {
-        ImColor styleActive = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
-        ImColor styleInactive = ImGui::GetStyleColorVec4(ImGuiCol_Button);
-        ImColor styleDisabled = ImColor(styleInactive.Value.x, styleInactive.Value.y,
-                                        styleInactive.Value.z, styleInactive.Value.w * 0.5f);
-        ImColor styleHovered = ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered);
-        ImColor styleTextColor =
-            ImGui::GetStyleColorVec4(isDiskInDrive ? ImGuiCol_Text : ImGuiCol_TextDisabled);
+        const float rightButtonSize = 16;
+        const float rightSectionWidth = (rightButtonSize + style.ItemInnerSpacing.x * 2);
 
-        ImGui::PushStyleColor(ImGuiCol_Text, styleTextColor.Value);
-        if (!isDiskInDrive) {
-            styleHovered = styleInactive;
-        }
-        bool wp = drive.isWriteProtected;
-        if (!isDiskInDrive) {
-            ImGui::PushStyleColor(ImGuiCol_Button, styleDisabled.Value);
-        } else if (wp) {
-            ImGui::PushStyleColor(ImGuiCol_Button, styleActive.Value);
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        ImVec2 anchorCursorPos = cursorPos;
+        ImVec2 tailCursorPos = cursorPos;
+
+        // body
+        if (shortForm) {
+            tailCursorPos.x += width - style.FramePadding.x - rightSectionWidth;
         } else {
-            ImGui::PushStyleColor(ImGuiCol_Button, styleInactive.Value);
+            tailCursorPos.x += width - style.FramePadding.x - rightSectionWidth * 2;
         }
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, styleHovered.Value);
-        if (ImGui::Button("WP")) {
-            if (isDiskInDrive) {
-                wp = !wp;
-                backendQueue_.writeProtectDisk(driveType, wp);
+        tailCursorPos.y += height;
+
+        ImGui::PushClipRect(anchorCursorPos, tailCursorPos, false);
+
+        if (ImGui::InvisibleButton("disk", buttonSize)) {
+            browseDriveType_ = driveType;
+            setGUIMode(GUIMode::DiskBrowser);
+        }
+        ImDrawList *drawList = ImGui::GetWindowDrawList();
+
+        if (ImGui::IsItemActive()) {
+            uiColor = style.Colors[ImGuiCol_ButtonActive];
+        } else if (ImGui::IsItemHovered()) {
+            uiColor = style.Colors[ImGuiCol_ButtonHovered];
+        } else {
+            uiColor = style.Colors[ImGuiCol_Button];
+        }
+        drawList->AddRectFilled(cursorPos, tailCursorPos, (ImU32)ImColor(uiColor));
+
+        //  icon
+        auto texId = ClemensHostStyle::getImTextureOfAsset(clemensDiskIcon);
+        ImVec2 rbCursorPos;
+        cursorPos.y += (height - iconSize) * 0.5f;
+        cursorPos.x += style.FramePadding.x;
+        rbCursorPos.x = cursorPos.x + iconSize;
+        rbCursorPos.y = cursorPos.y + iconSize;
+        if (driveStatus.isMounted()) {
+            uiColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        } else {
+            uiColor = ImVec4(1.0f, 1.0f, 1.0f, 0.5f);
+        }
+        drawList->AddImage(texId, cursorPos, rbCursorPos, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                           IM_COL32_WHITE);
+
+        cursorPos.x += iconSize + style.ItemInnerSpacing.x;
+        doMachineDiskMotorStatus(cursorPos, ImVec2(6.0f, iconSize), driveStatus.isSpinning);
+        auto title = driveStatus.isMounted()
+                         ? std::filesystem::path(driveStatus.assetPath).filename().stem().string()
+                         : "No Disk";
+
+        cursorPos.x += style.ItemSpacing.x;
+        cursorPos.y += (iconSize - ImGui::GetFontSize()) * 0.5f;
+
+        drawList->AddText(cursorPos, (ImU32)ImColor(uiColor), title.c_str());
+
+        ImGui::PopClipRect();
+
+        if (driveStatus.isMounted()) {
+            rbCursorPos = tailCursorPos;
+            ImVec2 buttonSize(rightButtonSize, rightButtonSize);
+            cursorPos.x = rbCursorPos.x + style.ItemInnerSpacing.x;
+            cursorPos.y = anchorCursorPos.y + style.FramePadding.y;
+            ImGui::SetCursorScreenPos(cursorPos);
+            if (ClemensHostImGui::IconButton(
+                    "Eject", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kEjectDisk),
+                    buttonSize)) {
+                if (driveStatus.isMounted()) {
+                    backendQueue_.ejectDisk(driveType);
+                }
             }
-        }
-        ImGui::PopStyleColor(3);
 
-        ImGui::SameLine();
+            if (shortForm) {
+                cursorPos.x = rbCursorPos.x + style.ItemInnerSpacing.x;
+                cursorPos.y += rightButtonSize + style.ItemSpacing.y;
+            } else {
+                cursorPos.x += rightSectionWidth;
+            }
 
-        ImGuiStyle &style = ImGui::GetStyle();
-        const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
-        const float motorStatusWidth = (circleRadius + style.ItemSpacing.x) * 2;
-        ImVec2 columnPos = ImGui::GetCursorPos();
-        if (width < ClemensHostStyle::kDiskStatusLongMinWidth) {
-            ImGui::TextUnformatted(sDriveName[driveType]);
-            ImGui::SameLine(width - motorStatusWidth);
-            doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
-            // next line
-            diskUnit_[driveType].frame(width, 0, backendQueue_,
-                                       frameReadState_.diskDrives[driveType], sDriveName[driveType],
-                                       false);
-        } else {
-            diskUnit_[driveType].frame(width - columnPos.x - motorStatusWidth, 0, backendQueue_,
-                                       frameReadState_.diskDrives[driveType], sDriveName[driveType],
-                                       true);
-            ImGui::SameLine(width - motorStatusWidth);
-            doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
+            if (driveStatus.isWriteProtected) {
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ClemensHostStyle::getWidgetToggleOnColor(*this));
+            } else {
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ClemensHostStyle::getWidgetToggleOffColor(*this));
+            }
+
+            ImGui::SetCursorScreenPos(cursorPos);
+            if (ClemensHostImGui::IconButton(
+                    "Lock", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kLockDisk),
+                    buttonSize)) {
+                backendQueue_.writeProtectDisk(driveType, !driveStatus.isWriteProtected);
+            }
+
+            ImGui::PopStyleColor();
         }
     }
     ImGui::EndGroup();
     ImGui::PopID();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-        if (isDiskInDrive) {
+        if (driveStatus.isMounted()) {
             ImGui::SetTooltip("%s (%s)", sDriveDescriptionShort[driveType],
-                              drive.imagePath.c_str());
+                              driveStatus.assetPath.c_str());
         } else {
             ImGui::SetTooltip("%s", sDriveDescription[driveType]);
         }
@@ -2023,54 +2147,141 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
 }
 
 void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width) {
-    const ClemensBackendDiskDriveState &drive = frameReadState_.smartDrives[driveIndex];
+    const auto &driveStatus = frameReadState_.frame.smartPortStatuses[driveIndex];
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const bool shortForm = !config_.hybridInterfaceEnabled;
+    const float height = shortForm ? 48.0f : 32.0f;
+    const float iconSize = shortForm ? 32.0f : 24.0f;
+    const auto clemensDiskIcon = ClemensHostAssets::kDiskHDD;
+    ImVec4 uiColor;
 
-    ImGui::PushID("SmartPort");
+    char driveName[32];
+    fmt::format_to_n(driveName, sizeof(driveName), "SmartHDD{}", driveIndex);
+
+    ImGui::PushID(driveName);
+    ImVec2 buttonSize(width, height);
     ImGui::BeginGroup();
     {
+        const float rightButtonSize = 16;
+        const float rightSectionWidth = (rightButtonSize + style.ItemInnerSpacing.x * 2);
 
-        ImGuiStyle &style = ImGui::GetStyle();
-        const float circleRadius = ImGui::GetTextLineHeight() * 0.5f;
-        const float motorStatusWidth = (circleRadius + style.ItemSpacing.x) * 2;
-        ImVec2 columnPos = ImGui::GetCursorPos();
-        if (width < ClemensHostStyle::kDiskStatusLongMinWidth) {
-            ImGui::Text("SmartD%d", driveIndex + 1);
-            ImGui::SameLine(width - motorStatusWidth);
-            doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
-            smartportUnit_.frame(width, 0, backendQueue_, frameReadState_.smartDrives[0],
-                                 sSmartDriveName[driveIndex], false);
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        ImVec2 anchorCursorPos = cursorPos;
+        ImVec2 tailCursorPos = cursorPos;
+
+        // body
+        if (shortForm) {
+            tailCursorPos.x += width - style.FramePadding.x - rightSectionWidth;
         } else {
-            smartportUnit_.frame(width - columnPos.x - motorStatusWidth, 0, backendQueue_,
-                                 frameReadState_.smartDrives[0], sSmartDriveName[0], true);
-            ImGui::SameLine(width - motorStatusWidth);
-            doMachineDiskMotorStatus(circleRadius, drive.isSpinning);
+            tailCursorPos.x += width - style.FramePadding.x - rightSectionWidth * 2;
         }
+        tailCursorPos.y += height;
+
+        ImGui::Dummy(buttonSize);
+
+        ImGui::PushClipRect(anchorCursorPos, tailCursorPos, false);
+
+        ImDrawList *drawList = ImGui::GetWindowDrawList();
+
+        if (ImGui::IsItemActive()) {
+            uiColor = style.Colors[ImGuiCol_ButtonActive];
+        } else if (ImGui::IsItemHovered()) {
+            uiColor = style.Colors[ImGuiCol_ButtonHovered];
+        } else {
+            uiColor = style.Colors[ImGuiCol_Button];
+        }
+        drawList->AddRectFilled(cursorPos, tailCursorPos, (ImU32)ImColor(uiColor));
+
+        //  icon
+        auto texId = ClemensHostStyle::getImTextureOfAsset(clemensDiskIcon);
+        ImVec2 rbCursorPos;
+        cursorPos.y += (height - iconSize) * 0.5f;
+        cursorPos.x += style.FramePadding.x;
+        rbCursorPos.x = cursorPos.x + iconSize;
+        rbCursorPos.y = cursorPos.y + iconSize;
+        if (driveStatus.isMounted()) {
+            uiColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        } else {
+            uiColor = ImVec4(1.0f, 1.0f, 1.0f, 0.5f);
+        }
+        drawList->AddImage(texId, cursorPos, rbCursorPos, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                           IM_COL32_WHITE);
+
+        cursorPos.x += iconSize + style.ItemInnerSpacing.x;
+        doMachineDiskMotorStatus(cursorPos, ImVec2(6.0f, iconSize), driveStatus.isSpinning);
+        auto title = driveStatus.isMounted()
+                         ? std::filesystem::path(driveStatus.assetPath).filename().stem().string()
+                         : "No Disk";
+
+        cursorPos.x += style.ItemSpacing.x;
+        cursorPos.y += (iconSize - ImGui::GetFontSize()) * 0.5f;
+
+        drawList->AddText(cursorPos, (ImU32)ImColor(uiColor), title.c_str());
+
+        ImGui::PopClipRect();
+        /*
+        if (driveStatus.isMounted()) {
+            rbCursorPos = tailCursorPos;
+            ImVec2 buttonSize(rightButtonSize, rightButtonSize);
+            cursorPos.x = rbCursorPos.x + style.ItemInnerSpacing.x;
+            cursorPos.y = anchorCursorPos.y + style.FramePadding.y;
+            ImGui::SetCursorScreenPos(cursorPos);
+            if (ClemensHostImGui::IconButton(
+                    "Eject", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kEjectDisk),
+                    buttonSize)) {
+                if (driveStatus.isMounted()) {
+                    backendQueue_.ejectDisk(driveType);
+                }
+            }
+
+            if (shortForm) {
+                cursorPos.x = rbCursorPos.x + style.ItemInnerSpacing.x;
+                cursorPos.y += rightButtonSize + style.ItemSpacing.y;
+            } else {
+                cursorPos.x += rightSectionWidth;
+            }
+
+            if (driveStatus.isWriteProtected) {
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ClemensHostStyle::getWidgetToggleOnColor(*this));
+            } else {
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ClemensHostStyle::getWidgetToggleOffColor(*this));
+            }
+
+            ImGui::SetCursorScreenPos(cursorPos);
+            if (ClemensHostImGui::IconButton(
+                    "Lock", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kLockDisk),
+                    buttonSize)) {
+                backendQueue_.writeProtectDisk(driveType, !driveStatus.isWriteProtected);
+            }
+
+            ImGui::PopStyleColor();
+        }
+        */
     }
     ImGui::EndGroup();
     ImGui::PopID();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-        if (!drive.imagePath.empty()) {
-            ImGui::SetTooltip("Smartport (%s)", drive.imagePath.c_str());
+        if (driveStatus.isMounted()) {
+            ImGui::SetTooltip("Smartport HDD (%u) %s", driveIndex, driveStatus.assetPath.c_str());
         } else {
-            ImGui::SetTooltip("Smartport (No Drive)");
+            ImGui::SetTooltip("Smartport");
         }
     }
 }
 
-void ClemensFrontend::doMachineDiskMotorStatus(float circleRadius, bool isSpinning) {
-    ImGuiStyle &style = ImGui::GetStyle();
+void ClemensFrontend::doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size,
+                                               bool isSpinning) {
     const ImColor kRed(255, 0, 0, 255);
     const ImColor kDark(64, 64, 64, 255);
-    ImVec2 screenPos = ImGui::GetCursorScreenPos();
-    const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
-    screenPos.x += style.ItemSpacing.x;
-    screenPos.y += lineHeight * 0.5f;
-    ImGui::Dummy(ImVec2(lineHeight, lineHeight));
+    auto lt = ImVec2(pos.x, pos.y);
+    auto rb = ImVec2(pos.x + size.x, pos.y + size.y);
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     if (isSpinning) {
-        drawList->AddCircleFilled(screenPos, circleRadius, kRed);
+        drawList->AddRectFilled(lt, rb, (ImU32)kRed, 2.0f);
     } else {
-        drawList->AddCircleFilled(screenPos, circleRadius, kDark);
+        drawList->AddRectFilled(lt, rb, (ImU32)kDark, 2.0f);
     }
 }
 
@@ -2311,7 +2522,7 @@ void ClemensFrontend::doMachineDebugVGCDisplay() {
     //            plus visual palette info
     //          - Row: IRQ, 640/320, ColorFill, Palette Index, Palette 0-15 RGB boxes
 
-    auto &graphics = frameReadState_.graphicsFrame;
+    auto &graphics = frameReadState_.frame.graphics;
     // auto &text = frameReadState_.textFrame;
 
     if (graphics.format == kClemensVideoFormat_Super_Hires) {
@@ -3375,13 +3586,14 @@ void ClemensFrontend::cmdDisk(std::string_view operand) {
     // disk <drive>,file=<image>
     // disk <drive>,wprot=off|on
     if (operand.empty()) {
-        for (auto it = frameReadState_.diskDrives.begin(); it != frameReadState_.diskDrives.end();
-             ++it) {
-            auto driveType = static_cast<ClemensDriveType>(it - frameReadState_.diskDrives.begin());
+        for (auto it = frameReadState_.frame.diskDriveStatuses.begin();
+             it != frameReadState_.frame.diskDriveStatuses.end(); ++it) {
+            auto driveType =
+                static_cast<ClemensDriveType>(it - frameReadState_.frame.diskDriveStatuses.begin());
             CLEM_TERM_COUT.format(TerminalLine::Info, "{} {}: {}",
                                   it->isWriteProtected ? "wp" : "  ",
                                   ClemensDiskUtilities::getDriveName(driveType),
-                                  it->imagePath.empty() ? "<none>" : it->imagePath);
+                                  it->assetPath.empty() ? "<none>" : it->assetPath);
         }
         return;
     }
@@ -3391,14 +3603,14 @@ void ClemensFrontend::cmdDisk(std::string_view operand) {
         CLEM_TERM_COUT.format(TerminalLine::Error, "Invalid drive name {} specified.", operand);
         return;
     }
-    auto &driveInfo = frameReadState_.diskDrives[driveType];
+    auto &driveInfo = frameReadState_.frame.diskDriveStatuses[driveType];
     std::string_view diskOpExpr;
     if (sepPos == std::string_view::npos || (diskOpExpr = trimToken(operand, sepPos + 1)).empty()) {
 
         CLEM_TERM_COUT.format(TerminalLine::Info, "{} {}: {}",
                               driveInfo.isWriteProtected ? "wp" : "  ",
                               ClemensDiskUtilities::getDriveName(driveType),
-                              driveInfo.imagePath.empty() ? "<none>" : driveInfo.imagePath);
+                              driveInfo.assetPath.empty() ? "<none>" : driveInfo.assetPath);
         return;
     }
 
@@ -3653,7 +3865,7 @@ void ClemensFrontend::cmdMinimode(std::string_view operand) {
         return;
     }
     config_.hybridInterfaceEnabled = false;
-    config_.save();
+    config_.setDirty();
 }
 
 void ClemensFrontend::cmdScript(std::string_view command) {

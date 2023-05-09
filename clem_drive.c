@@ -205,6 +205,7 @@ unsigned _clem_disk_get_track_position(struct ClemensDrive *drive) {
 int clem_disk_control_525(struct ClemensDrive *drive, unsigned *io_flags, unsigned in_phase,
                           clem_clocks_duration_t clocks_dt) {
     int qtr_track_index = drive->qtr_track_index;
+    int next_qtr_track_index;
     int qtr_track_delta;
 
     drive->is_spindle_on = true;
@@ -213,13 +214,24 @@ int clem_disk_control_525(struct ClemensDrive *drive, unsigned *io_flags, unsign
     /* turning a cog that can be oriented in one of 8 directions */
     qtr_track_delta = (s_disk2_phase_states[drive->cog_orient & 0x7][in_phase & 0xf]);
     drive->cog_orient = (drive->cog_orient + qtr_track_delta) % 8;
-    qtr_track_index += qtr_track_delta;
-    if (qtr_track_index < 0) {
-        CLEM_LOG("IWM: Disk525[%u]: Motor: %u; CLACK", (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
-                 (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0);
-        qtr_track_index = 0;
-    } else if (qtr_track_index >= 160)
-        qtr_track_index = 160;
+    next_qtr_track_index = qtr_track_index + qtr_track_delta;
+    if (next_qtr_track_index < 0) {
+        CLEM_DEBUG("IWM: Disk525[%u]: Motor: %u; CLACK",
+                   (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
+                   (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0);
+
+        next_qtr_track_index = 0;
+    } else if (next_qtr_track_index >= 160)
+        next_qtr_track_index = 160;
+
+    if (next_qtr_track_index != qtr_track_index) {
+        CLEM_DEBUG(
+            "IWM: Disk525[%u]: Motor: %u; %u -> %u", (*io_flags & CLEM_IWM_FLAG_DRIVE_2) ? 2 : 1,
+            (*io_flags & CLEM_IWM_FLAG_DRIVE_ON) ? 1 : 0, qtr_track_index, next_qtr_track_index);
+    }
+
+    qtr_track_index = next_qtr_track_index;
+
     drive->ctl_switch = in_phase;
 
     if (drive->disk.is_write_protected) {

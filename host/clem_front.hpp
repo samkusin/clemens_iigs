@@ -5,19 +5,19 @@
 #include "clem_host_platform.h"
 #include "clem_host_view.hpp"
 
+#include "core/clem_apple2gs_config.hpp"
+
 #include "cinek/buffer.hpp"
 #include "cinek/circular_buffer.hpp"
 #include "cinek/fixedstack.hpp"
 #include "clem_audio.hpp"
 #include "clem_configuration.hpp"
-#include "clem_disk_library.hpp"
+#include "clem_disk_browser.hpp"
 #include "clem_display.hpp"
 #include "clem_host_shared.hpp"
-#include "clem_ui_disk_unit.hpp"
 #include "clem_ui_load_snapshot.hpp"
 #include "clem_ui_save_snapshot.hpp"
 #include "clem_ui_settings.hpp"
-#include "clem_ui_smartport_unit.hpp"
 
 #include "imgui.h"
 #include "imgui_memory_editor.h"
@@ -33,6 +33,7 @@
 struct ImFont;
 
 class ClemensBackend;
+struct ClemensBackendState;
 
 class ClemensFrontend : public ClemensHostView {
   public:
@@ -57,7 +58,6 @@ class ClemensFrontend : public ClemensHostView {
     //  when a frame has been published
     void backendStateDelegate(const ClemensBackendState &state,
                               const ClemensCommandQueue::ResultBuffer &results);
-    void copyState(const ClemensBackendState &state);
     void processBackendResult(const ClemensBackendResult &result);
 
     void doEmulatorInterface(ImVec2 dimensions, ImVec2 screenUVs, double deltaTime);
@@ -74,7 +74,7 @@ class ClemensFrontend : public ClemensHostView {
     void doMachineDiskDisplay(float width);
     void doMachineDiskStatus(ClemensDriveType driveType, float width);
     void doMachineDiskSelection(ClemensDriveType driveType, float width, bool showLabel);
-    void doMachineDiskMotorStatus(float circleRadius, bool isSpinning);
+    void doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size, bool isSpinning);
     void doMachineSmartDriveStatus(unsigned driveIndex, float width);
     void doMachineCPUInfoDisplay();
     void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU, float screenV);
@@ -171,6 +171,8 @@ class ClemensFrontend : public ClemensHostView {
         uint8_t latch;
         uint8_t status;
         uint8_t ph03;
+
+        void copyFrom(ClemensMMIO &mmio, const ClemensDeviceIWM &iwm);
     };
 
     struct DOCStatus {
@@ -188,54 +190,8 @@ class ClemensFrontend : public ClemensHostView {
     struct ADBStatus {
         unsigned mod_states;
         uint16_t mouse_reg[4];
-    };
 
-    // This state comes in for any update to the emulator per frame.  As such
-    // its possible to "lose" state if the emulator runs faster than the UI.
-    // This is OK in most cases as the UI will only present this data per frame
-    struct FrameState {
-        unsigned mark = 0;
-        uint8_t *bankE0 = nullptr;
-        uint8_t *bankE1 = nullptr;
-        uint8_t *memoryView = nullptr;
-        uint8_t *ioPage = nullptr;
-        uint8_t *docRAM = nullptr;
-        uint8_t *bram = nullptr;
-        LogOutputNode *logNode = nullptr;
-        ClemensBackendBreakpoint *breakpoints = nullptr;
-        unsigned breakpointCount = 0;
-        int logLevel;
-
-        std::array<ClemensBackendDiskDriveState, kClemensDrive_Count> diskDrives;
-        std::array<ClemensBackendDiskDriveState, CLEM_SMARTPORT_DRIVE_LIMIT> smartDrives;
-        std::array<std::string, CLEM_CARD_SLOT_COUNT> cards;
-
-        float machineSpeedMhz;
-        float avgVBLsPerFrame;
-        ClemensClock emulatorClock;
-
-        Clemens65C816 cpu;
-        ClemensMonitor monitorFrame;
-        ClemensVideo textFrame;
-        ClemensVideo graphicsFrame;
-        ClemensAudio audioFrame;
-
-        IWMStatus iwm;
-        DOCStatus doc;
-        ADBStatus adb;
-
-        uint32_t vgcModeFlags;
-
-        uint32_t irqs, nmis;
-
-        uint8_t memoryViewBank = 0;
-
-        unsigned backendCPUID;
-        float fps;
-        bool mmioWasInitialized = false;
-        bool isTracing = false;
-        bool isIWMTracing = false;
-        bool isRunning = false;
+        void copyFrom(ClemensMMIO &mmio);
     };
 
     //  This state sticks around until processed by the UI frame - a hacky solution
@@ -245,6 +201,7 @@ class ClemensFrontend : public ClemensHostView {
         std::vector<ClemensBackendResult> results;
         std::optional<unsigned> hitBreakpoint;
         std::optional<std::string> message;
+        std::optional<ClemensAppleIIGSConfig> gsConfig;
         LogOutputNode *logNode = nullptr;
         LogOutputNode *logNodeTail = nullptr;
         LogInstructionNode *logInstructionNode = nullptr;
@@ -253,11 +210,49 @@ class ClemensFrontend : public ClemensHostView {
         bool isFastEmulationOn;
     };
 
-    ClemensBackendConfig backendConfig_;
+    // This state comes in for any update to the emulator per frame.  As such
+    // its possible to "lose" state if the emulator runs faster than the UI.
+    // This is OK in most cases as the UI will only present this data per frame
+    struct FrameState {
+        ClemensClock emulatorClock;
+        Clemens65C816 cpu;
+        ClemensAppleIIGSFrame frame;
+        std::array<std::string, CLEM_CARD_SLOT_COUNT> cards;
+
+        IWMStatus iwm;
+        DOCStatus doc;
+        ADBStatus adb;
+
+        uint8_t *memoryView = nullptr;
+        uint8_t *docRAM = nullptr;
+        uint8_t *ioPage = nullptr;
+        uint8_t *bram = nullptr;
+        uint8_t *e0bank = nullptr;
+        uint8_t *e1bank = nullptr;
+
+        ClemensBackendBreakpoint *breakpoints = nullptr;
+        unsigned breakpointCount = 0;
+        int logLevel;
+
+        float machineSpeedMhz;
+        float avgVBLsPerFrame;
+        uint32_t vgcModeFlags;
+        uint32_t irqs, nmis;
+        uint8_t memoryViewBank = 0;
+
+        unsigned backendCPUID;
+        float fps;
+        bool mmioWasInitialized = false;
+        bool isTracing = false;
+        bool isIWMTracing = false;
+        bool isRunning = false;
+
+        void copyState(const ClemensBackendState &state, LastCommandState &commandState,
+                       cinek::FixedStack &frameMemory);
+    };
 
     cinek::FixedStack frameWriteMemory_;
     cinek::FixedStack frameReadMemory_;
-    cinek::FixedStack frameMemory_;
     FrameState frameWriteState_;
     FrameState frameReadState_;
     LastCommandState lastCommandState_;
@@ -288,9 +283,7 @@ class ClemensFrontend : public ClemensHostView {
 
     std::vector<ClemensBackendBreakpoint> breakpoints_;
 
-    std::string diskLibraryRootPath_;
-    std::string diskTracesRootPath_;
-    ClemensDiskLibrary diskLibrary_;
+    std::string snapshotRootPath_;
 
   private:
     void doMachineDebugMemoryDisplay();
@@ -332,6 +325,7 @@ class ClemensFrontend : public ClemensHostView {
         SaveSnapshot,
         Settings,
         Help,
+        DiskBrowser,
         RebootEmulator,
         StartingEmulator,
         ShutdownEmulator
@@ -341,17 +335,14 @@ class ClemensFrontend : public ClemensHostView {
     GUIMode guiMode_;
     GUIMode guiPrevMode_;
 
-    ClemensDriveType importDriveType_;
-    std::string importDiskSetName_;
-    std::string importDiskSetPath_;
-    std::vector<std::string> importDiskFiles_;
     std::string messageModalString_;
 
-    ClemensDiskUnitUI diskUnit_[kClemensDrive_Count];
-    ClemensSmartPortUnitUI smartportUnit_;
     ClemensLoadSnapshotUI loadSnapshotMode_;
     ClemensSaveSnapshotUI saveSnapshotMode_;
     ClemensSettingsUI settingsMode_;
+    ClemensDiskBrowser diskBrowserMode_;
+
+    std::optional<ClemensDriveType> browseDriveType_;
 
     std::optional<float> delayRebootTimer_;
 };
