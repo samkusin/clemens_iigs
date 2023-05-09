@@ -22,6 +22,7 @@ class ClemensTestHarness : public ClemensSystemListener {
                                    const char *msg) final;
     void onClemensSystemLocalLog(int logLevel, const char *msg) final;
     void onClemensSystemWriteConfig(const ClemensAppleIIGS::Config &config) final;
+    void onClemensInstruction(struct ClemensInstruction *inst, const char *operand) final;
 
   private:
     bool reset();

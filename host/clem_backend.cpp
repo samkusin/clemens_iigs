@@ -480,27 +480,62 @@ void ClemensBackend::localLog(int log_level, const char *msg, Args... args) {
 bool ClemensBackend::serialize(const std::string &path) const {
     ClemensSnapshot snapshot(path);
 
-    return snapshot.serialize(
-        *GS_, [this](mpack_writer_t *writer, ClemensAppleIIGS &gs) -> bool { return true; });
+    return snapshot.serialize(*GS_, [this](mpack_writer_t *writer, ClemensAppleIIGS &) -> bool {
+        mpack_build_map(writer);
+        mpack_write_cstr(writer, "breakpoints");
+        mpack_start_array(writer, (uint32_t)breakpoints_.size());
+        for (auto &breakpoint : breakpoints_) {
+            mpack_build_map(writer);
+            mpack_write_cstr(writer, "type");
+            mpack_write_i32(writer, static_cast<int>(breakpoint.type));
+            mpack_write_cstr(writer, "address");
+            mpack_write_u32(writer, breakpoint.address);
+            mpack_complete_map(writer);
+        }
+        mpack_finish_array(writer);
+        mpack_finish_map(writer);
+        return mpack_writer_error(writer) == mpack_ok;
+    });
 }
 
 bool ClemensBackend::unserialize(const std::string &path) {
     ClemensSnapshot snapshot(path);
 
+    std::vector<ClemensBackendBreakpoint> breakpoints;
+
     auto gs = snapshot.unserialize(
-        *this, [this](mpack_reader_t *reader, ClemensAppleIIGS &gs) -> bool { return true; });
+        *this, [&breakpoints](mpack_reader_t *reader, ClemensAppleIIGS &) -> bool {
+            mpack_expect_cstr_match(reader, "breakpoints");
+            uint32_t breakpointCount = mpack_expect_array_max(reader, 1024);
+            breakpoints.clear();
+            breakpoints.reserve(breakpointCount);
+            for (uint32_t breakpointIdx = 0; breakpointIdx < breakpointCount; ++breakpointIdx) {
+                breakpoints.emplace_back();
+                auto &breakpoint = breakpoints.back();
+                mpack_expect_map(reader);
+                mpack_expect_cstr_match(reader, "type");
+                breakpoint.type =
+                    static_cast<ClemensBackendBreakpoint::Type>(mpack_expect_i32(reader));
+                mpack_expect_cstr_match(reader, "address");
+                breakpoint.address = mpack_expect_u32(reader);
+                mpack_done_map(reader);
+            }
+            mpack_done_array(reader);
+            return mpack_reader_error(reader) == mpack_ok;
+        });
     if (!gs)
         return false;
     GS_->unmount();
     GS_ = std::move(gs);
     GS_->mount();
+    breakpoints_ = std::move(breakpoints);
     return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //  ClemensAppleIIGS events
 //
-void ClemensBackend::onClemensSystemMachineLog(int logLevel, const ClemensMachine *machine,
+void ClemensBackend::onClemensSystemMachineLog(int logLevel, const ClemensMachine *,
                                                const char *msg) {
     spdlog::level::level_enum levelEnums[] = {spdlog::level::debug, spdlog::level::info,
                                               spdlog::level::warn, spdlog::level::warn,
@@ -619,7 +654,7 @@ bool ClemensBackend::onCommandInsertBlankSmartPortDisk(unsigned driveIndex, std:
     return GS_->getStorage().createSmartPortDisk(GS_->getMMIO(), driveIndex, diskPath);
 }
 
-void ClemensBackend::onCommandEjectSmartPortDisk(unsigned driveIndex) {
+void ClemensBackend::onCommandEjectSmartPortDisk(unsigned) {
     // smartPortDrives_[driveIndex].isEjecting = true;
     //   TODO: handle this in the main loop like we do for regular drives
 }

@@ -17,7 +17,7 @@ ClemensTestHarness::ClemensTestHarness() : execCounter_(0), failed_(false) {
     ClemensAppleIIGS::Config config{};
     config.audioSamplesPerSecond = 48000;
     config.memory = 256;
-    a2gs_ = std::make_unique<ClemensAppleIIGS>(config, *this);
+    a2gs_ = std::make_unique<ClemensAppleIIGS>("", config, *this);
     a2gs_->mount();
     if (a2gs_->isOk()) {
         localLog(CLEM_DEBUG_LOG_INFO, "STAT", "Machine created.");
@@ -222,12 +222,12 @@ void ClemensTestHarness::step(unsigned cnt, unsigned statusStepRate) {
         bool outputStatus = statusStepRate > 0 && (i % statusStepRate) == 0;
         if (outputStatus) {
             printStatus();
-            clemens_opcode_callback(&a2gs_->getMachine(), &ClemensTestHarness::opcode);
+            a2gs_->enableOpcodeLogging(true);
         }
         a2gs_->stepMachine();
         execCounter_++;
         if (outputStatus) {
-            clemens_opcode_callback(&a2gs_->getMachine(), NULL);
+            a2gs_->enableOpcodeLogging(false);
         }
     }
     //  normally this is done inside a2gs_->getFrame()
@@ -264,12 +264,10 @@ void ClemensTestHarness::localLog(int logLevel, const char *type, const char *ms
                execCounter_, type, text);
 }
 
-void ClemensTestHarness::opcode(struct ClemensInstruction *inst, const char *operand,
-                                void *userptr) {
-    auto *self = reinterpret_cast<ClemensTestHarness *>(userptr);
+void ClemensTestHarness::onClemensInstruction(struct ClemensInstruction *inst,
+                                              const char *operand) {
     auto execColor = fg(fmt::terminal_color::white) | fmt::emphasis::faint;
-    fmt::print(execColor, "[{:<16}][EXEC  ] {} {}\n", self->execCounter_, inst->desc->name,
-               operand);
+    fmt::print(execColor, "[{:<16}][EXEC  ] {} {}\n", execCounter_, inst->desc->name, operand);
 }
 
 void ClemensTestHarness::onClemensSystemMachineLog(int logLevel, const ClemensMachine *,
@@ -283,6 +281,6 @@ void ClemensTestHarness::onClemensSystemLocalLog(int logLevel, const char *msg) 
                execCounter_, msg);
 }
 
-void ClemensTestHarness::onClemensSystemWriteConfig(const ClemensAppleIIGS::Config &config) {
+void ClemensTestHarness::onClemensSystemWriteConfig(const ClemensAppleIIGS::Config &) {
     // TODO:
 }
