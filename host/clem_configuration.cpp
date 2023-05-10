@@ -12,7 +12,7 @@
 #include <cstring>
 
 ClemensConfiguration::ClemensConfiguration()
-    : majorVersion(0), minorVersion(0), logLevel(CLEM_DEBUG_LOG_INFO),
+    : majorVersion(0), minorVersion(0), logLevel(CLEM_DEBUG_LOG_INFO), poweredOn(false),
       hybridInterfaceEnabled(false), fastEmulationEnabled(true), isDirty(true) {
     gs.audioSamplesPerSecond = 0;
     gs.memory = CLEM_EMULATOR_RAM_DEFAULT;
@@ -34,6 +34,7 @@ void ClemensConfiguration::copyFrom(const ClemensConfiguration &other) {
     majorVersion = other.majorVersion;
     minorVersion = other.minorVersion;
     logLevel = other.logLevel;
+    poweredOn = other.poweredOn;
 
     gs = other.gs;
 
@@ -58,8 +59,10 @@ bool ClemensConfiguration::save() {
                "data={}\n"
                "hybrid={}\n"
                "logger={}\n"
+               "power={}\n"
                "\n",
-               majorVersion, minorVersion, dataDirectory, hybridInterfaceEnabled ? 1 : 0, logLevel);
+               majorVersion, minorVersion, dataDirectory, hybridInterfaceEnabled ? 1 : 0, logLevel,
+               poweredOn ? 1 : 0);
     fmt::print(fp,
                "[emulator]\n"
                "romfile={}\n"
@@ -108,15 +111,17 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
         } else if (strncmp(name, "data", 16) == 0) {
             config->dataDirectory = value;
         } else if (strncmp(name, "hybrid", 16) == 0) {
-            config->hybridInterfaceEnabled = atoi(value) > 0 ? true : false;
+            config->hybridInterfaceEnabled = atoi(value) > 0;
         } else if (strncmp(name, "logger", 16) == 0) {
             config->logLevel = atoi(value);
+        } else if (strncmp(name, "power", 16) == 0) {
+            config->poweredOn = atoi(value) > 0;
         }
     } else if (strncmp(section, "emulator", 16) == 0) {
         if (strncmp(name, "romfile", 16) == 0) {
             config->romFilename = value;
         } else if (strncmp(name, "fastiwm", 16) == 0) {
-            config->fastEmulationEnabled = atoi(value) > 0 ? true : false;
+            config->fastEmulationEnabled = atoi(value) > 0;
         } else if (strncmp(name, "gs.ramkb", 16) == 0) {
             config->gs.memory = (unsigned)atoi(value);
         } else if (strncmp(name, "gs.audio_samples", 32) == 0) {

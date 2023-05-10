@@ -16,6 +16,7 @@
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
 #include "clem_mmio_types.h"
+#include "clem_ui_settings.hpp"
 #include "core/clem_apple2gs_config.hpp"
 #include "core/clem_disk_asset.hpp"
 #include "core/clem_disk_status.hpp"
@@ -715,8 +716,7 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false), terminalChanged_(false),
       consoleChanged_(false), terminalMode_(TerminalMode::Command), debugIOMode_(DebugIOMode::Core),
       vgcDebugMinScanline_(0), vgcDebugMaxScanline_(0), joystickSlotCount_(0),
-      guiMode_(GUIMode::RebootEmulator), guiPrevMode_(GUIMode::RebootEmulator),
-      diskBrowserMode_("diskBrowser") {
+      guiMode_(GUIMode::Setup), guiPrevMode_(GUIMode::Setup), diskBrowserMode_("diskBrowser") {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -741,6 +741,10 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
     CLEM_TERM_COUT.format(TerminalLine::Info, "Welcome to the Clemens IIgs Emulator {}.{}",
                           CLEM_HOST_VERSION_MAJOR, CLEM_HOST_VERSION_MINOR);
     spdlog::info("Clemens IIGS Emulator {}.{}", CLEM_HOST_VERSION_MAJOR, CLEM_HOST_VERSION_MINOR);
+
+    if (config_.poweredOn) {
+        setGUIMode(GUIMode::RebootEmulator);
+    }
 }
 
 ClemensFrontend::~ClemensFrontend() {
@@ -779,7 +783,7 @@ void ClemensFrontend::lostFocus() {
     emulatorHasKeyboardFocus_ = false;
 }
 
-void ClemensFrontend::createBackend() {
+void ClemensFrontend::startBackend() {
     auto romPath = std::filesystem::path(config_.dataDirectory) / config_.romFilename;
 
     ClemensBackendConfig backendConfig{};
@@ -797,6 +801,7 @@ void ClemensFrontend::createBackend() {
     backendConfig.GS.cardNames[3] = ClemensAppleIIGS::kClemensCardMockingboardName;
 
     spdlog::info("Starting new emulator backend");
+    config_.poweredOn = true;
     auto backend = std::make_unique<ClemensBackend>(romPath.string(), backendConfig);
     backendThread_ = std::thread(&ClemensFrontend::runBackend, this, std::move(backend));
 
@@ -860,8 +865,8 @@ void ClemensFrontend::stopBackend() {
     if (lastCommandState_.gsConfig.has_value()) {
         config_.gs = *lastCommandState_.gsConfig;
         config_.setDirty();
-        config_.save();
     }
+    config_.poweredOn = false;
     spdlog::info("Terminated emulator backend");
 }
 
@@ -1266,7 +1271,8 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     }
 
     switch (guiMode_) {
-    case GUIMode::Empty:
+    case GUIMode::Setup:
+        //  this is handled above
         break;
     case GUIMode::SaveSnapshot:
         if (!saveSnapshotMode_.isStarted()) {
@@ -1284,19 +1290,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         if (loadSnapshotMode_.frame(width, height, backendQueue_)) {
             loadSnapshotMode_.stop(backendQueue_);
             guiMode_ = GUIMode::Emulator;
-        }
-        break;
-    case GUIMode::Settings:
-        if (!settingsMode_.isStarted()) {
-            settingsMode_.start(config_);
-        }
-        if (settingsMode_.frame(width, height)) {
-            if (settingsMode_.shouldBeCommitted()) {
-                config_ = settingsMode_.getConfiguration();
-                backendQueue_.enableFastDiskEmulation(config_.fastEmulationEnabled);
-            }
-            settingsMode_.stop();
-            setGUIMode(GUIMode::Emulator);
         }
         break;
     case GUIMode::Help:
@@ -1325,7 +1318,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         break;
     case GUIMode::RebootEmulator:
         if (!isBackendRunning()) {
-            createBackend();
+            startBackend();
             setGUIMode(GUIMode::StartingEmulator);
         }
         break;
@@ -1334,31 +1327,10 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
             setGUIMode(GUIMode::Emulator);
         }
         break;
-    case GUIMode::ShutdownEmulator: {
-        if (!ImGui::IsPopupOpen("Shutdown Emulator")) {
-            ImGui::OpenPopup("Shutdown Emulator");
-        }
-        ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(std::min(width * 0.5f, 640.0f), 0.0f));
-        if (ImGui::BeginPopupModal("Shutdown Emulator", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Spacing();
-            ImGui::TextUnformatted(CLEM_L10N_LABEL(kExitMessage));
-            ImGui::NewLine();
-            ImGui::Separator();
-            if (ImGui::Button("YES") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-                interop.exitApp = true;
-                ImGui::CloseCurrentPopup();
-                setGUIMode(GUIMode::Empty);
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("No") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-                ImGui::CloseCurrentPopup();
-                setGUIMode(GUIMode::Emulator);
-            }
-            ImGui::EndPopup();
-        }
-    } break;
+    case GUIMode::ShutdownEmulator:
+        stopBackend();
+        setGUIMode(GUIMode::Setup);
+        break;
     default:
         break;
     }
@@ -1479,7 +1451,11 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 dimensions, ImVec2 screenUVs,
     ImVec2 kInfoSizeAnchor(0.0f, kSideBarSize.y);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ClemensHostStyle::getFrameColor(*this));
     doSidePanelLayout(kSideBarAnchor, kSideBarSize);
-    doMachineViewLayout(kMonitorViewAnchor, kMonitorViewSize, screenUVs[0], screenUVs[1]);
+    if (guiMode_ == GUIMode::Setup) {
+        doSetupUI(kMonitorViewAnchor, kMonitorViewSize);
+    } else {
+        doMachineViewLayout(kMonitorViewAnchor, kMonitorViewSize, screenUVs[0], screenUVs[1]);
+    }
     doInfoStatusLayout(kInfoSizeAnchor, kInfoStatusSize, kMonitorViewAnchor.x);
     ImGui::PopStyleColor();
 }
@@ -1537,7 +1513,11 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     if (ClemensHostImGui::IconButton(
             "Power", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kPowerButton),
             kIconSize)) {
-        setGUIMode(GUIMode::ShutdownEmulator);
+        if (guiMode_ == GUIMode::Setup) {
+            setGUIMode(GUIMode::RebootEmulator);
+        } else {
+            setGUIMode(GUIMode::ShutdownEmulator);
+        }
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
         ImGui::SetTooltip("Power");
@@ -1554,15 +1534,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(64, 64, 64, 255));
     }
     ImGui::SameLine();
-    if (ClemensHostImGui::IconButton(
-            "Settings", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kSettings),
-            kIconSize)) {
-        setGUIMode(GUIMode::Settings);
-    }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-        ImGui::SetTooltip("Settings");
-    }
-    ImGui::SameLine();
+
     //  Button Group 2
     ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
     ImGui::SameLine();
@@ -2999,6 +2971,18 @@ void ClemensFrontend::doMachineDebugSoundDisplay() {
     ImGui::EndTable();
 
     ImGui::EndTable();
+}
+
+void ClemensFrontend::doSetupUI(ImVec2 anchor, ImVec2 dimensions) {
+    ClemensSettingsUI form(config_);
+
+    ImGui::SetNextWindowPos(anchor);
+    ImGui::SetNextWindowSize(dimensions);
+    ImGui::Begin("Settings", NULL,
+                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+    ImGui::Spacing();
+    form.frame();
+    ImGui::End();
 }
 
 void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU,

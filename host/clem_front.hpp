@@ -17,7 +17,6 @@
 #include "clem_host_shared.hpp"
 #include "clem_ui_load_snapshot.hpp"
 #include "clem_ui_save_snapshot.hpp"
-#include "clem_ui_settings.hpp"
 
 #include "imgui.h"
 #include "imgui_memory_editor.h"
@@ -49,7 +48,7 @@ class ClemensFrontend : public ClemensHostView {
   private:
     template <typename TBufferType> friend struct FormatView;
 
-    void createBackend();
+    void startBackend();
     void runBackend(std::unique_ptr<ClemensBackend> backend);
     void stopBackend();
     bool isBackendRunning() const;
@@ -77,6 +76,7 @@ class ClemensFrontend : public ClemensHostView {
     void doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size, bool isSpinning);
     void doMachineSmartDriveStatus(unsigned driveIndex, float width);
     void doMachineCPUInfoDisplay();
+    void doSetupUI(ImVec2 anchor, ImVec2 dimensions);
     void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU, float screenV);
     void doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize);
     void doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize);
@@ -318,12 +318,12 @@ class ClemensFrontend : public ClemensHostView {
     bool isEmulatorActive() const;
 
     enum class GUIMode {
-        Empty,
         Preamble,
+        Setup,
         Emulator,
         LoadSnapshot,
         SaveSnapshot,
-        Settings,
+
         Help,
         DiskBrowser,
         RebootEmulator,
@@ -339,11 +339,9 @@ class ClemensFrontend : public ClemensHostView {
 
     ClemensLoadSnapshotUI loadSnapshotMode_;
     ClemensSaveSnapshotUI saveSnapshotMode_;
-    ClemensSettingsUI settingsMode_;
     ClemensDiskBrowser diskBrowserMode_;
 
     std::optional<ClemensDriveType> browseDriveType_;
-
     std::optional<float> delayRebootTimer_;
 };
 

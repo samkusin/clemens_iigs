@@ -26,10 +26,11 @@ struct ClemensConfiguration {
     std::string dataDirectory;
     std::string romFilename;
     int logLevel;
+    bool poweredOn;
+    bool hybridInterfaceEnabled;
 
     ClemensAppleIIGSConfig gs;
 
-    bool hybridInterfaceEnabled;
     bool fastEmulationEnabled;
 
     ClemensConfiguration();
