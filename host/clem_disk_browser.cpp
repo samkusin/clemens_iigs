@@ -1,6 +1,7 @@
 #include "clem_disk_browser.hpp"
 
 #include "core/clem_disk_asset.hpp"
+#include "core/clem_disk_utils.hpp"
 #include "imgui.h"
 
 #include <algorithm>
@@ -156,18 +157,21 @@ auto getRecordsFromDirectory(std::string directoryPathname, ClemensDiskAsset::Di
             }
         }
 
-        if (driveType != kClemensDrive_Invalid) {
+        if (driveType != kClemensDrive_Invalid || isSmartPortDrive) {
+            ClemensDiskBrowser::Record record{};
+            record.size = fileSize;
+            record.fileTime = to_time_t(std::filesystem::last_write_time(entry.path()));
             if ((diskType == ClemensDiskAsset::Disk35 && driveType == kClemensDrive_3_5_D1) ||
                 (diskType == ClemensDiskAsset::Disk525 && driveType == kClemensDrive_5_25_D1)) {
-                ClemensDiskBrowser::Record record{};
                 record.asset = ClemensDiskAsset(entry.path().string(), driveType);
-                record.size = fileSize;
-                record.fileTime = to_time_t(std::filesystem::last_write_time(entry.path()));
                 records.emplace_back(record);
             } else if (diskType == ClemensDiskAsset::DiskHDD && isSmartPortDrive) {
                 // TODO: add HDD disk asset which needs a constructor in ClemensDiskAsset
+                record.asset = ClemensDiskAsset(entry.path().string());
+                records.emplace_back(record);
             }
         }
+        isSmartPortDrive = false;
     }
 
     return records;
@@ -194,6 +198,7 @@ void ClemensDiskBrowser::open(ClemensDiskAsset::DiskType diskType, const std::st
     nextRefreshTime_ = std::chrono::steady_clock::now();
     createDiskImageType_ = ClemensDiskAsset::ImageNone;
     createDiskFilename_[0] = '\0';
+    createDiskMBCount_ = 0;
 }
 
 bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
@@ -248,6 +253,7 @@ bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
             }
             selectedWorkingDirectory /= *it;
             cwdName_ = selectedWorkingDirectory.string();
+            nextRefreshTime_ = std::chrono::steady_clock::now();
         }
         ImGui::SameLine();
     }
@@ -337,10 +343,13 @@ bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
     if (ImGui::Button("Create Disk")) {
         ImGui::OpenPopup("Create Disk");
         createDiskFilename_[0] = '\0';
+        createDiskMBCount_ = ClemensDiskUtilities::kMaximumHDDSizeInMB;
         if (diskType_ == ClemensDiskAsset::Disk35) {
             createDiskImageType_ = ClemensDiskAsset::Image2IMG;
         } else if (diskType_ == ClemensDiskAsset::Disk525) {
             createDiskImageType_ = ClemensDiskAsset::ImageProDOS;
+        } else if (diskType_ == ClemensDiskAsset::DiskHDD) {
+            createDiskImageType_ = ClemensDiskAsset::Image2IMG;
         } else {
             createDiskImageType_ = ClemensDiskAsset::ImageNone;
         }
@@ -394,11 +403,27 @@ bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
                         createDiskImageType_ = ClemensDiskAsset::Image2IMG;
                     }
                     break;
+                case ClemensDiskAsset::DiskHDD:
+                    if (ImGui::Selectable(
+                            ClemensDiskAsset::imageName(ClemensDiskAsset::ImageProDOS))) {
+                        createDiskImageType_ = ClemensDiskAsset::ImageProDOS;
+                    }
+                    if (ImGui::Selectable(
+                            ClemensDiskAsset::imageName(ClemensDiskAsset::Image2IMG))) {
+                        createDiskImageType_ = ClemensDiskAsset::Image2IMG;
+                    }
+                    break;
                 default:
                     ImGui::Selectable(ClemensDiskAsset::imageName(ClemensDiskAsset::ImageNone));
                     break;
                 }
                 ImGui::EndCombo();
+            }
+            if (diskType_ == ClemensDiskAsset::DiskHDD) {
+                //  allow size selection
+                ImGui::SliderInt("Size (MB)", &createDiskMBCount_, 1,
+                                 int(ClemensDiskUtilities::kMaximumHDDSizeInMB), "%d",
+                                 ImGuiSliderFlags_AlwaysClamp);
             }
             ImGui::Spacing();
             ImGui::Separator();
@@ -427,12 +452,14 @@ bool ClemensDiskBrowser::display(const ImVec2 &maxSize) {
                 }
                 if (!fileName.empty()) {
                     selectedRecord_.asset = (std::filesystem::path(cwdName_) / fileName).string();
+                    selectedRecord_.size = createDiskMBCount_ * 1024 * 1024;
                 }
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SameLine();
             if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
                 createDiskImageType_ = ClemensDiskAsset::ImageNone;
+                createDiskMBCount_ = 0;
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();

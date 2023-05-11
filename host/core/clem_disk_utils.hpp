@@ -2,22 +2,23 @@
 #define CLEM_HOST_DISK_UTILS_HPP
 
 #include "cinek/buffertypes.hpp"
-#include "clem_woz.h"
+#include "clem_mmio_types.h"
 #include <string_view>
 
 namespace ClemensDiskUtilities {
 
-size_t calculateNibRequiredMemory(ClemensDriveType driveType);
-
-struct ClemensWOZDisk *parseWOZ(struct ClemensWOZDisk *woz, cinek::ConstRange<uint8_t> &image);
+constexpr unsigned kMaximumHDDSizeInMB = 32;
+constexpr unsigned kBlocksPerMB = 2048;
 
 std::string_view getDriveName(ClemensDriveType driveType);
 
 ClemensDriveType getDriveType(std::string_view driveName);
 
-struct ClemensWOZDisk *createWOZ(struct ClemensWOZDisk *woz, const struct ClemensNibbleDisk *nib);
+bool createDisk(cinek::Range<uint8_t> decodeBuffer, const std::string &path,
+                ClemensDriveType driveType);
 
-void createEmptyDisk(ClemensDriveType driveType, ClemensNibbleDisk &nib);
+//  returns the number of blocks written (if == blockCount, then OK)
+unsigned createProDOSHardDisk(const std::string &path, unsigned blockCount);
 
 } // namespace ClemensDiskUtilities
 

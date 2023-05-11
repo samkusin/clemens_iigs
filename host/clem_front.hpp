@@ -74,15 +74,19 @@ class ClemensFrontend : public ClemensHostView {
     void doMachineDiskStatus(ClemensDriveType driveType, float width);
     void doMachineDiskSelection(ClemensDriveType driveType, float width, bool showLabel);
     void doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size, bool isSpinning);
-    void doMachineSmartDriveStatus(unsigned driveIndex, float width);
+    void doMachineSmartDriveStatus(unsigned driveIndex, float width, bool allowSelect);
     void doMachineCPUInfoDisplay();
     void doSetupUI(ImVec2 anchor, ImVec2 dimensions);
     void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU, float screenV);
     void doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize);
     void doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize);
+    void doMachineDiskBrowserInterface(ImVec2 dimensions);
+    void doMachineSmartDiskBrowserInterface(ImVec2 dimensions);
 
     void layoutTerminalLines();
     void layoutConsoleLines();
+
+    template <typename... Args> void doModalError(const char *msg, Args... args);
 
     std::pair<std::string, bool> importDisks(std::string outputPath, std::string name,
                                              ClemensDriveType driveType,
@@ -323,9 +327,7 @@ class ClemensFrontend : public ClemensHostView {
         Emulator,
         LoadSnapshot,
         SaveSnapshot,
-
         Help,
-        DiskBrowser,
         RebootEmulator,
         StartingEmulator,
         ShutdownEmulator
@@ -342,6 +344,7 @@ class ClemensFrontend : public ClemensHostView {
     ClemensDiskBrowser diskBrowserMode_;
 
     std::optional<ClemensDriveType> browseDriveType_;
+    std::optional<unsigned> browseSmartDriveIndex_;
     std::optional<float> delayRebootTimer_;
 };
 

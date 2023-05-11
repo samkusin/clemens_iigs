@@ -84,14 +84,20 @@ bool clem_2img_parse_header(struct Clemens2IMGDisk *disk, const uint8_t *image,
  * @param image Logical sectors based on the sector format
  * @param image_end End of the raw post-nibblized logical sector input buffer
  * @param image_data_offset Indicates where in the input image the disk data resides
+ * @param data_size Number of bytes in the data - if 0, then uses the input image buffer
  * @return true
  * @return false
  */
 bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, const uint8_t *image,
-                               const uint8_t *image_end, uint32_t image_data_offset);
+                               const uint8_t *image_end, uint32_t image_data_offset,
+                               uint32_t data_size);
 
 /**
  * @brief Create a 2IMG disk buffer to serialize into a 2img file.
+ *
+ * This can be used to serialize just the header if disk.data is NULL and disk.data_end
+ * indicates the desired disk size in bytes.  Otherwise, this function will serialize
+ * the entirety of data to data_end in addition to the header.
  *
  * @param disk The populated Clemens2IMGDisk struct
  * @param image The backing buffer

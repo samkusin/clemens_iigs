@@ -28,6 +28,8 @@ class ClemensDiskBrowser {
     bool isCancel() const { return finishedStatus_ == BrowserFinishedStatus::Cancelled; }
 
     ClemensDiskAsset acquireSelectedFilePath() { return std::move(selectedRecord_.asset); }
+    unsigned acquireSelectedBlockCount() { return selectedRecord_.size / 512; }
+
     bool isSelectedFilePathNewFile() const {
         return createDiskImageType_ != ClemensDiskAsset::ImageNone;
     }
@@ -55,6 +57,7 @@ class ClemensDiskBrowser {
     std::chrono::steady_clock::time_point nextRefreshTime_;
 
     char createDiskFilename_[128];
+    int createDiskMBCount_;
     ClemensDiskAsset::ImageType createDiskImageType_;
 };
 

@@ -1266,6 +1266,12 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         doEmulatorInterface(ImVec2(width, height), ImVec2(screenUVs[0], screenUVs[1]), deltaTime);
     }
 
+    if (browseDriveType_.has_value()) {
+        doMachineDiskBrowserInterface(ImVec2(width, height));
+    } else if (browseSmartDriveIndex_.has_value()) {
+        doMachineSmartDiskBrowserInterface(ImVec2(width, height));
+    }
+
     if (isBackendTerminated) {
         fflush(stdout);
     }
@@ -1295,27 +1301,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     case GUIMode::Help:
         doHelpScreen(width, height);
         break;
-    case GUIMode::DiskBrowser:
-        if (!diskBrowserMode_.isOpen()) {
-            diskBrowserMode_.open(ClemensDiskAsset::diskTypeFromDriveType(*browseDriveType_));
-        }
-        if (diskBrowserMode_.isOpen()) {
-            ImVec2 browserSize(std::max(640.0f, width * 0.66f), std::max(512.0f, height * 0.5f));
-            if (diskBrowserMode_.display(browserSize)) {
-                if (diskBrowserMode_.isOk()) {
-                    auto asset = diskBrowserMode_.acquireSelectedFilePath();
-                    if (diskBrowserMode_.isSelectedFilePathNewFile()) {
-                        backendQueue_.insertBlankDisk(*browseDriveType_, asset.path());
-                    } else {
-                        backendQueue_.insertDisk(*browseDriveType_, asset.path());
-                    }
-                }
-                diskBrowserMode_.close();
-                browseDriveType_ = std::nullopt;
-                setGUIMode(GUIMode::Emulator);
-            }
-        }
-        break;
     case GUIMode::RebootEmulator:
         if (!isBackendRunning()) {
             startBackend();
@@ -1344,6 +1329,31 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         }
     }
 
+    //  message modals at the top of everything else
+    if (!messageModalString_.empty()) {
+        if (!ImGui::IsPopupOpen("Error")) {
+            ImGui::OpenPopup("Error");
+        }
+        ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(std::max(480.0f, width * 0.66f), 0.0f));
+        if (ImGui::BeginPopupModal("Error", NULL,
+                                   ImGuiWindowFlags_Modal | ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Spacing();
+            ImGui::PushTextWrapPos();
+            ImGui::TextUnformatted(messageModalString_.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::Spacing();
+            ImGui::Separator();
+            if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+                ImGui::CloseCurrentPopup();
+                messageModalString_.clear();
+            }
+            ImGui::EndPopup();
+        }
+    }
+
+    //  handle emulator controls
     if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
         if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) {
             if (ImGui::IsKeyDown(ImGuiKey_RightAlt) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) {
@@ -1983,7 +1993,7 @@ void ClemensFrontend::doMachineDiskDisplay(float width) {
     doMachineDiskStatus(kClemensDrive_5_25_D2, width);
     ImGui::Separator();
     ImGui::Spacing();
-    doMachineSmartDriveStatus(0, width);
+    doMachineSmartDriveStatus(0, width, !isBackendRunning());
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -1991,8 +2001,15 @@ void ClemensFrontend::doMachineDiskDisplay(float width) {
 }
 
 void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float width) {
-    const ClemensDiskDriveStatus &driveStatus = frameReadState_.frame.diskDriveStatuses[driveType];
+    ClemensDiskDriveStatus driveStatus{};
     auto driveName = ClemensDiskUtilities::getDriveName(driveType);
+
+    if (isBackendRunning()) {
+        driveStatus = frameReadState_.frame.diskDriveStatuses[driveType];
+    } else {
+        driveStatus.assetPath = config_.gs.diskImagePaths[driveType];
+    }
+
     const ImGuiStyle &style = ImGui::GetStyle();
     const bool shortForm = !config_.hybridInterfaceEnabled;
     const float height = shortForm ? 48.0f : 32.0f;
@@ -2004,7 +2021,6 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
     ImVec4 uiColor;
 
     ImGui::PushID(driveName.data(), driveName.data() + driveName.size());
-    ImVec2 buttonSize(width, height);
     ImGui::BeginGroup();
     {
         const float rightButtonSize = 16;
@@ -2023,10 +2039,11 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
         tailCursorPos.y += height;
 
         ImGui::PushClipRect(anchorCursorPos, tailCursorPos, false);
-
-        if (ImGui::InvisibleButton("disk", buttonSize)) {
+        ImVec2 buttonSize(tailCursorPos.x - anchorCursorPos.x, tailCursorPos.y - anchorCursorPos.y);
+        if (browseDriveType_.has_value()) {
+            ImGui::Dummy(buttonSize);
+        } else if (ImGui::InvisibleButton("disk", buttonSize)) {
             browseDriveType_ = driveType;
-            setGUIMode(GUIMode::DiskBrowser);
         }
         ImDrawList *drawList = ImGui::GetWindowDrawList();
 
@@ -2076,8 +2093,11 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
             if (ClemensHostImGui::IconButton(
                     "Eject", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kEjectDisk),
                     buttonSize)) {
-                if (driveStatus.isMounted()) {
+                if (isBackendRunning()) {
                     backendQueue_.ejectDisk(driveType);
+                } else {
+                    config_.gs.diskImagePaths[driveType].clear();
+                    config_.setDirty();
                 }
             }
 
@@ -2088,22 +2108,28 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
                 cursorPos.x += rightSectionWidth;
             }
 
-            if (driveStatus.isWriteProtected) {
-                ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ClemensHostStyle::getWidgetToggleOnColor(*this));
-            } else {
-                ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ClemensHostStyle::getWidgetToggleOffColor(*this));
-            }
+            if (isBackendRunning()) {
+                //  TODO: we don't persist write protected status in the configuration, so there's
+                //        nowhere to persist this attribute until the machine is on.
+                //        yes, 2IMG and WOZ do persist the write protect status but DSK,DO,PO do
+                //        not.
+                if (driveStatus.isWriteProtected) {
+                    ImGui::PushStyleColor(ImGuiCol_Button,
+                                          ClemensHostStyle::getWidgetToggleOnColor(*this));
+                } else {
+                    ImGui::PushStyleColor(ImGuiCol_Button,
+                                          ClemensHostStyle::getWidgetToggleOffColor(*this));
+                }
 
-            ImGui::SetCursorScreenPos(cursorPos);
-            if (ClemensHostImGui::IconButton(
-                    "Lock", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kLockDisk),
-                    buttonSize)) {
-                backendQueue_.writeProtectDisk(driveType, !driveStatus.isWriteProtected);
-            }
+                ImGui::SetCursorScreenPos(cursorPos);
+                if (ClemensHostImGui::IconButton(
+                        "Lock", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kLockDisk),
+                        buttonSize)) {
+                    backendQueue_.writeProtectDisk(driveType, !driveStatus.isWriteProtected);
+                }
 
-            ImGui::PopStyleColor();
+                ImGui::PopStyleColor();
+            }
         }
     }
     ImGui::EndGroup();
@@ -2118,8 +2144,21 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
     }
 }
 
-void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width) {
-    const auto &driveStatus = frameReadState_.frame.smartPortStatuses[driveIndex];
+void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width,
+                                                bool allowSelect) {
+    // TODO: Crazy code duplication with doMachineDiskStatus
+    //       The only difference is the source status object which comes from the
+    //       driveIndex vs driveType.   Perhaps pass one or the other in to a
+    //       common doMachineDriveStatus() call and handle smart port vs plain
+    //       floppy disk tray UI
+    ClemensDiskDriveStatus driveStatus{};
+
+    if (isBackendRunning()) {
+        driveStatus = frameReadState_.frame.smartPortStatuses[driveIndex];
+    } else {
+        driveStatus.assetPath = config_.gs.smartPortImagePaths[driveIndex];
+    }
+
     const ImGuiStyle &style = ImGui::GetStyle();
     const bool shortForm = !config_.hybridInterfaceEnabled;
     const float height = shortForm ? 48.0f : 32.0f;
@@ -2131,7 +2170,6 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
     fmt::format_to_n(driveName, sizeof(driveName), "SmartHDD{}", driveIndex);
 
     ImGui::PushID(driveName);
-    ImVec2 buttonSize(width, height);
     ImGui::BeginGroup();
     {
         const float rightButtonSize = 16;
@@ -2149,15 +2187,21 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
         }
         tailCursorPos.y += height;
 
-        ImGui::Dummy(buttonSize);
+        ImVec2 buttonSize(tailCursorPos.x - anchorCursorPos.x, tailCursorPos.y - anchorCursorPos.y);
+
+        if (browseSmartDriveIndex_.has_value() || !allowSelect) {
+            ImGui::Dummy(buttonSize);
+        } else if (ImGui::InvisibleButton("disk", buttonSize)) {
+            browseSmartDriveIndex_ = driveIndex;
+        }
 
         ImGui::PushClipRect(anchorCursorPos, tailCursorPos, false);
 
         ImDrawList *drawList = ImGui::GetWindowDrawList();
 
-        if (ImGui::IsItemActive()) {
+        if (ImGui::IsItemActive() && allowSelect) {
             uiColor = style.Colors[ImGuiCol_ButtonActive];
-        } else if (ImGui::IsItemHovered()) {
+        } else if (ImGui::IsItemHovered() && allowSelect) {
             uiColor = style.Colors[ImGuiCol_ButtonHovered];
         } else {
             uiColor = style.Colors[ImGuiCol_Button];
@@ -2191,8 +2235,8 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
         drawList->AddText(cursorPos, (ImU32)ImColor(uiColor), title.c_str());
 
         ImGui::PopClipRect();
-        /*
-        if (driveStatus.isMounted()) {
+
+        if (driveStatus.isMounted() && allowSelect) {
             rbCursorPos = tailCursorPos;
             ImVec2 buttonSize(rightButtonSize, rightButtonSize);
             cursorPos.x = rbCursorPos.x + style.ItemInnerSpacing.x;
@@ -2201,36 +2245,14 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
             if (ClemensHostImGui::IconButton(
                     "Eject", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kEjectDisk),
                     buttonSize)) {
-                if (driveStatus.isMounted()) {
-                    backendQueue_.ejectDisk(driveType);
+                if (isBackendRunning()) {
+                    backendQueue_.ejectSmartPortDisk(driveIndex);
+                } else {
+                    config_.gs.smartPortImagePaths[driveIndex].clear();
+                    config_.setDirty();
                 }
             }
-
-            if (shortForm) {
-                cursorPos.x = rbCursorPos.x + style.ItemInnerSpacing.x;
-                cursorPos.y += rightButtonSize + style.ItemSpacing.y;
-            } else {
-                cursorPos.x += rightSectionWidth;
-            }
-
-            if (driveStatus.isWriteProtected) {
-                ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ClemensHostStyle::getWidgetToggleOnColor(*this));
-            } else {
-                ImGui::PushStyleColor(ImGuiCol_Button,
-                                      ClemensHostStyle::getWidgetToggleOffColor(*this));
-            }
-
-            ImGui::SetCursorScreenPos(cursorPos);
-            if (ClemensHostImGui::IconButton(
-                    "Lock", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kLockDisk),
-                    buttonSize)) {
-                backendQueue_.writeProtectDisk(driveType, !driveStatus.isWriteProtected);
-            }
-
-            ImGui::PopStyleColor();
         }
-        */
     }
     ImGui::EndGroup();
     ImGui::PopID();
@@ -2255,6 +2277,93 @@ void ClemensFrontend::doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &
     } else {
         drawList->AddRectFilled(lt, rb, (ImU32)kDark, 2.0f);
     }
+}
+
+void ClemensFrontend::doMachineDiskBrowserInterface(ImVec2 dimensions) {
+    if (!diskBrowserMode_.isOpen()) {
+        diskBrowserMode_.open(ClemensDiskAsset::diskTypeFromDriveType(*browseDriveType_));
+    }
+    if (diskBrowserMode_.isOpen()) {
+        ImVec2 browserSize(std::max(640.0f, dimensions.x * 0.66f),
+                           std::max(512.0f, dimensions.y * 0.5f));
+        if (diskBrowserMode_.display(browserSize)) {
+            if (diskBrowserMode_.isOk()) {
+                auto asset = diskBrowserMode_.acquireSelectedFilePath();
+                bool success = true;
+                if (diskBrowserMode_.isSelectedFilePathNewFile()) {
+                    //  brute force duplication of code from the backend
+                    //  but since the backend isn't around, we have to do
+                    //  replicate most of what's done there.
+                    std::vector<uint8_t> decodeBuffer;
+                    decodeBuffer.resize(4 * 1024 * 1024);
+                    //  generated target image
+                    auto imageBuffer = cinek::Range<uint8_t>(
+                        decodeBuffer.data(), decodeBuffer.data() + decodeBuffer.size());
+                    success = ClemensDiskUtilities::createDisk(imageBuffer, asset.path(),
+                                                               *browseDriveType_);
+                    if (success) {
+                        spdlog::info("ClemensFrontend - disk {}://{} created",
+                                     ClemensDiskUtilities::getDriveName(*browseDriveType_),
+                                     asset.path());
+                    } else {
+                        doModalError("Unable to create disk at {}", asset.path());
+                    }
+                }
+                if (success) {
+                    if (isBackendRunning()) {
+                        backendQueue_.insertDisk(*browseDriveType_, asset.path());
+                    } else {
+                        config_.gs.diskImagePaths[*browseDriveType_] = asset.path();
+                        config_.setDirty();
+                    }
+                }
+            }
+            diskBrowserMode_.close();
+            browseDriveType_ = std::nullopt;
+        }
+    }
+}
+
+void ClemensFrontend::doMachineSmartDiskBrowserInterface(ImVec2 dimensions) {
+    if (!diskBrowserMode_.isOpen()) {
+        diskBrowserMode_.open(ClemensDiskAsset::DiskHDD);
+    }
+    if (diskBrowserMode_.isOpen()) {
+        ImVec2 browserSize(std::max(640.0f, dimensions.x * 0.66f),
+                           std::max(512.0f, dimensions.y * 0.5f));
+        if (diskBrowserMode_.display(browserSize)) {
+            if (diskBrowserMode_.isOk()) {
+                auto asset = diskBrowserMode_.acquireSelectedFilePath();
+                auto blockCount = diskBrowserMode_.acquireSelectedBlockCount();
+                bool success = true;
+                if (diskBrowserMode_.isSelectedFilePathNewFile()) {
+                    success = blockCount > 0 && ClemensDiskUtilities::createProDOSHardDisk(
+                                                    asset.path(), blockCount) == blockCount;
+                    if (success) {
+                        spdlog::info("ClemensFrontend - disk smart{}://{} created",
+                                     *browseSmartDriveIndex_, asset.path());
+                    } else {
+                        doModalError("Unable to create disk at {}", asset.path());
+                    }
+                }
+                if (success) {
+                    if (isBackendRunning()) {
+                        backendQueue_.insertSmartPortDisk(*browseSmartDriveIndex_, asset.path());
+                    } else {
+                        config_.gs.smartPortImagePaths[*browseSmartDriveIndex_] = asset.path();
+                        config_.setDirty();
+                    }
+                }
+            }
+            diskBrowserMode_.close();
+            browseSmartDriveIndex_ = std::nullopt;
+        }
+    }
+}
+
+template <typename... Args> void ClemensFrontend::doModalError(const char *msg, Args... args) {
+    messageModalString_ = fmt::format(msg, args...);
+    spdlog::error("ClemensFrontend: {}\n", messageModalString_);
 }
 
 #define CLEM_HOST_GUI_CPU_PINS_COLOR(_field_)                                                      \

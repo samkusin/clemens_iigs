@@ -95,7 +95,7 @@ void test_clem_2img_generate_image_from_dsk(void) {
 
     TEST_ASSERT_NOT_NULL_MESSAGE(image_data, "Failed to open disk image");
     TEST_ASSERT_TRUE(clem_2img_generate_header(&disk, CLEM_DISK_FORMAT_DOS, image_data,
-                                               image_data + image_sz, 0));
+                                               image_data + image_sz, 0, 0));
 
     free(image_data);
 }
@@ -109,7 +109,7 @@ void test_clem_2img_generate_image_from_po_800k(void) {
 
     TEST_ASSERT_NOT_NULL_MESSAGE(image_data, "Failed to open disk image");
     TEST_ASSERT_TRUE(clem_2img_generate_header(&disk, CLEM_DISK_FORMAT_PRODOS, image_data,
-                                               image_data + image_sz, 0));
+                                               image_data + image_sz, 0, 0));
     TEST_ASSERT_EQUAL_UINT(disk.block_count, 1600);
 
     free(image_data);

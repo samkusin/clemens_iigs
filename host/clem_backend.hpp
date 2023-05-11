@@ -159,11 +159,9 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     bool onCommandRemoveBreakpoint(int index) final;
     void onCommandInputEvent(const ClemensInputEvent &inputEvent) final;
     bool onCommandInsertDisk(ClemensDriveType driveType, std::string diskPath) final;
-    bool onCommandInsertBlankDisk(ClemensDriveType driveType, std::string diskPath) final;
     void onCommandEjectDisk(ClemensDriveType driveType) final;
     bool onCommandWriteProtectDisk(ClemensDriveType driveType, bool wp) final;
     bool onCommandInsertSmartPortDisk(unsigned driveIndex, std::string diskPath) final;
-    bool onCommandInsertBlankSmartPortDisk(unsigned driveIndex, std::string diskPath) final;
     void onCommandEjectSmartPortDisk(unsigned driveIndex) final;
     void onCommandDebugMemoryPage(uint8_t pageIndex) final;
     void onCommandDebugMemoryWrite(uint16_t addr, uint8_t value) final;

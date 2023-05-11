@@ -80,7 +80,6 @@ int clem_disk_control_35(struct ClemensDrive *drive, unsigned *io_flags, unsigne
         if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING) {
             drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_EJECTING;
             drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_EJECTED;
-            drive->has_disk = false;
             CLEM_LOG("clem_drive35: ejected disk");
         } else {
             if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_STEP_IN) {

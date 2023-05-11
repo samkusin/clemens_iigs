@@ -34,11 +34,9 @@ class ClemensStorageUnit {
     ClemensStorageUnit();
     ~ClemensStorageUnit();
 
-    bool createSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex, const std::string &imagePath);
     bool assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex, const std::string &imagePath);
     void saveSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex);
     bool ejectSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex);
-    bool createDisk(ClemensMMIO &mmio, ClemensDriveType driveType, const std::string &path);
     bool insertDisk(ClemensMMIO &mmio, ClemensDriveType driveType, const std::string &path);
     void saveDisk(ClemensMMIO &mmio, ClemensDriveType driveType);
     bool ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType);

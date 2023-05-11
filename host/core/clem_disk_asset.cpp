@@ -220,7 +220,7 @@ cinek::ConstRange<uint8_t> ClemensDiskAsset::createBlankDiskImage(ImageType imag
     case Image2IMG: {
         struct Clemens2IMGDisk disk {};
         if (clem_2img_generate_header(&disk, format, serializeBuffer.first, serializeBuffer.second,
-                                      CLEM_2IMG_HEADER_BYTE_SIZE)) {
+                                      CLEM_2IMG_HEADER_BYTE_SIZE, 0)) {
             clem_2img_build_image(&disk, serializeBuffer.first, serializeBuffer.second);
         } else {
             error = true;
@@ -318,7 +318,7 @@ ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveTyp
     case ImageProDOS: {
         struct Clemens2IMGDisk disk {};
         if (clem_2img_generate_header(&disk, CLEM_DISK_FORMAT_PRODOS, sourceDataPtr,
-                                      sourceDataPtrEnd, 0)) {
+                                      sourceDataPtrEnd, 0, 0)) {
             disk.nib = &nib;
             if (nibblizeDisk(disk)) {
                 sourceDataPtrTail = sourceDataPtrEnd;
@@ -336,7 +336,7 @@ ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveTyp
     case ImageDSK: {
         struct Clemens2IMGDisk disk {};
         if (clem_2img_generate_header(&disk, CLEM_DISK_FORMAT_DOS, sourceDataPtr, sourceDataPtrEnd,
-                                      0)) {
+                                      0, 0)) {
             disk.nib = &nib;
             if (nibblizeDisk(disk)) {
                 sourceDataPtrTail = sourceDataPtrEnd;

@@ -19,10 +19,6 @@ ClemensProDOSDisk::ClemensProDOSDisk() {}
 ClemensProDOSDisk::ClemensProDOSDisk(cinek::ByteBuffer backingBuffer)
     : storage_(std::move(backingBuffer)), blocks_{}, interface_{}, disk_{} {}
 
-bool ClemensProDOSDisk::create(ClemensSmartPortDevice &device, const ClemensDiskAsset &asset) {
-    return false;
-}
-
 bool ClemensProDOSDisk::bind(ClemensSmartPortDevice &device, const ClemensDiskAsset &asset) {
     if (asset.diskType() != ClemensDiskAsset::DiskHDD)
         return false;
@@ -66,7 +62,7 @@ bool ClemensProDOSDisk::bind(ClemensSmartPortDevice &device, const ClemensDiskAs
         if (fsin.bad() || fsin.eof())
             return false;
         if (!clem_2img_generate_header(&disk_, CLEM_DISK_FORMAT_PRODOS, input.first, input.second,
-                                       CLEM_2IMG_HEADER_BYTE_SIZE))
+                                       CLEM_2IMG_HEADER_BYTE_SIZE, 0))
             return false;
         blocks_ = cinek::Range<uint8_t>(input.first + CLEM_2IMG_HEADER_BYTE_SIZE, input.second);
         break;
@@ -236,7 +232,7 @@ bool ClemensProDOSDisk::unserialize(mpack_reader_t *reader, ClemensSmartPortDevi
             return false;
     } else if (imageType == ClemensDiskAsset::ImageProDOS) {
         if (!clem_2img_generate_header(&disk_, CLEM_DISK_FORMAT_PRODOS, storage_.getHead(),
-                                       storage_.getTail(), CLEM_2IMG_HEADER_BYTE_SIZE))
+                                       storage_.getTail(), CLEM_2IMG_HEADER_BYTE_SIZE, 0))
             return false;
     } else if (imageType != ClemensDiskAsset::ImageNone) {
         spdlog::error("ClemensProDOSDisk - unsupported asset {}", assetPath_);
