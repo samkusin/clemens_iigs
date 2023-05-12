@@ -40,7 +40,7 @@ void ClemensStorageUnit::allocateBuffers() {
 
     // create empty backing ProDOS buffer for SmartPort disk
     hardDisks_[0] = ClemensProDOSDisk(cinek::ByteBuffer(
-        slab_.allocateArray<uint8_t>(kSmartPortDiskSize + 128), kSmartPortDiskSize + 128));
+        slab_.allocateArray<uint8_t>(kSmartPortDiskSize + 4096), kSmartPortDiskSize + 4096));
 
     // create empty decode scratchpad for saving images to the host's filesystem
     decodeBuffer_ =

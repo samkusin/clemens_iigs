@@ -493,7 +493,7 @@ bool ClemensBackend::serialize(const std::string &path) const {
             mpack_complete_map(writer);
         }
         mpack_finish_array(writer);
-        mpack_finish_map(writer);
+        mpack_complete_map(writer);
         return mpack_writer_error(writer) == mpack_ok;
     });
 }
@@ -505,6 +505,7 @@ bool ClemensBackend::unserialize(const std::string &path) {
 
     auto gs = snapshot.unserialize(
         *this, [&breakpoints](mpack_reader_t *reader, ClemensAppleIIGS &) -> bool {
+            mpack_expect_map(reader);
             mpack_expect_cstr_match(reader, "breakpoints");
             uint32_t breakpointCount = mpack_expect_array_max(reader, 1024);
             breakpoints.clear();
