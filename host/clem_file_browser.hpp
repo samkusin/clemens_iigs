@@ -1,13 +1,15 @@
 #ifndef CLEM_HOST_FILE_BROWSER_HPP
 #define CLEM_HOST_FILE_BROWSER_HPP
 
-#include "core/clem_disk_asset.hpp"
-
 #include "imgui.h"
 
 #include <chrono>
+#include <ctime>
+#include <filesystem>
 #include <future>
+#include <string>
 #include <utility>
+#include <vector>
 
 //  Using the ClemensFileBrowser
 //    - Display files according to a filter at the 'current directory'
@@ -15,47 +17,43 @@
 //    - Select (double click) of directory descends into directory
 //    - Select of file is a signal to end browsing
 //
-class ClemensDiskBrowser {
+
+class ClemensFileBrowser {
   public:
-    ClemensDiskBrowser(const std::string &idName) : idName_(idName) {}
-    bool isOpen() const;
-    void open(ClemensDiskAsset::DiskType diskType, const std::string &browsePath = "");
-    bool display(const ImVec2 &maxSize);
-    void close();
+    ClemensFileBrowser();
 
-    bool isOk() const { return finishedStatus_ == BrowserFinishedStatus::Selected; }
-    bool isCancel() const { return finishedStatus_ == BrowserFinishedStatus::Cancelled; }
+    void setCurrentDirectory(const std::string &directory);
 
-    ClemensDiskAsset acquireSelectedFilePath() { return std::move(selectedRecord_.asset); }
-    unsigned acquireSelectedBlockCount() { return selectedRecord_.size / 512; }
+    void frame(ImVec2 size);
 
-    bool isSelectedFilePathNewFile() const {
-        return createDiskImageType_ != ClemensDiskAsset::ImageNone;
-    }
+    //  user selected the current highlight
+    bool isSelected() const;
+    bool isCancelled() const;
+    bool isDone() const;
+
+    //  gets the currently selected or highlighted item
+    std::string getCurrentPathname() const;
+    std::string getCurrentDirectory() const;
 
   private:
     struct Record {
-        ClemensDiskAsset asset;
+        std::string name;
         size_t size = 0;
-        std::time_t fileTime;
-        bool isDirectory() const;
+        std::time_t fileTime = 0;
+        bool isDirectory;
     };
     using Records = std::vector<Record>;
-    std::future<Records> getRecordsResult_;
-    friend Records getRecordsFromDirectory(std::string directoryPathname,
-                                           ClemensDiskAsset::DiskType diskType);
+    static Records getRecordsFromDirectory(std::string directoryPathname);
 
-    enum class BrowserFinishedStatus { None, Active, Selected, Cancelled };
+    std::future<Records> getRecordsResult_;
     //  list of records on the current path;
-    std::string idName_;
-    ClemensDiskAsset::DiskType diskType_ = ClemensDiskAsset::DiskNone;
-    std::string cwdName_;
+    std::filesystem::path currentDirectoryPath_;
     Record selectedRecord_;
     std::vector<Record> records_;
-    BrowserFinishedStatus finishedStatus_;
     std::chrono::steady_clock::time_point nextRefreshTime_;
 
-    char createDiskFilename_[128];
-    int createDiskMBCount_;
-    ClemensDiskAsset::ImageType createDiskImageType_;
+    enum class BrowserFinishedStatus { None, Selected, Cancelled };
+    BrowserFinishedStatus selectionStatus_;
 };
+
+#endif

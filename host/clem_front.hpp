@@ -17,6 +17,7 @@
 #include "clem_host_shared.hpp"
 #include "clem_ui_load_snapshot.hpp"
 #include "clem_ui_save_snapshot.hpp"
+#include "clem_ui_settings.hpp"
 
 #include "imgui.h"
 #include "imgui_memory_editor.h"
@@ -322,6 +323,7 @@ class ClemensFrontend : public ClemensHostView {
     bool isEmulatorActive() const;
 
     enum class GUIMode {
+        None,
         Preamble,
         Setup,
         Emulator,
@@ -342,6 +344,7 @@ class ClemensFrontend : public ClemensHostView {
     ClemensLoadSnapshotUI loadSnapshotMode_;
     ClemensSaveSnapshotUI saveSnapshotMode_;
     ClemensDiskBrowser diskBrowserMode_;
+    ClemensSettingsUI settingsView_;
 
     std::optional<ClemensDriveType> browseDriveType_;
     std::optional<unsigned> browseSmartDriveIndex_;

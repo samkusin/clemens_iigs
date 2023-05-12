@@ -3,6 +3,7 @@
 #include "clem_l10n.hpp"
 
 #include "clem_imgui.hpp"
+
 #include "fmt/format.h"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -13,71 +14,95 @@ namespace {
 std::array<int, 3> kSupportedRAMSizes = {1024, 4096, 8192};
 } // namespace
 
-ClemensSettingsUI::ClemensSettingsUI(ClemensConfiguration &config) : config_(config) {}
+ClemensSettingsUI::ClemensSettingsUI(ClemensConfiguration &config)
+    : config_(config), mode_(ClemensSettingsUI::Mode::None) {}
+
+void ClemensSettingsUI::stop() { mode_ = ClemensSettingsUI::Mode::None; }
+
+void ClemensSettingsUI::start() { mode_ = ClemensSettingsUI::Mode::Main; }
 
 void ClemensSettingsUI::frame() {
-    char romFilename[1024];
 
-    ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsMachineSystemSetup));
-    ImGui::BeginTable("Machine", 2, ImGuiTableFlags_SizingStretchSame);
-    ImGui::TableNextRow();
-    {
-        ImGui::TableNextColumn();
-        ImGui::TextUnformatted(CLEM_L10N_LABEL(kSettingsMachineROMFilename));
-        ImGui::TableNextColumn();
-        fmt::format_to_n(romFilename, sizeof(romFilename), "{}{} {}", CLEM_HOST_FOLDER_LEFT_UTF8,
-                         CLEM_HOST_FOLDER_RIGHT_UTF8, config_.romFilename.c_str());
-        if (ImGui::Button(romFilename)) {
-            // mode_ = Mode::ROMFileBrowse;
-        }
-    }
-    ImGui::TableNextRow();
-    {
-        ImGui::TableNextColumn();
-        ImGui::TextUnformatted(CLEM_L10N_LABEL(kSettingsMachineSystemMemory));
-        ImGui::TableNextColumn();
-        int ramSizeKB = config_.gs.memory;
-        bool nonstandardRAMSize = true;
-        for (unsigned i = 0; i < kSupportedRAMSizes.size(); ++i) {
-            if (ramSizeKB == kSupportedRAMSizes[i]) {
-                nonstandardRAMSize = false;
+    switch (mode_) {
+    case Mode::None:
+        break;
+    case Mode::Main: {
+        char romFilename[1024];
+        ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsMachineSystemSetup));
+        ImGui::BeginTable("Machine", 2, ImGuiTableFlags_SizingStretchSame);
+        ImGui::TableNextRow();
+        {
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(CLEM_L10N_LABEL(kSettingsMachineROMFilename));
+            ImGui::TableNextColumn();
+            snprintf(romFilename, sizeof(romFilename), "%s%s %s", CLEM_HOST_FOLDER_LEFT_UTF8,
+                     CLEM_HOST_FOLDER_RIGHT_UTF8, config_.romFilename.c_str());
+            if (ImGui::Button(romFilename)) {
+                mode_ = Mode::ROMFileBrowse;
             }
         }
-        if (nonstandardRAMSize) {
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
-            ImGui::Text("Configured: %dK", ramSizeKB);
-            ImGui::Spacing();
+        ImGui::TableNextRow();
+        {
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(CLEM_L10N_LABEL(kSettingsMachineSystemMemory));
+            ImGui::TableNextColumn();
+            int ramSizeKB = config_.gs.memory;
+            bool nonstandardRAMSize = true;
+            for (unsigned i = 0; i < kSupportedRAMSizes.size(); ++i) {
+                if (ramSizeKB == kSupportedRAMSizes[i]) {
+                    nonstandardRAMSize = false;
+                }
+            }
+            if (nonstandardRAMSize) {
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+                ImGui::Text("Configured: %dK", ramSizeKB);
+                ImGui::Spacing();
+            }
+            for (unsigned ramSizeIdx = 0; ramSizeIdx < kSupportedRAMSizes.size(); ++ramSizeIdx) {
+                char radioLabel[8]{};
+                snprintf(radioLabel, sizeof(radioLabel) - 1, "%dK", kSupportedRAMSizes[ramSizeIdx]);
+                ImGui::RadioButton(radioLabel, &ramSizeKB, kSupportedRAMSizes[ramSizeIdx]);
+            }
+            if (nonstandardRAMSize) {
+                ImGui::PopItemFlag();
+                ImGui::PopStyleVar();
+            }
+            config_.gs.memory = ramSizeKB;
         }
-        for (unsigned ramSizeIdx = 0; ramSizeIdx < kSupportedRAMSizes.size(); ++ramSizeIdx) {
-            char radioLabel[8]{};
-            snprintf(radioLabel, sizeof(radioLabel) - 1, "%dK", kSupportedRAMSizes[ramSizeIdx]);
-            ImGui::RadioButton(radioLabel, &ramSizeKB, kSupportedRAMSizes[ramSizeIdx]);
-        }
-        if (nonstandardRAMSize) {
-            ImGui::PopItemFlag();
-            ImGui::PopStyleVar();
-        }
-        config_.gs.memory = ramSizeKB;
-    }
-    ImGui::EndTable();
+        ImGui::EndTable();
 
-    ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsTabEmulation));
-    ImGui::BeginTable("Emulation", 2, ImGuiTableFlags_SizingStretchSame);
-    ImGui::TableNextRow();
-    {
-        ImGui::TableNextColumn();
-        ImGui::TextUnformatted(CLEM_L10N_LABEL(kSettingsEmulationFastDisk));
-        ImGui::TableNextColumn();
-        ImGui::Checkbox("", &config_.fastEmulationEnabled);
-        ImGui::Indent();
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 0, 255));
-        ImGui::TextWrapped("%s", CLEM_L10N_LABEL(kSettingsEmulationFaskDiskHelp));
-        ImGui::PopStyleColor();
-        ImGui::Unindent();
+        ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsTabEmulation));
+        ImGui::BeginTable("Emulation", 2, ImGuiTableFlags_SizingStretchSame);
+        ImGui::TableNextRow();
+        {
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(CLEM_L10N_LABEL(kSettingsEmulationFastDisk));
+            ImGui::TableNextColumn();
+            ImGui::Checkbox("", &config_.fastEmulationEnabled);
+            ImGui::Indent();
+            ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 0, 255));
+            ImGui::TextWrapped("%s", CLEM_L10N_LABEL(kSettingsEmulationFaskDiskHelp));
+            ImGui::PopStyleColor();
+            ImGui::Unindent();
+        }
+        ImGui::EndTable();
+        break;
     }
-    ImGui::EndTable();
+    case Mode::ROMFileBrowse: {
+        ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsMachineROMFilename));
+        auto size = ImGui::GetContentRegionAvail();
+        fileBrowser_.frame(size);
+        if (fileBrowser_.isDone()) {
+            if (fileBrowser_.isSelected()) {
+                config_.romFilename = fileBrowser_.getCurrentPathname();
+            }
+            mode_ = Mode::Main;
+        }
+        break;
+    }
+    }
 }
 
 /*
@@ -137,13 +162,11 @@ bool ClemensSettingsUI::frame(float width, float height) {
                     ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsMachineSystemMemory));
                     if (nonstandardRAMSize_) {
                         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
-                        ImGui::Text("Configured: %dK", ramSizeKB_);
-                        ImGui::Spacing();
+                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha *
+0.5f); ImGui::Text("Configured: %dK", ramSizeKB_); ImGui::Spacing();
                     }
-                    for (int ramSizeIdx = 0; ramSizeIdx < kSupportedRAMSizeCount; ++ramSizeIdx) {
-                        char radioLabel[8]{};
-                        snprintf(radioLabel, sizeof(radioLabel) - 1, "%dK",
+                    for (int ramSizeIdx = 0; ramSizeIdx < kSupportedRAMSizeCount; ++ramSizeIdx)
+{ char radioLabel[8]{}; snprintf(radioLabel, sizeof(radioLabel) - 1, "%dK",
                                  s_supportedRAMSizes[ramSizeIdx]);
                         ImGui::RadioButton(radioLabel, &ramSizeKB_,
                                            s_supportedRAMSizes[ramSizeIdx]);
@@ -255,7 +278,8 @@ bool ClemensSettingsUI::frame(float width, float height) {
 }
 
 bool ClemensSettingsUI::willRequireRestart() const {
-    return (config_.gs.memory != (unsigned)(ramSizeKB_)) || (config_.romFilename != romFilename_);
+    return (config_.gs.memory != (unsigned)(ramSizeKB_)) || (config_.romFilename !=
+romFilename_);
 }
 
 void ClemensSettingsUI::updateConfig() {

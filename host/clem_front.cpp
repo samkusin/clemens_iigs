@@ -16,7 +16,6 @@
 #include "clem_mem.h"
 #include "clem_mmio_defs.h"
 #include "clem_mmio_types.h"
-#include "clem_ui_settings.hpp"
 #include "core/clem_apple2gs_config.hpp"
 #include "core/clem_disk_asset.hpp"
 #include "core/clem_disk_status.hpp"
@@ -716,7 +715,8 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false), terminalChanged_(false),
       consoleChanged_(false), terminalMode_(TerminalMode::Command), debugIOMode_(DebugIOMode::Core),
       vgcDebugMinScanline_(0), vgcDebugMaxScanline_(0), joystickSlotCount_(0),
-      guiMode_(GUIMode::Setup), guiPrevMode_(GUIMode::Setup), diskBrowserMode_("diskBrowser") {
+      guiMode_(GUIMode::Setup), guiPrevMode_(GUIMode::None), diskBrowserMode_("diskBrowser"),
+      settingsView_(config_) {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -784,7 +784,7 @@ void ClemensFrontend::lostFocus() {
 }
 
 void ClemensFrontend::startBackend() {
-    auto romPath = std::filesystem::path(config_.dataDirectory) / config_.romFilename;
+    auto romPath = config_.romFilename;
 
     ClemensBackendConfig backendConfig{};
 
@@ -802,7 +802,7 @@ void ClemensFrontend::startBackend() {
 
     spdlog::info("Starting new emulator backend");
     config_.poweredOn = true;
-    auto backend = std::make_unique<ClemensBackend>(romPath.string(), backendConfig);
+    auto backend = std::make_unique<ClemensBackend>(romPath, backendConfig);
     backendThread_ = std::thread(&ClemensFrontend::runBackend, this, std::move(backend));
 
     uiFrameTimeDelta_ = 0.0;
@@ -1225,6 +1225,16 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         stagedBackendQueue_.queue(backendQueue_);
     }
     readyForFrame_.notify_one();
+
+    if (guiMode_ != guiPrevMode_) {
+        switch (guiMode_) {
+        case GUIMode::Setup:
+            settingsView_.start();
+            break;
+        default:
+            break;
+        }
+    }
 
     //  render video
     //  video is rendered to a texture and the UVs of the display on the virtual
@@ -2171,7 +2181,7 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
     ImVec4 uiColor;
 
     char driveName[32];
-    fmt::format_to_n(driveName, sizeof(driveName), "SmartHDD{}", driveIndex);
+    snprintf(driveName, sizeof(driveName), "SmartHDD%u", driveIndex);
 
     ImGui::PushID(driveName);
     ImGui::BeginGroup();
@@ -3087,14 +3097,12 @@ void ClemensFrontend::doMachineDebugSoundDisplay() {
 }
 
 void ClemensFrontend::doSetupUI(ImVec2 anchor, ImVec2 dimensions) {
-    ClemensSettingsUI form(config_);
-
     ImGui::SetNextWindowPos(anchor);
     ImGui::SetNextWindowSize(dimensions);
     ImGui::Begin("Settings", NULL,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
     ImGui::Spacing();
-    form.frame();
+    settingsView_.frame();
     ImGui::End();
 }
 

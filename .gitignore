@@ -7,4 +7,5 @@ build/
 dist/
 data/*.rom
 data/*.bin
+compile_flags.txt
 
