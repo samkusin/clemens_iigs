@@ -16,6 +16,8 @@ std::array<int, 3> kSupportedRAMSizes = {1024, 4096, 8192};
 ClemensSettingsUI::ClemensSettingsUI(ClemensConfiguration &config) : config_(config) {}
 
 void ClemensSettingsUI::frame() {
+    char romFilename[1024];
+
     ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsMachineSystemSetup));
     ImGui::BeginTable("Machine", 2, ImGuiTableFlags_SizingStretchSame);
     ImGui::TableNextRow();
@@ -23,11 +25,11 @@ void ClemensSettingsUI::frame() {
         ImGui::TableNextColumn();
         ImGui::TextUnformatted(CLEM_L10N_LABEL(kSettingsMachineROMFilename));
         ImGui::TableNextColumn();
-        if (ImGui::Button(CLEM_HOST_FOLDER_LEFT_UTF8 CLEM_HOST_FOLDER_RIGHT_UTF8)) {
+        fmt::format_to_n(romFilename, sizeof(romFilename), "{}{} {}", CLEM_HOST_FOLDER_LEFT_UTF8,
+                         CLEM_HOST_FOLDER_RIGHT_UTF8, config_.romFilename.c_str());
+        if (ImGui::Button(romFilename)) {
             // mode_ = Mode::ROMFileBrowse;
         }
-        ImGui::SameLine();
-        ImGui::TextUnformatted(config_.romFilename.c_str());
     }
     ImGui::TableNextRow();
     {

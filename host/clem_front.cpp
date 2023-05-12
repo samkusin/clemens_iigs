@@ -1354,15 +1354,19 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     }
 
     //  handle emulator controls
-    if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
-        if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) {
-            if (ImGui::IsKeyDown(ImGuiKey_RightAlt) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) {
-                emulatorHasMouseFocus_ = false;
-            } else if (ImGui::IsKeyPressed(ImGuiKey_F11)) {
-                config_.hybridInterfaceEnabled = !config_.hybridInterfaceEnabled;
-                config_.setDirty();
+    if (guiMode_ == GUIMode::Emulator) {
+        if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
+            if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) {
+                if (ImGui::IsKeyDown(ImGuiKey_RightAlt) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) {
+                    emulatorHasMouseFocus_ = false;
+                } else if (ImGui::IsKeyPressed(ImGuiKey_F11)) {
+                    config_.hybridInterfaceEnabled = !config_.hybridInterfaceEnabled;
+                    config_.setDirty();
+                }
             }
         }
+    } else {
+        lostFocus();
     }
 
     config_.save();
