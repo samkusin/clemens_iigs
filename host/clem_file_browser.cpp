@@ -208,8 +208,6 @@ std::string ClemensFileBrowser::getCurrentDirectory() const {
 
 auto ClemensFileBrowser::getRecordsFromDirectory(std::string directoryPathname) -> Records {
     Records records;
-    uint8_t headerData[128];
-    bool isSmartPortDrive = false;
 
     //  cwdName_ identifies the directory to introspect
     //  flat structure (do not descent into directories)

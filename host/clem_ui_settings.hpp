@@ -18,6 +18,7 @@ class ClemensSettingsUI {
     ClemensFileBrowser fileBrowser_;
     enum class Mode { None, Main, ROMFileBrowse };
     Mode mode_;
+    bool romFileExists_;
 };
 
 #endif

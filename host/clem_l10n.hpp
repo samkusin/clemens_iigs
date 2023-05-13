@@ -22,6 +22,8 @@ extern const char *kSettingsMachineCards[];
 extern const char *kSettingsTabEmulation[];
 extern const char *kSettingsEmulationFastDisk[];
 extern const char *kSettingsEmulationFaskDiskHelp[];
+extern const char *kSettingsROMFileWarning[];
+extern const char *kSettingsROMFileError[];
 
 extern const char *kEmulatorHelp[];
 extern const char *kDiskSelectionHelp[];

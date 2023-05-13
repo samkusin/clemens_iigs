@@ -15,11 +15,14 @@ std::array<int, 3> kSupportedRAMSizes = {1024, 4096, 8192};
 } // namespace
 
 ClemensSettingsUI::ClemensSettingsUI(ClemensConfiguration &config)
-    : config_(config), mode_(ClemensSettingsUI::Mode::None) {}
+    : config_(config), mode_(ClemensSettingsUI::Mode::None), romFileExists_(false) {}
 
 void ClemensSettingsUI::stop() { mode_ = ClemensSettingsUI::Mode::None; }
 
-void ClemensSettingsUI::start() { mode_ = ClemensSettingsUI::Mode::Main; }
+void ClemensSettingsUI::start() {
+    mode_ = ClemensSettingsUI::Mode::Main;
+    romFileExists_ = !config_.romFilename.empty() && std::filesystem::exists(config_.romFilename);
+}
 
 void ClemensSettingsUI::frame() {
 
@@ -27,19 +30,36 @@ void ClemensSettingsUI::frame() {
     case Mode::None:
         break;
     case Mode::Main: {
-        char romFilename[1024];
         ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsMachineSystemSetup));
-        ImGui::BeginTable("Machine", 2, ImGuiTableFlags_SizingStretchSame);
+        ImGui::BeginTable("Machine", 2);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
+                                ImGui::GetFont()->GetCharAdvance('A') * 20);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableNextRow();
         {
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(CLEM_L10N_LABEL(kSettingsMachineROMFilename));
             ImGui::TableNextColumn();
-            snprintf(romFilename, sizeof(romFilename), "%s%s %s", CLEM_HOST_FOLDER_LEFT_UTF8,
-                     CLEM_HOST_FOLDER_RIGHT_UTF8, config_.romFilename.c_str());
-            if (ImGui::Button(romFilename)) {
+            ImGui::GetContentRegionMax();
+            if (ImGui::Button(CLEM_HOST_FOLDER_LEFT_UTF8 CLEM_HOST_FOLDER_RIGHT_UTF8 "  ")) {
                 mode_ = Mode::ROMFileBrowse;
             }
+            ImGui::SameLine();
+            ImGui::TextUnformatted(config_.romFilename.c_str());
+            if (!romFileExists_) {
+                ImGui::Spacing();
+                ImGui::Indent();
+                ImGui::SameLine();
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 32, 0, 255));
+                if (config_.romFilename.empty()) {
+                    ImGui::TextWrapped("%s", CLEM_L10N_LABEL(kSettingsROMFileWarning));
+                } else {
+                    ImGui::TextWrapped("%s", CLEM_L10N_LABEL(kSettingsROMFileError));
+                }
+                ImGui::PopStyleColor();
+                ImGui::Unindent();
+            }
+            ImGui::NewLine();
         }
         ImGui::TableNextRow();
         {
@@ -74,12 +94,16 @@ void ClemensSettingsUI::frame() {
 
         ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsTabEmulation));
         ImGui::BeginTable("Emulation", 2, ImGuiTableFlags_SizingStretchSame);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
+                                ImGui::GetFont()->GetCharAdvance('A') * 20);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableNextRow();
         {
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(CLEM_L10N_LABEL(kSettingsEmulationFastDisk));
             ImGui::TableNextColumn();
             ImGui::Checkbox("", &config_.fastEmulationEnabled);
+            ImGui::Spacing();
             ImGui::Indent();
             ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 0, 255));
@@ -97,6 +121,7 @@ void ClemensSettingsUI::frame() {
         if (fileBrowser_.isDone()) {
             if (fileBrowser_.isSelected()) {
                 config_.romFilename = fileBrowser_.getCurrentPathname();
+                romFileExists_ = std::filesystem::exists(config_.romFilename);
             }
             mode_ = Mode::Main;
         }
