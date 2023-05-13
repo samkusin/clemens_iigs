@@ -2172,6 +2172,8 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
     } else {
         driveStatus.assetPath = config_.gs.smartPortImagePaths[driveIndex];
     }
+    bool isDisabled = isBackendRunning() && !driveStatus.isMounted();
+    float widgetAlpha = isDisabled ? 0.2f : 1.0f;
 
     const ImGuiStyle &style = ImGui::GetStyle();
     const bool shortForm = !config_.hybridInterfaceEnabled;
@@ -2220,6 +2222,7 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
         } else {
             uiColor = style.Colors[ImGuiCol_Button];
         }
+        uiColor.w = widgetAlpha;
         drawList->AddRectFilled(cursorPos, tailCursorPos, (ImU32)ImColor(uiColor));
 
         //  icon
@@ -2229,13 +2232,10 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
         cursorPos.x += style.FramePadding.x;
         rbCursorPos.x = cursorPos.x + iconSize;
         rbCursorPos.y = cursorPos.y + iconSize;
-        if (driveStatus.isMounted()) {
-            uiColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-        } else {
-            uiColor = ImVec4(1.0f, 1.0f, 1.0f, 0.5f);
-        }
+
+        uiColor = ImVec4(1.0f, 1.0f, 1.0f, widgetAlpha);
         drawList->AddImage(texId, cursorPos, rbCursorPos, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
-                           IM_COL32_WHITE);
+                           ImColor(uiColor));
 
         cursorPos.x += iconSize + style.ItemInnerSpacing.x;
         doMachineDiskMotorStatus(cursorPos, ImVec2(6.0f, iconSize), driveStatus.isSpinning);
@@ -2246,7 +2246,7 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
         cursorPos.x += style.ItemSpacing.x;
         cursorPos.y += (iconSize - ImGui::GetFontSize()) * 0.5f;
 
-        drawList->AddText(cursorPos, (ImU32)ImColor(uiColor), title.c_str());
+        drawList->AddText(cursorPos, ImColor(uiColor), title.c_str());
 
         ImGui::PopClipRect();
 
@@ -2274,7 +2274,7 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width
         if (driveStatus.isMounted()) {
             ImGui::SetTooltip("Smartport HDD (%u) %s", driveIndex, driveStatus.assetPath.c_str());
         } else {
-            ImGui::SetTooltip("Smartport");
+            ImGui::SetTooltip("Smartport HDD");
         }
     }
 }

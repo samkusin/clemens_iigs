@@ -35,15 +35,20 @@ class ClemensFileBrowser {
     std::string getCurrentPathname() const;
     std::string getCurrentDirectory() const;
 
-  private:
+  protected:
     struct Record {
         std::string name;
+        uintptr_t context = 0;
         size_t size = 0;
         std::time_t fileTime = 0;
         bool isDirectory;
     };
+    virtual void onModifyRecord(Record &){};
+    virtual std::string onDisplayRecord(const Record &record);
+
+  private:
     using Records = std::vector<Record>;
-    static Records getRecordsFromDirectory(std::string directoryPathname);
+    Records getRecordsFromDirectory(std::string directoryPathname);
 
     std::future<Records> getRecordsResult_;
     //  list of records on the current path;

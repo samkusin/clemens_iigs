@@ -63,7 +63,8 @@ void ClemensFileBrowser::frame(ImVec2 size) {
     }
     //  query records using this directory and a specified filter
     if (!getRecordsResult_.valid() && std::chrono::steady_clock::now() >= nextRefreshTime_) {
-        getRecordsResult_ = std::async(std::launch::async, &getRecordsFromDirectory, cwd.string());
+        getRecordsResult_ = std::async(
+            std::launch::async, &ClemensFileBrowser::getRecordsFromDirectory, this, cwd.string());
     }
     if (getRecordsResult_.valid()) {
         if (getRecordsResult_.wait_for(std::chrono::milliseconds(1)) == std::future_status::ready) {
@@ -124,13 +125,13 @@ void ClemensFileBrowser::frame(ImVec2 size) {
                                 ImGui::CalcTextSize("9999 Kb").x);
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
                                 ImGui::CalcTextSize("XXXX-XX-XX XX:XX").x);
+        std::string filename;
         for (auto const &record : records_) {
             //      icon (5.25, 3.5, HDD), filename, date
-            auto filename = std::filesystem::path(record.name).filename().string();
+
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
-            //  ICON?
-            ImGui::TextUnformatted(" ");
+            auto filename = onDisplayRecord(record);
             ImGui::TableSetColumnIndex(1);
             bool isSelected = ImGui::Selectable(
                 filename.c_str(), record.name == selectedRecord_.name,
@@ -206,6 +207,12 @@ std::string ClemensFileBrowser::getCurrentDirectory() const {
     return currentDirectoryPath_.string();
 }
 
+std::string ClemensFileBrowser::onDisplayRecord(const Record &record) {
+    //  display the file type
+    ImGui::TextUnformatted(" ");
+    return record.name;
+}
+
 auto ClemensFileBrowser::getRecordsFromDirectory(std::string directoryPathname) -> Records {
     Records records;
 
@@ -236,6 +243,7 @@ auto ClemensFileBrowser::getRecordsFromDirectory(std::string directoryPathname) 
         record.name = entry.path().filename().string();
         record.size = fileSize;
         record.fileTime = to_time_t(std::filesystem::last_write_time(entry.path()));
+        onModifyRecord(record);
         records.emplace_back(record);
     }
 
