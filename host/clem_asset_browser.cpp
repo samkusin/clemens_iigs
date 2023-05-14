@@ -7,6 +7,7 @@
 #include "clem_mmio_types.h"
 #include "clem_woz.h"
 
+#include <algorithm>
 #include <fstream>
 
 namespace {
@@ -259,7 +260,8 @@ auto ClemensAssetBrowser::onExtraSelectionUI(ImVec2 dimensions,
                     break;
                 }
                 if (!fileName.empty()) {
-                    selectedRecord.path = std::filesystem::path(getCurrentDirectory()) / fileName;
+                    selectedRecord.path =
+                        (std::filesystem::path(getCurrentDirectory()) / fileName).string();
                     selectedRecord.name = fileName;
                     selectedRecord.size = createDiskMBCount_ * 1024 * 1024;
                 }

@@ -2,7 +2,6 @@
 
 #include "imgui.h"
 
-#include <algorithm>
 #include <cassert>
 #include <system_error>
 
