@@ -23,6 +23,7 @@ class ClemensFileBrowser {
     ClemensFileBrowser();
 
     void setCurrentDirectory(const std::string &directory);
+    void forceRefresh();
 
     void frame(ImVec2 size);
 
@@ -34,17 +35,28 @@ class ClemensFileBrowser {
     //  gets the currently selected or highlighted item
     std::string getCurrentPathname() const;
     std::string getCurrentDirectory() const;
+    size_t getFileSize() const;
 
   protected:
     struct Record {
+        std::string path;
         std::string name;
-        uintptr_t context = 0;
         size_t size = 0;
         std::time_t fileTime = 0;
+        uint8_t context[16];
         bool isDirectory;
     };
-    virtual void onModifyRecord(Record &){};
+    enum class BrowserFinishedStatus { None, Selected, Cancelled };
+
+    virtual bool onCreateRecord(const std::filesystem::directory_entry & /* direntry */,
+                                Record & /* entryRecord */) {
+        return true;
+    }
     virtual std::string onDisplayRecord(const Record &record);
+    virtual BrowserFinishedStatus onExtraSelectionUI(ImVec2 /* dimensions*/,
+                                                     Record & /* selectedRecord*/) {
+        return BrowserFinishedStatus::None;
+    }
 
   private:
     using Records = std::vector<Record>;
@@ -57,7 +69,6 @@ class ClemensFileBrowser {
     std::vector<Record> records_;
     std::chrono::steady_clock::time_point nextRefreshTime_;
 
-    enum class BrowserFinishedStatus { None, Selected, Cancelled };
     BrowserFinishedStatus selectionStatus_;
 };
 

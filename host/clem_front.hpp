@@ -7,18 +7,18 @@
 
 #include "core/clem_apple2gs_config.hpp"
 
-#include "cinek/buffer.hpp"
-#include "cinek/circular_buffer.hpp"
-#include "cinek/fixedstack.hpp"
-#include "clem_audio.hpp"
+#include "clem_asset_browser.hpp"
 #include "clem_configuration.hpp"
-#include "clem_disk_browser.hpp"
 #include "clem_display.hpp"
 #include "clem_host_shared.hpp"
 #include "clem_ui_load_snapshot.hpp"
 #include "clem_ui_save_snapshot.hpp"
 #include "clem_ui_settings.hpp"
 
+#include "cinek/buffer.hpp"
+#include "cinek/circular_buffer.hpp"
+#include "cinek/fixedstack.hpp"
+#include "clem_audio.hpp"
 #include "imgui.h"
 #include "imgui_memory_editor.h"
 
@@ -81,8 +81,8 @@ class ClemensFrontend : public ClemensHostView {
     void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU, float screenV);
     void doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize);
     void doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize);
-    void doMachineDiskBrowserInterface(ImVec2 dimensions);
-    void doMachineSmartDiskBrowserInterface(ImVec2 dimensions);
+    void doMachineDiskBrowserInterface(ImVec2 anchor, ImVec2 dimensions);
+    void doMachineSmartDiskBrowserInterface(ImVec2 anchor, ImVec2 dimensions);
 
     void layoutTerminalLines();
     void layoutConsoleLines();
@@ -338,12 +338,15 @@ class ClemensFrontend : public ClemensHostView {
 
     GUIMode guiMode_;
     GUIMode guiPrevMode_;
+    double appTime_;
+    double nextUIFlashCycleAppTime_;
+    float uiFlashAlpha_;
 
     std::string messageModalString_;
 
     ClemensLoadSnapshotUI loadSnapshotMode_;
     ClemensSaveSnapshotUI saveSnapshotMode_;
-    ClemensDiskBrowser diskBrowserMode_;
+    ClemensAssetBrowser assetBrowser_;
     ClemensSettingsUI settingsView_;
 
     std::optional<ClemensDriveType> browseDriveType_;

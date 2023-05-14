@@ -38,8 +38,6 @@ class ClemensAppleIIGS {
 
     enum class ResultFlags { None = 0, VerticalBlank = 1 << 0, Resetting = 1 << 1 };
 
-    static constexpr const char *kClemensCardMockingboardName = "mockingboard_c";
-
     using OnWriteConfigCallback = std::function<void(const Config &)>;
     using OnLocalLogCallback = std::function<void(int, const char *)>;
 

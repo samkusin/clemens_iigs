@@ -15,8 +15,6 @@
 #define CLEM_HOST_SNAPSHOT_DIR "snapshots"
 #define CLEM_HOST_TRACES_DIR   "traces"
 
-constexpr const char *kClemensCardMockingboardName = "mockingboard_c";
-
 struct ClemensBackendOutputText {
     int level;
     std::string text;

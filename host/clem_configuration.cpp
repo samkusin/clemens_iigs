@@ -16,6 +16,7 @@ ClemensConfiguration::ClemensConfiguration()
       hybridInterfaceEnabled(false), fastEmulationEnabled(true), isDirty(true) {
     gs.audioSamplesPerSecond = 0;
     gs.memory = CLEM_EMULATOR_RAM_DEFAULT;
+    gs.cardNames[3] = kClemensCardMockingboardName;
 }
 
 ClemensConfiguration::ClemensConfiguration(std::string pathname, std::string datadir)
@@ -77,6 +78,9 @@ bool ClemensConfiguration::save() {
     }
     for (unsigned i = 0; i < (unsigned)gs.smartPortImagePaths.size(); i++) {
         fmt::print(fp, "gs.smart.{}={}\n", i, gs.smartPortImagePaths[i]);
+    }
+    for (unsigned i = 0; i < (unsigned)gs.cardNames.size(); i++) {
+        fmt::print(fp, "gs.card.{}={}\n", i, gs.cardNames[i]);
     }
     assert(gs.bram.size() == 256);
     for (unsigned i = 0; i < 256; i += 16) {
@@ -169,6 +173,14 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
                 return 0;
             }
             config->gs.smartPortImagePaths[driveIndex] = value;
+        } else if (strncmp(name, "gs.card.", 9) == 0) {
+            const char *partial = name + 9;
+            unsigned cardIndex;
+            if (std::from_chars(partial, partial + 1, cardIndex, 10).ec != std::errc{}) {
+                fmt::print(stderr, "Invalid Card configuration {}={}\n", name, value);
+                return 0;
+            }
+            config->gs.cardNames[cardIndex] = value;
         }
     }
 

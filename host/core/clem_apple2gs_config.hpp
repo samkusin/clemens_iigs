@@ -7,6 +7,8 @@
 #include <array>
 #include <string>
 
+constexpr const char *kClemensCardMockingboardName = "mockingboard_c";
+
 struct ClemensAppleIIGSConfig {
     //  RAM in Kilobytes, not counting Mega 2 memory
     unsigned memory = 0;
