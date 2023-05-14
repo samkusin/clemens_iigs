@@ -262,7 +262,7 @@ auto ClemensAssetBrowser::onExtraSelectionUI(ImVec2 dimensions,
                 if (!fileName.empty()) {
                     selectedRecord.path =
                         (std::filesystem::path(getCurrentDirectory()) / fileName).string();
-                    selectedRecord.name = fileName;
+                    selectedRecord.name = fileName.string();
                     selectedRecord.size = createDiskMBCount_ * 1024 * 1024;
                 }
                 ImGui::CloseCurrentPopup();
