@@ -1,3 +1,6 @@
+//  Boo...
+#define _USE_MATH_DEFINES
+
 #include "clem_front.hpp"
 
 #include "clem_backend.hpp"
