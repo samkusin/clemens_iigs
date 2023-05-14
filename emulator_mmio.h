@@ -101,31 +101,6 @@ bool clemens_assign_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
  *
  * @param mmio
  * @param drive_type
- * @param disk  The output disk
- */
-void clemens_eject_disk_old(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
-                            struct ClemensNibbleDisk *disk);
-
-/**
- * @brief Performs a device specific eject of a disk (3.5" disks mainly.)
- *
- * The eject sequence can take a second or so if exact Apple Drive 3.5"
- * emulation is desired.
- *
- * @param mmio
- * @param drive_type
- * @param disk  The final nibbilised disk object
- * @return true Disk has ejected
- * @return false Disk is still ejecting
- */
-bool clemens_eject_disk_async_old(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
-                                  struct ClemensNibbleDisk *disk);
-
-/**
- * @brief
- *
- * @param mmio
- * @param drive_type
  * @param bits_data
  * @param bits_data_end
  */

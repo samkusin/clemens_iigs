@@ -12,10 +12,11 @@
 #include <cstring>
 
 ClemensConfiguration::ClemensConfiguration()
-    : majorVersion(0), minorVersion(0), logLevel(CLEM_DEBUG_LOG_INFO),
+    : majorVersion(0), minorVersion(0), logLevel(CLEM_DEBUG_LOG_INFO), poweredOn(false),
       hybridInterfaceEnabled(false), fastEmulationEnabled(true), isDirty(true) {
     gs.audioSamplesPerSecond = 0;
     gs.memory = CLEM_EMULATOR_RAM_DEFAULT;
+    gs.cardNames[3] = kClemensCardMockingboardName;
 }
 
 ClemensConfiguration::ClemensConfiguration(std::string pathname, std::string datadir)
@@ -34,6 +35,7 @@ void ClemensConfiguration::copyFrom(const ClemensConfiguration &other) {
     majorVersion = other.majorVersion;
     minorVersion = other.minorVersion;
     logLevel = other.logLevel;
+    poweredOn = other.poweredOn;
 
     gs = other.gs;
 
@@ -58,8 +60,10 @@ bool ClemensConfiguration::save() {
                "data={}\n"
                "hybrid={}\n"
                "logger={}\n"
+               "power={}\n"
                "\n",
-               majorVersion, minorVersion, dataDirectory, hybridInterfaceEnabled ? 1 : 0, logLevel);
+               majorVersion, minorVersion, dataDirectory, hybridInterfaceEnabled ? 1 : 0, logLevel,
+               poweredOn ? 1 : 0);
     fmt::print(fp,
                "[emulator]\n"
                "romfile={}\n"
@@ -74,6 +78,9 @@ bool ClemensConfiguration::save() {
     }
     for (unsigned i = 0; i < (unsigned)gs.smartPortImagePaths.size(); i++) {
         fmt::print(fp, "gs.smart.{}={}\n", i, gs.smartPortImagePaths[i]);
+    }
+    for (unsigned i = 0; i < (unsigned)gs.cardNames.size(); i++) {
+        fmt::print(fp, "gs.card.{}={}\n", i, gs.cardNames[i]);
     }
     assert(gs.bram.size() == 256);
     for (unsigned i = 0; i < 256; i += 16) {
@@ -108,15 +115,17 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
         } else if (strncmp(name, "data", 16) == 0) {
             config->dataDirectory = value;
         } else if (strncmp(name, "hybrid", 16) == 0) {
-            config->hybridInterfaceEnabled = atoi(value) > 0 ? true : false;
+            config->hybridInterfaceEnabled = atoi(value) > 0;
         } else if (strncmp(name, "logger", 16) == 0) {
             config->logLevel = atoi(value);
+        } else if (strncmp(name, "power", 16) == 0) {
+            config->poweredOn = atoi(value) > 0;
         }
     } else if (strncmp(section, "emulator", 16) == 0) {
         if (strncmp(name, "romfile", 16) == 0) {
             config->romFilename = value;
         } else if (strncmp(name, "fastiwm", 16) == 0) {
-            config->fastEmulationEnabled = atoi(value) > 0 ? true : false;
+            config->fastEmulationEnabled = atoi(value) > 0;
         } else if (strncmp(name, "gs.ramkb", 16) == 0) {
             config->gs.memory = (unsigned)atoi(value);
         } else if (strncmp(name, "gs.audio_samples", 32) == 0) {
@@ -164,6 +173,14 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
                 return 0;
             }
             config->gs.smartPortImagePaths[driveIndex] = value;
+        } else if (strncmp(name, "gs.card.", 9) == 0) {
+            const char *partial = name + 9;
+            unsigned cardIndex;
+            if (std::from_chars(partial, partial + 1, cardIndex, 10).ec != std::errc{}) {
+                fmt::print(stderr, "Invalid Card configuration {}={}\n", name, value);
+                return 0;
+            }
+            config->gs.cardNames[cardIndex] = value;
         }
     }
 

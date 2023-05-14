@@ -129,12 +129,13 @@ set(PROJECT_SOURCES
     ${PLATFORM_SOURCES}
     ${SOKOL_SOURCES}
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_assets.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_asset_browser.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_audio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_display.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_backend.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_command_queue.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_configuration.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/clem_disk_browser.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_file_browser.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_front.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_app.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_host_utils.cpp"

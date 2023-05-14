@@ -52,22 +52,14 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
             listener.onCommandStep(count);
         } break;
         case Command::InsertDisk:
-            if (!insertDisk(listener, cmd.operand, false))
-                commandFailed = true;
-            break;
-        case Command::InsertBlankDisk:
-            if (!insertDisk(listener, cmd.operand, true))
+            if (!insertDisk(listener, cmd.operand))
                 commandFailed = true;
             break;
         case Command::EjectDisk:
             ejectDisk(listener, cmd.operand);
             break;
         case Command::InsertSmartPortDisk:
-            if (!insertSmartPortDisk(listener, cmd.operand, false))
-                commandFailed = true;
-            break;
-        case Command::InsertBlankSmartPortDisk:
-            if (!insertSmartPortDisk(listener, cmd.operand, true))
+            if (!insertSmartPortDisk(listener, cmd.operand))
                 commandFailed = true;
             break;
         case Command::EjectSmartPortDisk:
@@ -171,13 +163,8 @@ void ClemensCommandQueue::insertDisk(ClemensDriveType driveType, std::string dis
                   fmt::format("{}={}", ClemensDiskUtilities::getDriveName(driveType), diskPath)});
 }
 
-void ClemensCommandQueue::insertBlankDisk(ClemensDriveType driveType, std::string diskPath) {
-    queue(Command{Command::InsertBlankDisk,
-                  fmt::format("{}={}", ClemensDiskUtilities::getDriveName(driveType), diskPath)});
-}
-
 bool ClemensCommandQueue::insertDisk(ClemensCommandQueueListener &listener,
-                                     const std::string_view &inputParam, bool allowBlank) {
+                                     const std::string_view &inputParam) {
     auto sepPos = inputParam.find('=');
     if (sepPos == std::string_view::npos)
         return false;
@@ -187,8 +174,7 @@ bool ClemensCommandQueue::insertDisk(ClemensCommandQueueListener &listener,
     if (driveType == kClemensDrive_Invalid)
         return false;
 
-    return allowBlank ? listener.onCommandInsertBlankDisk(driveType, std::string(imagePath))
-                      : listener.onCommandInsertDisk(driveType, std::string(imagePath));
+    return listener.onCommandInsertDisk(driveType, std::string(imagePath));
 }
 
 void ClemensCommandQueue::ejectDisk(ClemensDriveType driveType) {
@@ -222,12 +208,8 @@ void ClemensCommandQueue::insertSmartPortDisk(unsigned driveIndex, std::string d
     queue(Command{Command::InsertSmartPortDisk, fmt::format("{}={}", driveIndex, diskPath)});
 }
 
-void ClemensCommandQueue::insertBlankSmartPortDisk(unsigned driveIndex, std::string diskPath) {
-    queue(Command{Command::InsertBlankSmartPortDisk, fmt::format("{}={}", driveIndex, diskPath)});
-}
-
 bool ClemensCommandQueue::insertSmartPortDisk(ClemensCommandQueueListener &listener,
-                                              const std::string_view &inputParam, bool allowBlank) {
+                                              const std::string_view &inputParam) {
     auto sepPos = inputParam.find('=');
     if (sepPos == std::string_view::npos)
         return false;
@@ -239,9 +221,7 @@ bool ClemensCommandQueue::insertSmartPortDisk(ClemensCommandQueueListener &liste
             .ec != std::errc{})
         return false;
 
-    return allowBlank
-               ? listener.onCommandInsertBlankSmartPortDisk(driveIndex, std::string(imagePath))
-               : listener.onCommandInsertSmartPortDisk(driveIndex, std::string(imagePath));
+    return listener.onCommandInsertSmartPortDisk(driveIndex, std::string(imagePath));
 }
 
 void ClemensCommandQueue::ejectSmartPortDisk(unsigned driveIndex) {

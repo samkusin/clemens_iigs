@@ -195,7 +195,7 @@ auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
             if (preambleResult != ClemensPreamble::Result::Active) {
                 if (preambleResult == ClemensPreamble::Result::Ok) {
                     preamble_ = nullptr;
-                    mode_ = Mode::ROMCheck;
+                    mode_ = Mode::Finished;
                 } else if (preambleResult == ClemensPreamble::Result::Exit) {
                     preamble_ = nullptr;
                     mode_ = Mode::Aborted;
@@ -203,93 +203,6 @@ auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
             }
         }
         break;
-
-    case Mode::ROMCheck:
-        //  if no rom file exists, ask the user to select one, and copy that
-        //  to our data directory root
-        if (!ImGui::IsPopupOpen("Select ROM Image") && !ImGui::IsPopupOpen("ROM File Not Found")) {
-            int checkROMResult = checkROMFile();
-            if (checkROMResult == 0) {
-                ImGui::OpenPopup("Select ROM Image");
-            } else if (checkROMResult < 0) {
-                ImGui::OpenPopup("ROM File Not Found");
-            } else {
-                mode_ = Mode::Finished;
-            }
-
-        } else {
-            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-            ImGui::SetNextWindowPos(center, 0, ImVec2(0.5f, 0.5f));
-            ImGui::SetNextWindowSize(ImVec2(width * 0.75f, 0.0f));
-            if (ImGui::BeginPopupModal("Select ROM Image", NULL,
-                                       ImGuiWindowFlags_AlwaysAutoResize)) {
-                ImGui::PushTextWrapPos();
-                ImGui::NewLine();
-                ImGui::TextUnformatted("Clemens IIGS requires a ROM 3 binary to run properly.  "
-                                       "Press 'OK' to select a ROM binary file.");
-                ImGui::NewLine();
-                ImGui::TextUnformatted(
-                    "Press 'Continue without ROM' to skip this step.  If this is your "
-                    "choice, the emulated machine will hang at startup.");
-                ImGui::NewLine();
-                ImGui::Separator();
-                ImGui::PopTextWrapPos();
-                if (ImGui::Button("OK", ImVec2(240, 0))) {
-                    mode_ = Mode::ROMFileBrowser;
-                    ImGui::CloseCurrentPopup();
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Continue without ROM", ImVec2(300, 0))) {
-                    mode_ = Mode::Finished;
-                    ImGui::CloseCurrentPopup();
-                }
-                ImGui::EndPopup();
-            }
-            ImGui::SetNextWindowPos(center, 0, ImVec2(0.5f, 0.5f));
-            ImGui::SetNextWindowSize(ImVec2(width * 0.75f, 0.0f));
-            if (ImGui::BeginPopupModal("ROM File Not Found", NULL,
-                                       ImGuiWindowFlags_AlwaysAutoResize)) {
-                ImGui::PushTextWrapPos();
-                ImGui::NewLine();
-                ImGui::Text("The file '%s' could not be found or opened.  Press 'OK' to select a "
-                            "ROM binary file.",
-                            config_.romFilename.c_str());
-                ImGui::NewLine();
-                ImGui::TextUnformatted(
-                    "Press 'Continue without ROM' to skip this step.  If this is your "
-                    "choice, the emulated machine will hang at startup.");
-                ImGui::NewLine();
-                ImGui::Separator();
-                ImGui::PopTextWrapPos();
-                if (ImGui::Button("OK", ImVec2(240, 0))) {
-                    mode_ = Mode::ROMFileBrowser;
-                    ImGui::CloseCurrentPopup();
-                    ImGuiFileDialog::Instance()->OpenDialog("Select ROM", "Select a ROM", ".*", ".",
-                                                            1, nullptr, ImGuiFileDialogFlags_Modal);
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Continue without ROM", ImVec2(300, 0))) {
-                    mode_ = Mode::Finished;
-                    ImGui::CloseCurrentPopup();
-                }
-                ImGui::EndPopup();
-            }
-        }
-        break;
-
-    case Mode::ROMFileBrowser: {
-        auto result = ClemensHostImGui::ROMFileBrowser(width, height, config_.dataDirectory);
-        if (result.type == ClemensHostImGui::ROMFileBrowserResult::Ok) {
-            config_.romFilename = result.filename;
-            mode_ = Mode::ROMCheck;
-        } else if (result.type == ClemensHostImGui::ROMFileBrowserResult::Cancel) {
-            mode_ = Mode::ROMCheck;
-        } else if (result.type == ClemensHostImGui::ROMFileBrowserResult::Error) {
-            setupError_ = fmt::format("Failed to copy ROM file {}", result.filename);
-            mode_ = Mode::SetupError;
-        }
-        break;
-    }
 
     case Mode::SetupError: {
         if (!ImGui::IsPopupOpen("Error")) {
@@ -377,27 +290,6 @@ bool ClemensStartupView::validateDirectories() {
         }
     }
     return true;
-}
-
-int ClemensStartupView::checkROMFile() {
-    //  check for existence of rom file  <data_directory>/<config::romFilename>
-    //  if ROM file exists, == 1, if no ROM file configured == 0,
-    //  if filename points to a nonexistent ROM file, -1
-
-    if (config_.romFilename.empty()) {
-        //  if the ROM file past versions expect exists, configure that and retry.
-        auto legacyROMPath = std::filesystem::path(config_.dataDirectory) / "gs_rom_3.rom";
-        if (std::filesystem::exists(legacyROMPath)) {
-            config_.romFilename = "gs_rom_3.rom";
-            return checkROMFile();
-        }
-        return 0;
-    }
-    if (!std::filesystem::exists(std::filesystem::path(config_.dataDirectory) /
-                                 config_.romFilename)) {
-        return -1;
-    }
-    return 1;
 }
 
 void ClemensStartupView::input(ClemensInputEvent) {}

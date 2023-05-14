@@ -114,31 +114,6 @@ bool clemens_assign_disk(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
     return true;
 }
 
-void clemens_eject_disk_old(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
-                            struct ClemensNibbleDisk *disk) {
-    struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
-    if (!drive)
-        return;
-
-    if (drive->disk.disk_type != CLEM_DISK_TYPE_NONE) {
-        CLEM_LOG("%s ejecting disk", s_drive_names[drive_type]);
-    }
-    clem_iwm_eject_disk_old(&mmio->dev_iwm, drive, disk);
-}
-
-bool clemens_eject_disk_async_old(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
-                                  struct ClemensNibbleDisk *disk) {
-    struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);
-    if (drive) {
-        if (drive->disk.disk_type != CLEM_DISK_TYPE_NONE) {
-            CLEM_LOG("%s ejecting disk", s_drive_names[drive_type]);
-        }
-        return clem_iwm_eject_disk_async_old(&mmio->dev_iwm, drive, disk);
-    }
-    clem_iwm_eject_disk_old(&mmio->dev_iwm, drive, disk);
-    return true;
-}
-
 void clemens_assign_disk_buffer(ClemensMMIO *mmio, enum ClemensDriveType drive_type,
                                 uint8_t *bits_data, uint8_t *bits_data_end) {
     struct ClemensDrive *drive = clemens_drive_get(mmio, drive_type);

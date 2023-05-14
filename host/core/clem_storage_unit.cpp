@@ -40,7 +40,7 @@ void ClemensStorageUnit::allocateBuffers() {
 
     // create empty backing ProDOS buffer for SmartPort disk
     hardDisks_[0] = ClemensProDOSDisk(cinek::ByteBuffer(
-        slab_.allocateArray<uint8_t>(kSmartPortDiskSize + 128), kSmartPortDiskSize + 128));
+        slab_.allocateArray<uint8_t>(kSmartPortDiskSize + 4096), kSmartPortDiskSize + 4096));
 
     // create empty decode scratchpad for saving images to the host's filesystem
     decodeBuffer_ =
@@ -64,14 +64,6 @@ ClemensSmartPortUnit *ClemensStorageUnit::getSmartPortUnit(ClemensMMIO &mmio, un
         return NULL;
     }
     return unit;
-}
-
-bool ClemensStorageUnit::createSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex,
-                                             const std::string &imagePath) {
-    ClemensSmartPortUnit *unit = getSmartPortUnit(mmio, driveIndex);
-    if (!unit)
-        return false;
-    return false;
 }
 
 bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex,
@@ -126,31 +118,6 @@ ClemensDrive *ClemensStorageUnit::getDrive(ClemensMMIO &mmio, ClemensDriveType d
         ejectDisk(mmio, driveType);
     }
     return drive;
-}
-
-bool ClemensStorageUnit::createDisk(ClemensMMIO &mmio, ClemensDriveType driveType,
-                                    const std::string &path) {
-    ClemensDrive *drive = getDrive(mmio, driveType);
-    if (!drive)
-        return false;
-
-    //  Use the decode buffer to generate a blank image and leverage the utilities
-    //  in ClemensDiskAsset to generate the underlying nib (basically, generate a
-    //  blank image...)
-    decodeBuffer_.reset();
-    auto imageBuffer = decodeBuffer_.forwardSize(decodeBuffer_.getCapacity());
-    auto imageGeneratedSource = ClemensDiskAsset::createBlankDiskImage(
-        ClemensDiskAsset::fromAssetPathUsingExtension(path),
-        ClemensDiskAsset::diskTypeFromDriveType(driveType), true, imageBuffer);
-    if (cinek::length(imageGeneratedSource) == 0)
-        return false;
-
-    bool mounted = mountDisk(mmio, path, driveType, imageGeneratedSource);
-    if (mounted) {
-        //  save the new disk NOW
-        saveDisk(driveType, drive->disk);
-    }
-    return mounted;
 }
 
 bool ClemensStorageUnit::insertDisk(ClemensMMIO &mmio, ClemensDriveType driveType,
@@ -261,15 +228,16 @@ void ClemensStorageUnit::writeProtectDisk(ClemensMMIO &mmio, ClemensDriveType dr
 void ClemensStorageUnit::update(ClemensMMIO &mmio) {
     for (auto it = diskStatuses_.begin(); it != diskStatuses_.end(); ++it) {
         auto driveType = static_cast<ClemensDriveType>(it - diskStatuses_.begin());
+        auto *drive = clemens_drive_get(&mmio, driveType);
         auto &status = diskStatuses_[driveType];
+        status.isSpinning = drive->is_spindle_on;
+
         if (!status.isMounted()) {
             status.isEjecting = false;
-            status.isSpinning = false;
             status.isWriteProtected = false;
             continue;
         }
-        auto *drive = clemens_drive_get(&mmio, driveType);
-        status.isSpinning = drive->is_spindle_on;
+
         status.isWriteProtected = drive->disk.is_write_protected;
         if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
             auto ejectStatus = clemens_eject_disk_in_progress(&mmio, driveType);
@@ -283,6 +251,10 @@ void ClemensStorageUnit::update(ClemensMMIO &mmio) {
                 diskStatuses_[driveType].unmount();
                 spdlog::info("ClemensStorageUnit - {}: auto ejected",
                              ClemensDiskUtilities::getDriveName(driveType));
+            } else if (!drive->has_disk) {
+                spdlog::error("ClemensStorageUnit - {}: disk was ejected but the event was not "
+                              "intercepted - DATA LOSS!!!",
+                              ClemensDiskUtilities::getDriveName(driveType));
             }
         }
     }

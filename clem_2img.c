@@ -270,8 +270,14 @@ unsigned clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uin
         return 0;
     }
 
-    if (image_size < source_size + creator_size + comment_size + CLEM_2IMG_HEADER_BYTE_SIZE)
-        return false;
+    if (disk->data == NULL) {
+        //  header only (so image buffer encompasses metadata only)
+        if (image_size < creator_size + comment_size + CLEM_2IMG_HEADER_BYTE_SIZE)
+            return false;
+    } else {
+        if (image_size < source_size + creator_size + comment_size + CLEM_2IMG_HEADER_BYTE_SIZE)
+            return false;
+    }
     if (disk->format == CLEM_DISK_FORMAT_PRODOS) {
         if (disk->block_count * 512 != source_size)
             return false;
@@ -324,21 +330,24 @@ unsigned clem_2img_build_image(struct Clemens2IMGDisk *disk, uint8_t *image, uin
     _encode_u32(&image_cur, 0);
     if (image_cur - image != CLEM_2IMG_HEADER_BYTE_SIZE)
         return 0;
-    data_tmp = image_cur;
-    _encode_mem(&image_cur, disk->data, source_size, overlapped);
-    disk->data = data_tmp;
-    disk->data_end = image_cur;
-    _encode_mem(&image_cur, (uint8_t *)disk->creator_data, creator_size, overlapped);
-    _encode_mem(&image_cur, (uint8_t *)disk->comment, comment_size, overlapped);
-
+    if (disk->data != NULL) {
+        data_tmp = image_cur;
+        _encode_mem(&image_cur, disk->data, source_size, overlapped);
+        disk->data = data_tmp;
+        disk->data_end = image_cur;
+        _encode_mem(&image_cur, (uint8_t *)disk->creator_data, creator_size, overlapped);
+        _encode_mem(&image_cur, (uint8_t *)disk->comment, comment_size, overlapped);
+    }
     disk->image_buffer_length = (unsigned)(image_cur - image);
 
     return disk->image_buffer_length;
 }
 
 bool clem_2img_generate_header(struct Clemens2IMGDisk *disk, uint32_t format, const uint8_t *image,
-                               const uint8_t *image_end, uint32_t image_data_offset) {
-    uint32_t disk_size = (uint32_t)(image_end - image) - image_data_offset;
+                               const uint8_t *image_end, uint32_t image_data_offset,
+                               unsigned data_size) {
+    uint32_t disk_size =
+        data_size > 0 ? data_size : (uint32_t)(image_end - image) - image_data_offset;
 
     strncpy(disk->creator, "CLEM", sizeof(disk->creator));
 

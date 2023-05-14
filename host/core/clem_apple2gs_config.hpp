@@ -7,11 +7,13 @@
 #include <array>
 #include <string>
 
+constexpr const char *kClemensCardMockingboardName = "mockingboard_c";
+
 struct ClemensAppleIIGSConfig {
     //  RAM in Kilobytes, not counting Mega 2 memory
-    unsigned memory;
+    unsigned memory = 0;
     //  Usually 48000 or equivalent to the target mix rate
-    unsigned audioSamplesPerSecond;
+    unsigned audioSamplesPerSecond = 0;
     //  Baterry RAM as laid out on the IIGS
     std::array<uint8_t, CLEM_RTC_BRAM_SIZE> bram;
     //  Drive images (can be empty)

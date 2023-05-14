@@ -28,7 +28,6 @@ class ClemensProDOSDisk {
     ClemensProDOSDisk();
     ClemensProDOSDisk(cinek::ByteBuffer backingBuffer);
 
-    bool create(ClemensSmartPortDevice &device, const ClemensDiskAsset &asset);
     bool bind(ClemensSmartPortDevice &device, const ClemensDiskAsset &asset);
     bool save();
     void release(ClemensSmartPortDevice &device);

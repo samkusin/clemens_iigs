@@ -2,28 +2,23 @@
 #define CLEM_HOST_SETTINGS_UI_HPP
 
 #include "clem_configuration.hpp"
+#include "clem_file_browser.hpp"
 
 class ClemensSettingsUI {
   public:
-    bool isStarted() const;
-    void start(const ClemensConfiguration &config);
-    bool frame(float width, float height);
-    ClemensConfiguration getConfiguration() const { return config_; }
-    bool shouldBeCommitted() const;
+    ClemensSettingsUI(ClemensConfiguration &config);
+
+    void start();
     void stop();
 
-  private:
-    bool willRequireRestart() const;
-    void updateConfig();
+    void frame();
 
   private:
-    enum class Mode { None, Active, ROMFileBrowse, ROMFileBrowseError, Commit, Cancelled };
-    Mode mode_ = Mode::None;
-    ClemensConfiguration config_;
-    std::string errorMessage_;
-    char romFilename_[64];
-    int ramSizeKB_;
-    bool nonstandardRAMSize_;
+    ClemensConfiguration &config_;
+    ClemensFileBrowser fileBrowser_;
+    enum class Mode { None, Main, ROMFileBrowse };
+    Mode mode_;
+    bool romFileExists_;
 };
 
 #endif

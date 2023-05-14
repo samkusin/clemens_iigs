@@ -19,10 +19,6 @@ ClemensProDOSDisk::ClemensProDOSDisk() {}
 ClemensProDOSDisk::ClemensProDOSDisk(cinek::ByteBuffer backingBuffer)
     : storage_(std::move(backingBuffer)), blocks_{}, interface_{}, disk_{} {}
 
-bool ClemensProDOSDisk::create(ClemensSmartPortDevice &device, const ClemensDiskAsset &asset) {
-    return false;
-}
-
 bool ClemensProDOSDisk::bind(ClemensSmartPortDevice &device, const ClemensDiskAsset &asset) {
     if (asset.diskType() != ClemensDiskAsset::DiskHDD)
         return false;
@@ -34,22 +30,26 @@ bool ClemensProDOSDisk::bind(ClemensSmartPortDevice &device, const ClemensDiskAs
         std::ifstream fsin(asset.path(), std::ios_base::binary);
         if (!fsin.is_open())
             return false;
-        auto input = storage_.forwardSize(CLEM_2IMG_HEADER_BYTE_SIZE);
-        fsin.read((char *)input.first, cinek::length(input));
+        auto header = storage_.forwardSize(CLEM_2IMG_HEADER_BYTE_SIZE);
+        fsin.read((char *)header.first, CLEM_2IMG_HEADER_BYTE_SIZE);
         if (fsin.bad() || fsin.eof())
             return false;
-        if (!clem_2img_parse_header(&disk_, input.first, input.second))
+        if (!clem_2img_parse_header(&disk_, header.first, header.second))
             return false;
         auto sz = int32_t(disk_.data_end - disk_.data);
         if (sz > storage_.getCapacity())
             return false;
         fsin.seekg(disk_.image_data_offset);
-        input = storage_.forwardSize(int32_t(disk_.data_end - disk_.data));
+        auto input = storage_.forwardSize(int32_t(disk_.data_end - disk_.data));
         if (cinek::length(input) < sz)
             return false;
-        fsin.read((char *)storage_.getHead(), sz);
+        fsin.read((char *)input.first, sz);
         if (fsin.bad() || fsin.eof())
             return false;
+        disk_.data = input.first;
+        disk_.data_end = input.second;
+        disk_.image_buffer_length = storage_.getSize();
+        disk_.image_buffer = storage_.getHead();
         blocks_ = input;
         break;
     }
@@ -57,16 +57,16 @@ bool ClemensProDOSDisk::bind(ClemensSmartPortDevice &device, const ClemensDiskAs
         std::ifstream fsin(asset.path(), std::ios_base::binary);
         if (!fsin.is_open())
             return false;
-        auto sz = fsin.seekg(0, std::ios_base::end).tellg();
-        auto input = storage_.forwardSize(CLEM_2IMG_HEADER_BYTE_SIZE + sz);
-        if (cinek::length(input) < CLEM_2IMG_HEADER_BYTE_SIZE + sz)
+        auto sz = std::streamoff(fsin.seekg(0, std::ios_base::end).tellg());
+        auto input = storage_.forwardSize(sz + CLEM_2IMG_HEADER_BYTE_SIZE);
+        if (cinek::length(input) < sz + CLEM_2IMG_HEADER_BYTE_SIZE)
             return false;
         fsin.seekg(0);
         fsin.read((char *)input.first + CLEM_2IMG_HEADER_BYTE_SIZE, sz);
         if (fsin.bad() || fsin.eof())
             return false;
         if (!clem_2img_generate_header(&disk_, CLEM_DISK_FORMAT_PRODOS, input.first, input.second,
-                                       CLEM_2IMG_HEADER_BYTE_SIZE))
+                                       CLEM_2IMG_HEADER_BYTE_SIZE, 0))
             return false;
         blocks_ = cinek::Range<uint8_t>(input.first + CLEM_2IMG_HEADER_BYTE_SIZE, input.second);
         break;
@@ -101,7 +101,7 @@ bool ClemensProDOSDisk::save() {
     case ClemensDiskAsset::Image2IMG:
         clem_2img_build_image(&disk_, storage_.getHead(), storage_.getTail());
         dataStart = storage_.getHead();
-        dataEnd = dataStart + disk_.image_buffer_length;
+        dataEnd = storage_.getTail();
         break;
     case ClemensDiskAsset::ImageProDOS:
         dataStart = disk_.data;
@@ -178,15 +178,15 @@ bool ClemensProDOSDisk::serialize(mpack_writer_t *writer, ClemensSmartPortDevice
     //  this will be either a 2IMG or a ProDOS image
     mpack_write_cstr(writer, "pages");
     {
-        unsigned bytesLeft = (unsigned)storage_.getSize();
+        unsigned bytesLeft = storage_.getSize();
         unsigned pageCount = (bytesLeft + 4095) / 4096;
-        unsigned byteOffset = 0;
+        const uint8_t *data = storage_.getHead();
         mpack_start_array(writer, pageCount);
         while (bytesLeft > 0) {
-            unsigned writeCount = std::min(bytesLeft, 4096U);
-            mpack_write_bin(writer, (const char *)storage_.getHead() + byteOffset, writeCount);
+            auto writeCount = std::min((unsigned)(storage_.getTail() - data), 4096U);
+            mpack_write_bin(writer, (const char *)data, writeCount);
             bytesLeft -= writeCount;
-            byteOffset += writeCount;
+            data += writeCount;
         }
         mpack_finish_array(writer);
     }
@@ -236,7 +236,7 @@ bool ClemensProDOSDisk::unserialize(mpack_reader_t *reader, ClemensSmartPortDevi
             return false;
     } else if (imageType == ClemensDiskAsset::ImageProDOS) {
         if (!clem_2img_generate_header(&disk_, CLEM_DISK_FORMAT_PRODOS, storage_.getHead(),
-                                       storage_.getTail(), CLEM_2IMG_HEADER_BYTE_SIZE))
+                                       storage_.getTail(), CLEM_2IMG_HEADER_BYTE_SIZE, 0))
             return false;
     } else if (imageType != ClemensDiskAsset::ImageNone) {
         spdlog::error("ClemensProDOSDisk - unsupported asset {}", assetPath_);

@@ -7,18 +7,18 @@
 
 #include "core/clem_apple2gs_config.hpp"
 
-#include "cinek/buffer.hpp"
-#include "cinek/circular_buffer.hpp"
-#include "cinek/fixedstack.hpp"
-#include "clem_audio.hpp"
+#include "clem_asset_browser.hpp"
 #include "clem_configuration.hpp"
-#include "clem_disk_browser.hpp"
 #include "clem_display.hpp"
 #include "clem_host_shared.hpp"
 #include "clem_ui_load_snapshot.hpp"
 #include "clem_ui_save_snapshot.hpp"
 #include "clem_ui_settings.hpp"
 
+#include "cinek/buffer.hpp"
+#include "cinek/circular_buffer.hpp"
+#include "cinek/fixedstack.hpp"
+#include "clem_audio.hpp"
 #include "imgui.h"
 #include "imgui_memory_editor.h"
 
@@ -49,7 +49,7 @@ class ClemensFrontend : public ClemensHostView {
   private:
     template <typename TBufferType> friend struct FormatView;
 
-    void createBackend();
+    void startBackend();
     void runBackend(std::unique_ptr<ClemensBackend> backend);
     void stopBackend();
     bool isBackendRunning() const;
@@ -75,14 +75,19 @@ class ClemensFrontend : public ClemensHostView {
     void doMachineDiskStatus(ClemensDriveType driveType, float width);
     void doMachineDiskSelection(ClemensDriveType driveType, float width, bool showLabel);
     void doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size, bool isSpinning);
-    void doMachineSmartDriveStatus(unsigned driveIndex, float width);
+    void doMachineSmartDriveStatus(unsigned driveIndex, float width, bool allowSelect);
     void doMachineCPUInfoDisplay();
+    void doSetupUI(ImVec2 anchor, ImVec2 dimensions);
     void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU, float screenV);
     void doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize);
     void doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize);
+    void doMachineDiskBrowserInterface(ImVec2 anchor, ImVec2 dimensions);
+    void doMachineSmartDiskBrowserInterface(ImVec2 anchor, ImVec2 dimensions);
 
     void layoutTerminalLines();
     void layoutConsoleLines();
+
+    template <typename... Args> void doModalError(const char *msg, Args... args);
 
     std::pair<std::string, bool> importDisks(std::string outputPath, std::string name,
                                              ClemensDriveType driveType,
@@ -318,14 +323,13 @@ class ClemensFrontend : public ClemensHostView {
     bool isEmulatorActive() const;
 
     enum class GUIMode {
-        Empty,
+        None,
         Preamble,
+        Setup,
         Emulator,
         LoadSnapshot,
         SaveSnapshot,
-        Settings,
         Help,
-        DiskBrowser,
         RebootEmulator,
         StartingEmulator,
         ShutdownEmulator
@@ -334,16 +338,19 @@ class ClemensFrontend : public ClemensHostView {
 
     GUIMode guiMode_;
     GUIMode guiPrevMode_;
+    double appTime_;
+    double nextUIFlashCycleAppTime_;
+    float uiFlashAlpha_;
 
     std::string messageModalString_;
 
     ClemensLoadSnapshotUI loadSnapshotMode_;
     ClemensSaveSnapshotUI saveSnapshotMode_;
-    ClemensSettingsUI settingsMode_;
-    ClemensDiskBrowser diskBrowserMode_;
+    ClemensAssetBrowser assetBrowser_;
+    ClemensSettingsUI settingsView_;
 
     std::optional<ClemensDriveType> browseDriveType_;
-
+    std::optional<unsigned> browseSmartDriveIndex_;
     std::optional<float> delayRebootTimer_;
 };
 

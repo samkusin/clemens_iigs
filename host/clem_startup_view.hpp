@@ -21,21 +21,8 @@ class ClemensStartupView : public ClemensHostView {
     void lostFocus() final;
 
   private:
-    enum class Mode {
-        Initial,
-        ChangeDataDirectory,
-        Preamble,
-        ROMCheck,
-        ROMFileBrowser,
-        SetupError,
-        Aborted,
-        Finished
-    };
+    enum class Mode { Initial, ChangeDataDirectory, Preamble, SetupError, Aborted, Finished };
     bool validateDirectories();
-
-    //  if ROM file exists, == 1, if no ROM file configured == 0,
-    //  if filename points to a nonexistent ROM file, -1
-    int checkROMFile();
 
     Mode mode_;
     ClemensConfiguration config_;
