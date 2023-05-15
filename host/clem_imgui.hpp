@@ -34,13 +34,10 @@ bool IconButton(const char *strId, ImTextureID texId, const ImVec2 &size);
 //  returns the link to navigate to if selected
 std::string Markdown(std::string_view markdown);
 
-struct ROMFileBrowserResult {
-    enum Type { Ok, Cancel, Error, Continue };
-    std::string filename;
-    Type type;
-};
-
-ROMFileBrowserResult ROMFileBrowser(int width, int height, const std::string &dataDirectory);
+//  styling hooks for common widgets
+void PushStyleButtonEnabled();
+void PushStyleButtonDisabled();
+void PopStyleButton();
 
 } // namespace ClemensHostImGui
 

@@ -8,8 +8,7 @@ class ClemensCommandQueue;
 class ClemensLoadSnapshotUI {
   public:
     bool isStarted() const;
-    void start(ClemensCommandQueue &backend, const std::string &snapshotDir,
-               bool isEmulatorRunning);
+    void start(ClemensCommandQueue &backend, const std::string &snapshotDir);
     bool frame(float width, float height, ClemensCommandQueue &backend);
     void stop(ClemensCommandQueue &backend);
     void succeeded();
@@ -20,8 +19,8 @@ class ClemensLoadSnapshotUI {
 
     Mode mode_ = Mode::None;
     std::string snapshotDir_;
-    bool interruptedExecution_ = false;
     char snapshotName_[128];
+    bool resumeExecutionOnExit_;
 };
 
 #endif

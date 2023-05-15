@@ -36,19 +36,17 @@
 
 #include "buffertypes.hpp"
 
-#include <type_traits>
 #include <new>
+#include <type_traits>
 
 namespace cinek {
-  /**
-   * Storage for a contiguous area of object memory created from a
-   * ResourceHeap.   This buffer does not perform any allocations from a
-   * ResourceHeap directly - it is the application's responsibility to supply
-   * a region of memory for the BufferBase to manage.
-   */
-  template<typename T>
-  class BufferBase
-  {
+/**
+ * Storage for a contiguous area of object memory created from a
+ * ResourceHeap.   This buffer does not perform any allocations from a
+ * ResourceHeap directly - it is the application's responsibility to supply
+ * a region of memory for the BufferBase to manage.
+ */
+template <typename T> class BufferBase {
   public:
     using Range = ::cinek::Range<T>;
     using ConstRange = ::cinek::ConstRange<T>;
@@ -56,31 +54,26 @@ namespace cinek {
     using ThisType = BufferBase<T>;
 
     BufferBase() = default;
-    BufferBase(T* data, int32_t limit, int32_t size=0);
-    BufferBase(BufferBase&& other) { moveFrom(other); }
-    BufferBase& operator=(BufferBase&& other) { moveFrom(other); return *this; }
-    BufferBase(const BufferBase& other) = delete;
-    BufferBase& operator=(const BufferBase& other) = delete;
+    BufferBase(T *data, int32_t limit, int32_t size = 0);
+    BufferBase(BufferBase &&other) { moveFrom(other); }
+    BufferBase &operator=(BufferBase &&other) {
+        moveFrom(other);
+        return *this;
+    }
+    BufferBase(const BufferBase &other) = delete;
+    BufferBase &operator=(const BufferBase &other) = delete;
 
-    const T& operator[](int32_t index) const {
-      return *getNodeAtIndex(index);
-    }
-    T& operator[](int32_t index) {
-      return *getNodeAtIndex(index);
-    }
+    const T &operator[](int32_t index) const { return *getNodeAtIndex(index); }
+    T &operator[](int32_t index) { return *getNodeAtIndex(index); }
 
-    const T* getBack() const {
-      CK_ASSERT_RETURN_VALUE(head_ < tail_, head_);
-      return tail_-1;
+    const T *getBack() const {
+        CK_ASSERT_RETURN_VALUE(head_ < tail_, head_);
+        return tail_ - 1;
     }
-    T* getBack() {
-      return const_cast<T*>(static_cast<const BufferBase*>(this)->getBack());
-    }
-    int32_t calcIndex(const T* ptr) const {
-      return static_cast<int32_t>(ptr - head_);
-    }
-    T* getNodeAtIndex(int32_t index);
-    const T* getNodeAtIndex(int32_t index) const;
+    T *getBack() { return const_cast<T *>(static_cast<const BufferBase *>(this)->getBack()); }
+    int32_t calcIndex(const T *ptr) const { return static_cast<int32_t>(ptr - head_); }
+    T *getNodeAtIndex(int32_t index);
+    const T *getNodeAtIndex(int32_t index) const;
     Range getRange(BufferString bs = BufferString{0, -1});
     ConstRange getConstRange(BufferString bs = BufferString{0, -1}) const;
 
@@ -104,165 +97,142 @@ namespace cinek {
     /// @return Reference to this Buffer for chaining
     void pushBack(T value);
 
-    template<class... Args>
-    T* emplaceBack(Args&&... args);
+    template <class... Args> T *emplaceBack(Args &&...args);
 
     /// @param  sz Amount to append to tail
     /// @return Returns the old and new tail pointers used for populating the
     ///         newly expanded region
     Range forwardSize(int32_t sz);
+    /// Specialization on buffers that support byte alignment.
+    /// This will be unimplemented by default
+    /// @param  sz Amount to append to tail
+    /// @return Returns the old and new tail pointers used for populating the
+    ///         newly expanded region
+    Range forwardSize(int32_t sz, bool align);
 
     //  DEPRECATED - Long term goal of Buffer() is to eliminate the need
     //               to explicitly access these pointer values so that we're not
     //               relying on std::vector-ish (linear buffer) implementations
-    const T* getHead() const { return head_; }
-    T* getHead() { return head_; }
-    const T* getTail() const { return tail_; }
-    T* getTail() { return tail_; }
+    const T *getHead() const { return head_; }
+    T *getHead() { return head_; }
+    const T *getTail() const { return tail_; }
+    T *getTail() { return tail_; }
 
   protected:
     void resetInternal();
-    void setTail(T* tail) { tail_ = tail; }
-    T* getLimit() { return limit_; }
-  private:
-    void moveFrom(BufferBase& other);
-    T* head_ = nullptr;
-    T* tail_ = nullptr;
-    T* limit_ = nullptr;
-  };
+    void setTail(T *tail) { tail_ = tail; }
+    T *getLimit() { return limit_; }
 
-  template<typename T>
-  BufferBase<T>::BufferBase(T* data, int32_t limit, int32_t size) :
-    head_(data),
-    tail_(data),
-    limit_(data + limit)
-  {
+  private:
+    void moveFrom(BufferBase &other);
+    T *head_ = nullptr;
+    T *tail_ = nullptr;
+    T *limit_ = nullptr;
+};
+
+template <typename T>
+BufferBase<T>::BufferBase(T *data, int32_t limit, int32_t size)
+    : head_(data), tail_(data), limit_(data + limit) {
     if (size > limit) {
-      CK_ASSERT(size <= limit);
-      size = limit;
+        CK_ASSERT(size <= limit);
+        size = limit;
     }
     tail_ = data + size;
-  }
+}
 
-  template<typename T>
-  void BufferBase<T>::moveFrom(BufferBase& other)
-  {
+template <typename T> void BufferBase<T>::moveFrom(BufferBase &other) {
     head_ = other.head_;
     tail_ = other.tail_;
     limit_ = other.limit_;
     other.head_ = nullptr;
     other.tail_ = nullptr;
     other.limit_ = nullptr;
-  }
+}
 
-  template<typename T>
-  void BufferBase<T>::resetInternal()
-  {;
+template <typename T> void BufferBase<T>::resetInternal() {
+    ;
     tail_ = head_;
-  }
+}
 
-  template<typename T>
-  void BufferBase<T>::pushBack(T value)
-  {
+template <typename T> void BufferBase<T>::pushBack(T value) {
     CK_ASSERT_RETURN(tail_ < limit_);
     *tail_ = value;
     ++tail_;
-  }
+}
 
-  template<typename T>
-  template<class... Args>
-  T* BufferBase<T>::emplaceBack(Args&&... args)
-  {
+template <typename T> template <class... Args> T *BufferBase<T>::emplaceBack(Args &&...args) {
     CK_ASSERT_RETURN_VALUE(tail_ < limit_, nullptr);
 
-    T* obj = tail_++;
-    return ::new(obj) T(std::forward<Args>(args)...);
-  }
+    T *obj = tail_++;
+    return ::new (obj) T(std::forward<Args>(args)...);
+}
 
-  template<typename T>
-  auto BufferBase<T>::forwardSize(int32_t sz) -> Range
-  {
+template <typename T> auto BufferBase<T>::forwardSize(int32_t sz) -> Range {
     Range range;
     range.first = tail_;
     range.second = tail_ + sz;
     if (range.second > limit_ || range.second < head_) {
-      CK_ASSERT(false);
-      range.second = limit_;
+        CK_ASSERT(false);
+        range.second = limit_;
     }
     tail_ = range.second;
-    for (auto* t = range.first; t != range.second; ++t) {
-      ::new(t) T();
+    for (auto *t = range.first; t != range.second; ++t) {
+        ::new (t) T();
     }
     return range;
-  }
+}
 
-  template<typename T>
-  T* BufferBase<T>::getNodeAtIndex(int32_t index)
-  {
-    return const_cast<T*>(static_cast<const ThisType*>(this)->getNodeAtIndex(index));
-  }
+template <typename T> T *BufferBase<T>::getNodeAtIndex(int32_t index) {
+    return const_cast<T *>(static_cast<const ThisType *>(this)->getNodeAtIndex(index));
+}
 
-  template<typename T>
-  const T* BufferBase<T>::getNodeAtIndex(int32_t index) const
-  {
+template <typename T> const T *BufferBase<T>::getNodeAtIndex(int32_t index) const {
     return (index < 0) ? getTail() - index : getHead() + index;
-  }
+}
 
-  template<typename T>
-  auto BufferBase<T>::getRange(BufferString bs) -> Range
-  {
-    if (bs.count < 0) { bs.count = getSize(); }
+template <typename T> auto BufferBase<T>::getRange(BufferString bs) -> Range {
+    if (bs.count < 0) {
+        bs.count = getSize();
+    }
     CK_ASSERT(bs.index + bs.count <= getSize());
     auto endIndex = (bs.index + bs.count < getSize()) ? (bs.index + bs.count) : getSize();
-    return Range { getNodeAtIndex(bs.index), getNodeAtIndex(endIndex) };
-  }
+    return Range{getNodeAtIndex(bs.index), getNodeAtIndex(endIndex)};
+}
 
-  template<typename T>
-  auto BufferBase<T>::getConstRange(BufferString bs) const -> ConstRange
-  {
-    if (bs.count < 0) { bs.count = getSize(); }
+template <typename T> auto BufferBase<T>::getConstRange(BufferString bs) const -> ConstRange {
+    if (bs.count < 0) {
+        bs.count = getSize();
+    }
     CK_ASSERT(bs.index + bs.count <= getSize());
     auto endIndex = (bs.index + bs.count < getSize()) ? (bs.index + bs.count) : getSize();
-    return ConstRange { getNodeAtIndex(bs.index), getNodeAtIndex(endIndex) };
-  }
+    return ConstRange{getNodeAtIndex(bs.index), getNodeAtIndex(endIndex)};
+}
 
-  template<typename T>
-  BufferString BufferBase<T>::getStringFromRange(Range range) const
-  {
-    return BufferString {
-      range.first ? calcIndex(range.first) : 0,
-      calcIndex(range.second) - calcIndex(range.first)
-    };
-  }
+template <typename T> BufferString BufferBase<T>::getStringFromRange(Range range) const {
+    return BufferString{range.first ? calcIndex(range.first) : 0,
+                        calcIndex(range.second) - calcIndex(range.first)};
+}
 
-  template<typename T>
-  BufferString BufferBase<T>::getStringFromRange(ConstRange range) const
-  {
-    return BufferString {
-      range.first ? calcIndex(range.first) : 0,
-      calcIndex(range.second) - calcIndex(range.first)
-    };
-  }
+template <typename T> BufferString BufferBase<T>::getStringFromRange(ConstRange range) const {
+    return BufferString{range.first ? calcIndex(range.first) : 0,
+                        calcIndex(range.second) - calcIndex(range.first)};
+}
 
+//////////////////////////////////////////////////////////////////////////////
 
-  //////////////////////////////////////////////////////////////////////////////
+template <typename T, typename Enable = void> class Buffer;
 
+// allow for buffers with non trivial types to avoid calling destructor per
+// buffer object
+template <typename T>
+using BufferEnableIfTrivial =
+    typename std::enable_if<std::is_trivially_destructible<T>::value>::type;
 
-  template<typename T, typename Enable=void>
-  class Buffer;
+template <typename T>
+using BufferEnableIfNonTrivial =
+    typename std::enable_if<!std::is_trivially_destructible<T>::value>::type;
 
-  // allow for buffers with non trivial types to avoid calling destructor per
-  // buffer object
-  template<typename T>
-  using BufferEnableIfTrivial = typename std::enable_if<
-    std::is_trivially_destructible<T>::value>::type;
-
-  template<typename T>
-  using BufferEnableIfNonTrivial = typename std::enable_if<!std::is_trivially_destructible<T>::value>::type;
-
-  template<typename T>
-  class Buffer<T, BufferEnableIfTrivial<T> > : public BufferBase<T>
-  {
+template <typename T> class Buffer<T, BufferEnableIfTrivial<T>> : public BufferBase<T> {
   public:
     using BaseType = BufferBase<T>;
     using Range = typename BaseType::Range;
@@ -270,7 +240,7 @@ namespace cinek {
     using DataType = T;
 
     Buffer() = default;
-    Buffer(T* data, int32_t limit, int32_t size=0);
+    Buffer(T *data, int32_t limit, int32_t size = 0);
 
     ///
     /// Resets buffer head and tail to start
@@ -282,36 +252,28 @@ namespace cinek {
     ///
     /// @param cnt  Count of items to rewind.
     void rewind(int32_t cnt);
-  };
+};
 
-  template<typename T>
-  Buffer<T, BufferEnableIfTrivial<T> >::Buffer(T* data, int32_t limit, int32_t size) :
-    BufferBase<T>(data, limit, size)
-  {
-  }
+template <typename T>
+Buffer<T, BufferEnableIfTrivial<T>>::Buffer(T *data, int32_t limit, int32_t size)
+    : BufferBase<T>(data, limit, size) {}
 
-  template<typename T>
-  void Buffer<T, BufferEnableIfTrivial<T> >::reset()
-  {
+template <typename T> void Buffer<T, BufferEnableIfTrivial<T>>::reset() {
     BaseType::resetInternal();
-  }
+}
 
-  template<typename T>
-  void Buffer<T, BufferEnableIfTrivial<T> >::rewind(int32_t cnt)
-  {
-    T* newTail = BaseType::getTail() - cnt;
+template <typename T> void Buffer<T, BufferEnableIfTrivial<T>>::rewind(int32_t cnt) {
+    T *newTail = BaseType::getTail() - cnt;
     if (newTail < BaseType::getHead() || newTail > BaseType::getTail()) {
-      CK_ASSERT(false);
-      newTail = BaseType::getHead();
+        CK_ASSERT(false);
+        newTail = BaseType::getHead();
     }
     BaseType::setTail(newTail);
-  }
+}
 
-  //////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 
-  template<typename T>
-  class Buffer<T, BufferEnableIfNonTrivial<T> > : public BufferBase<T>
-  {
+template <typename T> class Buffer<T, BufferEnableIfNonTrivial<T>> : public BufferBase<T> {
   public:
     using BaseType = BufferBase<T>;
     using Range = typename BaseType::Range;
@@ -319,7 +281,7 @@ namespace cinek {
     using DataType = T;
 
     Buffer() = default;
-    Buffer(T* data, int32_t limit, int32_t size=0);
+    Buffer(T *data, int32_t limit, int32_t size = 0);
     ~Buffer();
 
     ///
@@ -332,66 +294,56 @@ namespace cinek {
     ///
     /// @param cnt  Count of items to rewind.
     void rewind(int32_t cnt);
-  };
+};
 
+template <typename T>
+Buffer<T, BufferEnableIfNonTrivial<T>>::Buffer(T *data, int32_t limit, int32_t size)
+    : BufferBase<T>(data, limit, size) {}
 
-  template<typename T>
-  Buffer<T, BufferEnableIfNonTrivial<T> >::Buffer(T* data, int32_t limit, int32_t size) :
-    BufferBase<T>(data, limit, size)
-  {
-  }
+template <typename T> Buffer<T, BufferEnableIfNonTrivial<T>>::~Buffer() { reset(); }
 
-  template<typename T>
-  Buffer<T, BufferEnableIfNonTrivial<T> >::~Buffer()
-  {
-    reset();
-  }
-
-  template<typename T>
-  void Buffer<T, BufferEnableIfNonTrivial<T> >::reset()
-  {
+template <typename T> void Buffer<T, BufferEnableIfNonTrivial<T>>::reset() {
     rewind(BaseType::getSize());
     BaseType::resetInternal();
-  }
+}
 
-  template<typename T>
-  void Buffer<T, BufferEnableIfNonTrivial<T> >::rewind(int32_t cnt)
-  {
-    T* tail = BaseType::getTail();
-    T* head = BaseType::getHead();
-    T* newTail = tail - cnt;
+template <typename T> void Buffer<T, BufferEnableIfNonTrivial<T>>::rewind(int32_t cnt) {
+    T *tail = BaseType::getTail();
+    T *head = BaseType::getHead();
+    T *newTail = tail - cnt;
     if (newTail < head || newTail > tail) {
-      CK_ASSERT(false);
-      newTail = head;
+        CK_ASSERT(false);
+        newTail = head;
     }
 
     while (tail > newTail) {
-      --tail;
-      tail->~T();
+        --tail;
+        tail->~T();
     }
     BaseType::setTail(tail);
-  }
+}
 
-  //////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 
-  template<typename T> cinek::Range<T> copy(cinek::Range<T> dest,
-                                            cinek::ConstRange<T> source) {
+template <typename T> cinek::Range<T> copy(cinek::Range<T> dest, cinek::ConstRange<T> source) {
     auto sourceIt = source.first;
     auto destIt = dest.first;
     for (; sourceIt < source.second && destIt < dest.second; ++sourceIt, ++destIt) {
-      *destIt = *sourceIt;
+        *destIt = *sourceIt;
     }
     dest.second = destIt;
     return dest;
-  }
-
-  using ByteBuffer = Buffer<uint8_t>;
-  using CharBuffer = Buffer<char>;
-  //  specialized version that behaves like malloc()
-  template<> auto BufferBase<uint8_t>::forwardSize(int32_t sz) -> Range;
-  //  specialized version that allocates aligned strings by architecture
-  //  (vs malloc)
-  template<> auto BufferBase<char>::forwardSize(int32_t sz) -> Range;
 }
+
+using ByteBuffer = Buffer<uint8_t>;
+using CharBuffer = Buffer<char>;
+//  specialized version that behaves like malloc()
+template <> auto BufferBase<uint8_t>::forwardSize(int32_t sz) -> Range;
+//  if align true, then uses the default implementation for ByteBuffer types
+template <> auto BufferBase<uint8_t>::forwardSize(int32_t sz, bool align) -> Range;
+//  specialized version that allocates aligned strings by architecture
+//  (vs malloc)
+template <> auto BufferBase<char>::forwardSize(int32_t sz) -> Range;
+} // namespace cinek
 
 #endif

@@ -328,6 +328,7 @@ class ClemensFrontend : public ClemensHostView {
         Setup,
         Emulator,
         LoadSnapshot,
+        LoadSnapshotAfterPowerOn,
         SaveSnapshot,
         Help,
         RebootEmulator,
