@@ -1817,6 +1817,7 @@ void clem_mmio_bind_machine(ClemensMachine *clem, ClemensMMIO *mmio) {
 
 void clem_mmio_restore(ClemensMachine *clem, ClemensMMIO *mmio) {
     clem_mmio_bind_machine(clem, mmio);
+    mmio->dev_debug = &clem->dev_debug;
     _clem_mmio_init_page_maps(mmio, clem->mem.bank_page_map, clem->mem.mega2_bank_map[0],
                               clem->mem.mega2_bank_map[1], mmio->mmap_register);
     clem_vgc_reset_scanlines(&mmio->vgc);
