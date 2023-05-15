@@ -153,5 +153,10 @@ bool clem_smartport_prodos_hdd32_unserialize(mpack_reader_t *reader,
     root.records = &kDevice[0];
     clemens_unserialize_object(reader, (uintptr_t)hdd, &root, alloc_cb, context);
     device->device_data = hdd;
+    device->do_reset = &_do_reset;
+    device->do_read_block = &_do_read_block;
+    device->do_write_block = &_do_write_block;
+    device->do_status = &_do_status;
+    device->do_control = &_do_control;
     return true;
 }

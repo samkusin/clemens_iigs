@@ -1,4 +1,5 @@
 #include "clem_prodos_disk.hpp"
+#include "cinek/buffertypes.hpp"
 #include "clem_disk_asset.hpp"
 
 #include "clem_2img.h"
@@ -234,6 +235,7 @@ bool ClemensProDOSDisk::unserialize(mpack_reader_t *reader, ClemensSmartPortDevi
         if (!clem_2img_parse_header(&disk_, storage_.getHead(),
                                     storage_.getHead() + storage_.getSize()))
             return false;
+
     } else if (imageType == ClemensDiskAsset::ImageProDOS) {
         if (!clem_2img_generate_header(&disk_, CLEM_DISK_FORMAT_PRODOS, storage_.getHead(),
                                        storage_.getTail(), CLEM_2IMG_HEADER_BYTE_SIZE, 0))
@@ -242,6 +244,9 @@ bool ClemensProDOSDisk::unserialize(mpack_reader_t *reader, ClemensSmartPortDevi
         spdlog::error("ClemensProDOSDisk - unsupported asset {}", assetPath_);
         return false;
     }
+
+    blocks_ = cinek::Range<uint8_t>(const_cast<uint8_t *>(disk_.data),
+                                    const_cast<uint8_t *>(disk_.data_end));
 
     //  This may be unnecessary if bind() was not called
     if (imageType != ClemensDiskAsset::ImageNone) {

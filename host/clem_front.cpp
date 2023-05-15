@@ -1272,16 +1272,36 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     }
 
     // render audio
-    if (isNewFrame && thisFrameAudioBuffer_.getSize() > 0) {
-        ClemensAudio audioFrame;
-        audioFrame.data = thisFrameAudioBuffer_.getHead();
-        audioFrame.frame_stride = frameReadState_.frame.audio.frame_stride;
-        audioFrame.frame_start = 0;
-        audioFrame.frame_count = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
-        audioFrame.frame_total = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
-        audio_.queue(audioFrame, deltaTime);
-        thisFrameAudioBuffer_.reset();
+    ClemensAudio audioFrame;
+    unsigned numBlankAudioFrames = 0;
+
+    audioFrame.data = thisFrameAudioBuffer_.getHead();
+    audioFrame.frame_start = 0;
+    audioFrame.frame_stride = audio_.getBufferStride();
+    audioFrame.frame_count = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
+    if (audioFrame.frame_count > 0) {
+        unsigned minAudioFrames = unsigned(audio_.getAudioFrequency() * deltaTime);
+        if (audioFrame.frame_count < minAudioFrames) {
+            numBlankAudioFrames = minAudioFrames - audioFrame.frame_count;
+        }
+    } else {
+        //  this prevents looped playback of the last samples added to the buffer
+        numBlankAudioFrames = audio_.getAudioFrequency() * deltaTime;
     }
+    //  fill in silence if necessary
+    if (numBlankAudioFrames > 0) {
+        if (numBlankAudioFrames >
+            (unsigned)(thisFrameAudioBuffer_.getRemaining() / audioFrame.frame_stride)) {
+            numBlankAudioFrames = thisFrameAudioBuffer_.getRemaining() / audioFrame.frame_stride;
+        }
+        auto audioFrames =
+            thisFrameAudioBuffer_.forwardSize(numBlankAudioFrames * audioFrame.frame_stride);
+        memset(audioFrames.first, 0, cinek::length(audioFrames));
+        audioFrame.frame_count += numBlankAudioFrames;
+    }
+    audioFrame.frame_total = audioFrame.frame_count;
+    audio_.queue(audioFrame, deltaTime);
+    thisFrameAudioBuffer_.reset();
 
     if (config_.hybridInterfaceEnabled) {
         doDebuggerInterface(ImVec2(width, height), ImVec2(screenUVs[0], screenUVs[1]), deltaTime);

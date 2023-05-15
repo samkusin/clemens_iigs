@@ -178,7 +178,11 @@ void ClemensFileBrowser::frame(ImVec2 size) {
     }
 
     ImGui::Spacing();
-    if (ImGui::Button("Select") || selectionMade || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+    bool isKeyFocus =
+        !ImGui::IsPopupOpen(NULL, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+
+    if (ImGui::Button("Select") || selectionMade ||
+        (isKeyFocus && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
         if (selectedRecord_.isDirectory) {
             currentDirectoryPath_ = cwd / selectedRecord_.name;
             forceRefresh();
@@ -187,7 +191,7 @@ void ClemensFileBrowser::frame(ImVec2 size) {
         }
     }
     ImGui::SameLine();
-    if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    if (ImGui::Button("Cancel") || (isKeyFocus && ImGui::IsKeyPressed(ImGuiKey_Escape))) {
         selectionStatus_ = BrowserFinishedStatus::Cancelled;
     }
 
