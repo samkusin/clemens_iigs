@@ -112,11 +112,26 @@ details of why are discussed in the next section.
 
 ## Technical
 
-### Bus Arbitration
+The SmartPort protocol is implemented between IWM and emulated storage.  The
+Apple IIGS firmware reference provides thorough documentation on the protocol
+and packet types passed along the bus when enabled.
 
-### I/O
+While an accurate emulation of SmartPort on disk port, there are limitations.
+Notably bus speed is limited to machine speed which runs at 1Mhz (it's unclear
+if fast IWM mode is supported but the ROM deals with slow mode here.)
 
+### Alternatives
 
+Most emulators implement a Slot 7 "SmartPort".  The card ROM at $C700 follows
+the SmartPort calling conventions so that ProDOS can interact with the device.
+But the actual calls are then forwarded to the emulator which copies block data
+from the emulated storage device back to the application.  This approach has
+two major benefits:
+
+1. Speed: blocks are copied to and from the emulated machine's RAM directly
+2. Usability: Slot 5 prevents SmartPort devices from booting while a 3.5" drive
+   is connected.  Instead the boot ROM in Slot 7 will provide the bootloader
+   for the emulated device.
 
 ## References
 
