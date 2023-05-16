@@ -276,42 +276,18 @@ std::string Markdown(std::string_view markdown) {
     return std::string(tempLinkBuffer);
 }
 
-auto ROMFileBrowser(int width, int height, const std::string &dataDirectory)
-    -> ROMFileBrowserResult {
-    ROMFileBrowserResult result;
-    result.type = ROMFileBrowserResult::Continue;
-    if (!ImGuiFileDialog::Instance()->IsOpened("Select ROM)")) {
-        ImGuiFileDialog::Instance()->OpenDialog("Select ROM", "Select a ROM", ".*", ".", 1, nullptr,
-                                                ImGuiFileDialogFlags_Modal);
-    }
-    if (ImGuiFileDialog::Instance()->Display(
-            "Select ROM", ImGuiWindowFlags_NoCollapse,
-            ImVec2(std::max(width * 0.75f, 640.0f), std::max(height * 0.75f, 480.0f)),
-            ImVec2(width, height))) {
-
-        if (ImGuiFileDialog::Instance()->IsOk()) {
-            std::error_code errc;
-            auto filePath = std::filesystem::path(ImGuiFileDialog::Instance()->GetFilePathName());
-            auto fileName = ImGuiFileDialog::Instance()->GetCurrentFileName();
-            auto destinationPath = std::filesystem::path(dataDirectory) / fileName;
-            if (filePath == destinationPath) {
-                result.filename = fileName;
-                result.type = ROMFileBrowserResult::Ok;
-            } else if (std::filesystem::copy_file(filePath, destinationPath,
-                                                  std::filesystem::copy_options::overwrite_existing,
-                                                  errc)) {
-                result.filename = fileName;
-                result.type = ROMFileBrowserResult::Ok;
-            } else {
-                result.filename = fileName;
-                result.type = ROMFileBrowserResult::Error;
-            }
-        } else {
-            result.type = ROMFileBrowserResult::Cancel;
-        }
-        ImGuiFileDialog::Instance()->Close();
-    }
-    return result;
+void PushStyleButtonEnabled() {
+    ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
 }
+
+void PushStyleButtonDisabled() {
+    ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(64, 64, 64, 255));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(64, 64, 64, 255));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(64, 64, 64, 255));
+}
+
+void PopStyleButton() { ImGui::PopStyleColor(3); }
 
 } // namespace ClemensHostImGui

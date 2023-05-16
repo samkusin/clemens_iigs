@@ -5,18 +5,18 @@
 #include "clem_imgui.hpp"
 #include "fmt/format.h"
 #include "imgui.h"
+#include "spdlog/spdlog.h"
 
 #include <filesystem>
 
 bool ClemensLoadSnapshotUI::isStarted() const { return mode_ != Mode::None; }
 
-void ClemensLoadSnapshotUI::start(ClemensCommandQueue &backend, const std::string &snapshotDir,
-                                  bool isEmulatorRunning) {
+void ClemensLoadSnapshotUI::start(ClemensCommandQueue &backend, const std::string &snapshotDir) {
     mode_ = Mode::Browser;
-    interruptedExecution_ = isEmulatorRunning;
     snapshotDir_ = snapshotDir;
     snapshotName_[0] = '\0';
     backend.breakExecution();
+    resumeExecutionOnExit_ = true;
 }
 
 bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue &backend) {
@@ -69,9 +69,8 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue
             }
             if (isOk && snapshotName_[0] != '\0') {
                 ImGui::CloseCurrentPopup();
-
                 backend.loadMachine(snapshotName_);
-                fmt::print("LoadSnapshotMode: loading...\n");
+                spdlog::info("ClemensLoadSnapshotUI - loading...");
                 mode_ = Mode::WaitForResponse;
             }
             ImGui::EndPopup();
@@ -90,6 +89,12 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue
             ImGui::Separator();
             if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
                 ImGui::CloseCurrentPopup();
+                done = true;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Break")) {
+                ImGui::CloseCurrentPopup();
+                resumeExecutionOnExit_ = false;
                 done = true;
             }
             ImGui::EndPopup();
@@ -120,7 +125,7 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue
 }
 
 void ClemensLoadSnapshotUI::stop(ClemensCommandQueue &backend) {
-    if (interruptedExecution_) {
+    if (resumeExecutionOnExit_) {
         backend.run();
     }
     mode_ = Mode::None;

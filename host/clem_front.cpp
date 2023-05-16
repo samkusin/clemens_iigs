@@ -719,7 +719,7 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false), terminalChanged_(false),
       consoleChanged_(false), terminalMode_(TerminalMode::Command), debugIOMode_(DebugIOMode::Core),
       vgcDebugMinScanline_(0), vgcDebugMaxScanline_(0), joystickSlotCount_(0),
-      guiMode_(GUIMode::Setup), guiPrevMode_(GUIMode::None), appTime_(0.0),
+      guiMode_(GUIMode::None), guiPrevMode_(GUIMode::None), appTime_(0.0),
       nextUIFlashCycleAppTime_(0.0), uiFlashAlpha_(1.0f), settingsView_(config_) {
 
     ClemensTraceExecutedInstruction::initialize();
@@ -748,6 +748,8 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
 
     if (config_.poweredOn) {
         setGUIMode(GUIMode::RebootEmulator);
+    } else {
+        setGUIMode(GUIMode::Setup);
     }
 }
 
@@ -936,7 +938,7 @@ void ClemensFrontend::FrameState::copyState(const ClemensBackendState &state,
     frame.audio = state.frame->audio;
     if (frame.audio.data) {
         auto audioBufferSize = int32_t(frame.audio.frame_count * frame.audio.frame_stride);
-        auto audioBufferRange = commandState.audioBuffer.forwardSize(audioBufferSize);
+        auto audioBufferRange = commandState.audioBuffer.forwardSize(audioBufferSize, false);
         memcpy(audioBufferRange.first, frame.audio.data, cinek::length(audioBufferRange));
         frame.audio.data = NULL;
     } else {
@@ -1239,16 +1241,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     }
     readyForFrame_.notify_one();
 
-    if (guiMode_ != guiPrevMode_) {
-        switch (guiMode_) {
-        case GUIMode::Setup:
-            settingsView_.start();
-            break;
-        default:
-            break;
-        }
-    }
-
     //  render video
     //  video is rendered to a texture and the UVs of the display on the virtual
     //  monitor are stored in screenUVs
@@ -1274,28 +1266,28 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     // render audio
     ClemensAudio audioFrame;
     unsigned numBlankAudioFrames = 0;
+    unsigned minAudioFrames = unsigned(audio_.getAudioFrequency() * deltaTime);
 
     audioFrame.data = thisFrameAudioBuffer_.getHead();
     audioFrame.frame_start = 0;
     audioFrame.frame_stride = audio_.getBufferStride();
     audioFrame.frame_count = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
     if (audioFrame.frame_count > 0) {
-        unsigned minAudioFrames = unsigned(audio_.getAudioFrequency() * deltaTime);
         if (audioFrame.frame_count < minAudioFrames) {
             numBlankAudioFrames = minAudioFrames - audioFrame.frame_count;
         }
     } else {
         //  this prevents looped playback of the last samples added to the buffer
-        numBlankAudioFrames = audio_.getAudioFrequency() * deltaTime;
+        numBlankAudioFrames = minAudioFrames;
     }
     //  fill in silence if necessary
     if (numBlankAudioFrames > 0) {
-        if (numBlankAudioFrames >
+        if (numBlankAudioFrames >=
             (unsigned)(thisFrameAudioBuffer_.getRemaining() / audioFrame.frame_stride)) {
             numBlankAudioFrames = thisFrameAudioBuffer_.getRemaining() / audioFrame.frame_stride;
         }
         auto audioFrames =
-            thisFrameAudioBuffer_.forwardSize(numBlankAudioFrames * audioFrame.frame_stride);
+            thisFrameAudioBuffer_.forwardSize(numBlankAudioFrames * audioFrame.frame_stride, false);
         memset(audioFrames.first, 0, cinek::length(audioFrames));
         audioFrame.frame_count += numBlankAudioFrames;
     }
@@ -1323,16 +1315,23 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         }
         if (saveSnapshotMode_.frame(width, height, backendQueue_)) {
             saveSnapshotMode_.stop(backendQueue_);
-            guiMode_ = GUIMode::Emulator;
+            setGUIMode(GUIMode::Emulator);
         }
         break;
     case GUIMode::LoadSnapshot:
         if (!loadSnapshotMode_.isStarted()) {
-            loadSnapshotMode_.start(backendQueue_, snapshotRootPath_, frameReadState_.isRunning);
+            loadSnapshotMode_.start(backendQueue_, snapshotRootPath_);
         }
         if (loadSnapshotMode_.frame(width, height, backendQueue_)) {
             loadSnapshotMode_.stop(backendQueue_);
-            guiMode_ = GUIMode::Emulator;
+            setGUIMode(GUIMode::Emulator);
+        }
+        break;
+    case GUIMode::LoadSnapshotAfterPowerOn:
+        if (!isBackendRunning()) {
+            startBackend();
+        } else {
+            setGUIMode(GUIMode::LoadSnapshot);
         }
         break;
     case GUIMode::Help:
@@ -1413,7 +1412,31 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     return getViewType();
 }
 
-void ClemensFrontend::setGUIMode(GUIMode guiMode) { guiMode_ = guiMode; }
+void ClemensFrontend::setGUIMode(GUIMode guiMode) {
+    static const char *kGUIModeNames[] = {"None",
+                                          "Preamble",
+                                          "Setup",
+                                          "Emulator",
+                                          "LoadSnapshot",
+                                          "LoadSnapshotAfterPowerOn",
+                                          "SaveSnapshot",
+                                          "Help",
+                                          "RebootEmulator",
+                                          "StartingEmulator",
+                                          "ShutdownEmulator"};
+    if (guiMode_ == guiMode)
+        return;
+
+    switch (guiMode) {
+    case GUIMode::Setup:
+        settingsView_.start();
+        break;
+    default:
+        break;
+    }
+    guiMode_ = guiMode;
+    spdlog::info("ClemensFrontend - setGUIMode() {}", kGUIModeNames[static_cast<int>(guiMode_)]);
+}
 
 void ClemensFrontend::processBackendResult(const ClemensBackendResult &result) {
     bool succeeded = false;
@@ -1578,31 +1601,36 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     }
     ImGui::PopStyleColor(3);
 
-    if (isBackendRunning() && !delayRebootTimer_.has_value()) {
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
-    } else {
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(64, 64, 64, 255));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(64, 64, 64, 255));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(64, 64, 64, 255));
-    }
-    ImGui::SameLine();
-
     //  Button Group 2
+    ImGui::SameLine();
+    if (!isEmulatorStarting()) {
+        ClemensHostImGui::PushStyleButtonEnabled();
+    } else {
+        ClemensHostImGui::PushStyleButtonDisabled();
+    }
     ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
     ImGui::SameLine();
     if (ClemensHostImGui::IconButton(
             "Load Snapshot", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kLoad),
             kIconSize)) {
-        if (isBackendRunning() && !isEmulatorStarting()) {
-            setGUIMode(GUIMode::LoadSnapshot);
+        if (isBackendRunning()) {
+            if (!isEmulatorStarting()) {
+                setGUIMode(GUIMode::LoadSnapshot);
+            }
+        } else {
+            setGUIMode(GUIMode::LoadSnapshotAfterPowerOn);
         }
     }
+    ClemensHostImGui::PopStyleButton();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
         ImGui::SetTooltip("Load Snapshot");
     }
     ImGui::SameLine();
+    if (isBackendRunning() && !isEmulatorStarting()) {
+        ClemensHostImGui::PushStyleButtonEnabled();
+    } else {
+        ClemensHostImGui::PushStyleButtonDisabled();
+    }
     if (ClemensHostImGui::IconButton(
             "Save Snapshot", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kSave),
             kIconSize)) {
@@ -1610,17 +1638,15 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
             setGUIMode(GUIMode::SaveSnapshot);
         }
     }
+    ClemensHostImGui::PopStyleButton();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
         ImGui::SetTooltip("Save Snapshot");
     }
-    ImGui::PopStyleColor(3);
 
     ImGui::SameLine();
     ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
     ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
+    ClemensHostImGui::PushStyleButtonEnabled();
     if (ClemensHostImGui::IconButton(
             "Help", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kHelp), kIconSize)) {
         setGUIMode(GUIMode::Help);
@@ -1628,7 +1654,7 @@ void ClemensFrontend::doUserMenuDisplay(float /* width */) {
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
         ImGui::SetTooltip("Help");
     }
-    ImGui::PopStyleColor(3);
+    ClemensHostImGui::PopStyleButton();
 
     ImGui::PopStyleVar();
     ImGui::Spacing();
@@ -1832,17 +1858,13 @@ void ClemensFrontend::doDebuggerQuickbar(float /*width */) {
                                                       2;
     const ImVec2 kIconSize(lineHeight, lineHeight);
     if (isBackendRunning()) {
-        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 255, 0, 192));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(128, 255, 128, 255));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(255, 255, 255, 255));
+        ClemensHostImGui::PushStyleButtonEnabled();
         ImGui::SameLine();
         if (ClemensHostImGui::IconButton(
                 "CycleButton",
                 ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kPowerCycle), kIconSize)) {
             if (isBackendRunning() && !isEmulatorStarting()) {
-                if (!delayRebootTimer_.has_value()) {
-                    rebootInternal();
-                }
+                rebootInternal();
             }
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
@@ -1889,7 +1911,7 @@ void ClemensFrontend::doDebuggerQuickbar(float /*width */) {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
             ImGui::SetTooltip("Open Assets Folder on Desktop");
         }
-        ImGui::PopStyleColor(3);
+        ClemensHostImGui::PopStyleButton();
     }
 }
 
@@ -2457,7 +2479,7 @@ void ClemensFrontend::doMachineSmartDiskBrowserInterface(ImVec2 anchor, ImVec2 d
 
 template <typename... Args> void ClemensFrontend::doModalError(const char *msg, Args... args) {
     messageModalString_ = fmt::format(msg, args...);
-    spdlog::error("ClemensFrontend: {}\n", messageModalString_);
+    spdlog::error("ClemensFrontend - doModalError() {}\n", messageModalString_);
 }
 
 #define CLEM_HOST_GUI_CPU_PINS_COLOR(_field_)                                                      \
@@ -3465,7 +3487,7 @@ void ClemensFrontend::doHelpScreen(int width, int height) {
         ImGui::EndPopup();
     }
     if (!isOpen) {
-        guiMode_ = GUIMode::Emulator;
+        setGUIMode(GUIMode::Emulator);
     }
 }
 
