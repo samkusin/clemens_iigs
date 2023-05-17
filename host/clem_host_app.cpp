@@ -476,6 +476,7 @@ static void doHostInputEvent(struct ClemensInputEvent &clemInput, uint32_t modif
 
 static void onEvent(const sapp_event *evt, void *) {
     struct ClemensInputEvent clemInput {};
+    float mouseX, mouseY;
 
     simgui_handle_event(evt);
 
@@ -529,12 +530,20 @@ static void onEvent(const sapp_event *evt, void *) {
         clemInput.type = kClemensInputType_MouseMove;
         clemInput.value_a = (int16_t)(std::floor(evt->mouse_dx));
         clemInput.value_b = (int16_t)(std::floor(evt->mouse_dy));
+        mouseX = evt->mouse_x;
+        mouseY = evt->mouse_y;
         break;
     default:
         clemInput.type = kClemensInputType_None;
         break;
     }
     doHostInputEvent(clemInput, evt->modifiers);
+    if (clemInput.type == kClemensInputType_MouseMove) {
+        clemInput.type = kClemensInputType_MouseMoveAbsolute;
+        clemInput.value_a = (int16_t)(std::floor(mouseX));
+        clemInput.value_b = (int16_t)(std::floor(mouseY));
+        doHostInputEvent(clemInput, evt->modifiers);
+    }
 }
 
 static void onCleanup(void *userdata) {

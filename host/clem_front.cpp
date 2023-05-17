@@ -1532,6 +1532,8 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 dimensions, ImVec2 screenUVs,
         doSetupUI(kMonitorViewAnchor, kMonitorViewSize);
     } else {
         doMachineViewLayout(kMonitorViewAnchor, kMonitorViewSize, screenUVs[0], screenUVs[1]);
+
+        doDebugView(kMonitorViewAnchor);
     }
     doInfoStatusLayout(kInfoSizeAnchor, kInfoStatusSize, kMonitorViewAnchor.x);
     ImGui::PopStyleColor();
@@ -3196,6 +3198,19 @@ void ClemensFrontend::doMachineDebugSoundDisplay() {
     ImGui::EndTable();
 
     ImGui::EndTable();
+}
+
+void ClemensFrontend::doDebugView(ImVec2 anchor) {
+    ImVec2 size;
+    size.x = ImGui::GetFont()->GetCharAdvance('A') * 20;
+    size.y = ImGui::GetFontSize() * 8;
+    ImGui::SetNextWindowPos(anchor, ImGuiCond_Once);
+    ImGui::SetNextWindowSize(size);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 128));
+    ImGui::Begin("Debug View", NULL);
+    ImGui::Text("Test");
+    ImGui::End();
+    ImGui::PopStyleColor();
 }
 
 void ClemensFrontend::doSetupUI(ImVec2 anchor, ImVec2 dimensions) {
