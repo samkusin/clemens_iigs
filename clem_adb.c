@@ -1836,7 +1836,10 @@ void clem_adb_glu_sync(struct ClemensDeviceADB *adb, uint32_t delta_us) {
     adb->poll_timer_us += delta_us;
     adb->keyb.timer_us += delta_us;
 
-    /*  On poll expiration, update device registers */
+    /*  On poll expiration, update device registers
+        TODO: this should occur on the VBL and not on a fixed interval since
+              reset!
+    */
     while (adb->poll_timer_us >= CLEM_MEGA2_CYCLES_PER_60TH) {
         /* IIgs prohibits the mouse from issuing SRQs for incoming mouse data,
            so we only do this for keyboards at this time.

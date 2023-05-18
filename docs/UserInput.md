@@ -61,13 +61,27 @@ Host(X,Y)           View(X,Y)           IIGS: X=[0xE10190/2],Y=[0xE10191/3]
                                              Equivalent E0/E1 locations
                                              + Slot Number (4 always) for each
                                                address
-
+```
 How calls to `ClampMouse`, `HomeMouse` and `PosMouse` are handled will depend
 on practical usage.
-```
 
-### Mouse References
+### Procedure
 
-#### Apple II firmware 
+1. The Event Manager kicks off mouse acquisition in GS/OS and other ProDOS 
+   titles that leverage the IIgs
+2. Calls to ReadMouse and ReadMouse2 will update absolute position variables
+   in Bank E1
+3. Likewise, for Mouse Firmware calls, screen holes (//c-like mode) are 
+   populated with positions
+4. Mouse tracking for Apple IIgs mouse functions detects 640 vs 320 'mode' 
+   which is an educated guess based on the use of 640 mode on the screen
+5. Verify mouse interrupts are triggered on the VBL (addendum)
+6. When mouse tracking is enabled, advertise this flag so that hosts can 
+   turn on or off the host mouse cursor
+
+
+### References
+
+#### Apple II Firmware:
 * https://www.applefritter.com/appleii-box/APPLE2/AppleMouseII/AppleMouseII.pdf
 
