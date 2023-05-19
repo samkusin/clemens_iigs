@@ -1401,8 +1401,8 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     if (guiMode_ == GUIMode::Emulator) {
         if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
             if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) {
-                if (ImGui::IsKeyDown(ImGuiKey_RightAlt) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) {
-                    emulatorHasMouseFocus_ = false;
+                if (ImGui::IsKeyPressed(ImGuiKey_F10)) {
+                    emulatorHasMouseFocus_ = !emulatorHasMouseFocus_;
                 } else if (ImGui::IsKeyPressed(ImGuiKey_F11)) {
                     config_.hybridInterfaceEnabled = !config_.hybridInterfaceEnabled;
                     config_.setDirty();
@@ -3294,14 +3294,6 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
         ImVec2(0, screenV0), ImVec2(viewToMonitor.screenUVs.x, screenV1),
         ImGui::GetColorU32(tint_col));
 
-    //  This logic is rather convoluted - we have two focus types and this logic is
-    //  an attempt to determine the user's intent regarding where keyboard and mouse
-    //  input goes (to the emulator vs GUI.)  Basically if the mouse pointer is in
-    //  the emulator view, all keyboard input goes to the view.  If the user
-    //  mouse-clicks inside the emulator view, all input goes to the view.
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !emulatorHasMouseFocus_) {
-        emulatorHasMouseFocus_ = ImGui::IsWindowHovered();
-    }
     emulatorHasKeyboardFocus_ = emulatorHasMouseFocus_;
     if (ImGui::IsWindowFocused()) {
         emulatorHasKeyboardFocus_ = true;
@@ -3321,6 +3313,8 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
         std::floor(std::clamp(mouseX - mouseToViewDX, 0.0f, viewToMonitor.workSize.x));
     diagnostics_.mouseY =
         std::floor(std::clamp(mouseY - mouseToViewDY, 0.0f, viewToMonitor.workSize.y));
+
+    
 
     /*
 if (input.type == kClemensInputType_MouseMoveAbsolute) {
@@ -3373,10 +3367,10 @@ void ClemensFrontend::doViewInputInstructions(ImVec2 dimensions) {
     const char *infoText = nullptr;
     if (emulatorHasMouseFocus_) {
         infoText = ClemensL10N::kMouseUnlock[ClemensL10N::kLanguageDefault];
-    } else if (emulatorHasKeyboardFocus_) {
-        infoText = ClemensL10N::kMouseLock[ClemensL10N::kLanguageDefault];
-    } else {
+    } else if (!emulatorHasKeyboardFocus_) {
         infoText = ClemensL10N::kViewInput[ClemensL10N::kLanguageDefault];
+    } else {
+        infoText = "";
     }
 
     ImVec2 anchor = ImGui::GetCursorScreenPos();

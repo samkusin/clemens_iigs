@@ -197,16 +197,16 @@ struct ClemensDeviceTimer {
  * @brief Identifies the input event sent to the ADB controller
  *
  */
-enum ClemensInputType {
-    kClemensInputType_None,
-    kClemensInputType_KeyDown,
-    kClemensInputType_KeyUp,
-    kClemensInputType_MouseButtonDown,
-    kClemensInputType_MouseButtonUp,
-    kClemensInputType_MouseMove,
-    kClemensInputType_MouseMoveAbsolute,
-    kClemensInputType_Paddle,
-    kClemensInputType_PaddleDisconnected
+enum ClemensInputType {    
+    kClemensInputType_None,                 /**< No input */
+    kClemensInputType_KeyDown,              /**< Key was pressed */
+    kClemensInputType_KeyUp,                /**< Key was released */
+    kClemensInputType_MouseButtonDown,      /**< Mouse button was pressed */
+    kClemensInputType_MouseButtonUp,        /**< Mouse button was released */
+    kClemensInputType_MouseMove,            /**< Mouse relative motion (deltas) */
+    kClemensInputType_MouseMoveAbsolute,    /**< Mouse absolution position (screen) */
+    kClemensInputType_Paddle,               /**< Paddle input (connected) */
+    kClemensInputType_PaddleDisconnected    /**< Paddle disconnected from system */
 };
 
 /**
