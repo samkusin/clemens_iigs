@@ -3220,8 +3220,8 @@ void ClemensFrontend::doDebugView(ImVec2 anchor, ImVec2 size) {
     ImGui::SetNextWindowPos(anchor, ImGuiCond_Once);
     ImGui::SetNextWindowSize(size);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 128));
-    ImGui::Begin("Debug View", NULL);
-    {
+    if (ImGui::Begin("Debug View", NULL)) {
+
         ImGui::BeginTable("Diagnostics", 2);
         {
             ImGui::TableNextRow();
