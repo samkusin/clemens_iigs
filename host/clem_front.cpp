@@ -3314,16 +3314,24 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
     diagnostics_.mouseY =
         std::floor(std::clamp(mouseY - mouseToViewDY, 0.0f, viewToMonitor.workSize.y));
 
-    
-
-    /*
-if (input.type == kClemensInputType_MouseMoveAbsolute) {
-        diagnostics_.mouseX = std::clamp(int32_t(input.value_a - monitorAnchorAbsolute_.x), 0,
-                                         int32_t(monitorSizeAbsolute_.x));
-        diagnostics_.mouseY = std::clamp(int32_t(input.value_b - monitorAnchorAbsolute_.y), 0,
-                                         int32_t(monitorSizeAbsolute_.y));
+    if (!emulatorHasMouseFocus_) {
+        ClemensInputEvent mouseEvt;
+        mouseEvt.type = kClemensInputType_MouseMoveAbsolute;
+        mouseEvt.value_a = int16_t(diagnostics_.mouseX);
+        mouseEvt.value_b = int16_t(diagnostics_.mouseY);
+        backendQueue_.inputEvent(mouseEvt);
+        if (ImGui::GetIO().MouseClicked[0] && ImGui::IsWindowHovered()) {
+            mouseEvt.type = kClemensInputType_MouseButtonDown;
+            mouseEvt.value_a = 0x01;
+            mouseEvt.value_b = 0x01;
+            backendQueue_.inputEvent(mouseEvt);
+        } else if (ImGui::GetIO().MouseReleased[0]) {
+            mouseEvt.type = kClemensInputType_MouseButtonUp;
+            mouseEvt.value_a = 0x01;
+            mouseEvt.value_b = 0x01;
+            backendQueue_.inputEvent(mouseEvt);
+        }        
     }
-    */
 
     ImGui::EndChild();
     ImGui::End();

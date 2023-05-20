@@ -371,6 +371,7 @@ bool clemens_is_mmio_initialized(const ClemensMMIO *mmio) {
 void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     struct Clemens65C816 *cpu = &clem->cpu;
     struct ClemensClock clock;
+    struct ClemensDeviceMega2Memory m2mem;
     uint32_t delta_mega2_cycles;
     uint32_t card_result;
     uint32_t card_irqs;
@@ -424,6 +425,9 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     mmio->mega2_cycles += delta_mega2_cycles;
     mmio->timer_60hz_us += delta_mega2_cycles;
 
+    m2mem.e0_bank = mmio->e0_bank;
+    m2mem.e1_bank = mmio->e1_bank;
+
     clock.ts = clem->tspec.clocks_spent;
     clock.ref_step = CLEM_CLOCKS_PHI0_CYCLE;
 
@@ -446,9 +450,10 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     clem_gameport_sync(&mmio->dev_adb.gameport, &clock);
 
     /* background execution of some async devices on the 60 hz timer */
+    /* TODO: ADB should occur on the VBL */
     while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {
         clem_timer_sync(&mmio->dev_timer, CLEM_MEGA2_CYCLES_PER_60TH);
-        clem_adb_glu_sync(&mmio->dev_adb, CLEM_MEGA2_CYCLES_PER_60TH);
+        clem_adb_glu_sync(&mmio->dev_adb, &m2mem, CLEM_MEGA2_CYCLES_PER_60TH);
         if (clem->resb_counter <= 0 && mmio->dev_adb.keyb.reset_key) {
             /* TODO: move into its own utility */
             clem->resb_counter = 2;

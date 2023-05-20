@@ -33,6 +33,10 @@ struct ClemensDeviceRTC {
     uint8_t ctl_c034;
 };
 
+/** 
+ * These are internal data structions for the ADB - do not maniuplate manually
+ * unless you know what you're doing or input state may be corrupted! 
+ */
 struct ClemensDeviceKeyboard {
     uint8_t keys[CLEM_ADB_KEYB_BUFFER_LIMIT];
     uint8_t states[CLEM_ADB_KEY_CODE_LIMIT]; // should be ascii, so 128
@@ -47,8 +51,11 @@ struct ClemensDeviceKeyboard {
 
 struct ClemensDeviceMouse {
     unsigned pos[CLEM_ADB_KEYB_BUFFER_LIMIT];
+    int16_t mx, my;     /**< Only valid if tracking mode enabled - current values */
+    int16_t mx0, my0;   /**< Only valid if tracking mode enabled - last tracked values */
     int size;
     bool btn_down;
+    bool tracking_enabled;      /**< Absolute mouse position/tracking mode enabled*/
 };
 
 struct ClemensDeviceGameport {
@@ -367,6 +374,11 @@ struct ClemensDriveBay {
     struct ClemensDrive slot5[2];
     struct ClemensDrive slot6[2];
     struct ClemensSmartPortUnit smartport[CLEM_SMARTPORT_DRIVE_LIMIT];
+};
+
+struct ClemensDeviceMega2Memory {
+    uint8_t* e0_bank;
+    uint8_t* e1_bank;
 };
 
 /**
