@@ -518,7 +518,7 @@ bool ClemensDiskAsset::serialize(mpack_writer_t *writer) {
     mpack_write_cstr(writer, path_.c_str());
     mpack_write_cstr(writer, "data");
     if (data_.size()) {
-        mpack_write_bytes(writer, (const char *)data_.data(), (unsigned)data_.size());
+        mpack_write_bin(writer, (const char *)data_.data(), (unsigned)data_.size());
     } else {
         mpack_write_nil(writer);
     }
@@ -641,6 +641,7 @@ bool ClemensDiskAsset::unserialize(mpack_reader_t *reader) {
         unsigned sz = mpack_expect_bin(reader);
         data_.resize(sz);
         mpack_read_bytes(reader, (char *)data_.data(), sz);
+        mpack_done_bin(reader);
     }
     mpack_expect_cstr_match(reader, "metadata");
 
