@@ -240,6 +240,7 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *cl
     bool use_page_2 = (mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
                       !(mmio->mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE);
     video->vbl_counter = vgc->vbl_counter;
+    video->has_640_mode_scanlines = false;
     if (vgc->mode_flags & CLEM_VGC_SUPER_HIRES) {
         video->format = kClemensVideoFormat_Super_Hires;
         video->scanline_count = CLEM_VGC_SHGR_SCANLINE_COUNT;
@@ -250,7 +251,10 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *cl
         video->rgb_buffer_size = sizeof(vgc->shgr_palettes);
         memory = clem->mem.mega2_bank_map[1] + 0x9d00;
         for (i = 0; i < video->scanline_count; ++i) {
-            video->scanlines[i].control = memory[i];
+            unsigned control = memory[i];
+            video->scanlines[i].control = control;
+            video->has_640_mode_scanlines = video->has_640_mode_scanlines ||
+                                            ((control & CLEM_VGC_SCANLINE_CONTROL_640_MODE) != 0);
         }
         return video;
     } else if (vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE) {
@@ -299,6 +303,38 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *cl
         }
     }
     return video;
+}
+
+void clemens_monitor_to_video_coordinates(ClemensMonitor *monitor, ClemensVideo *video, int16_t *vx,
+                                          int16_t *vy, int16_t mx, int16_t my) {
+    switch (video->format) {
+    case kClemensVideoFormat_Super_Hires:
+        if (video->has_640_mode_scanlines) {
+            *vx = mx;
+        } else {
+            *vx = mx / 2;
+        }
+        *vy = my / 2;
+        break;
+    case kClemensVideoFormat_Double_Hires:
+        *vx = mx;
+        *vy = my / 2;
+        break;
+    case kClemensVideoFormat_Hires:
+        *vx = mx / 2;
+        *vy = my / 2;
+        break;
+    case kClemensVideoFormat_Double_Lores:
+        *vx = mx / 7;
+        *vy = my / 8;
+        break;
+    case kClemensVideoFormat_Lores:
+        *vx = mx / 14;
+        *vy = my / 8;
+        break;
+    default:
+        break;
+    }
 }
 
 void clemens_assign_audio_mix_buffer(ClemensMMIO *mmio, struct ClemensAudioMixBuffer *mix_buffer) {

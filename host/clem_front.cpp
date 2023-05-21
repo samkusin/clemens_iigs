@@ -3309,16 +3309,33 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
     float mouseToViewDX = (viewToMonitor.size.x - viewToMonitor.workSize.x) * 0.5f;
     float mouseToViewDY = (viewToMonitor.size.y - viewToMonitor.workSize.y) * 0.5f;
 
-    diagnostics_.mouseX =
-        std::floor(std::clamp(mouseX - mouseToViewDX, 0.0f, viewToMonitor.workSize.x));
-    diagnostics_.mouseY =
-        std::floor(std::clamp(mouseY - mouseToViewDY, 0.0f, viewToMonitor.workSize.y));
+    bool mouseInDeviceScreen = true;
+    diagnostics_.mouseX = std::floor(mouseX - mouseToViewDX);
+    diagnostics_.mouseY = std::floor(mouseY - mouseToViewDY);
 
-    if (!emulatorHasMouseFocus_) {
+    if (diagnostics_.mouseX < 0 || diagnostics_.mouseX >= viewToMonitor.workSize.x)
+        mouseInDeviceScreen = false;
+    else if (diagnostics_.mouseY < 0 || diagnostics_.mouseY >= viewToMonitor.workSize.y)
+        mouseInDeviceScreen = false;
+
+    //
+    //` super-hires tracking: x /= 2 if in 320 mode (any scanlines that are 640 pixel,
+    //```means 640 mode)
+    //  what to do about legacy graphics modes (use screen holes, but what do apps expect
+    //  in ranges from firmware?)
+    if (!emulatorHasMouseFocus_ && mouseInDeviceScreen) {
         ClemensInputEvent mouseEvt;
+
+        int16_t a2screenX, a2screenY;
+
+        //  TODO: maybe only run this for super-hires mode?
+        clemens_monitor_to_video_coordinates(&frameReadState_.frame.monitor,
+                                             &frameReadState_.frame.graphics, &a2screenX,
+                                             &a2screenY, diagnostics_.mouseX, diagnostics_.mouseY);
+
         mouseEvt.type = kClemensInputType_MouseMoveAbsolute;
-        mouseEvt.value_a = int16_t(diagnostics_.mouseX);
-        mouseEvt.value_b = int16_t(diagnostics_.mouseY);
+        mouseEvt.value_a = int16_t(a2screenX);
+        mouseEvt.value_b = int16_t(a2screenY);
         backendQueue_.inputEvent(mouseEvt);
         if (ImGui::GetIO().MouseClicked[0] && ImGui::IsWindowHovered()) {
             mouseEvt.type = kClemensInputType_MouseButtonDown;
@@ -3330,7 +3347,7 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
             mouseEvt.value_a = 0x01;
             mouseEvt.value_b = 0x01;
             backendQueue_.inputEvent(mouseEvt);
-        }        
+        }
     }
 
     ImGui::EndChild();

@@ -33,9 +33,9 @@ struct ClemensDeviceRTC {
     uint8_t ctl_c034;
 };
 
-/** 
+/**
  * These are internal data structions for the ADB - do not maniuplate manually
- * unless you know what you're doing or input state may be corrupted! 
+ * unless you know what you're doing or input state may be corrupted!
  */
 struct ClemensDeviceKeyboard {
     uint8_t keys[CLEM_ADB_KEYB_BUFFER_LIMIT];
@@ -51,11 +51,12 @@ struct ClemensDeviceKeyboard {
 
 struct ClemensDeviceMouse {
     unsigned pos[CLEM_ADB_KEYB_BUFFER_LIMIT];
-    int16_t mx, my;     /**< Only valid if tracking mode enabled - current values */
-    int16_t mx0, my0;   /**< Only valid if tracking mode enabled - last tracked values */
+    int16_t mx, my;   /**< Only valid if tracking mode enabled - current values */
+    int16_t mx0, my0; /**< Only valid if tracking mode enabled - last tracked values */
     int size;
     bool btn_down;
-    bool tracking_enabled;      /**< Absolute mouse position/tracking mode enabled*/
+    bool tracking_enabled; /**< Absolute mouse position/tracking mode enabled*/
+    bool valid_clamp_box;  /**< Determine every VBL based on toolbox variables */
 };
 
 struct ClemensDeviceGameport {
@@ -204,16 +205,16 @@ struct ClemensDeviceTimer {
  * @brief Identifies the input event sent to the ADB controller
  *
  */
-enum ClemensInputType {    
-    kClemensInputType_None,                 /**< No input */
-    kClemensInputType_KeyDown,              /**< Key was pressed */
-    kClemensInputType_KeyUp,                /**< Key was released */
-    kClemensInputType_MouseButtonDown,      /**< Mouse button was pressed */
-    kClemensInputType_MouseButtonUp,        /**< Mouse button was released */
-    kClemensInputType_MouseMove,            /**< Mouse relative motion (deltas) */
-    kClemensInputType_MouseMoveAbsolute,    /**< Mouse absolution position (screen) */
-    kClemensInputType_Paddle,               /**< Paddle input (connected) */
-    kClemensInputType_PaddleDisconnected    /**< Paddle disconnected from system */
+enum ClemensInputType {
+    kClemensInputType_None,              /**< No input */
+    kClemensInputType_KeyDown,           /**< Key was pressed */
+    kClemensInputType_KeyUp,             /**< Key was released */
+    kClemensInputType_MouseButtonDown,   /**< Mouse button was pressed */
+    kClemensInputType_MouseButtonUp,     /**< Mouse button was released */
+    kClemensInputType_MouseMove,         /**< Mouse relative motion (deltas) */
+    kClemensInputType_MouseMoveAbsolute, /**< Mouse absolution position (screen) */
+    kClemensInputType_Paddle,            /**< Paddle input (connected) */
+    kClemensInputType_PaddleDisconnected /**< Paddle disconnected from system */
 };
 
 /**
@@ -261,7 +262,7 @@ struct ClemensVGC {
     /* bgr- (4:4:4) bits 0 - 11 */
     uint16_t shgr_palettes[16 * CLEM_VGC_SHGR_SCANLINE_COUNT];
 
-    /* Used for precise-ish timing of vertical blank and scanline irqs */
+    /* Used for timing of vertical blank and scanline irqs */
     clem_clocks_time_t ts_last_frame;
     clem_clocks_duration_t dt_scanline;
     unsigned vbl_counter;
@@ -377,8 +378,8 @@ struct ClemensDriveBay {
 };
 
 struct ClemensDeviceMega2Memory {
-    uint8_t* e0_bank;
-    uint8_t* e1_bank;
+    uint8_t *e0_bank;
+    uint8_t *e1_bank;
 };
 
 /**
@@ -491,6 +492,10 @@ typedef struct {
         clemens_emulate_cpu(). */
     uint16_t *rgb;
     unsigned rgb_buffer_size;
+    /** These values can be used by hosts to handle specific video situations like
+     *  mouse pointer tracking
+     */
+    bool has_640_mode_scanlines;
 } ClemensVideo;
 
 typedef struct {

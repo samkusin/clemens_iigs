@@ -181,6 +181,10 @@ bool clemens_is_drive_io_active(ClemensMMIO *mmio);
 /**
  * @brief Forwards input from ths host machine to the ADB
  *
+ * Note, mouse movement input can either be relative or absolute.  If absolute,
+ * then tracking is enabled - else if relative, deltas are assumed and mouse
+ * position is tracked by the emulated firmware
+ *
  * @param mmio
  * @param input
  */
@@ -276,6 +280,22 @@ ClemensVideo *clemens_get_text_video(ClemensVideo *video, ClemensMMIO *mmio);
  */
 ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *machine,
                                          ClemensMMIO *mmio);
+
+/**
+ * @brief Converts monitor coordinates to the specified video view window coordinates
+ *
+ * The monitor coordinates must reside from 0 to monitor.width for x, and 0 to
+ * monitor.height for y.
+ *
+ * @param monitor
+ * @param video
+ * @param vx [out]  Video X
+ * @param vy [out]  Video Y
+ * @param mx Monitor X
+ * @param my Monitor Y
+ */
+void clemens_monitor_to_video_coordinates(ClemensMonitor *monitor, ClemensVideo *video, int16_t *vx,
+                                          int16_t *vy, int16_t mx, int16_t my);
 
 #ifdef __cplusplus
 }
