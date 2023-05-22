@@ -3,6 +3,36 @@
 #include "clem_mmio_defs.h"
 #include "clem_mmio_types.h"
 
+
+/*  SCC Implementation
+    ==================
+    This module implements communication between the machine and an emulated
+    Zilog 8530.  Though not called out in the docs - the data/command per port
+    interface is very similar to how the system communicates with the Ensoniq.
+
+    Commands and data are funneled between the machine and emulated Zilog unit.
+    Command sent from machine with data:    SCC_x_CMD,  SCC_x_DATA
+    Zilog responds with data:               SCC_x_DATA
+
+    The "GLU" will expect a command byte and a data byte 
+
+    The emulated SCC has the following components:
+
+    - Command Data registers
+    - Interrupt control logic
+    - Channel controllers (I/O)
+
+
+    These ports are used to communicate with a printer and modem (A, B)
+    These "peripherals" will expect tx/rx from this module.
+*/
+
+struct ClemensDeviceSCC1 {
+
+};
+
+
+
 #define CLEM_SCC_STATE_REGISTER_WAIT     0
 #define CLEM_SCC_STATE_REGISTER_SELECTED 1
 
