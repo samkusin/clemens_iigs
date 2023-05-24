@@ -36,11 +36,14 @@ typedef uint8_t *(*ClemensSerializerAllocateCb)(unsigned /* type */, unsigned /*
  *
  *  If you divide the CLEM_CLOCKS_PHI0_CYCLE by the CLEM_CLOCKS_PHI2_FAST_CYCLE
  *  the value will be the effective maximum clock speed in Mhz of the CPU.
+ *
+ *  Ref: https://www.kansasfest.org/wp-content/uploads/2011-krue-fpi.pdf
  */
 
 #define CLEM_CLOCKS_14MHZ_CYCLE     200U                           // 14.318 Mhz
 #define CLEM_CLOCKS_7MHZ_CYCLE      400U                           // 7.159  Mhz
 #define CLEM_CLOCKS_4MHZ_CYCLE      700U                           // 4.091  Mhz
+#define CLEM_CLOCKS_CREF_CYCLE      800U                           // 3.580  Mhz
 #define CLEM_CLOCKS_PHI2_FAST_CYCLE (CLEM_CLOCKS_14MHZ_CYCLE * 5)  // 2.864  Mhz
 #define CLEM_CLOCKS_2MHZ_CYCLE      (CLEM_CLOCKS_14MHZ_CYCLE * 7)  // 2.045  Mhz
 #define CLEM_CLOCKS_Q3_CYCLE        CLEM_CLOCKS_2MHZ_CYCLE         // 2Mhz cycle with stretch

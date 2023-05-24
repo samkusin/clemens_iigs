@@ -70,10 +70,11 @@ uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_
     switch (ioreg) {
     case CLEM_MMIO_REG_SCC_B_CMD:
     case CLEM_MMIO_REG_SCC_A_CMD:
+        //  always read from current register - this will reset selected register
+        //  to 0x00 which is one way for the app to sync with the SCC.
         ch_idx = CLEM_MMIO_REG_SCC_A_CMD - ioreg;
-        if (scc->state[ch_idx] == CLEM_SCC_STATE_REGISTER) {
-            scc->selected_reg[ch_idx] = 0x00;
-        }
+        scc->selected_reg[ch_idx] = 0x00;
+        scc->state[ch_idx] = CLEM_SCC_STATE_READY;
         break;
     case CLEM_MMIO_REG_SCC_B_DATA:
     case CLEM_MMIO_REG_SCC_A_DATA:
