@@ -24,6 +24,15 @@
 
     These ports are used to communicate with a printer and modem (A, B)
     These "peripherals" will expect tx/rx from this module.
+
+    Timing (from IIGS schematic docs) and
+    https://www.kansasfest.org/wp-content/uploads/2011-krue-fpi.pdf
+
+    ~SYNCA, ~RTXCA, RTXCB = 3.6864 mhz
+    PCLK = Megs 2 CREF
+
+    Ref
+
 */
 
 struct ClemensDeviceSCC1 {};
