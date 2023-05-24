@@ -105,7 +105,7 @@ struct ClemensDeviceSCC {
     clem_clocks_time_t ts_last_frame;
 
     /** Internal state that drives how the cmd/data registers are interpreted */
-    unsigned state;
+    unsigned state[2];
     unsigned selected_reg[2];
 
     uint8_t serial[2]; /**< See CLEM_SCC_PORT_xxx */
