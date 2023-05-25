@@ -101,26 +101,37 @@ struct ClemensDeviceADB {
     uint32_t irq_line;     /**< IRQ flags passed to machine */
 };
 
+struct ClemensDeviceSCCChannel {
+    unsigned serial_port;
+
+    /** Data buffers - FIFO queues that mimic the Z8530 recv/xmit buffers */
+    uint8_t recv_queue[3];
+    uint8_t xmit_byte;
+
+    /* Data settings */
+    unsigned clock_rate;     // WR4 - clock rate only, x1, x16, x32, x64
+    unsigned stop_half_bits; // WR4 - 2 half bits per bit, so 1.5 stop bits = 3 here
+    unsigned sync_parity;    // WR4 - bits 0,1,4,5
+
+    /** CPU Interface */
+    unsigned state;
+    unsigned selected_reg;
+
+    /** Transmit Logic */
+    unsigned txrc_out_mode; // WR11 - clock mode, high bit = enabled
+    unsigned tx_clk_mode;   // WR11 - clock mode
+
+    /** Receive Logic */
+    unsigned recv_clk_mode; // WR11 - clock mode
+    unsigned recv_ctl;      // WR3 - receiver control
+};
+
 struct ClemensDeviceSCC {
     /** Clocks, including the XTAL oscillator @ 3.6864 mhz*/
     clem_clocks_time_t ts_last_frame;
     clem_clocks_duration_t xtal_clocks;
-    
-    /** Peripheral I/O as represented by serial pin ports. See CLEM_SCC_PORT_xxx  */
-    uint8_t serial[2];
 
-    /** CPU Interface */
-    unsigned state[2];
-    unsigned selected_reg[2];
-
-    /** Transmit Logic */
-    uint8_t trxc_out_mode[2];       // WR11 - clock mode
-    uint8_t xmit_clk_mode[2];       // WR11 - clock mode
-    bool trxc_out[2];               // WR11 - trxc_out mode enabled?
-
-    /** Receive Logic */
-    uint8_t recv_clk_mode[2];       // WR11 - clock mode
-
+    struct ClemensDeviceSCCChannel channel[2];
 
     uint32_t irq_line; /**< IRQ flags passed to machine */
 };
