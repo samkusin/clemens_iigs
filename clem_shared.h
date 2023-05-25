@@ -132,6 +132,16 @@ typedef struct {
     const char *(*io_name)(void *context);
 } ClemensCard;
 
+
+/* Serial port interface */
+#define CLEM_SCC_PORT_DTR        0x01
+#define CLEM_SCC_PORT_HSKI       0x02
+#define CLEM_SCC_PORT_TX_D_LO    0x04
+#define CLEM_SCC_PORT_TX_D_HI    0x08
+#define CLEM_SCC_PORT_RX_D_LO    0x10
+#define CLEM_SCC_PORT_RX_D_HI    0x20
+#define CLEM_SCC_PORT_GPI        0x40
+
 #ifdef __cplusplus
 }
 #endif

@@ -93,11 +93,11 @@ void clem_scc_write_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t 
         ch_idx = CLEM_MMIO_REG_SCC_A_CMD - ioreg;
         if (scc->channel[ch_idx].state == CLEM_SCC_STATE_READY) {
             scc->channel[ch_idx].selected_reg = value;
-            scc->channel[ch_idx].state[ = CLEM_SCC_STATE_REGISTER;
+            scc->channel[ch_idx].state = CLEM_SCC_STATE_REGISTER;
         } else if (scc->channel[ch_idx].state == CLEM_SCC_STATE_REGISTER) {
             //  command write register
-            scc->selected_reg[ch_idx] = 0x00;
-            scc->state[ch_idx] = CLEM_SCC_STATE_READY;
+            scc->channel[ch_idx].selected_reg = 0x00;
+            scc->channel[ch_idx].state = CLEM_SCC_STATE_READY;
         }
         break;
     case CLEM_MMIO_REG_SCC_B_DATA:
