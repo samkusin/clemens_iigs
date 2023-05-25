@@ -102,13 +102,25 @@ struct ClemensDeviceADB {
 };
 
 struct ClemensDeviceSCC {
+    /** Clocks, including the XTAL oscillator @ 3.6864 mhz*/
     clem_clocks_time_t ts_last_frame;
+    clem_clocks_duration_t xtal_clocks;
+    
+    /** Peripheral I/O as represented by serial pin ports. See CLEM_SCC_PORT_xxx  */
+    uint8_t serial[2];
 
-    /** Internal state that drives how the cmd/data registers are interpreted */
+    /** CPU Interface */
     unsigned state[2];
     unsigned selected_reg[2];
 
-    uint8_t serial[2]; /**< See CLEM_SCC_PORT_xxx */
+    /** Transmit Logic */
+    uint8_t trxc_out_mode[2];       // WR11 - clock mode
+    uint8_t xmit_clk_mode[2];       // WR11 - clock mode
+    bool trxc_out[2];               // WR11 - trxc_out mode enabled?
+
+    /** Receive Logic */
+    uint8_t recv_clk_mode[2];       // WR11 - clock mode
+
 
     uint32_t irq_line; /**< IRQ flags passed to machine */
 };

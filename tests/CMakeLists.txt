@@ -37,6 +37,9 @@ target_link_libraries(test_disk_2img clemens_disktypes clem_test_utils unity)
 add_executable(test_disk_woz test_disk_woz.c ${CLEMENS_TEST_COMMON_ASSETS})
 target_link_libraries(test_disk_woz clemens_disktypes clem_test_utils unity)
 
+add_executable(test_scc test_scc.c)
+target_link_libraries(test_scc clemens_65816_mmio unity)
+
 add_test(NAME minimal COMMAND test_emulate_minimal)
 add_test(NAME cpu_adc COMMAND test_adc)
 add_test(NAME disk_nib COMMAND test_disk_nib)
@@ -44,6 +47,7 @@ add_test(NAME disk_2img COMMAND test_disk_2img)
 add_test(NAME disk_woz COMMAND test_disk_woz)
 add_test(NAME gameport COMMAND test_gameport)
 add_test(NAME mmio_video_switches COMMAND test_mmio_video_switches)
+add_test(NAME scc COMMAND test_scc)
 
 
 # add_library(test_lib util.c)

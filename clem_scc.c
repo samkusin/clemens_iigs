@@ -3,6 +3,8 @@
 #include "clem_mmio_defs.h"
 #include "clem_mmio_types.h"
 
+#include <math.h>
+
 /*  SCC Implementation
     ==================
     This module implements communication between the machine and an emulated
@@ -21,21 +23,32 @@
     - Interrupt control logic
     - Channel controllers (I/O)
 
-
     These ports are used to communicate with a printer and modem (A, B)
     These "peripherals" will expect tx/rx from this module.
 
     Timing (from IIGS schematic docs) and
     https://www.kansasfest.org/wp-content/uploads/2011-krue-fpi.pdf
 
-    ~SYNCA, ~RTXCA, RTXCB = 3.6864 mhz
-    PCLK = Megs 2 CREF
+    ~SYNCA, ~RTXCA, RTXCB = 3.6864 mhz, or the XTAL oscillator clock
+    PCLK = Mega 2 CREF
 
-    Ref
+    Peripheral (Plug to SCC Pin)
+    ==========
+    1:CLEM_SCC_PORT_DTR     - /DTR
+    2:CLEM_SCC_PORT_HSKI    - /CTS, /TRxC
+    3:CLEM_SCC_PORT_TX_D_LO - TxD
+    5:CLEM_SCC_PORT_RX_D_LO - RxD
+    6:CLEM_SCC_PORT_TX_D_HI - /RTS
+    7:CLEM_SCC_PORT_GPI     - DCD
+    
 
+    Registers
+    =========
+    WR6     - SYNC/SDLC Address Field
+    WR8     - TX buffer
 */
 
-struct ClemensDeviceSCC1 {};
+#define CLEM_CLOCKS_SCC_XTAL_MHZ      3.6864
 
 #define CLEM_SCC_CH_A 0
 #define CLEM_SCC_CH_B 1
@@ -43,7 +56,22 @@ struct ClemensDeviceSCC1 {};
 #define CLEM_SCC_STATE_READY    0
 #define CLEM_SCC_STATE_REGISTER 1
 
-void clem_scc_reset(struct ClemensDeviceSCC *scc) {}
+//  Clock Mode (WR11)
+#define CLEM_SCC_CLK_TX_OUT_SHIFT   0x00
+#define CLEM_SCC_CLK_TX_OUT_XTAL    0x00
+#define CLEM_SCC_CLK_TX_OUT_XMIT    0x01
+#define CLEM_SCC_CLK_TX_OUT_BRG     0x02
+#define CLEM_SCC_CLK_TX_OUT_DPLL    0x03    // TODO: Phase Locked Loop Sim?
+#define CLEM_SCC_CLK_TX_IN_OUT      0x04
+#define CLEM_SCC_CLK_TX_XMIT_MASK   0x18
+#define CLEM_SCC_CLK_TX_XMIT_TRXC   0x01
+
+void clem_scc_reset(struct ClemensDeviceSCC *scc) {
+    //  equivalent to a hardware reset
+    scc->xtal_clocks = (clem_clocks_duration_t)floor(
+        (14.31818 / CLEM_CLOCKS_SCC_XTAL_MHZ)  * CLEM_CLOCKS_14MHZ_CYCLE + 0.5);
+
+}
 
 void clem_scc_glu_sync(struct ClemensDeviceSCC *scc, struct ClemensClock *clock) {
     scc->ts_last_frame = clock->ts;
