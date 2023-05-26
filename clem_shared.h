@@ -40,6 +40,7 @@ typedef uint8_t *(*ClemensSerializerAllocateCb)(unsigned /* type */, unsigned /*
  *  Ref: https://www.kansasfest.org/wp-content/uploads/2011-krue-fpi.pdf
  */
 
+#define CLEM_CLOCKS_28MHZ_CYCLE     100U                           // 28.636 Mhz
 #define CLEM_CLOCKS_14MHZ_CYCLE     200U                           // 14.318 Mhz
 #define CLEM_CLOCKS_7MHZ_CYCLE      400U                           // 7.159  Mhz
 #define CLEM_CLOCKS_4MHZ_CYCLE      700U                           // 4.091  Mhz
