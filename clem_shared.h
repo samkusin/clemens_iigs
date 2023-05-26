@@ -132,15 +132,31 @@ typedef struct {
     const char *(*io_name)(void *context);
 } ClemensCard;
 
-
 /* Serial port interface */
-#define CLEM_SCC_PORT_DTR        0x01
-#define CLEM_SCC_PORT_HSKI       0x02
-#define CLEM_SCC_PORT_TX_D_LO    0x04
-#define CLEM_SCC_PORT_TX_D_HI    0x08
-#define CLEM_SCC_PORT_RX_D_LO    0x10
-#define CLEM_SCC_PORT_RX_D_HI    0x20
-#define CLEM_SCC_PORT_GPI        0x40
+#define CLEM_SCC_PORT_DTR     0x01
+#define CLEM_SCC_PORT_HSKI    0x02
+#define CLEM_SCC_PORT_TX_D_LO 0x04
+#define CLEM_SCC_PORT_TX_D_HI 0x08
+#define CLEM_SCC_PORT_RX_D_LO 0x10
+#define CLEM_SCC_PORT_RX_D_HI 0x20
+#define CLEM_SCC_PORT_GPI     0x40
+
+/** Limit of 57600 baud is based on the maximum baud rate that can be generated
+    by the SCC (3.6884mhz / 16) with proven settings.  It may be possible to
+    go higher with an accelerated GS and a x1 clock mode vs x16 as supported
+    on the Z8530 (though unsure of the NMOS version can operate that high.)
+*/
+enum ClemensSerialBaudRate {
+    kClemensSerialBaudRate_300,
+    kClemensSerialBaudRate_1200,
+    kClemensSerialBaudRate_2400,
+    kClemensSerialBaudRate_4800,
+    kClemensSerialBaudRate_9600,
+    kClemensSerialBaudRate_19200,
+    kClemensSerialBaudRate_38400,
+    kClemensSerialBaudRate_57600,
+    kClemensSerialBaudRate_Clock
+};
 
 #ifdef __cplusplus
 }

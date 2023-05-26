@@ -9,8 +9,8 @@ add_library(clemens_65816_iocards STATIC
 target_include_directories(clemens_65816_iocards
     PUBLIC $<BUILD_INTERFACE:${_CLEM_INCLUDE_DIRECTORY}>)
 
-add_library(clemens_65816_peripherals STATIC
+add_library(clemens_65816_serial_devices STATIC
     clem_peer.c)
 
-target_include_directories(clemens_65816_peripherals
+target_include_directories(clemens_65816_serial_devices
     PUBLIC $<BUILD_INTERFACE:${_CLEM_INCLUDE_DIRECTORY}>)

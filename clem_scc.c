@@ -43,10 +43,10 @@
     7:CLEM_SCC_PORT_GPI     - DCD
 
 
-    Registers
-    =========
-    WR6     - SYNC/SDLC Address Field
-    WR8     - TX buffer
+    Timing
+    ======
+    BRG baud constant = (Clock Freq) / (2 * BAUD * ClockMode) - 2
+
 */
 
 #define CLEM_CLOCKS_SCC_XTAL_MHZ 3.6864

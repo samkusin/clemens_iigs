@@ -127,7 +127,8 @@ struct ClemensDeviceSCCChannel {
 };
 
 struct ClemensDeviceSCC {
-    /** Clocks, including the XTAL oscillator @ 3.6864 mhz*/
+    /** Clocks, including the XTAL oscillator @ 3.6864 mhz, CREF is defined in
+        clem_shared.h */
     clem_clocks_time_t ts_last_frame;
     clem_clocks_duration_t xtal_clocks;
 

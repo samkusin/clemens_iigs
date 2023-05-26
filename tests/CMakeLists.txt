@@ -38,7 +38,7 @@ add_executable(test_disk_woz test_disk_woz.c ${CLEMENS_TEST_COMMON_ASSETS})
 target_link_libraries(test_disk_woz clemens_disktypes clem_test_utils unity)
 
 add_executable(test_scc test_scc.c)
-target_link_libraries(test_scc clemens_65816_mmio unity)
+target_link_libraries(test_scc clemens_65816_serial_devices clemens_65816_mmio unity)
 
 add_test(NAME minimal COMMAND test_emulate_minimal)
 add_test(NAME cpu_adc COMMAND test_adc)
