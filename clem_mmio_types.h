@@ -104,9 +104,16 @@ struct ClemensDeviceADB {
 struct ClemensDeviceSCCChannel {
     unsigned serial_port;
 
+    /** Register set */
+    uint8_t regs[16];
+    /** Timings */
+    clem_clocks_time_t tx_next_ts;
+    clem_clocks_time_t rx_next_ts;
+
     /** Data buffers - FIFO queues that mimic the Z8530 recv/xmit buffers */
     uint8_t recv_queue[3];
-    uint8_t xmit_byte;
+    uint8_t tx_byte;
+    unsigned tx_register;
 
     /* Data settings */
     unsigned clock_rate;     // WR4 - clock rate only, x1, x16, x32, x64

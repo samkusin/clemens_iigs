@@ -1,7 +1,8 @@
+#include "clem_scc.h"
+
 #include "clem_debug.h"
 #include "clem_device.h"
-#include "clem_mmio_defs.h"
-#include "clem_mmio_types.h"
+#include "clem_shared.h"
 
 #include <math.h>
 #include <string.h>
@@ -27,25 +28,36 @@
     These ports are used to communicate with a printer and modem (A, B)
     These "peripherals" will expect tx/rx from this module.
 
-    Timing (from IIGS schematic docs) and
-    https://www.kansasfest.org/wp-content/uploads/2011-krue-fpi.pdf
-
     ~SYNCA, ~RTXCA, RTXCB = 3.6864 mhz, or the XTAL oscillator clock
     PCLK = Mega 2 CREF
 
     Peripheral (Plug to SCC Pin)
     ==========
-    1:CLEM_SCC_PORT_DTR     - /DTR
-    2:CLEM_SCC_PORT_HSKI    - /CTS, /TRxC
+    1:CLEM_SCC_PORT_DTR     - DTR
+    2:CLEM_SCC_PORT_HSKI    - CTS, TRxC
     3:CLEM_SCC_PORT_TX_D_LO - TxD
     5:CLEM_SCC_PORT_RX_D_LO - RxD
-    6:CLEM_SCC_PORT_TX_D_HI - /RTS
+    6:CLEM_SCC_PORT_TX_D_HI - RTS
     7:CLEM_SCC_PORT_GPI     - DCD
 
 
     Timing
     ======
     BRG baud constant = (Clock Freq) / (2 * BAUD * ClockMode) - 2
+    CTS, TRxC, XTAL (RTxC, SYNC), or Baud-rate-generator (BRG via PCLK/RTxC)
+
+    Interrupts
+    ==========
+    See 4.2 Z8530 1986 documentation (page 4-1), figure 4-2 (page 4-4)
+    Note, since /INTACK is always high as referenced in the IIGS schemeatic,
+    this means 'Interrupt Without Acknowledge' is the only approach that needs
+    to be implemented.  This method relies on register reads to extract details.
+
+    Each channel will trigger an interrupt based on recv/xmit status.
+
+    Prioritization may be required (page 4-2, Interrupt Sources) so that high
+    priority interrupts don't erase lower-priority ones of interest.
+
 
 */
 
@@ -54,21 +66,21 @@
 #define CLEM_SCC_STATE_READY    0
 #define CLEM_SCC_STATE_REGISTER 1
 
-//  Clock Mode (WR11)
-#define CLEM_SCC_CLK_TRxC_OUT_XTAL 0x00
-#define CLEM_SCC_CLK_TRxC_OUT_XMIT 0x01
-#define CLEM_SCC_CLK_TRxC_OUT_BRG  0x02
-#define CLEM_SCC_CLK_TRxC_OUT_DPLL 0x03
-#define CLEM_SCC_CLK_SOURCE_RTxC   0x00
-#define CLEM_SCC_CLK_SOURCE_TRxC   0x01
-#define CLEM_SCC_CLK_SOURCE_BRG    0x02
-#define CLEM_SCC_CLK_SOURCE_DPLL   0x03
-
 void clem_scc_reset_channel(struct ClemensDeviceSCCChannel *channel, bool hw) {
-    // WR11 reset
-    channel->tx_clk_mode = channel->tx_clk_mode = CLEM_SCC_CLK_SOURCE_TRxC;
-    // WR4 reset
-    channel->stop_half_bits = channel->stop_half_bits = 2;
+    if (hw) {
+        memset(channel->regs, 0, sizeof(channel->regs));
+        channel->regs[11] |= CLEM_SCC_CLK_SOURCE_TRxC;
+    }
+    channel->regs[4] |= CLEM_SCC_STOP_BIT_1;
+}
+
+void clem_scc_sync_channel_uart(struct ClemensDeviceSCCChannel *channel, clem_clocks_time_t prev_ts,
+                                clem_clocks_time_t ts) {
+    //  may need to run at a high enough rate
+    //  may need to run like a master/slave where the serial connection is
+    //  guaranteed to run in sync with us
+    //  if tx enabled (auto-enable or explicitly via reg, may just need to check reg)
+    //      while (channel->tx_next_ts - prev_ts <= ts - prev_ts) {}
 }
 
 void clem_scc_reset(struct ClemensDeviceSCC *scc) {
@@ -81,6 +93,13 @@ void clem_scc_reset(struct ClemensDeviceSCC *scc) {
 }
 
 void clem_scc_glu_sync(struct ClemensDeviceSCC *scc, struct ClemensClock *clock) {
+    //  channel A and B xmit/recv functionality is driven by either the PCLK
+    //  or the XTAL (via configuration)
+    //  synchronization between channel and GLU occurs on PCLK intervals
+
+    clem_scc_sync_channel_uart(&scc->channel[0], scc->ts_last_frame, clock->ts);
+    clem_scc_sync_channel_uart(&scc->channel[1], scc->ts_last_frame, clock->ts);
+
     scc->ts_last_frame = clock->ts;
 }
 

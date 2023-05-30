@@ -148,6 +148,7 @@ typedef struct {
     on the Z8530 (though unsure of the NMOS version can operate that high.)
 */
 enum ClemensSerialBaudRate {
+    kClemensSerialBaudRate_None,
     kClemensSerialBaudRate_300,
     kClemensSerialBaudRate_1200,
     kClemensSerialBaudRate_2400,
