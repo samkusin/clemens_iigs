@@ -101,14 +101,22 @@ struct ClemensDeviceADB {
     uint32_t irq_line;     /**< IRQ flags passed to machine */
 };
 
+struct ClemensDeviceSCCClockRef {
+    clem_clocks_duration_t xtal_step;
+    clem_clocks_duration_t pclk_step;
+};
+
 struct ClemensDeviceSCCChannel {
     unsigned serial_port;
 
     /** Register set */
     uint8_t regs[16];
-    /** Timings */
+    /** Timings based on clock mode and XTAL vs PCLK (if using baud gen)*/
     clem_clocks_time_t tx_next_ts;
     clem_clocks_time_t rx_next_ts;
+    /** Applies clock mode (/1, /16, /32, /64) and XTAL or PCLK (again, if baud gen is ON) */
+    clem_clocks_duration_t tx_clock_step;
+    clem_clocks_duration_t rx_clock_step;
 
     /** Data buffers - FIFO queues that mimic the Z8530 recv/xmit buffers */
     uint8_t recv_queue[3];
@@ -137,8 +145,7 @@ struct ClemensDeviceSCC {
     /** Clocks, including the XTAL oscillator @ 3.6864 mhz, CREF is defined in
         clem_shared.h */
     clem_clocks_time_t ts_last_frame;
-    clem_clocks_duration_t xtal_clocks;
-
+    struct ClemensDeviceSCCClockRef clock_ref;
     struct ClemensDeviceSCCChannel channel[2];
 
     uint32_t irq_line; /**< IRQ flags passed to machine */
