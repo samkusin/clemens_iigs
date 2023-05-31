@@ -107,6 +107,9 @@ struct ClemensDeviceSCCChannel {
     /** Register set */
     uint8_t regs[16];
     /** Applies clock mode (/1, /16, /32, /64) and XTAL or PCLK (again, if baud gen is ON) */
+    clem_clocks_time_t poll_device_clock_ts;
+    clem_clocks_time_t tx_clock_ts;
+    clem_clocks_time_t rx_clock_ts;
     clem_clocks_duration_t tx_clock_step;
     clem_clocks_duration_t rx_clock_step;
 
@@ -114,12 +117,14 @@ struct ClemensDeviceSCCChannel {
     uint8_t recv_queue[3];
     uint8_t tx_byte;
     unsigned tx_register;
+
+    unsigned state;
+    uint8_t selected_reg;
 };
 
 struct ClemensDeviceSCC {
     /** Clocks, including the XTAL oscillator @ 3.6864 mhz, CREF is defined in
         clem_shared.h */
-    clem_clocks_time_t ts_last_frame;
     clem_clocks_duration_t xtal_step;
     clem_clocks_duration_t pclk_step;
 
