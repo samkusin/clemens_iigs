@@ -2,6 +2,7 @@
 
 #include "clem_debug.h"
 #include "clem_device.h"
+#include "clem_mmio_types.h"
 #include "clem_shared.h"
 
 #include <math.h>
@@ -44,10 +45,10 @@
     Timing
     ======
     Compromise between accuracy and efficiency when emulating the clock
-    Rely on clock mode and the multiplier, which determines the effective 
-    clock frequency for the transmitter and receiver.  
-    
-    This means encoding  beyond NRZ/NRZI will likely not work since higher 
+    Rely on clock mode and the multiplier, which determines the effective
+    clock frequency for the transmitter and receiver.
+
+    This means encoding  beyond NRZ/NRZI will likely not work since higher
     effective clock frequencies are required to sample the I/O data stream.
     As a side effect, it's unlikely synchronous mode will work correctly.
 
@@ -77,6 +78,8 @@
 #define CLEM_SCC_STATE_READY    0
 #define CLEM_SCC_STATE_REGISTER 1
 
+#define CLEM_SCC_RESET_TX_CLOCK 1
+#define CLEM_SCC_RESET_RX_CLOCK 2
 
 static inline bool _clem_scc_is_tx_enabled(struct ClemensDeviceSCCChannel *channel) {
     return (channel->regs[5] & CLEM_SCC_TX_ENABLE) != 0;
@@ -86,58 +89,72 @@ static inline bool _clem_scc_is_rx_enabled(struct ClemensDeviceSCCChannel *chann
     return (channel->regs[3] & CLEM_SCC_RX_ENABLE) != 0;
 }
 
-static void _clem_scc_channel_set_tx_rx_clock_step(struct ClemensDeviceSCCChannel *channel, 
-                            struct ClemensDeviceSCCClockRef* clock_ref) {
+static inline clem_clocks_duration_t
+_clem_scc_clock_data_step_from_mode(clem_clocks_duration_t clock_step, uint8_t mode) {
+    switch (mode) {
+    case CLEM_SCC_CLOCK_X1:
+        return clock_step;
+    case CLEM_SCC_CLOCK_X16:
+        return clock_step * 16;
+    case CLEM_SCC_CLOCK_X32:
+        return clock_step * 32;
+    case CLEM_SCC_CLOCK_X64:
+        return clock_step * 64;
+    default:
+        assert(false);
+    }
+    return clock_step;
+}
+
+static void _clem_scc_channel_set_tx_rx_clock_step(struct ClemensDeviceSCCChannel *channel,
+                                                   struct ClemensDeviceSCCClockRef *clock_ref) {
     bool brg_on = (channel->regs[14] & CLEM_SCC_CLK_BRG_ON) != 0;
     bool brg_rx = (brg_on && channel->regs[11] & CLEM_SCC_CLK_RX_SOURCE_BRG) != 0;
     bool brg_tx = (brg_on && channel->regs[11] & CLEM_SCC_CLK_TX_SOURCE_BRG) != 0;
-    clem_clocks_duration_t step_rx = (brg_rx && channel->regs[14] & CLEM_SCC_CLK_BRG_PCLK) 
-        ? clock_ref->pclk_step : clock_ref->xtal_step;
-    clem_clocks_duration_t step_tx = (brg_tx && channel->regs[14] & CLEM_SCC_CLK_BRG_PCLK) 
-        ? clock_ref->pclk_step : clock_ref->xtal_step;
+    clem_clocks_duration_t step_rx = (brg_rx && channel->regs[14] & CLEM_SCC_CLK_BRG_PCLK)
+                                         ? clock_ref->pclk_step
+                                         : clock_ref->xtal_step;
+    clem_clocks_duration_t step_tx = (brg_tx && channel->regs[14] & CLEM_SCC_CLK_BRG_PCLK)
+                                         ? clock_ref->pclk_step
+                                         : clock_ref->xtal_step;
     switch (channel->regs[4] & 0xc0) {
-        case CLEM_SCC_CLOCK_X1:
-            channel->tx_clock_step = step_tx;
-            channel->rx_clock_step = step_rx;
-            break;
-        case CLEM_SCC_CLOCK_X16:
-            channel->tx_clock_step = step_tx * 16;
-            channel->rx_clock_step = step_rx * 16;
-            break;
-        case CLEM_SCC_CLOCK_X32:
-            channel->tx_clock_step = step_tx * 32;
-            channel->rx_clock_step = step_rx * 32;
-            break;
-        case CLEM_SCC_CLOCK_X64:
-            channel->tx_clock_step = step_tx * 64;
-            channel->rx_clock_step = step_rx * 64;
-            break;
-    }  
+    case CLEM_SCC_CLOCK_X1:
+        channel->tx_clock_step = step_tx;
+        channel->rx_clock_step = step_rx;
+        break;
+    case CLEM_SCC_CLOCK_X16:
+        channel->tx_clock_step = step_tx * 16;
+        channel->rx_clock_step = step_rx * 16;
+        break;
+    case CLEM_SCC_CLOCK_X32:
+        channel->tx_clock_step = step_tx * 32;
+        channel->rx_clock_step = step_rx * 32;
+        break;
+    case CLEM_SCC_CLOCK_X64:
+        channel->tx_clock_step = step_tx * 64;
+        channel->rx_clock_step = step_rx * 64;
+        break;
+    }
     //  modify steps to account for desired baud rates
     //  tc = ( xtal / (2 * baud_rate * clock_div) ) - 2
     if (brg_rx) {
-
-    }   
+    }
     if (brg_tx) {
-
-    }                           
+    }
 }
-
 
 static clem_clocks_time_t _clem_scc_channel_tx_next_ts(struct ClemensDeviceSCCChannel *channel) {
     clem_clocks_time_t next_ts = 0;
     switch (channel->regs[11] & 0x18) {
-        case CLEM_SCC_CLK_TX_SOURCE_BRG:
-            break;
-        case CLEM_SCC_CLK_TX_SOURCE_TRxC:
-            //  always use TRxC pin-in
-            channel->tx_next_ts += channel->
-             (channel->serial_port & CLEM_SCC_PORT_HSKI)
-            break;
-        case CLEM_SCC_CLK_TX_SOURCE_RTxC:
-            break;        
-        case CLEM_SCC_CLK_TX_SOURCE_DPLL:
-            break;
+    case CLEM_SCC_CLK_TX_SOURCE_BRG:
+        break;
+    case CLEM_SCC_CLK_TX_SOURCE_TRxC:
+        //  always use TRxC pin-in
+        channel->tx_next_ts += channel->(channel->serial_port & CLEM_SCC_PORT_HSKI) break;
+    case CLEM_SCC_CLK_TX_SOURCE_RTxC:
+        break;
+    case CLEM_SCC_CLK_TX_SOURCE_DPLL:
+        break;
     }
     return next_ts;
 }
@@ -145,35 +162,49 @@ static clem_clocks_time_t _clem_scc_channel_tx_next_ts(struct ClemensDeviceSCCCh
 static clem_clocks_time_t _clem_scc_channel_rx_next_ts(struct ClemensDeviceSCCChannel *channel) {
     clem_clocks_time_t next_ts = 0;
     switch (channel->regs[11] & 0x60) {
-        case CLEM_SCC_CLK_RX_SOURCE_BRG:
-            break;
-        case CLEM_SCC_CLK_RX_SOURCE_TRxC:
-            //  always use TRxC pin-in
-            break;
-        case CLEM_SCC_CLK_RX_SOURCE_RTxC:
-            break;        
-        case CLEM_SCC_CLK_RX_SOURCE_DPLL:
-            break;
+    case CLEM_SCC_CLK_RX_SOURCE_BRG:
+        break;
+    case CLEM_SCC_CLK_RX_SOURCE_TRxC:
+        //  always use TRxC pin-in
+        break;
+    case CLEM_SCC_CLK_RX_SOURCE_RTxC:
+        break;
+    case CLEM_SCC_CLK_RX_SOURCE_DPLL:
+        break;
     }
     return next_ts;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void clem_scc_reset_channel(struct ClemensDeviceSCCChannel *channel, 
-                            struct ClemensDeviceSCCClockRef* clock_ref, bool hw) {
+void clem_scc_reset_channel_clocks(struct ClemensDeviceSCC *scc, unsigned ch_idx,
+                                   unsigned options) {
+    // The transmitter and receiver each operate on a clock defined by registers
+    // WR4 (clock mode), WR11 (TRxC, RTxC) and W14 (baud rate gen.)  These
+    // clocks align with the data rate - so for synchronous communication,
+    // x1 clock steps are enforced (very slow - likely not used in real world
+    // IIGS applications? fingers crossed.)
+    struct ClemensDeviceSCCChannel *channel = &scc->channel[ch_idx];
+    if (options & CLEM_SCC_RESET_TX_CLOCK) {
+    }
+}
+
+void clem_scc_reset_channel(struct ClemensDeviceSCC *scc, unsigned ch_idx, bool hw) {
+    struct ClemensDeviceSCCChannel *channel = &scc->channel[ch_idx];
     if (hw) {
         memset(channel->regs, 0, sizeof(channel->regs));
         channel->regs[11] |= CLEM_SCC_CLK_TX_SOURCE_TRxC;
     }
     channel->regs[4] |= CLEM_SCC_STOP_BIT_1;
-
-    _clem_scc_channel_set_tx_rx_clock_step(channel, clock_ref);
+    clem_scc_reset_channel_clocks(scc, ch_idx, CLEM_SCC_RESET_TX_CLOCK | CLEM_SCC_RESET_RX_CLOCK);
 }
 
-void clem_scc_sync_channel_uart(struct ClemensDeviceSCCChannel *channel, 
-                                struct ClemensDeviceSCCClockRef* clock_ref,
-                                clem_clocks_time_t cur_ts, clem_clocks_time_t next_ts) {
+void clem_scc_sync_channel_uart(struct ClemensDeviceSCC *scc, unsigned ch_idx,
+                                clem_clocks_time_t next_ts) {
+    struct ClemensDeviceSCCClockRef *clock_ref = &scc->clock_ref;
+    struct ClemensDeviceSCCChannel *channel = &scc->channel[ch_idx];
+    clem_clocks_time_t cur_ts = scc->ts_last_frame;
+
     bool rx_enabled = _clem_scc_is_rx_enabled(channel);
     bool tx_enabled = _clem_scc_is_tx_enabled(channel);
     while (cur_ts < next_ts && (rx_enabled || tx_enabled)) {
@@ -184,18 +215,17 @@ void clem_scc_sync_channel_uart(struct ClemensDeviceSCCChannel *channel,
             channel->rx_next_ts = _clem_scc_channel_rx_next_ts(channel);
         }
     }
-
 }
 
 void clem_scc_reset(struct ClemensDeviceSCC *scc) {
     //  equivalent to a hardware reset
     memset(scc, 0, sizeof(*scc));
-    scc->clock_ref.xtal_step = (clem_clocks_duration_t)floor(
+    scc->xtal_step = (clem_clocks_duration_t)floor(
         (14.31818 / CLEM_CLOCKS_SCC_XTAL_MHZ) * CLEM_CLOCKS_14MHZ_CYCLE + 0.5);
-    scc->clock_ref.pclk_step = CLEM_CLOCKS_CREF_CYCLE;
+    scc->pclk_step = CLEM_CLOCKS_CREF_CYCLE;
 
-    clem_scc_reset_channel(&scc->channel[0], &scc->clock_ref, true);
-
+    clem_scc_reset_channel(scc, 0, true);
+    clem_scc_reset_channel(scc, 1, true);
 }
 
 void clem_scc_glu_sync(struct ClemensDeviceSCC *scc, struct ClemensClock *clock) {
@@ -203,8 +233,8 @@ void clem_scc_glu_sync(struct ClemensDeviceSCC *scc, struct ClemensClock *clock)
     //  or the XTAL (via configuration)
     //  synchronization between channel and GLU occurs on PCLK intervals
 
-    clem_scc_sync_channel_uart(&scc->channel[0], &scc->clock_ref, scc->ts_last_frame, clock->ts);
-    clem_scc_sync_channel_uart(&scc->channel[1],&scc->clock_ref, scc->ts_last_frame, clock->ts);
+    clem_scc_sync_channel_uart(scc, 0, clock->ts);
+    clem_scc_sync_channel_uart(scc, 1, clock->ts);
 
     scc->ts_last_frame = clock->ts;
 }

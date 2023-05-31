@@ -101,19 +101,11 @@ struct ClemensDeviceADB {
     uint32_t irq_line;     /**< IRQ flags passed to machine */
 };
 
-struct ClemensDeviceSCCClockRef {
-    clem_clocks_duration_t xtal_step;
-    clem_clocks_duration_t pclk_step;
-};
-
 struct ClemensDeviceSCCChannel {
     unsigned serial_port;
 
     /** Register set */
     uint8_t regs[16];
-    /** Timings based on clock mode and XTAL vs PCLK (if using baud gen)*/
-    clem_clocks_time_t tx_next_ts;
-    clem_clocks_time_t rx_next_ts;
     /** Applies clock mode (/1, /16, /32, /64) and XTAL or PCLK (again, if baud gen is ON) */
     clem_clocks_duration_t tx_clock_step;
     clem_clocks_duration_t rx_clock_step;
@@ -122,30 +114,15 @@ struct ClemensDeviceSCCChannel {
     uint8_t recv_queue[3];
     uint8_t tx_byte;
     unsigned tx_register;
-
-    /* Data settings */
-    unsigned clock_rate;     // WR4 - clock rate only, x1, x16, x32, x64
-    unsigned stop_half_bits; // WR4 - 2 half bits per bit, so 1.5 stop bits = 3 here
-    unsigned sync_parity;    // WR4 - bits 0,1,4,5
-
-    /** CPU Interface */
-    unsigned state;
-    unsigned selected_reg;
-
-    /** Transmit Logic */
-    unsigned txrc_out_mode; // WR11 - clock mode, high bit = enabled
-    unsigned tx_clk_mode;   // WR11 - clock mode
-
-    /** Receive Logic */
-    unsigned recv_clk_mode; // WR11 - clock mode
-    unsigned recv_ctl;      // WR3 - receiver control
 };
 
 struct ClemensDeviceSCC {
     /** Clocks, including the XTAL oscillator @ 3.6864 mhz, CREF is defined in
         clem_shared.h */
     clem_clocks_time_t ts_last_frame;
-    struct ClemensDeviceSCCClockRef clock_ref;
+    clem_clocks_duration_t xtal_step;
+    clem_clocks_duration_t pclk_step;
+
     struct ClemensDeviceSCCChannel channel[2];
 
     uint32_t irq_line; /**< IRQ flags passed to machine */
