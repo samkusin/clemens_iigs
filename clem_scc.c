@@ -280,6 +280,22 @@ void clem_scc_glu_sync(struct ClemensDeviceSCC *scc, struct ClemensClock *clock)
     clem_scc_sync_channel_uart(scc, 1, clock->ts);
 }
 
+void clem_scc_reg_master_interrupt(struct ClemensDeviceSCC *scc, uint8_t value) {
+    uint8_t reset = (value & 0xc0);
+    switch (reset) {
+    case 0x40:
+        clem_scc_reset_channel(scc, 1, false);
+        break;
+    case 0x80:
+        clem_scc_reset_channel(scc, 0, false);
+        break;
+    case 0xc0:
+        clem_scc_reset_channel(scc, 0, true);
+        clem_scc_reset_channel(scc, 1, true);
+        break;
+    }
+}
+
 void clem_scc_write_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t value) {
     unsigned ch_idx;
 
@@ -293,6 +309,7 @@ void clem_scc_write_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t 
         } else if (scc->channel[ch_idx].state == CLEM_SCC_STATE_REGISTER) {
             //  command write register
             CLEM_LOG("SCC: Write Reg %u <= %02x", scc->channel[ch_idx].selected_reg, value);
+            clem_scc_reg_master_interrupt(scc, value);
             scc->channel[ch_idx].selected_reg = 0x00;
             scc->channel[ch_idx].state = CLEM_SCC_STATE_READY;
         }
@@ -314,9 +331,11 @@ uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_
         //  always read from current register - this will reset selected register
         //  to 0x00 which is one way for the app to sync with the SCC.
         ch_idx = CLEM_MMIO_REG_SCC_A_CMD - ioreg;
-        CLEM_LOG("SCC: Read Reg %u => ??", scc->channel[ch_idx].selected_reg);
-        scc->channel[ch_idx].selected_reg = 0x00;
-        scc->channel[ch_idx].state = CLEM_SCC_STATE_READY;
+        if (!CLEM_IS_IO_NO_OP(flags)) {
+            // CLEM_LOG("SCC: Read Reg %u => ??", scc->channel[ch_idx].selected_reg);
+            scc->channel[ch_idx].selected_reg = 0x00;
+            scc->channel[ch_idx].state = CLEM_SCC_STATE_READY;
+        }
         break;
     case CLEM_MMIO_REG_SCC_B_DATA:
     case CLEM_MMIO_REG_SCC_A_DATA:
