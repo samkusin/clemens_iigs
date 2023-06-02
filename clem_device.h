@@ -290,40 +290,6 @@ bool clem_smartport_bus(struct ClemensSmartPortUnit *unit, unsigned unit_count, 
 /**
  * @brief
  *
- * @param scc
- */
-void clem_scc_reset(struct ClemensDeviceSCC *scc);
-
-/**
- * @brief
- *
- * @param scc
- * @param clock
- */
-void clem_scc_glu_sync(struct ClemensDeviceSCC *scc, struct ClemensClock *clock);
-
-/**
- * @brief
- *
- * @param scc
- * @param ioreg
- * @param value
- */
-void clem_scc_write_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t value);
-
-/**
- * @brief
- *
- * @param scc
- * @param ioreg
- * @param flags
- * @return uint8_t
- */
-uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t flags);
-
-/**
- * @brief
- *
  * @param iwm
  * @param drive_type
  * @param disk

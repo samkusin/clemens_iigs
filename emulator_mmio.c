@@ -14,6 +14,7 @@
 #include "clem_debug.h"
 #include "clem_device.h"
 #include "clem_drive.h"
+#include "clem_scc.h"
 #include "clem_util.h"
 #include "clem_vgc.h"
 

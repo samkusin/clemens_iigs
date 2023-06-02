@@ -7,12 +7,15 @@
 extern "C" {
 #endif
 
-#define CLEM_SCC_WR2_INT_VECTOR     0x2
-#define CLEM_SCC_WR9_MASTER_INT     0x9
-#define CLEM_SCC_WR11_CLOCK_MODE    0xB
-#define CLEM_SCC_WR12_TIME_CONST_LO 0xC
-#define CLEM_SCC_WR13_TIME_CONST_HI 0xD
-#define CLEM_SCC_WR15_INT_ENABLE    0xF
+#define CLEM_SCC_WR2_INT_VECTOR      0x2
+#define CLEM_SCC_WR3_RECV_CONTROL    0x3
+#define CLEM_SCC_WR4_CLOCK_DATA_RATE 0x4
+#define CLEM_SCC_WR9_MASTER_INT      0x9
+#define CLEM_SCC_WR11_CLOCK_MODE     0xB
+#define CLEM_SCC_WR12_TIME_CONST_LO  0xC
+#define CLEM_SCC_WR13_TIME_CONST_HI  0xD
+#define CLEM_SCC_WR14_MISC_CONTROL   0xE
+#define CLEM_SCC_WR15_INT_ENABLE     0xF
 
 #define CLEM_SCC_RR2_INT_VECTOR     0x2
 #define CLEM_SCC_RR12_TIME_CONST_LO 0xC
@@ -70,8 +73,11 @@ extern "C" {
 #define CLEM_SCC_CLK_XTAL_ON        0x80
 
 // WR14
-#define CLEM_SCC_CLK_BRG_ON   0x01
-#define CLEM_SCC_CLK_BRG_PCLK 0x02
+#define CLEM_SCC_CLK_BRG_ON     0x01
+#define CLEM_SCC_CLK_BRG_PCLK   0x02
+#define CLEM_SCC_DTR_FUNCTION   0x04
+#define CLEM_SCC_AUTO_ENABLE    0x08
+#define CLEM_SCC_LOCAL_LOOPBACK 0x10
 
 //  RR0
 #define CLEM_SCC_IN_CTS 0x20
@@ -79,6 +85,41 @@ extern "C" {
 //  Port settings
 void clem_scc_channel_port_lo(struct ClemensDeviceSCCChannel *channel, uint8_t flags);
 void clem_scc_channel_port_hi(struct ClemensDeviceSCCChannel *channel, uint8_t flags);
+
+/**
+ * @brief
+ *
+ * @param scc
+ */
+void clem_scc_reset(struct ClemensDeviceSCC *scc);
+
+/**
+ * @brief
+ *
+ * @param scc
+ * @param clock
+ */
+void clem_scc_glu_sync(struct ClemensDeviceSCC *scc, struct ClemensClock *clock);
+
+/**
+ * @brief
+ *
+ * @param scc
+ * @param ioreg
+ * @param value
+ */
+void clem_scc_write_switch(struct ClemensDeviceSCC *scc, struct ClemensTimeSpec *tspec,
+                           uint8_t ioreg, uint8_t value);
+
+/**
+ * @brief
+ *
+ * @param scc
+ * @param ioreg
+ * @param flags
+ * @return uint8_t
+ */
+uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t flags);
 
 #ifdef __cplusplus
 }
