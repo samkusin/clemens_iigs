@@ -73,6 +73,14 @@
 
 */
 
+#define CLEM_SCC_DEBUG
+
+#ifdef CLEM_SCC_DEBUG
+#define CLEM_SCC_LOG(...) CLEM_LOG(__VA_ARGS__)
+#else
+#define CLEM_SCC_LOG(...) CLEM_DEBUG(__VA_ARGS__)
+#endif
+
 #define CLEM_CLOCKS_SCC_XTAL_MHZ 3.6864
 
 #define CLEM_SCC_STATE_READY    0
@@ -149,7 +157,7 @@ static clem_clocks_time_t _clem_scc_channel_rx_next_ts(struct ClemensDeviceSCCCh
 ////////////////////////////////////////////////////////////////////////////////
 
 void clem_scc_reset_channel_clocks(struct ClemensDeviceSCC *scc, unsigned ch_idx,
-                                   clem_clocks_time_t ts, unsigned options) {
+                                   unsigned options) {
     // The transmitter and receiver each operate on a clock defined by registers
     // WR4 (clock mode), WR11 (TRxC, RTxC) and W14 (baud rate gen.)  These
     // clocks align with the data rate - so for synchronous communication,
@@ -189,7 +197,6 @@ void clem_scc_reset_channel_clocks(struct ClemensDeviceSCC *scc, unsigned ch_idx
             channel->tx_clock_step =
                 _clem_scc_clock_data_step_from_mode(channel->tx_clock_step, clk_mode);
         }
-        channel->tx_clock_ts = ts;
     }
     if (options & CLEM_SCC_RESET_RX_CLOCK) {
         switch (channel->regs[11] & 0x60) {
@@ -216,7 +223,6 @@ void clem_scc_reset_channel_clocks(struct ClemensDeviceSCC *scc, unsigned ch_idx
             channel->rx_clock_step =
                 _clem_scc_clock_data_step_from_mode(channel->rx_clock_step, clk_mode);
         }
-        channel->rx_clock_ts = ts;
     }
 }
 
@@ -227,8 +233,7 @@ void clem_scc_reset_channel(struct ClemensDeviceSCC *scc, unsigned ch_idx, bool 
         channel->regs[11] |= CLEM_SCC_CLK_TX_SOURCE_TRxC;
     }
     channel->regs[4] |= CLEM_SCC_STOP_BIT_1;
-    clem_scc_reset_channel_clocks(scc, ch_idx, 0,
-                                  CLEM_SCC_RESET_TX_CLOCK | CLEM_SCC_RESET_RX_CLOCK);
+    clem_scc_reset_channel_clocks(scc, ch_idx, CLEM_SCC_RESET_TX_CLOCK | CLEM_SCC_RESET_RX_CLOCK);
     channel->poll_device_clock_ts = 0;
 }
 
@@ -280,20 +285,56 @@ void clem_scc_glu_sync(struct ClemensDeviceSCC *scc, struct ClemensClock *clock)
     clem_scc_sync_channel_uart(scc, 1, clock->ts);
 }
 
+void clem_scc_reg_interrupt_vector(struct ClemensDeviceSCC *scc, uint8_t value) {
+    //  a single value replicated on both channels
+    CLEM_SCC_LOG("SCC: WR2 Interrupt Vector <= %02x", value);
+    scc->channel[0].regs[CLEM_SCC_WR2_INT_VECTOR] = value;
+    scc->channel[1].regs[CLEM_SCC_WR2_INT_VECTOR] = value;
+}
+
 void clem_scc_reg_master_interrupt(struct ClemensDeviceSCC *scc, uint8_t value) {
     uint8_t reset = (value & 0xc0);
+
     switch (reset) {
     case 0x40:
+        CLEM_SCC_LOG("SCC: WR9 B reset");
         clem_scc_reset_channel(scc, 1, false);
         break;
     case 0x80:
+        CLEM_SCC_LOG("SCC: WR9 A reset");
         clem_scc_reset_channel(scc, 0, false);
         break;
     case 0xc0:
+        CLEM_SCC_LOG("SCC: WR9 Hardware Reset");
         clem_scc_reset_channel(scc, 0, true);
         clem_scc_reset_channel(scc, 1, true);
         break;
     }
+}
+
+void clem_scc_reg_clock_mode(struct ClemensDeviceSCC *scc, unsigned ch_idx, uint8_t value) {
+    unsigned options = 0;
+    uint8_t xmode = scc->channel[ch_idx].regs[CLEM_SCC_WR11_CLOCK_MODE] ^ value;
+    if (!xmode)
+        return;
+
+    CLEM_SCC_LOG("SCC: WR11 %c mode <= %02x", ch_idx ? 'B' : 'A', value);
+    if (xmode & 0x60) { // recv clk changed
+        options |= CLEM_SCC_RESET_RX_CLOCK;
+    }
+    if (xmode & 0x18) { // send clk changed
+        options |= CLEM_SCC_RESET_TX_CLOCK;
+    }
+    // TODO: TRxC O/I and special case overrides
+    clem_scc_reset_channel_clocks(scc, ch_idx, options);
+
+    scc->channel[ch_idx].regs[CLEM_SCC_WR11_CLOCK_MODE] = value;
+}
+
+void clem_scc_reg_set_interrupt_enable(struct ClemensDeviceSCC *scc, unsigned ch_idx,
+                                       uint8_t value) {
+    CLEM_SCC_LOG("SCC: WR15 %c mode <= %02x", ch_idx ? 'B' : 'A', value);
+    scc->channel[ch_idx].regs[CLEM_SCC_WR15_INT_ENABLE] = value;
 }
 
 void clem_scc_write_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t value) {
@@ -308,8 +349,31 @@ void clem_scc_write_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t 
             scc->channel[ch_idx].state = CLEM_SCC_STATE_REGISTER;
         } else if (scc->channel[ch_idx].state == CLEM_SCC_STATE_REGISTER) {
             //  command write register
-            CLEM_LOG("SCC: Write Reg %u <= %02x", scc->channel[ch_idx].selected_reg, value);
-            clem_scc_reg_master_interrupt(scc, value);
+            switch (scc->channel[ch_idx].selected_reg) {
+            case CLEM_SCC_WR2_INT_VECTOR:
+                clem_scc_reg_interrupt_vector(scc, value);
+                break;
+            case CLEM_SCC_WR9_MASTER_INT:
+                clem_scc_reg_master_interrupt(scc, value);
+                break;
+            case CLEM_SCC_WR11_CLOCK_MODE:
+                clem_scc_reg_clock_mode(scc, ch_idx, value);
+                break;
+            case CLEM_SCC_WR12_TIME_CONST_LO:
+                scc->channel[ch_idx].regs[CLEM_SCC_WR12_TIME_CONST_LO] = value;
+                CLEM_SCC_LOG("SCC: WR12 TC LO <= %02x", value);
+                break;
+            case CLEM_SCC_WR13_TIME_CONST_HI:
+                scc->channel[ch_idx].regs[CLEM_SCC_WR13_TIME_CONST_HI] = value;
+                CLEM_SCC_LOG("SCC: WR13 TC HI <= %02x", value);
+                break;
+            case CLEM_SCC_WR15_INT_ENABLE:
+                clem_scc_reg_set_interrupt_enable(scc, ch_idx, value);
+                break;
+            default:
+                CLEM_SCC_LOG("SCC: WR%u <= %02x", scc->channel[ch_idx].selected_reg, value);
+                break;
+            }
             scc->channel[ch_idx].selected_reg = 0x00;
             scc->channel[ch_idx].state = CLEM_SCC_STATE_READY;
         }
@@ -333,9 +397,32 @@ uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_
         ch_idx = CLEM_MMIO_REG_SCC_A_CMD - ioreg;
         if (!CLEM_IS_IO_NO_OP(flags)) {
             // CLEM_LOG("SCC: Read Reg %u => ??", scc->channel[ch_idx].selected_reg);
+            //  Some later Zilog docs mention the NMOS version will return
+            //  an 'image' of another register - and we'll try that here.
+            switch (scc->channel[ch_idx].selected_reg) {
+            case CLEM_SCC_RR2_INT_VECTOR:
+                value = scc->channel[ch_idx].regs[CLEM_SCC_WR2_INT_VECTOR];
+                break;
+            case CLEM_SCC_RR12_TIME_CONST_LO:
+                value = scc->channel[ch_idx].regs[CLEM_SCC_WR12_TIME_CONST_LO];
+                break;
+            case 0x09: //  returns an image of RR13/WR13
+            case CLEM_SCC_RR13_TIME_CONST_HI:
+                value = scc->channel[ch_idx].regs[CLEM_SCC_WR13_TIME_CONST_HI];
+                break;
+            case 0x0B: //  returns an image of RR15/WR15
+            case CLEM_SCC_RR15_INT_ENABLE:
+                // bits 0 and 2 are always 0
+                value = scc->channel[ch_idx].regs[CLEM_SCC_WR15_INT_ENABLE] & 0xfa;
+                break;
+            default:
+                CLEM_SCC_LOG("SCC: RR%u unhandled", scc->channel[ch_idx].selected_reg);
+                break;
+            }
             scc->channel[ch_idx].selected_reg = 0x00;
             scc->channel[ch_idx].state = CLEM_SCC_STATE_READY;
         }
+
         break;
     case CLEM_MMIO_REG_SCC_B_DATA:
     case CLEM_MMIO_REG_SCC_A_DATA:

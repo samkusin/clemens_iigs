@@ -7,6 +7,18 @@
 extern "C" {
 #endif
 
+#define CLEM_SCC_WR2_INT_VECTOR     0x2
+#define CLEM_SCC_WR9_MASTER_INT     0x9
+#define CLEM_SCC_WR11_CLOCK_MODE    0xB
+#define CLEM_SCC_WR12_TIME_CONST_LO 0xC
+#define CLEM_SCC_WR13_TIME_CONST_HI 0xD
+#define CLEM_SCC_WR15_INT_ENABLE    0xF
+
+#define CLEM_SCC_RR2_INT_VECTOR     0x2
+#define CLEM_SCC_RR12_TIME_CONST_LO 0xC
+#define CLEM_SCC_RR13_TIME_CONST_HI 0xD
+#define CLEM_SCC_RR15_INT_ENABLE    0xF
+
 //  Receiver options WR3
 #define CLEM_SCC_RX_ENABLE         0x01
 #define CLEM_SCC_TX_RX_AUTO_ENABLE 0x20
