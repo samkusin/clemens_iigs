@@ -157,8 +157,11 @@ struct ClemensSerializerRecord kSCCChannel[] = {
                                  recv_queue, 3, 0),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, tx_byte),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCCChannel, tx_register),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCCChannel, tx_shift_ctr),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCCChannel, rx_queue_pos),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCCChannel, state),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, selected_reg),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceSCCChannel, tx_buffer_ready),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 struct ClemensSerializerRecord kSCC[] = {

@@ -117,9 +117,11 @@ struct ClemensDeviceSCCChannel {
     uint8_t recv_queue[3];
     uint8_t tx_byte;
     unsigned tx_register;
-
+    unsigned tx_shift_ctr;
+    unsigned rx_queue_pos;
     unsigned state;
     uint8_t selected_reg;
+    bool tx_buffer_ready;
 };
 
 struct ClemensDeviceSCC {

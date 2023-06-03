@@ -10,6 +10,10 @@ extern "C" {
 #define CLEM_SCC_WR2_INT_VECTOR      0x2
 #define CLEM_SCC_WR3_RECV_CONTROL    0x3
 #define CLEM_SCC_WR4_CLOCK_DATA_RATE 0x4
+#define CLEM_SCC_WR5_XMIT_CONTROL    0x5
+#define CLEM_SCC_WR6_SYNC_CHAR_1     0x6
+#define CLEM_SCC_WR7_SYNC_CHAR_2     0x7
+#define CLEM_SCC_WR8_XMIT_BUFFER     0x8
 #define CLEM_SCC_WR9_MASTER_INT      0x9
 #define CLEM_SCC_WR11_CLOCK_MODE     0xB
 #define CLEM_SCC_WR12_TIME_CONST_LO  0xC
@@ -17,6 +21,7 @@ extern "C" {
 #define CLEM_SCC_WR14_MISC_CONTROL   0xE
 #define CLEM_SCC_WR15_INT_ENABLE     0xF
 
+#define CLEM_SCC_RR0_STATUS         0x0
 #define CLEM_SCC_RR2_INT_VECTOR     0x2
 #define CLEM_SCC_RR12_TIME_CONST_LO 0xC
 #define CLEM_SCC_RR13_TIME_CONST_HI 0xD
@@ -76,11 +81,12 @@ extern "C" {
 #define CLEM_SCC_CLK_BRG_ON     0x01
 #define CLEM_SCC_CLK_BRG_PCLK   0x02
 #define CLEM_SCC_DTR_FUNCTION   0x04
-#define CLEM_SCC_AUTO_ENABLE    0x08
+#define CLEM_SCC_AUTO_ECHO      0x08 // Support is partial
 #define CLEM_SCC_LOCAL_LOOPBACK 0x10
 
 //  RR0
-#define CLEM_SCC_IN_CTS 0x20
+#define CLEM_SCC_RR0_TX_READY 0x04
+#define CLEM_SCC_RR0_IN_CTS   0x20
 
 //  Port settings
 void clem_scc_channel_port_lo(struct ClemensDeviceSCCChannel *channel, uint8_t flags);
