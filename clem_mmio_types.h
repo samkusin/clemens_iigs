@@ -106,22 +106,25 @@ struct ClemensDeviceSCCChannel {
 
     /** Register set */
     uint8_t regs[16];
-    /** Applies clock mode (/1, /16, /32, /64) and XTAL or PCLK (again, if baud gen is ON) */
-    clem_clocks_time_t poll_device_clock_ts;
-    clem_clocks_time_t tx_clock_ts;
-    clem_clocks_time_t rx_clock_ts;
-    clem_clocks_duration_t tx_clock_step;
-    clem_clocks_duration_t rx_clock_step;
+    uint8_t rr0, rr1;
+    uint8_t rr3, rr8, rr10;
+    uint8_t selected_reg;
+    uint8_t pad[2];
+
+    /** Applies clock mode (/1, /16, /32, /64) to calculate the master step  and edges. */
+    clem_clocks_time_t master_clock_ts;
+    clem_clocks_time_t xtal_edge_ts;
+    clem_clocks_time_t pclk_edge_ts;
+    clem_clocks_duration_t master_clock_step;
 
     /** Data buffers - FIFO queues that mimic the Z8530 recv/xmit buffers */
     uint8_t recv_queue[3];
     uint8_t tx_byte;
-    unsigned tx_register;
-    unsigned tx_shift_ctr;
-    unsigned rx_queue_pos;
+    uint32_t tx_register;
+    uint32_t tx_shift_ctr;
+    uint32_t rx_queue_pos;
+    uint32_t brg_counter; /* Bit 31 = high bit is the flip-flop state*/
     unsigned state;
-    uint8_t selected_reg;
-    bool tx_buffer_ready;
 };
 
 struct ClemensDeviceSCC {

@@ -1753,7 +1753,7 @@ void clem_mmio_reset(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) {
     clem_sound_reset(&mmio->dev_audio);
     clem_vgc_reset(&mmio->vgc);
     clem_iwm_reset(&mmio->dev_iwm, tspec);
-    clem_scc_reset(&mmio->dev_scc);
+    clem_scc_reset(&mmio->dev_scc, tspec);
 }
 
 void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,

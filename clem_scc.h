@@ -85,7 +85,7 @@ extern "C" {
 #define CLEM_SCC_LOCAL_LOOPBACK 0x10
 
 //  RR0
-#define CLEM_SCC_RR0_TX_READY 0x04
+#define CLEM_SCC_RR0_TX_EMPTY 0x04
 #define CLEM_SCC_RR0_IN_CTS   0x20
 
 //  Port settings
@@ -97,7 +97,7 @@ void clem_scc_channel_port_hi(struct ClemensDeviceSCCChannel *channel, uint8_t f
  *
  * @param scc
  */
-void clem_scc_reset(struct ClemensDeviceSCC *scc);
+void clem_scc_reset(struct ClemensDeviceSCC *scc, struct ClemensTimeSpec *tspec);
 
 /**
  * @brief
