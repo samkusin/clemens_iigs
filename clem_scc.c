@@ -146,7 +146,7 @@ static inline bool _clem_scc_is_brg_on(struct ClemensDeviceSCCChannel *channel) 
 static inline bool _clem_scc_is_brg_clock_mode(struct ClemensDeviceSCCChannel *channel,
                                                uint8_t mode) {
     bool brg_pclk = (channel->regs[CLEM_SCC_WR14_MISC_CONTROL] & CLEM_SCC_CLK_BRG_PCLK) != 0;
-    if (_clem_scc_is_xtal_enabled(channel) {
+    if (_clem_scc_is_xtal_enabled(channel)) {
         return mode == CLEM_SCC_CLOCK_MODE_XTAL && !brg_pclk;
     } else {
         return mode == CLEM_SCC_CLOCK_MODE_PCLK && brg_pclk;
@@ -175,65 +175,32 @@ static bool _clem_scc_brg_tick(struct ClemensDeviceSCCChannel *channel) {
     return (channel->brg_counter & CLEM_SCC_BRG_STATUS_PULSE_FLAG) != 0;
 }
 
-//  XTAL clock edge actions
-//  XTAL must be enabled
-//  RTxC always
-//  BRG if BRG-XTAL enabled
-//  check if transmitter clock
-//  check if receiver clock
-
-static bool _clem_scc_pulse_xtal(struct ClemensDeviceSCCChannel *channel, uint8_t mode) {
-    // uint8_t mode = channel->regs[CLEM_SCC_WR11_CLOCK_MODE] & 0x18;
-    switch (mode) {
-    case CLEM_SCC_CLK_TX_SOURCE_BRG:
-        return (channel->brg_counter & CLEM_SCC_BRG_STATUS_PULSE_FLAG) != 0;
-    case CLEM_SCC_CLK_TX_SOURCE_TRxC:
-        return (channel->serial_port & CLEM_SCC_PORT_HSKI) != 0;
-    case CLEM_SCC_CLK_TX_SOURCE_RTxC:
-        return true;
-    case CLEM_SCC_CLK_TX_SOURCE_DPLL:
-        //  TODO?
-        break;
-    }
-    return false;
-}
-
-//  PCLK clock edge actions
-//  TRxC always *polled*
-//  BRG if BRG-PCLK enabled
-//  check if transmitter clock
-//  check if receiver clock
-
-static clem_clocks_time_t _clem_scc_pulse_pclk(struct ClemensDeviceSCCChannel *channel,
-                                               uint8_t mode) {
-    // uint8_t mode = channel->regs[CLEM_SCC_WR11_CLOCK_MODE] & 0x60;
+static void _clem_scc_do_rx_tx(struct ClemensDeviceSCCChannel *channel, bool trxc_pulse,
+                               bool rtxc_pulse, bool brg_pulse) {
+    uint8_t mode = channel->regs[CLEM_SCC_WR11_CLOCK_MODE] & 0x60;
     switch (mode) {
     case CLEM_SCC_CLK_RX_SOURCE_BRG:
-        return (channel->brg_counter & 0x80000000) != 0;
+        break;
     case CLEM_SCC_CLK_RX_SOURCE_TRxC:
-        return (channel->serial_port & CLEM_SCC_PORT_HSKI) != 0;
+        break;
     case CLEM_SCC_CLK_RX_SOURCE_RTxC:
-        / return false;
+        break;
     case CLEM_SCC_CLK_RX_SOURCE_DPLL:
         //  TODO?
         break;
     }
-    return false;
-}
-
-static bool _clem_scc_tx_pulse_pclk(struct ClemensDeviceSCCChannel *channel) {
-    switch (channel->regs[CLEM_SCC_WR11_CLOCK_MODE] & 0x18) {
+    mode = channel->regs[CLEM_SCC_WR11_CLOCK_MODE] & 0x18;
+    switch (mode) {
     case CLEM_SCC_CLK_TX_SOURCE_BRG:
-        return (channel->brg_counter & 0x80000000) != 0;
+        break;
     case CLEM_SCC_CLK_TX_SOURCE_TRxC:
-        return (channel->serial_port & CLEM_SCC_PORT_HSKI) != 0;
+        break;
     case CLEM_SCC_CLK_TX_SOURCE_RTxC:
-        return (channel->regs[CLEM_SCC_WR11_CLOCK_MODE] & CLEM_SCC_CLK_XTAL_ON) != 0;
+        break;
     case CLEM_SCC_CLK_TX_SOURCE_DPLL:
         //  TODO?
         break;
     }
-    return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -345,40 +312,48 @@ void clem_scc_sync_channel_uart(struct ClemensDeviceSCC *scc, unsigned ch_idx,
     //  1 mhz cycles, though realistically that implies something like 200-300k baud rate)
     //  so likely not...?
     //
-    if (rx_enabled || tx_enabled) {
-        while (channel->master_clock_ts < next_ts) {
-            bool trxc_pulse = (channel->serial_port & CLEM_SCC_PORT_HSKI) != 0;
-            bool rtxc_pulse = false;
-            bool brg_pulse = false;
-            while (channel->master_clock_ts >= channel->xtal_edge_ts ||
-                   channel->master_clock_step >= channel->pclk_edge_ts) {
-                if (channel->master_clock_ts >= channel->xtal_edge_ts) {
-                    if (_clem_scc_is_xtal_enabled(channel)) {
-                        if (_clem_scc_is_brg_clock_mode(channel, CLEM_SCC_CLOCK_MODE_XTAL)) {
-                            brg_pulse = _clem_scc_brg_tick(channel);
-                        }
-                        rtxc_pulse = true;
-                    }
-                    channel->xtal_edge_ts +=
-                        _clem_scc_channel_calc_clock_step(channel, scc->xtal_step);
-                }
-                if (channel->master_clock_step >= channel->pclk_edge_ts) {
-                    if (_clem_scc_is_brg_clock_mode(channel, CLEM_SCC_CLOCK_MODE_PCLK)) {
-                        brg_pulse = _clem_scc_brg_tick(channel);
-                    }
-                    channel->pclk_edge_ts +=
-                        _clem_scc_channel_calc_clock_step(channel, scc->xtal_step);
-                }
-            }
+    bool trxc_pulse = false;
+    bool brg_pulse = false;
 
-            channel->master_clock_ts += channel->master_clock_step;
-        }
-    } else {
+    if (!rx_enabled && !tx_enabled) {
         channel->master_clock_ts = next_ts;
         channel->xtal_edge_ts =
             channel->master_clock_ts + _clem_scc_channel_calc_clock_step(channel, scc->xtal_step);
         channel->pclk_edge_ts =
             channel->master_clock_ts + _clem_scc_channel_calc_clock_step(channel, scc->pclk_step);
+        return;
+    }
+
+    while (channel->master_clock_ts < next_ts) {
+        while (channel->master_clock_ts >= channel->xtal_edge_ts ||
+               channel->master_clock_step >= channel->pclk_edge_ts) {
+            if (channel->master_clock_ts >= channel->xtal_edge_ts) {
+                if (_clem_scc_is_xtal_enabled(channel)) {
+                    trxc_pulse = (channel->serial_port & CLEM_SCC_PORT_HSKI) != 0;
+                    if (_clem_scc_is_brg_clock_mode(channel, CLEM_SCC_CLOCK_MODE_XTAL)) {
+                        brg_pulse = _clem_scc_brg_tick(channel);
+                    }
+                    _clem_scc_do_rx_tx(channel, trxc_pulse, true, brg_pulse);
+                }
+
+                channel->xtal_edge_ts += _clem_scc_channel_calc_clock_step(channel, scc->xtal_step);
+            }
+            if (channel->master_clock_step >= channel->pclk_edge_ts) {
+                if (_clem_scc_is_brg_clock_mode(channel, CLEM_SCC_CLOCK_MODE_PCLK)) {
+                    brg_pulse = _clem_scc_brg_tick(channel);
+                }
+                if (_clem_scc_is_xtal_enabled(channel)) {
+                    trxc_pulse = false;
+                } else {
+                    trxc_pulse = (channel->serial_port & CLEM_SCC_PORT_HSKI) != 0;
+                }
+                _clem_scc_do_rx_tx(channel, trxc_pulse, false, brg_pulse);
+
+                channel->pclk_edge_ts += _clem_scc_channel_calc_clock_step(channel, scc->xtal_step);
+            }
+        }
+
+        channel->master_clock_ts += channel->master_clock_step;
     }
 }
 
