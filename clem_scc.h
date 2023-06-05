@@ -30,6 +30,10 @@ extern "C" {
 //  Receiver options WR3
 #define CLEM_SCC_RX_ENABLE         0x01
 #define CLEM_SCC_TX_RX_AUTO_ENABLE 0x20
+#define CLEM_SCC_RX_BITS_5_OR_LESS 0x00
+#define CLEM_SCC_RX_BITS_7         0x40
+#define CLEM_SCC_RX_BITS_6         0x80
+#define CLEM_SCC_RX_BITS_8         0xc0
 
 //  Misc Data Format/Rate WR4
 #define CLEM_SCC_PARITY_ENABLED 0x01

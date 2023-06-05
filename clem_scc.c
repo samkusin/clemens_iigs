@@ -94,6 +94,7 @@
 #define CLEM_SCC_BRG_STATUS_COUNTER_MASK 0x0000ffff
 
 static unsigned s_scc_clk_x_speeds[] = {1, 16, 32, 64};
+static unsigned s_scc_bit_count[] = {5, 7, 6, 8};
 
 static inline bool _clem_scc_is_xtal_on(struct ClemensDeviceSCCChannel *channel) {
     return (channel->regs[CLEM_SCC_WR11_CLOCK_MODE] & CLEM_SCC_CLK_XTAL_ON) != 0;
@@ -175,9 +176,83 @@ static bool _clem_scc_brg_tick(struct ClemensDeviceSCCChannel *channel) {
     return (channel->brg_counter & CLEM_SCC_BRG_STATUS_PULSE_FLAG) != 0;
 }
 
+inline unsigned _clem_scc_count_1_bits(uint8_t v, unsigned bps) {
+    //  TODO!
+}
+
+inline bool _clem_scc_do_parity_even(uint8_t v, unsigned bps) {
+    //  if odd number of 1 bits, return true so the encoder can add another 1 bit (even total)
+    return _clem_scc_count_1_bits(v, bps) & 1;
+}
+
+inline bool _clem_scc_do_parity_odd(uint8_t v, unsigned bps) {
+    //  if even number of 1 bits, return true so the encoder can add another 1 bit (odd total)
+    return !(_clem_scc_count_1_bits(v, bps) & 1);
+}
+
+static void _clem_scc_do_tx(struct ClemensDeviceSCCChannel *channel) {
+    //  manages the tx_register from tx_byte to the transmitter
+    unsigned bits_per_character =
+        s_scc_bit_count[(channel->regs[CLEM_SCC_WR5_XMIT_CONTROL] & 0x60) >> 5];
+    if (channel->tx_shift_ctr == 0) {
+        if (!_clem_scc_is_synchronous_mode(channel)) {
+            channel->tx_register = channel->tx_byte;
+            channel->tx_shift_ctr = bits_per_character;
+            if (channel->regs[CLEM_SCC_WR4_CLOCK_DATA_RATE] & CLEM_SCC_PARITY_ENABLED) {
+                if (channel->regs[CLEM_SCC_WR4_CLOCK_DATA_RATE] & CLEM_SCC_PARITY_EVEN) {
+                    if (_clem_scc_do_parity_even(channel->tx_byte, bits_per_character)) {
+                        channel->tx_register |= (1 << channel->tx_shift_ctr);
+                    }
+                } else {
+                    if (_clem_scc_do_parity_odd(channel->tx_byte, bits_per_character)) {
+                        channel->tx_register |= (1 << channel->tx_shift_ctr);
+                    }
+                }
+                channel->tx_shift_ctr++;
+            }
+            //  add stop bits 1.5 can't be supported unless we support more advanced
+            //  encoding.
+            if ((channel->regs[CLEM_SCC_WR4_CLOCK_DATA_RATE] & 0x0c) == CLEM_SCC_STOP_BIT_2) {
+                channel->tx_register |= (0x03 << channel->tx_shift_ctr);
+                channel->tx_shift_ctr++;
+                channel->tx_shift_ctr++;
+            } else {
+                //  TODO: warn about 1.5 stop bits on the WR4 set so we know this won't work
+                //        so this will be 1 bit!
+                channel->tx_register |= (0x01 << channel->tx_shift_ctr);
+                channel->tx_shift_ctr++;
+            }
+            //  start bit (lo)
+            channel->tx_register <<= 1;
+            channel->tx_shift_ctr++;
+            channel->rr0 |= CLEM_SCC_RR0_TX_EMPTY;
+        } else {
+            CLEM_ASSERT(false);
+        }
+    }
+}
+
 static void _clem_scc_do_rx_tx(struct ClemensDeviceSCCChannel *channel, bool trxc_pulse,
                                bool rtxc_pulse, bool brg_pulse) {
-    uint8_t mode = channel->regs[CLEM_SCC_WR11_CLOCK_MODE] & 0x60;
+    uint8_t mode = channel->regs[CLEM_SCC_WR11_CLOCK_MODE] & 0x18;
+    switch (mode) {
+    case CLEM_SCC_CLK_TX_SOURCE_BRG:
+        if (brg_pulse)
+            _clem_scc_do_tx(channel);
+        break;
+    case CLEM_SCC_CLK_TX_SOURCE_TRxC:
+        if (trxc_pulse)
+            _clem_scc_do_tx(channel);
+        break;
+    case CLEM_SCC_CLK_TX_SOURCE_RTxC:
+        if (rtxc_pulse)
+            _clem_scc_do_tx(channel);
+        break;
+    case CLEM_SCC_CLK_TX_SOURCE_DPLL:
+        //  TODO?
+        break;
+    }
+    mode = channel->regs[CLEM_SCC_WR11_CLOCK_MODE] & 0x60;
     switch (mode) {
     case CLEM_SCC_CLK_RX_SOURCE_BRG:
         break;
@@ -186,18 +261,6 @@ static void _clem_scc_do_rx_tx(struct ClemensDeviceSCCChannel *channel, bool trx
     case CLEM_SCC_CLK_RX_SOURCE_RTxC:
         break;
     case CLEM_SCC_CLK_RX_SOURCE_DPLL:
-        //  TODO?
-        break;
-    }
-    mode = channel->regs[CLEM_SCC_WR11_CLOCK_MODE] & 0x18;
-    switch (mode) {
-    case CLEM_SCC_CLK_TX_SOURCE_BRG:
-        break;
-    case CLEM_SCC_CLK_TX_SOURCE_TRxC:
-        break;
-    case CLEM_SCC_CLK_TX_SOURCE_RTxC:
-        break;
-    case CLEM_SCC_CLK_TX_SOURCE_DPLL:
         //  TODO?
         break;
     }
@@ -434,7 +497,7 @@ void clem_scc_reg_xmit_byte(struct ClemensDeviceSCC *scc, unsigned ch_idx, uint8
     }
     scc->channel[ch_idx].tx_byte = value;
     scc->channel[ch_idx].rr0 &= ~CLEM_SCC_RR0_TX_EMPTY;
-    CLEM_WARN("SCC: WR8 %c tx %02X", ch_idx + 'A', value);
+    CLEM_SCC_LOG("SCC: WR8 %c tx %02X", ch_idx + 'A', value);
 }
 
 void clem_scc_reg_master_interrupt_wr9(struct ClemensDeviceSCC *scc, clem_clocks_time_t ts,
@@ -601,7 +664,7 @@ void clem_scc_write_switch(struct ClemensDeviceSCC *scc, struct ClemensTimeSpec 
     case CLEM_MMIO_REG_SCC_B_DATA:
     case CLEM_MMIO_REG_SCC_A_DATA:
         ch_idx = CLEM_MMIO_REG_SCC_A_CMD - ioreg;
-        CLEM_SCC_LOG("SCC: WR DATA %c <= %02X", 'A' + ch_idx, value);
+        clem_scc_reg_xmit_byte(scc, ch_idx, value);
         break;
     }
     // CLEM_LOG("clem_scc: %02X <- %02X", ioreg, value);
