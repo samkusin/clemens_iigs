@@ -120,10 +120,13 @@ struct ClemensDeviceSCCChannel {
 
     /** Data buffers - FIFO queues that mimic the Z8530 recv/xmit buffers */
     uint8_t recv_queue[3];
+    uint8_t recv_err_queue[3];
     uint8_t tx_byte;
     uint32_t tx_register;
     uint32_t tx_shift_ctr;
     uint32_t rx_queue_pos;
+    uint32_t rx_shift_ctr;
+    uint32_t rx_register;
     uint32_t brg_counter; /* Bit 31 = high bit is the flip-flop state*/
     unsigned state;
 };
