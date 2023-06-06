@@ -112,6 +112,29 @@ static inline bool _clem_scc_is_synchronous_mode(struct ClemensDeviceSCCChannel 
     return (channel->regs[CLEM_SCC_WR4_CLOCK_DATA_RATE] & 0x0c) == CLEM_SCC_STOP_SYNC_MODE;
 }
 
+static inline bool _clem_scc_is_auto_enable(struct ClemensDeviceSCCChannel *channel) {
+    return (channel->regs[CLEM_SCC_WR3_RECV_CONTROL] & CLEM_SCC_TX_RX_AUTO_ENABLE) != 0;
+}
+
+static bool _clem_scc_is_auto_echo_enabled(struct ClemensDeviceSCCChannel *channel) {
+    return (channel->regs[CLEM_SCC_WR14_MISC_CONTROL] & CLEM_SCC_AUTO_ECHO) != 0;
+}
+
+static inline bool _clem_scc_is_local_loopback_enabled(struct ClemensDeviceSCCChannel *channel) {
+    return (channel->regs[CLEM_SCC_WR14_MISC_CONTROL] & CLEM_SCC_LOCAL_LOOPBACK) != 0;
+}
+
+static inline bool _clem_scc_check_port_cts_txrc(struct ClemensDeviceSCCChannel *channel) {
+    return (channel->serial_port & CLEM_SCC_PORT_HSKI) != 0;
+}
+
+static inline void _clem_scc_set_port_txd(struct ClemensDeviceSCCChannel *channel, bool txd) {
+    if (txd)
+        channel->serial_port |= CLEM_SCC_PORT_TX_D_LO;
+    else
+        channel->serial_port &= ~CLEM_SCC_PORT_TX_D_LO;
+}
+
 static inline clem_clocks_duration_t
 _clem_scc_clock_data_step_from_mode(clem_clocks_duration_t clock_step, uint8_t mode) {
     return clock_step * s_scc_clk_x_speeds[mode >> 6];
@@ -177,7 +200,14 @@ static bool _clem_scc_brg_tick(struct ClemensDeviceSCCChannel *channel) {
 }
 
 inline unsigned _clem_scc_count_1_bits(uint8_t v, unsigned bps) {
-    //  TODO!
+    //   this could be a generated lookup table gene that returns even/odd
+    unsigned cnt = 0;
+    while (bps--) {
+        if (v & 1)
+            cnt++;
+        v >>= 1;
+    }
+    return cnt;
 }
 
 inline bool _clem_scc_do_parity_even(uint8_t v, unsigned bps) {
@@ -192,8 +222,18 @@ inline bool _clem_scc_do_parity_odd(uint8_t v, unsigned bps) {
 
 static void _clem_scc_do_tx(struct ClemensDeviceSCCChannel *channel) {
     //  manages the tx_register from tx_byte to the transmitter
-    unsigned bits_per_character =
-        s_scc_bit_count[(channel->regs[CLEM_SCC_WR5_XMIT_CONTROL] & 0x60) >> 5];
+    unsigned bits_per_character;
+
+    //  if auto enable is on, then CTS will drive the transmitted
+    //  which is not the case with auto-enable or local loopback
+    if (_clem_scc_is_auto_enable(channel) && !_clem_scc_check_port_cts_txrc(channel)) {
+        if (!_clem_scc_is_local_loopback_enabled(channel) &&
+            !_clem_scc_is_auto_echo_enabled(channel))
+            return;
+    }
+
+    bits_per_character = s_scc_bit_count[(channel->regs[CLEM_SCC_WR5_XMIT_CONTROL] & 0x60) >> 5];
+
     if (channel->tx_shift_ctr == 0) {
         if (!_clem_scc_is_synchronous_mode(channel)) {
             channel->tx_register = channel->tx_byte;
@@ -229,6 +269,15 @@ static void _clem_scc_do_tx(struct ClemensDeviceSCCChannel *channel) {
         } else {
             CLEM_ASSERT(false);
         }
+    } else {
+        channel->txd_internal = (uint8_t)(channel->tx_register & 1);
+        channel->tx_shift_ctr--;
+
+        if (!_clem_scc_is_auto_echo_enabled(channel)) {
+            //  TxD will not receive the transmitted bit if auto-echo enabled
+            //  which takes priority over local loopback
+            _clem_scc_set_port_txd(channel, channel->txd_internal);
+        }
     }
 }
 
@@ -255,10 +304,16 @@ static void _clem_scc_do_rx_tx(struct ClemensDeviceSCCChannel *channel, bool trx
     mode = channel->regs[CLEM_SCC_WR11_CLOCK_MODE] & 0x60;
     switch (mode) {
     case CLEM_SCC_CLK_RX_SOURCE_BRG:
+        if (brg_pulse)
+            _clem_scc_do_tx(channel);
         break;
     case CLEM_SCC_CLK_RX_SOURCE_TRxC:
+        if (trxc_pulse)
+            _clem_scc_do_tx(channel);
         break;
     case CLEM_SCC_CLK_RX_SOURCE_RTxC:
+        if (rtxc_pulse)
+            _clem_scc_do_tx(channel);
         break;
     case CLEM_SCC_CLK_RX_SOURCE_DPLL:
         //  TODO?
@@ -361,6 +416,7 @@ void clem_scc_reset_channel(struct ClemensDeviceSCC *scc, clem_clocks_time_t ts,
     channel->regs[CLEM_SCC_WR4_CLOCK_DATA_RATE] |= CLEM_SCC_STOP_BIT_1;
     channel->rr0 |= CLEM_SCC_RR0_TX_EMPTY;
     _clem_scc_brg_counter_reset(channel, true);
+    channel->txd_internal = 1;
 }
 
 void clem_scc_sync_channel_uart(struct ClemensDeviceSCC *scc, unsigned ch_idx,
@@ -392,7 +448,7 @@ void clem_scc_sync_channel_uart(struct ClemensDeviceSCC *scc, unsigned ch_idx,
                channel->master_clock_step >= channel->pclk_edge_ts) {
             if (channel->master_clock_ts >= channel->xtal_edge_ts) {
                 if (_clem_scc_is_xtal_enabled(channel)) {
-                    trxc_pulse = (channel->serial_port & CLEM_SCC_PORT_HSKI) != 0;
+                    trxc_pulse = _clem_scc_check_port_cts_txrc(channel);
                     if (_clem_scc_is_brg_clock_mode(channel, CLEM_SCC_CLOCK_MODE_XTAL)) {
                         brg_pulse = _clem_scc_brg_tick(channel);
                     }
@@ -663,7 +719,7 @@ void clem_scc_write_switch(struct ClemensDeviceSCC *scc, struct ClemensTimeSpec 
         break;
     case CLEM_MMIO_REG_SCC_B_DATA:
     case CLEM_MMIO_REG_SCC_A_DATA:
-        ch_idx = CLEM_MMIO_REG_SCC_A_CMD - ioreg;
+        ch_idx = CLEM_MMIO_REG_SCC_A_DATA - ioreg;
         clem_scc_reg_xmit_byte(scc, ch_idx, value);
         break;
     }

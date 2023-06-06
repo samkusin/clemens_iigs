@@ -109,7 +109,8 @@ struct ClemensDeviceSCCChannel {
     uint8_t rr0, rr1;
     uint8_t rr3, rr8, rr10;
     uint8_t selected_reg;
-    uint8_t pad[2];
+    uint8_t txd_internal; /* Used for loopback*/
+    uint8_t pad;
 
     /** Applies clock mode (/1, /16, /32, /64) to calculate the master step  and edges. */
     clem_clocks_time_t master_clock_ts;
