@@ -107,10 +107,11 @@ struct ClemensDeviceSCCChannel {
     /** Register set */
     uint8_t regs[16];
     uint8_t rr0, rr1;
-    uint8_t rr3, rr8, rr10;
+    uint8_t rr3, rr8;
     uint8_t selected_reg;
     uint8_t txd_internal; /* Used for loopback*/
     uint8_t rxd_error;    /* Tracks received byte and acts as the error byte */
+    uint8_t pad;
 
     /** Applies clock mode (/1, /16, /32, /64) to calculate the master step  and edges. */
     clem_clocks_time_t master_clock_ts;
@@ -122,6 +123,7 @@ struct ClemensDeviceSCCChannel {
     uint8_t recv_queue[CLEM_SCC_RECV_QUEUE_SIZE];
     uint8_t recv_err_queue[CLEM_SCC_RECV_QUEUE_SIZE];
     uint8_t tx_byte;
+    uint8_t rx_condition; /* Special Receive Condition */
     uint32_t tx_register;
     uint32_t tx_shift_ctr;
     uint32_t rx_queue_pos;

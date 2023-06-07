@@ -152,7 +152,6 @@ struct ClemensSerializerRecord kSCCChannel[] = {
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, rr1),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, rr3),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, rr8),
-    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, rr10),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, selected_reg),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, txd_internal),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, rxd_error),

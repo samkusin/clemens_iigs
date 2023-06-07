@@ -459,7 +459,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     }
 
     mmio->irq_line = (mmio->dev_adb.irq_line | mmio->dev_timer.irq_line | mmio->dev_audio.irq_line |
-                      mmio->vgc.irq_line | card_irqs);
+                      mmio->vgc.irq_line | mmio->dev_scc.irq_line | card_irqs);
     mmio->nmi_line = card_nmis;
     clem_iwm_speed_disk_gate(mmio, &clem->tspec);
 

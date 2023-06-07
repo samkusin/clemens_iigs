@@ -73,7 +73,7 @@
     Not Supported (Yet?)
     ====================
     - Synchronous mode unless it's really needed on the IIGS
-    - Many features associated with Synchronous Mode
+    - Many features associated with Synchronous Mode (SDLC, Hunt, etc)
     - Most interrupt features that aren't needed on the IIGS
 */
 
@@ -145,6 +145,27 @@ static inline void _clem_scc_set_port_txd(struct ClemensDeviceSCCChannel *channe
 
 static inline bool _clem_scc_check_port_rxd(struct ClemensDeviceSCCChannel *channel) {
     return (channel->serial_port & CLEM_SCC_PORT_RX_D_LO) != 0;
+}
+
+static inline bool _clem_scc_interrupts_enabled(struct ClemensDeviceSCC *scc) {
+    return (scc->channel[0].regs[CLEM_SCC_WR9_MASTER_INT] & 0x80) != 0;
+}
+
+static inline bool _clem_scc_is_interrupt_enabled(struct ClemensDeviceSCCChannel *channel,
+                                                  uint8_t iflag) {
+    return (channel->regs[CLEM_SCC_WR15_INT_ENABLE] & iflag) != 0;
+}
+
+static inline bool _clem_scc_is_interrupt_pending(struct ClemensDeviceSCC *scc, uint8_t iflag) {
+    return (scc->channel[0].rr3 & iflag) != 0;
+}
+
+static inline void _clem_scc_set_interrupt_pending(struct ClemensDeviceSCC *scc, uint8_t iflag) {
+    scc->channel[0].rr3 |= iflag;
+}
+
+static inline void _clem_scc_clear_interrupt_pending(struct ClemensDeviceSCC *scc, uint8_t iflag) {
+    scc->channel[0].rr3 &= ~iflag;
 }
 
 static inline clem_clocks_duration_t
@@ -232,6 +253,17 @@ inline bool _clem_scc_do_parity_odd(uint8_t v, unsigned bps) {
     return !(_clem_scc_count_1_bits(v, bps) & 1);
 }
 
+inline void _clem_scc_channel_error(struct ClemensDeviceSCCChannel *channel, uint8_t err) {
+    channel->rxd_error |= err;
+    if (err & CLEM_SCC_RR1_PARITY_ERROR) {
+        if (channel->regs[CLEM_SCC_WR1_IN_TX_RX] & CLEM_SCC_ENABLE_PARITY_SPECIAL_COND) {
+            channel->rx_condition |= err;
+        }
+    } else {
+        channel->rx_condition |= err;
+    }
+}
+
 static void _clem_scc_do_rx(struct ClemensDeviceSCCChannel *channel) {
     //  manages the tx_register from tx_byte to the transmitter
     unsigned bits_per_character;
@@ -285,18 +317,18 @@ static void _clem_scc_do_rx(struct ClemensDeviceSCCChannel *channel) {
                 if (!_clem_scc_do_parity_even((uint8_t)(channel->rx_register & 0xff),
                                               bits_per_character) ||
                     !rxd) {
-                    channel->rxd_error |= CLEM_SCC_RR1_PARITY_ERROR;
+                    _clem_scc_channel_error(channel, CLEM_SCC_RR1_PARITY_ERROR);
                 }
             } else {
                 if (!_clem_scc_do_parity_odd((uint8_t)(channel->rx_register & 0xff),
                                              bits_per_character) ||
                     !rxd) {
-                    channel->rxd_error |= CLEM_SCC_RR1_PARITY_ERROR;
+                    _clem_scc_channel_error(channel, CLEM_SCC_RR1_PARITY_ERROR);
                 }
             }
         } else if (channel->rx_shift_ctr < stop_bit_index) {
             if (!rxd) {
-                channel->rxd_error |= CLEM_SCC_RR1_FRAMING_ERROR;
+                _clem_scc_channel_error(channel, CLEM_SCC_RR1_FRAMING_ERROR);
             }
         }
     }
@@ -313,7 +345,7 @@ static void _clem_scc_do_rx(struct ClemensDeviceSCCChannel *channel) {
         } else {
             //  overrun - docs are hazy on whether this item overwrites the top
             //  but we'll just flag an error for now
-            channel->rr1 |= CLEM_SCC_RR1_RECV_OVERRUN;
+            _clem_scc_channel_error(channel, CLEM_SCC_RR1_RECV_OVERRUN);
         }
         channel->rr0 |= CLEM_SCC_RR0_RECV_AVAIL;
         //  RR1 and RR0 updates
@@ -453,6 +485,52 @@ static void _clem_scc_do_rx_tx(struct ClemensDeviceSCCChannel *channel, bool trx
     }
 }
 
+static void _clem_scc_channel_port_states(struct ClemensDeviceSCC *scc, unsigned ch_idx) {
+    //  reports the various status pin states
+    //  updates status pins based on register values
+    //  status interrupts
+    struct ClemensDeviceSCCChannel *channel = &scc->channel[ch_idx];
+    uint8_t rr0 = channel->rr0;
+    uint8_t xrr0;
+    ch_idx *= 3;
+
+    if (!_clem_scc_is_interrupt_pending(scc, CLEM_SCC_RR3_EXT_STATUS_IP_A >> ch_idx)) {
+        if (channel->serial_port & CLEM_SCC_PORT_HSKI) {
+            channel->rr0 |= CLEM_SCC_RR0_CTS_STATUS;
+        } else {
+            channel->rr0 &= ~CLEM_SCC_RR0_CTS_STATUS;
+        }
+        if (channel->serial_port & CLEM_SCC_PORT_GPI) {
+            channel->rr0 |= CLEM_SCC_RR0_DCD_STATUS;
+        } else {
+            channel->rr0 &= ~CLEM_SCC_RR0_DCD_STATUS;
+        }
+        if (_clem_scc_is_brg_on(channel) && channel->brg_counter == 0) {
+            channel->rr0 |= CLEM_SCC_RR0_ZERO_COUNT;
+        } else {
+            channel->rr0 &= ~CLEM_SCC_RR0_ZERO_COUNT;
+        }
+    }
+    xrr0 = rr0 ^ channel->rr0;
+    if (xrr0) {
+        if (_clem_scc_is_interrupt_enabled(channel, CLEM_SCC_INT_CTS_INT_ENABLE) &&
+            (xrr0 & CLEM_SCC_RR0_CTS_STATUS)) {
+            _clem_scc_set_interrupt_pending(scc, CLEM_SCC_RR3_EXT_STATUS_IP_A >> ch_idx);
+        }
+        if (_clem_scc_is_interrupt_enabled(channel, CLEM_SCC_INT_DCD_INT_ENABLE) &&
+            (xrr0 & CLEM_SCC_RR0_DCD_STATUS)) {
+            _clem_scc_set_interrupt_pending(scc, CLEM_SCC_RR3_EXT_STATUS_IP_A >> ch_idx);
+        }
+        if (_clem_scc_is_interrupt_enabled(channel, CLEM_SCC_INT_ZERO_COUNT_INT_ENABLE) &&
+            (channel->rr0 & CLEM_SCC_RR0_ZERO_COUNT)) {
+            _clem_scc_set_interrupt_pending(scc, CLEM_SCC_RR3_EXT_STATUS_IP_A >> ch_idx);
+        }
+        // TODO: do something with BREAK_ABORT here - even if it means duplicating status so the
+        // logic
+        //       here can set or clear the RR0 bit and issue status interrupts.
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 void clem_scc_reset_channel(struct ClemensDeviceSCC *scc, clem_clocks_time_t ts, unsigned ch_idx,
@@ -471,13 +549,15 @@ void clem_scc_reset_channel(struct ClemensDeviceSCC *scc, clem_clocks_time_t ts,
     channel->regs[CLEM_SCC_WR4_CLOCK_DATA_RATE] |= CLEM_SCC_STOP_BIT_1;
 
     _clem_scc_brg_counter_reset(channel, true);
+
     channel->txd_internal = 1;
     channel->tx_shift_ctr = 0;
     channel->rx_shift_ctr = 0;
     channel->rx_queue_pos = 0;
     channel->rxd_error = 0;
+    channel->rx_condition = 0;
 
-    channel->rr0 |= CLEM_SCC_RR0_TX_EMPTY;
+    channel->rr0 |= (CLEM_SCC_RR0_TX_EMPTY + CLEM_SCC_RR0_TX_UNDERRUN);
 }
 
 void clem_scc_sync_channel_uart(struct ClemensDeviceSCC *scc, unsigned ch_idx,
@@ -492,8 +572,8 @@ void clem_scc_sync_channel_uart(struct ClemensDeviceSCC *scc, unsigned ch_idx,
     //  1 mhz cycles, though realistically that implies something like 200-300k baud rate)
     //  so likely not...?
     //
-    bool trxc_pulse = false;
-    bool brg_pulse = false;
+    bool trxc_pulse;
+    bool brg_pulse;
 
     if (!rx_enabled && !tx_enabled) {
         channel->master_clock_ts = next_ts;
@@ -503,6 +583,9 @@ void clem_scc_sync_channel_uart(struct ClemensDeviceSCC *scc, unsigned ch_idx,
             channel->master_clock_ts + _clem_scc_channel_calc_clock_step(channel, scc->pclk_step);
         return;
     }
+
+    trxc_pulse = false;
+    brg_pulse = false;
 
     while (channel->master_clock_ts < next_ts) {
         while (channel->master_clock_ts >= channel->xtal_edge_ts ||
@@ -531,6 +614,7 @@ void clem_scc_sync_channel_uart(struct ClemensDeviceSCC *scc, unsigned ch_idx,
 
                 channel->pclk_edge_ts += _clem_scc_channel_calc_clock_step(channel, scc->xtal_step);
             }
+            _clem_scc_channel_port_states(scc, ch_idx);
         }
 
         channel->master_clock_ts += channel->master_clock_step;
@@ -555,6 +639,32 @@ void clem_scc_glu_sync(struct ClemensDeviceSCC *scc, struct ClemensClock *clock)
 
     clem_scc_sync_channel_uart(scc, 0, clock->ts);
     clem_scc_sync_channel_uart(scc, 1, clock->ts);
+
+    if (_clem_scc_interrupts_enabled(scc)) {
+    } else {
+        scc->irq_line = 0;
+    }
+}
+
+void clem_scc_reg_command_wr0(struct ClemensDeviceSCC *scc, unsigned ch_idx, uint8_t value) {
+    struct ClemensDeviceSCCChannel *channel = &scc->channel[ch_idx];
+    //  register commands are unnecessary (bits 0-2), and CRC related settings (bits 6,7)
+    switch (value & CLEM_SCC_CMD_MASK) {
+    case CLEM_SCC_CMD_RESET_ERROR:
+        channel->rr1 &= ~CLEM_SCC_RR1_ERROR_MASK;
+        break;
+    default:
+        CLEM_UNIMPLEMENTED("SCC: WR0 unimplemented command %02x", (value & CLEM_SCC_CMD_MASK) >> 3);
+        break;
+    }
+
+    channel->regs[CLEM_SCC_WR0_COMMAND] = value;
+}
+
+void clem_scc_reg_interrupts_wr1(struct ClemensDeviceSCC *scc, unsigned ch_idx, uint8_t value) {
+    struct ClemensDeviceSCCChannel *channel = &scc->channel[ch_idx];
+
+    channel->regs[CLEM_SCC_WR1_IN_TX_RX] = value;
 }
 
 void clem_scc_reg_interrupt_vector_wr2(struct ClemensDeviceSCC *scc, uint8_t value) {
@@ -730,6 +840,12 @@ void clem_scc_write_switch(struct ClemensDeviceSCC *scc, struct ClemensTimeSpec 
         } else if (scc->channel[ch_idx].state == CLEM_SCC_STATE_REGISTER) {
             //  command write register
             switch (scc->channel[ch_idx].selected_reg) {
+            case CLEM_SCC_WR0_COMMAND:
+                clem_scc_reg_command_wr0(scc, ch_idx, value);
+                break;
+            case CLEM_SCC_WR1_IN_TX_RX:
+                clem_scc_reg_interrupts_wr1(scc, ch_idx, value);
+                break;
             case CLEM_SCC_WR2_INT_VECTOR:
                 clem_scc_reg_interrupt_vector_wr2(scc, value);
                 break;
@@ -795,7 +911,35 @@ void clem_scc_write_switch(struct ClemensDeviceSCC *scc, struct ClemensTimeSpec 
 
 uint8_t clem_scc_reg_get_tx_rx_status(struct ClemensDeviceSCC *scc, unsigned ch_idx) {
     struct ClemensDeviceSCCChannel *channel = &scc->channel[ch_idx];
+
     return channel->rr0;
+}
+
+uint8_t clem_scc_reg_get_error_status(struct ClemensDeviceSCC *scc, unsigned ch_idx) {
+    struct ClemensDeviceSCCChannel *channel = &scc->channel[ch_idx];
+
+    //  meld special condition and recv error from queue 0
+    return channel->rx_condition | channel->recv_err_queue[0];
+}
+
+uint8_t clem_scc_recv_byte(struct ClemensDeviceSCC *scc, unsigned ch_idx) {
+    struct ClemensDeviceSCCChannel *channel = &scc->channel[ch_idx];
+    uint8_t value = channel->recv_queue[0];
+    channel->recv_err_queue[0] = 0x00;
+
+    if (channel->rx_queue_pos > 0) {
+        unsigned qpos;
+        for (qpos = 1; qpos < channel->rx_queue_pos; qpos++) {
+            channel->recv_queue[qpos - 1] = channel->recv_queue[qpos];
+            channel->recv_err_queue[qpos - 1] = channel->recv_err_queue[qpos];
+        }
+        --channel->rx_queue_pos;
+    }
+    //  TODO: does this really happen here?  when do special condition bits
+    //        get cleared?
+    channel->rx_condition = 0x00;
+
+    return value;
 }
 
 uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t flags) {
@@ -816,11 +960,20 @@ uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_
             case CLEM_SCC_RR0_STATUS:
                 value = clem_scc_reg_get_tx_rx_status(scc, ch_idx);
                 break;
+            case CLEM_SCC_RR1_SPECIAL_RECEIVE:
+                value = clem_scc_reg_get_error_status(scc, ch_idx);
+                break;
             case CLEM_SCC_RR2_INT_VECTOR:
                 value = scc->channel[ch_idx].regs[CLEM_SCC_WR2_INT_VECTOR];
                 break;
+            case CLEM_SCC_RR3_INT_PENDING:
+                value = ch_idx == 0 ? scc->channel[ch_idx].rr3 : 0x00;
+                break;
             case CLEM_SCC_RR12_TIME_CONST_LO:
                 value = scc->channel[ch_idx].regs[CLEM_SCC_WR12_TIME_CONST_LO];
+                break;
+            case CLEM_SCC_RR8_RECV_QUEUE:
+                value = clem_scc_recv_byte(scc, ch_idx);
                 break;
             case 0x09: //  returns an image of RR13/WR13
             case CLEM_SCC_RR13_TIME_CONST_HI:
@@ -844,6 +997,8 @@ uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_
     case CLEM_MMIO_REG_SCC_A_DATA:
         //  Remember, reading data will pop both the error and the recv bytes
         //  per Sec 4.2.2 of Z8530.pdf
+        ch_idx = CLEM_MMIO_REG_SCC_A_DATA - ioreg;
+        value = clem_scc_recv_byte(scc, ch_idx);
         break;
     }
     return value;
