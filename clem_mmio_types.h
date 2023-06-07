@@ -119,8 +119,8 @@ struct ClemensDeviceSCCChannel {
     clem_clocks_duration_t master_clock_step;
 
     /** Data buffers - FIFO queues that mimic the Z8530 recv/xmit buffers */
-    uint8_t recv_queue[3];
-    uint8_t recv_err_queue[3];
+    uint8_t recv_queue[CLEM_SCC_RECV_QUEUE_SIZE];
+    uint8_t recv_err_queue[CLEM_SCC_RECV_QUEUE_SIZE];
     uint8_t tx_byte;
     uint32_t tx_register;
     uint32_t tx_shift_ctr;

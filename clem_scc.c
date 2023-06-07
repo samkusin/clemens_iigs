@@ -244,8 +244,9 @@ static void _clem_scc_do_rx(struct ClemensDeviceSCCChannel *channel) {
         if (!_clem_scc_is_local_loopback_enabled(channel))
             return;
     }
-    //  data bits per received character not including parity/start/stop
-    bits_per_character = s_scc_bit_count[(channel->regs[CLEM_SCC_WR3_RECV_CONTROL] & 0xc0) >> 6];
+    //  data bits per received character not including parity/stop *but* including start
+    bits_per_character =
+        s_scc_bit_count[(channel->regs[CLEM_SCC_WR3_RECV_CONTROL] & 0xc0) >> 6] + 1;
     rxd = _clem_scc_is_local_loopback_enabled(channel) ? channel->txd_internal
                                                        : (uint8_t)_clem_scc_check_port_rxd(channel);
 
@@ -261,49 +262,81 @@ static void _clem_scc_do_rx(struct ClemensDeviceSCCChannel *channel) {
             channel->rxd_error = 0;
             channel->rx_shift_ctr++;
         }
+        return;
+    }
+    parity_bit_index = (channel->regs[CLEM_SCC_WR4_CLOCK_DATA_RATE] & CLEM_SCC_PARITY_ENABLED)
+                           ? bits_per_character + 1
+                           : bits_per_character;
+    if ((channel->regs[CLEM_SCC_WR4_CLOCK_DATA_RATE] & 0x0c) == CLEM_SCC_STOP_BIT_2) {
+        stop_bit_index = parity_bit_index + 2;
     } else {
-        parity_bit_index = (channel->regs[CLEM_SCC_WR4_CLOCK_DATA_RATE] & CLEM_SCC_PARITY_ENABLED)
-                               ? bits_per_character + 1
-                               : bits_per_character;
-        if ((channel->regs[CLEM_SCC_WR4_CLOCK_DATA_RATE] & 0x0c) == CLEM_SCC_STOP_BIT_2) {
-            stop_bit_index = parity_bit_index + 2;
-        } else {
-            //  TODO: and 1.5 bit only if we ever support non NRZ encoding - highly unlikely
-            stop_bit_index = parity_bit_index + 1;
+        //  TODO: and 1.5 bit only if we ever support non NRZ encoding - highly unlikely
+        stop_bit_index = parity_bit_index + 1;
+    }
+    if (channel->rx_shift_ctr < bits_per_character) {
+        channel->rx_register <<= 1;
+        if (rxd) {
+            channel->rx_register |= 0x1;
         }
-        if (channel->rx_shift_ctr < bits_per_character) {
-            channel->rx_register <<= 1;
-            if (rxd) {
-                channel->rx_register |= 0x1;
-            }
-        } else {
-            if (channel->rx_shift_ctr < parity_bit_index) {
-                //  rxd is the parity bit
-                if (channel->regs[CLEM_SCC_WR4_CLOCK_DATA_RATE] & CLEM_SCC_PARITY_EVEN) {
-                    if (!_clem_scc_do_parity_even((uint8_t)(channel->rx_register & 0xff),
-                                                  bits_per_character) ||
-                        !rxd) {
-                        channel->rxd_error |= CLEM_SCC_RR1_PARITY_ERROR;
-                    }
-                } else {
-                    if (!_clem_scc_do_parity_odd((uint8_t)(channel->rx_register & 0xff),
-                                                 bits_per_character) ||
-                        !rxd) {
-                        channel->rxd_error |= CLEM_SCC_RR1_PARITY_ERROR;
-                    }
+    } else {
+        if (channel->rx_shift_ctr < parity_bit_index) {
+            //  rxd is the parity bit
+            if (channel->regs[CLEM_SCC_WR4_CLOCK_DATA_RATE] & CLEM_SCC_PARITY_EVEN) {
+                if (!_clem_scc_do_parity_even((uint8_t)(channel->rx_register & 0xff),
+                                              bits_per_character) ||
+                    !rxd) {
+                    channel->rxd_error |= CLEM_SCC_RR1_PARITY_ERROR;
                 }
-            } else if (channel->rx_shift_ctr < stop_bit_index) {
-                if (!rxd) {
-                    channel->rxd_error |= CLEM_SCC_RR1_FRAMING_ERROR;
+            } else {
+                if (!_clem_scc_do_parity_odd((uint8_t)(channel->rx_register & 0xff),
+                                             bits_per_character) ||
+                    !rxd) {
+                    channel->rxd_error |= CLEM_SCC_RR1_PARITY_ERROR;
                 }
             }
+        } else if (channel->rx_shift_ctr < stop_bit_index) {
+            if (!rxd) {
+                channel->rxd_error |= CLEM_SCC_RR1_FRAMING_ERROR;
+            }
         }
-        channel->rx_shift_ctr++;
-        if (channel->rx_shift_ctr == stop_bit_index) {
-            //  push onto recv queue!
-            //  overrun?
+    }
+    channel->rx_shift_ctr++;
+    if (channel->rx_shift_ctr < stop_bit_index)
+        return;
 
-            channel->rx_shift_ctr = 0;
+    //  will be a break if a framing error detected with a zero byte
+    if (channel->rx_register != 0 || !(channel->rxd_error & CLEM_SCC_RR1_FRAMING_ERROR)) {
+        if (channel->rx_queue_pos < CLEM_SCC_RECV_QUEUE_SIZE) {
+            channel->recv_err_queue[channel->rx_queue_pos] = channel->rxd_error;
+            channel->recv_queue[channel->rx_queue_pos] = (uint8_t)(channel->rx_register & 0xff);
+            ++channel->rx_queue_pos;
+        } else {
+            //  overrun - docs are hazy on whether this item overwrites the top
+            //  but we'll just flag an error for now
+            channel->rr1 |= CLEM_SCC_RR1_RECV_OVERRUN;
+        }
+        channel->rr0 |= CLEM_SCC_RR0_RECV_AVAIL;
+        //  RR1 and RR0 updates
+        //  pull data from queue when reading RR8 or data port
+        //  error at queue position 0 is used for RR1 (and updated when the queue changes)
+        //  overrun stays in RR1 until cleared by interrupt/reset
+        CLEM_SCC_LOG("SCC: recv %03x", channel->rx_register);
+        channel->rx_shift_ctr = 0;
+    } else {
+        //  Unsure if we need to push this zero byte onto the queue since the tech docs
+        //  mention the byte is 'read and discarded' after being placed on the queue.
+        //  But we do need to set the RR0 break status bit here
+        if (channel->rr0 & CLEM_SCC_RR0_BREAK_ABORT) {
+            if (rxd) {
+                channel->rr0 &= ~CLEM_SCC_RR0_BREAK_ABORT;
+                CLEM_SCC_LOG("SCC: break OFF");
+                channel->rx_shift_ctr = 0;
+            }
+        } else {
+            if (!rxd) {
+                channel->rr0 |= CLEM_SCC_RR0_BREAK_ABORT;
+                CLEM_SCC_LOG("SCC: break ON");
+            }
         }
     }
 }
@@ -327,6 +360,7 @@ static void _clem_scc_do_tx(struct ClemensDeviceSCCChannel *channel) {
         if (channel->rr0 & CLEM_SCC_RR0_TX_EMPTY) {
             channel->txd_internal = 1;
         } else if (!_clem_scc_is_synchronous_mode(channel)) {
+            channel->rr1 &= ~CLEM_SCC_RR1_ALL_SENT;
             channel->tx_register = channel->tx_byte;
             channel->tx_shift_ctr = bits_per_character;
             if (channel->regs[CLEM_SCC_WR4_CLOCK_DATA_RATE] & CLEM_SCC_PARITY_ENABLED) {
@@ -363,7 +397,11 @@ static void _clem_scc_do_tx(struct ClemensDeviceSCCChannel *channel) {
     }
     if (channel->tx_shift_ctr > 0) {
         channel->txd_internal = (uint8_t)(channel->tx_register & 1);
+        channel->tx_register >>= 1;
         channel->tx_shift_ctr--;
+        if (channel->tx_shift_ctr == 0) {
+            channel->rr1 |= CLEM_SCC_RR1_ALL_SENT;
+        }
     }
 
     //  TxD will not receive the transmitted bit if auto-echo enabled
@@ -468,7 +506,7 @@ void clem_scc_sync_channel_uart(struct ClemensDeviceSCC *scc, unsigned ch_idx,
 
     while (channel->master_clock_ts < next_ts) {
         while (channel->master_clock_ts >= channel->xtal_edge_ts ||
-               channel->master_clock_step >= channel->pclk_edge_ts) {
+               channel->master_clock_ts >= channel->pclk_edge_ts) {
             if (channel->master_clock_ts >= channel->xtal_edge_ts) {
                 if (_clem_scc_is_xtal_enabled(channel)) {
                     trxc_pulse = _clem_scc_check_port_cts_txrc(channel);
@@ -480,7 +518,7 @@ void clem_scc_sync_channel_uart(struct ClemensDeviceSCC *scc, unsigned ch_idx,
 
                 channel->xtal_edge_ts += _clem_scc_channel_calc_clock_step(channel, scc->xtal_step);
             }
-            if (channel->master_clock_step >= channel->pclk_edge_ts) {
+            if (channel->master_clock_ts >= channel->pclk_edge_ts) {
                 if (_clem_scc_is_brg_clock_mode(channel, CLEM_SCC_CLOCK_MODE_PCLK)) {
                     brg_pulse = _clem_scc_brg_tick(channel);
                 }
@@ -546,6 +584,12 @@ void clem_scc_reg_clock_data_rate_wr4(struct ClemensDeviceSCC *scc, unsigned ch_
     if (xvalue & 0x0c) {
         if ((value & 0xc) == CLEM_SCC_STOP_SYNC_MODE) {
             CLEM_UNIMPLEMENTED("SCC: WR4 %c Synchronous Mode Set", 'A' + ch_idx);
+        } else {
+            CLEM_SCC_LOG("SCC: stop bits %u.%u", (value & 0xc) == CLEM_SCC_STOP_BIT_2 ? 2 : 1,
+                         (value & 0xc) == CLEM_SCC_STOP_BIT_1_5 ? 5 : 0);
+            if ((value & 0xc) == CLEM_SCC_STOP_BIT_1_5) {
+                CLEM_WARN("SCC: stop bits of 1.5 may not work!!!");
+            }
         }
     }
     CLEM_SCC_LOG("SCC: WR4 %c X%u CLK, %02X", ch_idx ? 'B' : 'A', s_scc_clk_x_speeds[value >> 6],

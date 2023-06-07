@@ -643,6 +643,10 @@
 #define CLEM_MONITOR_COLOR_RGB  0
 #define CLEM_MONITOR_COLOR_MONO 1
 
+/* Mose SCC defines are in clem_scc.h - the few that are here are required by
+   clem_mmio_types.h */
+#define CLEM_SCC_RECV_QUEUE_SIZE 3
+
 /* NTSC scanlines start at counter 7 and end at 198 (192 lines)
    VBL begins at 199 (scanline 192)
    see technote 39, 40 and clem_vgc.c for links
