@@ -155,6 +155,7 @@ struct ClemensSerializerRecord kSCCChannel[] = {
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, rr10),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, selected_reg),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, txd_internal),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, rxd_error),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceSCCChannel, master_clock_ts),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceSCCChannel, xtal_edge_ts),
     CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceSCCChannel, pclk_edge_ts),

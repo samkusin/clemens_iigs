@@ -21,11 +21,12 @@ extern "C" {
 #define CLEM_SCC_WR14_MISC_CONTROL   0xE
 #define CLEM_SCC_WR15_INT_ENABLE     0xF
 
-#define CLEM_SCC_RR0_STATUS         0x0
-#define CLEM_SCC_RR2_INT_VECTOR     0x2
-#define CLEM_SCC_RR12_TIME_CONST_LO 0xC
-#define CLEM_SCC_RR13_TIME_CONST_HI 0xD
-#define CLEM_SCC_RR15_INT_ENABLE    0xF
+#define CLEM_SCC_RR0_STATUS          0x0
+#define CLEM_SCC_RR1_SPECIAL_RECEIVE 0x1
+#define CLEM_SCC_RR2_INT_VECTOR      0x2
+#define CLEM_SCC_RR12_TIME_CONST_LO  0xC
+#define CLEM_SCC_RR13_TIME_CONST_HI  0xD
+#define CLEM_SCC_RR15_INT_ENABLE     0xF
 
 //  Receiver options WR3
 #define CLEM_SCC_RX_ENABLE         0x01
@@ -89,8 +90,16 @@ extern "C" {
 #define CLEM_SCC_LOCAL_LOOPBACK 0x10
 
 //  RR0
-#define CLEM_SCC_RR0_TX_EMPTY 0x04
-#define CLEM_SCC_RR0_IN_CTS   0x20
+#define CLEM_SCC_RR0_RECV_AVAIL 0x01
+#define CLEM_SCC_RR0_ZERO_COUNT 0x02
+#define CLEM_SCC_RR0_TX_EMPTY   0x04
+#define CLEM_SCC_RR0_IN_CTS     0x20
+
+//  RR1
+#define CLEM_SCC_RR1_ALL_SENT      0x01
+#define CLEM_SCC_RR1_PARITY_ERROR  0x10
+#define CLEM_SCC_RR1_RECV_OVERRUN  0x20
+#define CLEM_SCC_RR1_FRAMING_ERROR 0x40
 
 //  Port settings
 void clem_scc_channel_port_lo(struct ClemensDeviceSCCChannel *channel, uint8_t flags);
