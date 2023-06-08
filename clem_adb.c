@@ -1553,7 +1553,6 @@ static void _clem_adb_mouse_check_clamping(struct ClemensDeviceADB *adb, uint8_t
                   e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_CLAMP_Y1];
 
     adb->mouse.valid_clamp_box = y0 < y1 && x0 < x1 && y1 < 0x400 && x1 < 0x400;
-    adb->mouse.tracking_enabled = adb->mouse.valid_clamp_box;
 }
 
 static void _clem_adb_glu_queue_tracked_mouse(struct ClemensDeviceADB *adb, int16_t mx,
@@ -1592,7 +1591,7 @@ static void _clem_adb_glu_mouse_tracking(struct ClemensDeviceADB *adb,
     int16_t delta_y;
 
     _clem_adb_mouse_check_clamping(adb, m2mem->e1_bank);
-    if (!adb->mouse.tracking_enabled)
+    if (!adb->mouse.tracking_enabled || !adb->mouse.valid_clamp_box)
         return;
 
     delta_x = adb->mouse.mx - adb->mouse.mx0;

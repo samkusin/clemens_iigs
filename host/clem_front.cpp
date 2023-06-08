@@ -717,10 +717,10 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)), lastFrameCPUPins_{},
       lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0), lastFrameNMIs_(0),
-      emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false), terminalChanged_(false),
-      consoleChanged_(false), terminalMode_(TerminalMode::Command), debugIOMode_(DebugIOMode::Core),
-      vgcDebugMinScanline_(0), vgcDebugMaxScanline_(0), joystickSlotCount_(0),
-      guiMode_(GUIMode::None), guiPrevMode_(GUIMode::None), appTime_(0.0),
+      emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false), mouseInEmulatorScreen_(false),
+      terminalChanged_(false), consoleChanged_(false), terminalMode_(TerminalMode::Command),
+      debugIOMode_(DebugIOMode::Core), vgcDebugMinScanline_(0), vgcDebugMaxScanline_(0),
+      joystickSlotCount_(0), guiMode_(GUIMode::None), guiPrevMode_(GUIMode::None), appTime_(0.0),
       nextUIFlashCycleAppTime_(0.0), uiFlashAlpha_(1.0f), settingsView_(config_) {
 
     ClemensTraceExecutedInstruction::initialize();
@@ -1416,6 +1416,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     config_.save();
 
     interop.mouseLock = emulatorHasMouseFocus_;
+    interop.mouseShow = !mouseInEmulatorScreen_;
 
     return getViewType();
 }
@@ -1548,7 +1549,7 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 dimensions,
         debugViewSize.y = ImGui::GetFontSize() * 8;
         debugViewAnchor.x = kMonitorViewAnchor.x + kMonitorViewSize.x - debugViewSize.x;
         debugViewAnchor.y = 0;
-        doDebugView(debugViewAnchor, debugViewSize);
+        // doDebugView(debugViewAnchor, debugViewSize);
     }
     doInfoStatusLayout(kInfoSizeAnchor, kInfoStatusSize, kMonitorViewAnchor.x);
     ImGui::PopStyleColor();
@@ -3323,31 +3324,36 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
     //```means 640 mode)
     //  what to do about legacy graphics modes (use screen holes, but what do apps expect
     //  in ranges from firmware?)
-    if (!emulatorHasMouseFocus_ && mouseInDeviceScreen) {
-        ClemensInputEvent mouseEvt;
+    if (!emulatorHasMouseFocus_) {
+        mouseInEmulatorScreen_ = mouseInDeviceScreen;
+        if (mouseInEmulatorScreen_) {
+            ClemensInputEvent mouseEvt;
 
-        int16_t a2screenX, a2screenY;
+            int16_t a2screenX, a2screenY;
 
-        //  TODO: maybe only run this for super-hires mode?
-        clemens_monitor_to_video_coordinates(&frameReadState_.frame.monitor,
-                                             &frameReadState_.frame.graphics, &a2screenX,
-                                             &a2screenY, diagnostics_.mouseX, diagnostics_.mouseY);
+            //  TODO: maybe only run this for super-hires mode?
+            clemens_monitor_to_video_coordinates(
+                &frameReadState_.frame.monitor, &frameReadState_.frame.graphics, &a2screenX,
+                &a2screenY, diagnostics_.mouseX, diagnostics_.mouseY);
 
-        mouseEvt.type = kClemensInputType_MouseMoveAbsolute;
-        mouseEvt.value_a = int16_t(a2screenX);
-        mouseEvt.value_b = int16_t(a2screenY);
-        backendQueue_.inputEvent(mouseEvt);
-        if (ImGui::GetIO().MouseClicked[0] && ImGui::IsWindowHovered()) {
-            mouseEvt.type = kClemensInputType_MouseButtonDown;
-            mouseEvt.value_a = 0x01;
-            mouseEvt.value_b = 0x01;
+            mouseEvt.type = kClemensInputType_MouseMoveAbsolute;
+            mouseEvt.value_a = int16_t(a2screenX);
+            mouseEvt.value_b = int16_t(a2screenY);
             backendQueue_.inputEvent(mouseEvt);
-        } else if (ImGui::GetIO().MouseReleased[0]) {
-            mouseEvt.type = kClemensInputType_MouseButtonUp;
-            mouseEvt.value_a = 0x01;
-            mouseEvt.value_b = 0x01;
-            backendQueue_.inputEvent(mouseEvt);
+            if (ImGui::GetIO().MouseClicked[0] && ImGui::IsWindowHovered()) {
+                mouseEvt.type = kClemensInputType_MouseButtonDown;
+                mouseEvt.value_a = 0x01;
+                mouseEvt.value_b = 0x01;
+                backendQueue_.inputEvent(mouseEvt);
+            } else if (ImGui::GetIO().MouseReleased[0]) {
+                mouseEvt.type = kClemensInputType_MouseButtonUp;
+                mouseEvt.value_a = 0x01;
+                mouseEvt.value_b = 0x01;
+                backendQueue_.inputEvent(mouseEvt);
+            }
         }
+    } else {
+        mouseInEmulatorScreen_ = false;
     }
 
     ImGui::EndChild();

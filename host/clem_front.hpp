@@ -281,6 +281,7 @@ class ClemensFrontend : public ClemensHostView {
     uint8_t lastFrameIORegs_[256];
     bool emulatorHasKeyboardFocus_;
     bool emulatorHasMouseFocus_;
+    bool mouseInEmulatorScreen_;
 
     struct TerminalLine {
         enum Type { Debug, Info, Warn, Error, Command, Opcode };
