@@ -253,13 +253,10 @@ inline bool _clem_scc_do_parity_odd(uint8_t v, unsigned bps) {
     return !(_clem_scc_count_1_bits(v, bps) & 1);
 }
 
-inline void _clem_scc_channel_error(struct ClemensDeviceSCCChannel *channel, uint8_t err) {
-    channel->rxd_error |= err;
-    if (err & CLEM_SCC_RR1_PARITY_ERROR) {
-        if (channel->regs[CLEM_SCC_WR1_IN_TX_RX] & CLEM_SCC_ENABLE_PARITY_SPECIAL_COND) {
-            channel->rx_condition |= err;
-        }
-    } else {
+inline void _clem_scc_channel_error(struct ClemensDeviceSCCChannel *channel, uint8_t err,
+                                    bool special) {
+    channel->rxd_error |= err; // the error latch
+    if (special) {
         channel->rx_condition |= err;
     }
 }
@@ -306,9 +303,8 @@ static void _clem_scc_do_rx(struct ClemensDeviceSCCChannel *channel) {
         stop_bit_index = parity_bit_index + 1;
     }
     if (channel->rx_shift_ctr < bits_per_character) {
-        channel->rx_register <<= 1;
         if (rxd) {
-            channel->rx_register |= 0x1;
+            channel->rx_register |= (0x1 << (channel->rx_shift_ctr - 1));
         }
     } else {
         if (channel->rx_shift_ctr < parity_bit_index) {
@@ -317,18 +313,22 @@ static void _clem_scc_do_rx(struct ClemensDeviceSCCChannel *channel) {
                 if (!_clem_scc_do_parity_even((uint8_t)(channel->rx_register & 0xff),
                                               bits_per_character) ||
                     !rxd) {
-                    _clem_scc_channel_error(channel, CLEM_SCC_RR1_PARITY_ERROR);
+                    _clem_scc_channel_error(channel, CLEM_SCC_RR1_PARITY_ERROR,
+                                            (channel->regs[CLEM_SCC_WR1_IN_TX_RX] &
+                                             CLEM_SCC_ENABLE_PARITY_SPECIAL_COND) != 0);
                 }
             } else {
                 if (!_clem_scc_do_parity_odd((uint8_t)(channel->rx_register & 0xff),
                                              bits_per_character) ||
                     !rxd) {
-                    _clem_scc_channel_error(channel, CLEM_SCC_RR1_PARITY_ERROR);
+                    _clem_scc_channel_error(channel, CLEM_SCC_RR1_PARITY_ERROR,
+                                            (channel->regs[CLEM_SCC_WR1_IN_TX_RX] &
+                                             CLEM_SCC_ENABLE_PARITY_SPECIAL_COND) != 0);
                 }
             }
         } else if (channel->rx_shift_ctr < stop_bit_index) {
             if (!rxd) {
-                _clem_scc_channel_error(channel, CLEM_SCC_RR1_FRAMING_ERROR);
+                _clem_scc_channel_error(channel, CLEM_SCC_RR1_FRAMING_ERROR, true);
             }
         }
     }
@@ -345,7 +345,7 @@ static void _clem_scc_do_rx(struct ClemensDeviceSCCChannel *channel) {
         } else {
             //  overrun - docs are hazy on whether this item overwrites the top
             //  but we'll just flag an error for now
-            _clem_scc_channel_error(channel, CLEM_SCC_RR1_RECV_OVERRUN);
+            _clem_scc_channel_error(channel, CLEM_SCC_RR1_RECV_OVERRUN, true);
         }
         channel->rr0 |= CLEM_SCC_RR0_RECV_AVAIL;
         //  RR1 and RR0 updates
@@ -558,6 +558,8 @@ void clem_scc_reset_channel(struct ClemensDeviceSCC *scc, clem_clocks_time_t ts,
     channel->rx_condition = 0;
 
     channel->rr0 |= (CLEM_SCC_RR0_TX_EMPTY + CLEM_SCC_RR0_TX_UNDERRUN);
+    // NOTE: reset RR1 to this and likely won't change unless synchronous mode is really implemented
+    channel->rr1 = 0x06;
 }
 
 void clem_scc_sync_channel_uart(struct ClemensDeviceSCC *scc, unsigned ch_idx,
@@ -652,6 +654,7 @@ void clem_scc_reg_command_wr0(struct ClemensDeviceSCC *scc, unsigned ch_idx, uin
     switch (value & CLEM_SCC_CMD_MASK) {
     case CLEM_SCC_CMD_RESET_ERROR:
         channel->rr1 &= ~CLEM_SCC_RR1_ERROR_MASK;
+        channel->rx_condition = 0;
         break;
     default:
         CLEM_UNIMPLEMENTED("SCC: WR0 unimplemented command %02x", (value & CLEM_SCC_CMD_MASK) >> 3);
@@ -725,11 +728,17 @@ void clem_scc_reg_xmit_byte(struct ClemensDeviceSCC *scc, unsigned ch_idx, uint8
     //  this byte is shifted into the tx_register when the tx_shift_ctr is 0
     //  additional bits may be prepended/appended based on various settings detailed
     //  in clem_scc_sync_channel_uart.
-    if (!(scc->channel[ch_idx].rr0 & CLEM_SCC_RR0_TX_EMPTY)) {
+    struct ClemensDeviceSCCChannel *channel = &scc->channel[ch_idx];
+    if (!(channel->rr0 & CLEM_SCC_RR0_TX_EMPTY)) {
         CLEM_WARN("SCC: WR8 %c tx buffer full", ch_idx + 'A');
     }
-    scc->channel[ch_idx].tx_byte = value;
-    scc->channel[ch_idx].rr0 &= ~CLEM_SCC_RR0_TX_EMPTY;
+    channel->tx_byte = value;
+    channel->rr0 &= ~CLEM_SCC_RR0_TX_EMPTY;
+    if (channel->tx_shift_ctr == 0) {
+        // write buffer clear, so loading the register here means we're effectively
+        // starting a new transmission.
+        channel->rr1 &= ~CLEM_SCC_RR1_ALL_SENT;
+    }
     CLEM_SCC_LOG("SCC: WR8 %c tx %02X", ch_idx + 'A', value);
 }
 
@@ -917,27 +926,34 @@ uint8_t clem_scc_reg_get_tx_rx_status(struct ClemensDeviceSCC *scc, unsigned ch_
 
 uint8_t clem_scc_reg_get_error_status(struct ClemensDeviceSCC *scc, unsigned ch_idx) {
     struct ClemensDeviceSCCChannel *channel = &scc->channel[ch_idx];
-
-    //  meld special condition and recv error from queue 0
-    return channel->rx_condition | channel->recv_err_queue[0];
+    channel->rr1 &= ~CLEM_SCC_RR1_FRAMING_ERROR; // errors not latched
+    channel->rr1 |=
+        channel->recv_err_queue[0]; // apply new error bits that are cleared on error_reset.
+    return channel->rr1;
 }
 
-uint8_t clem_scc_recv_byte(struct ClemensDeviceSCC *scc, unsigned ch_idx) {
+uint8_t clem_scc_recv_byte(struct ClemensDeviceSCC *scc, unsigned ch_idx, uint8_t flags) {
     struct ClemensDeviceSCCChannel *channel = &scc->channel[ch_idx];
     uint8_t value = channel->recv_queue[0];
-    channel->recv_err_queue[0] = 0x00;
 
-    if (channel->rx_queue_pos > 0) {
-        unsigned qpos;
-        for (qpos = 1; qpos < channel->rx_queue_pos; qpos++) {
-            channel->recv_queue[qpos - 1] = channel->recv_queue[qpos];
-            channel->recv_err_queue[qpos - 1] = channel->recv_err_queue[qpos];
+    if (!CLEM_IS_IO_NO_OP(flags)) {
+        channel->recv_err_queue[0] = 0x00;
+
+        if (channel->rx_queue_pos > 0) {
+            unsigned qpos;
+            CLEM_SCC_LOG("SCC: RR8 %c rx %02X", ch_idx + 'A', value);
+            for (qpos = 1; qpos < channel->rx_queue_pos; qpos++) {
+                channel->recv_queue[qpos - 1] = channel->recv_queue[qpos];
+                channel->recv_err_queue[qpos - 1] = channel->recv_err_queue[qpos];
+            }
+            --channel->rx_queue_pos;
         }
-        --channel->rx_queue_pos;
+        if (channel->rx_queue_pos > 0) {
+            channel->rr0 |= CLEM_SCC_RR0_RECV_AVAIL; // redundant?
+        } else {
+            channel->rr0 &= ~CLEM_SCC_RR0_RECV_AVAIL;
+        }
     }
-    //  TODO: does this really happen here?  when do special condition bits
-    //        get cleared?
-    channel->rx_condition = 0x00;
 
     return value;
 }
@@ -945,7 +961,7 @@ uint8_t clem_scc_recv_byte(struct ClemensDeviceSCC *scc, unsigned ch_idx) {
 uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_t flags) {
     uint8_t value = 0;
     unsigned ch_idx;
-    bool is_noop = (flags & CLEM_OP_IO_NO_OP) != 0;
+
     switch (ioreg) {
     case CLEM_MMIO_REG_SCC_B_CMD:
     case CLEM_MMIO_REG_SCC_A_CMD:
@@ -973,7 +989,7 @@ uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_
                 value = scc->channel[ch_idx].regs[CLEM_SCC_WR12_TIME_CONST_LO];
                 break;
             case CLEM_SCC_RR8_RECV_QUEUE:
-                value = clem_scc_recv_byte(scc, ch_idx);
+                value = clem_scc_recv_byte(scc, ch_idx, flags);
                 break;
             case 0x09: //  returns an image of RR13/WR13
             case CLEM_SCC_RR13_TIME_CONST_HI:
@@ -998,7 +1014,7 @@ uint8_t clem_scc_read_switch(struct ClemensDeviceSCC *scc, uint8_t ioreg, uint8_
         //  Remember, reading data will pop both the error and the recv bytes
         //  per Sec 4.2.2 of Z8530.pdf
         ch_idx = CLEM_MMIO_REG_SCC_A_DATA - ioreg;
-        value = clem_scc_recv_byte(scc, ch_idx);
+        value = clem_scc_recv_byte(scc, ch_idx, flags);
         break;
     }
     return value;
