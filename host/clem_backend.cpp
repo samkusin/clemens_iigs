@@ -522,6 +522,7 @@ bool ClemensBackend::unserialize(const std::string &path) {
                 mpack_done_map(reader);
             }
             mpack_done_array(reader);
+            mpack_done_map(reader);
             return mpack_reader_error(reader) == mpack_ok;
         });
     if (!gs)

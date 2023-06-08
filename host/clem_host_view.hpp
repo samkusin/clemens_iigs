@@ -9,6 +9,7 @@ class ClemensHostView {
   public:
     enum class ViewType { Startup, Main };
     struct FrameAppInterop {
+        bool mouseShow; // show or hide the mouse
         bool mouseLock; // enable mouse lock
         bool exitApp;   // terminate the app
     };

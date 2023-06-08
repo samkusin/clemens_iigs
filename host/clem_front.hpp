@@ -49,6 +49,12 @@ class ClemensFrontend : public ClemensHostView {
   private:
     template <typename TBufferType> friend struct FormatView;
 
+    struct ViewToMonitorTranslation {
+        ImVec2 screenUVs;
+        ImVec2 size;
+        ImVec2 workSize;
+    };
+
     void startBackend();
     void runBackend(std::unique_ptr<ClemensBackend> backend);
     void stopBackend();
@@ -60,8 +66,10 @@ class ClemensFrontend : public ClemensHostView {
                               const ClemensCommandQueue::ResultBuffer &results);
     void processBackendResult(const ClemensBackendResult &result);
 
-    void doEmulatorInterface(ImVec2 dimensions, ImVec2 screenUVs, double deltaTime);
-    void doDebuggerInterface(ImVec2 dimensions, ImVec2 screenUVs, double deltaTime);
+    void doEmulatorInterface(ImVec2 dimensions, const ViewToMonitorTranslation &viewToMonitor,
+                             double deltaTime);
+    void doDebuggerInterface(ImVec2 dimensions, const ViewToMonitorTranslation &viewToMonitor,
+                             double deltaTime);
 
     void doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions);
     void doUserMenuDisplay(float width);
@@ -77,8 +85,10 @@ class ClemensFrontend : public ClemensHostView {
     void doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size, bool isSpinning);
     void doMachineSmartDriveStatus(unsigned driveIndex, float width, bool allowSelect);
     void doMachineCPUInfoDisplay();
+    void doDebugView(ImVec2 anchor, ImVec2 size);
     void doSetupUI(ImVec2 anchor, ImVec2 dimensions);
-    void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU, float screenV);
+    void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
+                             const ViewToMonitorTranslation &viewToMonitor);
     void doMachineInfoBar(ImVec2 rootAnchor, ImVec2 rootSize);
     void doMachineTerminalLayout(ImVec2 rootAnchor, ImVec2 rootSize);
     void doMachineDiskBrowserInterface(ImVec2 anchor, ImVec2 dimensions);
@@ -271,6 +281,7 @@ class ClemensFrontend : public ClemensHostView {
     uint8_t lastFrameIORegs_[256];
     bool emulatorHasKeyboardFocus_;
     bool emulatorHasMouseFocus_;
+    bool mouseInEmulatorScreen_;
 
     struct TerminalLine {
         enum Type { Debug, Info, Warn, Error, Command, Opcode };
@@ -353,6 +364,13 @@ class ClemensFrontend : public ClemensHostView {
     std::optional<ClemensDriveType> browseDriveType_;
     std::optional<unsigned> browseSmartDriveIndex_;
     std::optional<float> delayRebootTimer_;
+
+    //  Used for debugging client-side features (i.e. audio playback, framerate)
+    struct DebugDiagnostics {
+        int16_t mouseX = 0;
+        int16_t mouseY = 0;
+    };
+    DebugDiagnostics diagnostics_;
 };
 
 #endif
