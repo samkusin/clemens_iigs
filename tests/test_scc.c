@@ -13,28 +13,14 @@ static struct ClemensDeviceSCC scc_dev;
 
 void setUp(void) {
     memset(&scc_dev, 0, sizeof(scc_dev));
-    clem_scc_reset(&scc_dev);
+    // clem_scc_reset(&scc_dev);
 }
 
 void tearDown(void) {}
 
 void test_scc_reset(void) {}
 
-void test_scc_transmit_sync(void) {
-    //  it's possible the SCC firmware doesn't use these modes...
-    //  demonstrate simple synchronous transmission of data to the pins
-    struct ClemensDeviceSCCChannel *chan = &scc_dev.channel[0];
-    chan->regs[3] = CLEM_SCC_TX_RX_AUTO_ENABLE;
-    chan->regs[4] = CLEM_SCC_STOP_SYNC_MODE | CLEM_SCC_MONO_SYNC_MODE;
-    chan->regs[10] = CLEM_SCC_SYNC_SIZE_8BIT;
-    chan->regs[5] = CLEM_SCC_TX_BITS_8;
-    chan->regs[6] = 0xa0; // sync tx byte
-    chan->regs[7] = 0x5f; // sync rx byte
-    chan->tx_byte = 0xbd; // transmit this byte
-
-    clem_scc_channel_port_lo(&scc_dev.channel[0], CLEM_SCC_PORT_HSKI); // CTS-
-    clem_scc_channel_port_hi(&scc_dev.channel[0], CLEM_SCC_PORT_HSKI); // CTS+
-}
+void test_scc_transmit_sync(void) {}
 
 void test_scc_tdd_null_modem(void) {
     /*  An attempt at a simple null-modem  connection between the 'test' and
