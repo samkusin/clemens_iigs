@@ -150,13 +150,40 @@ struct ClemensSerializerRecord kAudio[] = {
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceAudio, irq_line),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
+struct ClemensSerializerRecord kSCCChannel[] = {
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCCChannel, serial_port),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceSCCChannel, kClemensSerializerTypeUInt8, regs,
+                                 16, 0),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, rr0),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, rr1),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, rr3),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, rr8),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, selected_reg),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, txd_internal),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, rxd_error),
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceSCCChannel, master_clock_ts),
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceSCCChannel, xtal_edge_ts),
+    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceSCCChannel, pclk_edge_ts),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceSCCChannel, master_clock_step),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceSCCChannel, kClemensSerializerTypeUInt8,
+                                 recv_queue, 3, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceSCCChannel, kClemensSerializerTypeUInt8,
+                                 recv_err_queue, 3, 0),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceSCCChannel, tx_byte),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCCChannel, tx_register),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCCChannel, tx_shift_ctr),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCCChannel, rx_queue_pos),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCCChannel, rx_shift_ctr),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCCChannel, rx_register),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCCChannel, brg_counter),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCCChannel, state),
+    CLEM_SERIALIZER_RECORD_EMPTY()};
+
 struct ClemensSerializerRecord kSCC[] = {
-    CLEM_SERIALIZER_RECORD_CLOCKS(struct ClemensDeviceSCC, ts_last_frame),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCC, state),
-    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceSCC, kClemensSerializerTypeUInt32,
-                                 selected_reg, 2, 0),
-    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceSCC, kClemensSerializerTypeUInt8, serial, 2,
-                                 0),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceSCC, xtal_step),
+    CLEM_SERIALIZER_RECORD_DURATION(struct ClemensDeviceSCC, pclk_step),
+    CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(struct ClemensDeviceSCC, channel, 2,
+                                         struct ClemensDeviceSCCChannel, kSCCChannel),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceSCC, irq_line),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 

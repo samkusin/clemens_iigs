@@ -6,6 +6,7 @@
 
 #include "clem_device.h"
 #include "clem_mmio_types.h"
+#include "clem_scc.h"
 #include "clem_types.h"
 #include "clem_util.h"
 #include "clem_vgc.h"
@@ -1081,7 +1082,7 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
     case CLEM_MMIO_REG_SCC_A_CMD:
     case CLEM_MMIO_REG_SCC_B_DATA:
     case CLEM_MMIO_REG_SCC_A_DATA:
-        clem_scc_write_switch(&mmio->dev_scc, ioreg, data);
+        clem_scc_write_switch(&mmio->dev_scc, tspec, ioreg, data);
         break;
     case CLEM_MMIO_REG_AUDIO_CTL:
         clem_sound_write_switch(&mmio->dev_audio, ioreg, data);
@@ -1752,7 +1753,7 @@ void clem_mmio_reset(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) {
     clem_sound_reset(&mmio->dev_audio);
     clem_vgc_reset(&mmio->vgc);
     clem_iwm_reset(&mmio->dev_iwm, tspec);
-    clem_scc_reset(&mmio->dev_scc);
+    clem_scc_reset(&mmio->dev_scc, tspec);
 }
 
 void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,

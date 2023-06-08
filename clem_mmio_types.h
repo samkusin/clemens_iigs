@@ -109,14 +109,45 @@ struct ClemensDeviceADB {
     uint32_t irq_line;     /**< IRQ flags passed to machine */
 };
 
-struct ClemensDeviceSCC {
-    clem_clocks_time_t ts_last_frame;
+struct ClemensDeviceSCCChannel {
+    unsigned serial_port;
 
-    /** Internal state that drives how the cmd/data registers are interpreted */
+    /** Register set */
+    uint8_t regs[16];
+    uint8_t rr0, rr1;
+    uint8_t rr3, rr8;
+    uint8_t selected_reg;
+    uint8_t txd_internal; /* Used for loopback*/
+    uint8_t rxd_error;    /* Tracks received byte and acts as the error byte */
+    uint8_t pad;
+
+    /** Applies clock mode (/1, /16, /32, /64) to calculate the master step  and edges. */
+    clem_clocks_time_t master_clock_ts;
+    clem_clocks_time_t xtal_edge_ts;
+    clem_clocks_time_t pclk_edge_ts;
+    clem_clocks_duration_t master_clock_step;
+
+    /** Data buffers - FIFO queues that mimic the Z8530 recv/xmit buffers */
+    uint8_t recv_queue[CLEM_SCC_RECV_QUEUE_SIZE];
+    uint8_t recv_err_queue[CLEM_SCC_RECV_QUEUE_SIZE];
+    uint8_t tx_byte;
+    uint8_t rx_condition; /* Special Receive Condition */
+    uint32_t tx_register;
+    uint32_t tx_shift_ctr;
+    uint32_t rx_queue_pos;
+    uint32_t rx_shift_ctr;
+    uint32_t rx_register;
+    uint32_t brg_counter; /* Bit 31 = high bit is the flip-flop state*/
     unsigned state;
-    unsigned selected_reg[2];
+};
 
-    uint8_t serial[2]; /**< See CLEM_SCC_PORT_xxx */
+struct ClemensDeviceSCC {
+    /** Clocks, including the XTAL oscillator @ 3.6864 mhz, CREF is defined in
+        clem_shared.h */
+    clem_clocks_duration_t xtal_step;
+    clem_clocks_duration_t pclk_step;
+
+    struct ClemensDeviceSCCChannel channel[2];
 
     uint32_t irq_line; /**< IRQ flags passed to machine */
 };
