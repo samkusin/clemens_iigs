@@ -312,6 +312,10 @@
  *
  * For example, the Transwarp card used c074, and some titles will write to it
  * to disable Transwarp (not IIgs fast mode).
+ *
+ * Also note that addresses c071 - c07f are used by the ROM for BRK/IRQ
+ * vectors.
+ *
  * - http://www.faqs.org/faqs/apple2/faq/part3/
  */
 #define CLEM_MMIO_REG_PTRIG 0x70

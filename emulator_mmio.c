@@ -241,6 +241,7 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *cl
     bool use_page_2 = (mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
                       !(mmio->mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE);
     video->vbl_counter = vgc->vbl_counter;
+    video->has_640_mode_scanlines = false;
     if (vgc->mode_flags & CLEM_VGC_SUPER_HIRES) {
         video->format = kClemensVideoFormat_Super_Hires;
         video->scanline_count = CLEM_VGC_SHGR_SCANLINE_COUNT;
@@ -251,7 +252,10 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *cl
         video->rgb_buffer_size = sizeof(vgc->shgr_palettes);
         memory = clem->mem.mega2_bank_map[1] + 0x9d00;
         for (i = 0; i < video->scanline_count; ++i) {
-            video->scanlines[i].control = memory[i];
+            unsigned control = memory[i];
+            video->scanlines[i].control = control;
+            video->has_640_mode_scanlines = video->has_640_mode_scanlines ||
+                                            ((control & CLEM_VGC_SCANLINE_CONTROL_640_MODE) != 0);
         }
         return video;
     } else if (vgc->mode_flags & CLEM_VGC_GRAPHICS_MODE) {
@@ -300,6 +304,38 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *cl
         }
     }
     return video;
+}
+
+void clemens_monitor_to_video_coordinates(ClemensMonitor *monitor, ClemensVideo *video, int16_t *vx,
+                                          int16_t *vy, int16_t mx, int16_t my) {
+    switch (video->format) {
+    case kClemensVideoFormat_Super_Hires:
+        if (video->has_640_mode_scanlines) {
+            *vx = mx;
+        } else {
+            *vx = mx / 2;
+        }
+        *vy = my / 2;
+        break;
+    case kClemensVideoFormat_Double_Hires:
+        *vx = mx;
+        *vy = my / 2;
+        break;
+    case kClemensVideoFormat_Hires:
+        *vx = mx / 2;
+        *vy = my / 2;
+        break;
+    case kClemensVideoFormat_Double_Lores:
+        *vx = mx / 7;
+        *vy = my / 8;
+        break;
+    case kClemensVideoFormat_Lores:
+        *vx = mx / 14;
+        *vy = my / 8;
+        break;
+    default:
+        break;
+    }
 }
 
 void clemens_assign_audio_mix_buffer(ClemensMMIO *mmio, struct ClemensAudioMixBuffer *mix_buffer) {
@@ -372,6 +408,7 @@ bool clemens_is_mmio_initialized(const ClemensMMIO *mmio) {
 void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     struct Clemens65C816 *cpu = &clem->cpu;
     struct ClemensClock clock;
+    struct ClemensDeviceMega2Memory m2mem;
     uint32_t delta_mega2_cycles;
     uint32_t card_result;
     uint32_t card_irqs;
@@ -425,6 +462,9 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     mmio->mega2_cycles += delta_mega2_cycles;
     mmio->timer_60hz_us += delta_mega2_cycles;
 
+    m2mem.e0_bank = mmio->e0_bank;
+    m2mem.e1_bank = mmio->e1_bank;
+
     clock.ts = clem->tspec.clocks_spent;
     clock.ref_step = CLEM_CLOCKS_PHI0_CYCLE;
 
@@ -447,9 +487,10 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     clem_gameport_sync(&mmio->dev_adb.gameport, &clock);
 
     /* background execution of some async devices on the 60 hz timer */
+    /* TODO: ADB should occur on the VBL */
     while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {
         clem_timer_sync(&mmio->dev_timer, CLEM_MEGA2_CYCLES_PER_60TH);
-        clem_adb_glu_sync(&mmio->dev_adb, CLEM_MEGA2_CYCLES_PER_60TH);
+        clem_adb_glu_sync(&mmio->dev_adb, &m2mem, CLEM_MEGA2_CYCLES_PER_60TH);
         if (clem->resb_counter <= 0 && mmio->dev_adb.keyb.reset_key) {
             /* TODO: move into its own utility */
             clem->resb_counter = 2;

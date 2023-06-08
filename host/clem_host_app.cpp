@@ -419,10 +419,14 @@ static void onFrame(void *) {
     if (g_Host) {
         ClemensHostView::FrameAppInterop interop;
         interop.mouseLock = sapp_mouse_locked();
+        interop.mouseShow = sapp_mouse_shown();
         interop.exitApp = exitApp;
 
         auto nextViewType = g_Host->frame(frameWidth, frameHeight, deltaTime, interop);
         sapp_lock_mouse(interop.mouseLock);
+        if (interop.mouseShow != sapp_mouse_shown()) {
+            sapp_show_mouse(interop.mouseShow);
+        }
         exitApp = interop.exitApp;
 
         if (nextViewType != g_Host->getViewType()) {

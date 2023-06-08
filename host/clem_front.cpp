@@ -1,4 +1,5 @@
 //  Boo...
+#include <algorithm>
 #define _USE_MATH_DEFINES
 
 #include "clem_front.hpp"
@@ -716,10 +717,10 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)), lastFrameCPUPins_{},
       lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0), lastFrameNMIs_(0),
-      emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false), terminalChanged_(false),
-      consoleChanged_(false), terminalMode_(TerminalMode::Command), debugIOMode_(DebugIOMode::Core),
-      vgcDebugMinScanline_(0), vgcDebugMaxScanline_(0), joystickSlotCount_(0),
-      guiMode_(GUIMode::None), guiPrevMode_(GUIMode::None), appTime_(0.0),
+      emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false), mouseInEmulatorScreen_(false),
+      terminalChanged_(false), consoleChanged_(false), terminalMode_(TerminalMode::Command),
+      debugIOMode_(DebugIOMode::Core), vgcDebugMinScanline_(0), vgcDebugMaxScanline_(0),
+      joystickSlotCount_(0), guiMode_(GUIMode::None), guiPrevMode_(GUIMode::None), appTime_(0.0),
       nextUIFlashCycleAppTime_(0.0), uiFlashAlpha_(1.0f), settingsView_(config_) {
 
     ClemensTraceExecutedInstruction::initialize();
@@ -1245,6 +1246,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     //  video is rendered to a texture and the UVs of the display on the virtual
     //  monitor are stored in screenUVs
     float screenUVs[2]{0.0f, 0.0f};
+    ViewToMonitorTranslation viewToMonitor;
     if (frameReadState_.mmioWasInitialized && isEmulatorActive()) {
         const uint8_t *e0mem = frameReadState_.e0bank;
         const uint8_t *e1mem = frameReadState_.e1bank;
@@ -1261,6 +1263,12 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
             display_.renderSuperHiresGraphics(frameReadState_.frame.graphics, e1mem);
         }
         display_.finish(screenUVs);
+        viewToMonitor.screenUVs.x = screenUVs[0];
+        viewToMonitor.screenUVs.y = screenUVs[1];
+        viewToMonitor.size.x = kClemensScreenWidth;
+        viewToMonitor.size.y = kClemensScreenHeight;
+        viewToMonitor.workSize.x = frameReadState_.frame.monitor.width;
+        viewToMonitor.workSize.y = frameReadState_.frame.monitor.height;
     }
 
     // render audio
@@ -1296,9 +1304,9 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     thisFrameAudioBuffer_.reset();
 
     if (config_.hybridInterfaceEnabled) {
-        doDebuggerInterface(ImVec2(width, height), ImVec2(screenUVs[0], screenUVs[1]), deltaTime);
+        doDebuggerInterface(ImVec2(width, height), viewToMonitor, deltaTime);
     } else {
-        doEmulatorInterface(ImVec2(width, height), ImVec2(screenUVs[0], screenUVs[1]), deltaTime);
+        doEmulatorInterface(ImVec2(width, height), viewToMonitor, deltaTime);
     }
 
     if (isBackendTerminated) {
@@ -1393,8 +1401,8 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     if (guiMode_ == GUIMode::Emulator) {
         if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
             if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) {
-                if (ImGui::IsKeyDown(ImGuiKey_RightAlt) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) {
-                    emulatorHasMouseFocus_ = false;
+                if (ImGui::IsKeyPressed(ImGuiKey_F10)) {
+                    emulatorHasMouseFocus_ = !emulatorHasMouseFocus_;
                 } else if (ImGui::IsKeyPressed(ImGuiKey_F11)) {
                     config_.hybridInterfaceEnabled = !config_.hybridInterfaceEnabled;
                     config_.setDirty();
@@ -1408,6 +1416,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     config_.save();
 
     interop.mouseLock = emulatorHasMouseFocus_;
+    interop.mouseShow = !mouseInEmulatorScreen_;
 
     return getViewType();
 }
@@ -1477,7 +1486,8 @@ void ClemensFrontend::processBackendResult(const ClemensBackendResult &result) {
     }
 }
 
-void ClemensFrontend::doDebuggerInterface(ImVec2 dimensions, ImVec2 screenUVs,
+void ClemensFrontend::doDebuggerInterface(ImVec2 dimensions,
+                                          const ViewToMonitorTranslation &viewToMonitor,
                                           double /*deltaTime*/) {
     const ImGuiStyle &kMainStyle = ImGui::GetStyle();
     const ImVec2 kWindowBoundary(kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.x,
@@ -1494,13 +1504,14 @@ void ClemensFrontend::doDebuggerInterface(ImVec2 dimensions, ImVec2 screenUVs,
     ImVec2 monitorSize(kMonitorViewWidth, kMonitorViewHeight);
 
     doMachineStateLayout(ImVec2(0, 0), ImVec2(kMachineStateViewWidth, dimensions.y));
-    doMachineViewLayout(ImVec2(kMonitorX, 0), monitorSize, screenUVs[0], screenUVs[1]);
+    doMachineViewLayout(ImVec2(kMonitorX, 0), monitorSize, viewToMonitor);
     doMachineInfoBar(ImVec2(kMonitorX, monitorSize.y), ImVec2(kMonitorViewWidth, kInfoBarHeight));
     doMachineTerminalLayout(ImVec2(kMonitorX, monitorSize.y + kInfoBarHeight),
                             ImVec2(kMonitorViewWidth, kTerminalViewHeight));
 }
 
-void ClemensFrontend::doEmulatorInterface(ImVec2 dimensions, ImVec2 screenUVs,
+void ClemensFrontend::doEmulatorInterface(ImVec2 dimensions,
+                                          const ViewToMonitorTranslation &viewToMonitor,
                                           double /*deltaTime*/) {
     const ImGuiStyle &kMainStyle = ImGui::GetStyle();
     const ImVec2 kWindowBoundary(kMainStyle.WindowBorderSize + kMainStyle.WindowPadding.x,
@@ -1531,7 +1542,14 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 dimensions, ImVec2 screenUVs,
     } else if (guiMode_ == GUIMode::Setup) {
         doSetupUI(kMonitorViewAnchor, kMonitorViewSize);
     } else {
-        doMachineViewLayout(kMonitorViewAnchor, kMonitorViewSize, screenUVs[0], screenUVs[1]);
+        doMachineViewLayout(kMonitorViewAnchor, kMonitorViewSize, viewToMonitor);
+        ImVec2 debugViewAnchor;
+        ImVec2 debugViewSize;
+        debugViewSize.x = ImGui::GetFont()->GetCharAdvance('A') * 24;
+        debugViewSize.y = ImGui::GetFontSize() * 8;
+        debugViewAnchor.x = kMonitorViewAnchor.x + kMonitorViewSize.x - debugViewSize.x;
+        debugViewAnchor.y = 0;
+        // doDebugView(debugViewAnchor, debugViewSize);
     }
     doInfoStatusLayout(kInfoSizeAnchor, kInfoStatusSize, kMonitorViewAnchor.x);
     ImGui::PopStyleColor();
@@ -3198,6 +3216,35 @@ void ClemensFrontend::doMachineDebugSoundDisplay() {
     ImGui::EndTable();
 }
 
+void ClemensFrontend::doDebugView(ImVec2 anchor, ImVec2 size) {
+    auto *state = frameReadState_.e1bank;
+    ImGui::SetNextWindowPos(anchor, ImGuiCond_Once);
+    ImGui::SetNextWindowSize(size);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 128));
+    if (ImGui::Begin("Debug View", NULL)) {
+
+        ImGui::BeginTable("Diagnostics", 2);
+        {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted("Mouse.Host");
+            ImGui::TableNextColumn();
+            ImGui::Text("(%d,%d)", diagnostics_.mouseX, diagnostics_.mouseY);
+            if (state) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("Mouse.E1ROM");
+                ImGui::TableNextColumn();
+                ImGui::Text("(%u,%u)", ((uint16_t)(state[0x192]) << 8) | state[0x190],
+                            ((uint16_t)(state[0x193]) << 8) | state[0x191]);
+            }
+        }
+        ImGui::EndTable();
+    }
+    ImGui::End();
+    ImGui::PopStyleColor();
+}
+
 void ClemensFrontend::doSetupUI(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::SetNextWindowPos(anchor);
     ImGui::SetNextWindowSize(dimensions);
@@ -3208,8 +3255,8 @@ void ClemensFrontend::doSetupUI(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::End();
 }
 
-void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, float screenU,
-                                          float screenV) {
+void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
+                                          const ViewToMonitorTranslation &viewToMonitor) {
     ImGui::SetNextWindowPos(rootAnchor);
     ImGui::SetNextWindowSize(rootSize);
     if (emulatorHasKeyboardFocus_) {
@@ -3234,7 +3281,7 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
     }
     ImVec2 monitorAnchor(p.x + (contentSize.x - monitorSize.x) * 0.5f,
                          p.y + (contentSize.y - monitorSize.y) * 0.5f);
-    float screenV0 = 0.0f, screenV1 = screenV;
+    float screenV0 = 0.0f, screenV1 = viewToMonitor.screenUVs.y;
 #if defined(CK3D_BACKEND_GL)
     // Flip the texture coords so that the top V is 1.0f
     screenV0 = 1.0f;
@@ -3245,21 +3292,69 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize, fl
     ImGui::GetWindowDrawList()->AddImage(
         texId, ImVec2(monitorAnchor.x, monitorAnchor.y),
         ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y),
-        ImVec2(0, screenV0), ImVec2(screenU, screenV1), ImGui::GetColorU32(tint_col));
+        ImVec2(0, screenV0), ImVec2(viewToMonitor.screenUVs.x, screenV1),
+        ImGui::GetColorU32(tint_col));
 
-    //  This logic is rather convoluted - we have two focus types and this logic is
-    //  an attempt to determine the user's intent regarding where keyboard and mouse
-    //  input goes (to the emulator vs GUI.)  Basically if the mouse pointer is in
-    //  the emulator view, all keyboard input goes to the view.  If the user
-    //  mouse-clicks inside the emulator view, all input goes to the view.
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !emulatorHasMouseFocus_) {
-        emulatorHasMouseFocus_ = ImGui::IsWindowHovered();
-    }
     emulatorHasKeyboardFocus_ = emulatorHasMouseFocus_;
     if (ImGui::IsWindowFocused()) {
         emulatorHasKeyboardFocus_ = true;
     }
     emulatorHasKeyboardFocus_ = emulatorHasKeyboardFocus_ || ImGui::IsWindowHovered();
+
+    //  translate mouse position to emulated screen coordinates
+    auto mousePos = ImGui::GetMousePos();
+    float viewToMonitorScalarX = viewToMonitor.size.x / monitorSize.x;
+    float viewToMonitorScalarY = viewToMonitor.size.y / monitorSize.y;
+    float mouseX = (mousePos.x - monitorAnchor.x) * viewToMonitorScalarX;
+    float mouseY = (mousePos.y - monitorAnchor.y) * viewToMonitorScalarY;
+    float mouseToViewDX = (viewToMonitor.size.x - viewToMonitor.workSize.x) * 0.5f;
+    float mouseToViewDY = (viewToMonitor.size.y - viewToMonitor.workSize.y) * 0.5f;
+
+    bool mouseInDeviceScreen = true;
+    diagnostics_.mouseX = std::floor(mouseX - mouseToViewDX);
+    diagnostics_.mouseY = std::floor(mouseY - mouseToViewDY);
+
+    if (diagnostics_.mouseX < 0 || diagnostics_.mouseX >= viewToMonitor.workSize.x)
+        mouseInDeviceScreen = false;
+    else if (diagnostics_.mouseY < 0 || diagnostics_.mouseY >= viewToMonitor.workSize.y)
+        mouseInDeviceScreen = false;
+
+    //
+    //` super-hires tracking: x /= 2 if in 320 mode (any scanlines that are 640 pixel,
+    //```means 640 mode)
+    //  what to do about legacy graphics modes (use screen holes, but what do apps expect
+    //  in ranges from firmware?)
+    if (!emulatorHasMouseFocus_) {
+        mouseInEmulatorScreen_ = mouseInDeviceScreen;
+        if (mouseInEmulatorScreen_) {
+            ClemensInputEvent mouseEvt;
+
+            int16_t a2screenX, a2screenY;
+
+            //  TODO: maybe only run this for super-hires mode?
+            clemens_monitor_to_video_coordinates(
+                &frameReadState_.frame.monitor, &frameReadState_.frame.graphics, &a2screenX,
+                &a2screenY, diagnostics_.mouseX, diagnostics_.mouseY);
+
+            mouseEvt.type = kClemensInputType_MouseMoveAbsolute;
+            mouseEvt.value_a = int16_t(a2screenX);
+            mouseEvt.value_b = int16_t(a2screenY);
+            backendQueue_.inputEvent(mouseEvt);
+            if (ImGui::GetIO().MouseClicked[0] && ImGui::IsWindowHovered()) {
+                mouseEvt.type = kClemensInputType_MouseButtonDown;
+                mouseEvt.value_a = 0x01;
+                mouseEvt.value_b = 0x01;
+                backendQueue_.inputEvent(mouseEvt);
+            } else if (ImGui::GetIO().MouseReleased[0]) {
+                mouseEvt.type = kClemensInputType_MouseButtonUp;
+                mouseEvt.value_a = 0x01;
+                mouseEvt.value_b = 0x01;
+                backendQueue_.inputEvent(mouseEvt);
+            }
+        }
+    } else {
+        mouseInEmulatorScreen_ = false;
+    }
 
     ImGui::EndChild();
     ImGui::End();
@@ -3303,10 +3398,10 @@ void ClemensFrontend::doViewInputInstructions(ImVec2 dimensions) {
     const char *infoText = nullptr;
     if (emulatorHasMouseFocus_) {
         infoText = ClemensL10N::kMouseUnlock[ClemensL10N::kLanguageDefault];
-    } else if (emulatorHasKeyboardFocus_) {
-        infoText = ClemensL10N::kMouseLock[ClemensL10N::kLanguageDefault];
-    } else {
+    } else if (!emulatorHasKeyboardFocus_) {
         infoText = ClemensL10N::kViewInput[ClemensL10N::kLanguageDefault];
+    } else {
+        infoText = "";
     }
 
     ImVec2 anchor = ImGui::GetCursorScreenPos();

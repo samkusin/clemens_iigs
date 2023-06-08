@@ -119,10 +119,11 @@ void clem_adb_reset(struct ClemensDeviceADB *adb) {
     adb->keyb.reset_key = false;
     adb->keyb.size = 0;
     adb->mouse.size = 0;
+    adb->mouse.tracking_enabled = false;
+    adb->mouse.valid_clamp_box = false;
     adb->gameport.ann_mask = 0;
     adb->gameport.btn_mask[0] = adb->gameport.btn_mask[1] = 0;
     adb->irq_dispatch = 0;
-
     for (i = 0; i < 4; ++i) {
         adb->gameport.paddle[i] = CLEM_GAMEPORT_PADDLE_AXIS_VALUE_INVALID;
         adb->gameport.paddle_timer_ns[i] = 0;
@@ -1511,6 +1512,116 @@ static unsigned _clem_adb_glu_unqueue_mouse(struct ClemensDeviceADB *adb) {
     return mouse;
 }
 
+/* TODO: these should be a part of a 'ROM introspection' utility */
+
+/* Mouse tracking assumes that certain ROM states are set before operating.
+   See the above TODO for how to improve upon this approach - as these values
+   are initialized by Toolbox code.
+
+   An approach that works and is used by other emulators involves verifying
+   that the Event Manager is initialized which assumes a desktop with cursor (or
+   a game that uses the Toolbox for mouse input.)
+
+   Since the clamp values and cursor positions are set by Toolbox calls,
+   it's possible that titles leverage SetClamp/ReadMouse/ReadMouse2 (beyond the
+   ROM's IRQ handler) without invoking the EventManager.   This solution will
+   try to account for these titles as well.
+
+   So - if the clamp values seem valid (x0,y0 >= 0 and x1,y1 < 1024 and > x0,y0)
+   we'll assume they were set by calls to the Toolbox.
+
+   TODO: Set positions/clamps in Apple 2/Slot 4 Mouse Firmware screen holes
+*/
+#define CLEM_ADB_MOUSE_IIGS_ROM_XL 0x190
+#define CLEM_ADB_MOUSE_IIGS_ROM_XH 0x192
+#define CLEM_ADB_MOUSE_IIGS_ROM_YL 0x191
+#define CLEM_ADB_MOUSE_IIGS_ROM_YH 0x193
+
+#define CLEM_ADB_MOUSE_IIGS_ROM_CLAMP_X0 0x2b8
+#define CLEM_ADB_MOUSE_IIGS_ROM_CLAMP_Y0 0x2ba
+#define CLEM_ADB_MOUSE_IIGS_ROM_CLAMP_X1 0x2bc
+#define CLEM_ADB_MOUSE_IIGS_ROM_CLAMP_Y1 0x2be
+
+static void _clem_adb_mouse_check_clamping(struct ClemensDeviceADB *adb, uint8_t *e1_bank) {
+    uint16_t x0 = ((uint16_t)(e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_CLAMP_X0 + 1]) << 16) |
+                  e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_CLAMP_X0];
+    uint16_t y0 = ((uint16_t)(e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_CLAMP_Y0 + 1]) << 16) |
+                  e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_CLAMP_Y0];
+    uint16_t x1 = ((uint16_t)(e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_CLAMP_X1 + 1]) << 16) |
+                  e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_CLAMP_X1];
+    uint16_t y1 = ((uint16_t)(e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_CLAMP_Y1 + 1]) << 16) |
+                  e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_CLAMP_Y1];
+
+    adb->mouse.valid_clamp_box = y0 < y1 && x0 < x1 && y1 < 0x400 && x1 < 0x400;
+}
+
+static void _clem_adb_glu_queue_tracked_mouse(struct ClemensDeviceADB *adb, int16_t mx,
+                                              int16_t my) {
+    /* This event isn't queued - but instead state variables for tracking are set
+       here.  Deltas are calculated on demand on reads to $c024.
+    */
+    adb->mouse.mx = mx;
+    adb->mouse.my = my;
+    if (!adb->mouse.tracking_enabled && adb->mouse.valid_clamp_box) {
+        /* need an initial position if we're starting to track */
+        adb->mouse.mx0 = adb->mouse.mx;
+        adb->mouse.mx0 = adb->mouse.my;
+        adb->mouse.tracking_enabled = true;
+    }
+}
+
+static void _clem_adb_glu_mouse_tracking(struct ClemensDeviceADB *adb,
+                                         struct ClemensDeviceMega2Memory *m2mem) {
+    //  IIGS firmware only
+    //  alternate readying X and Y based on the current status flags
+    //  if mouse.tracking_enabled we calculate deltas here based on current and previous
+    //  mouse positions.  note if the deltas are > than abs(63), then the delta is 0
+    //
+    //  This relies on ROM code that calls ReadMouse() and memory locations that
+    //  will contain the current mouse x and y.
+    //
+    //  The deltas are then calculated and returned here.  The ROM code will
+    //  perform the translation. (i.e. x + dx = x')
+    //  If delta is 0, then set current mouse position to the next position
+    //
+    //  NOTE: This does not take Apple II mouse calls into account.  That
+    //  logic should occur in a different location.
+
+    int16_t delta_x;
+    int16_t delta_y;
+
+    _clem_adb_mouse_check_clamping(adb, m2mem->e1_bank);
+    if (!adb->mouse.tracking_enabled || !adb->mouse.valid_clamp_box)
+        return;
+
+    delta_x = adb->mouse.mx - adb->mouse.mx0;
+    delta_y = adb->mouse.my - adb->mouse.my0;
+    //  TODO: must account for screen mode (320 vs 640)
+    //        maybe this occurs on the host side which will translate coordinates.
+
+    if (delta_x > 63 || delta_x < -63) {
+        m2mem->e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_XL] = (uint8_t)(adb->mouse.mx & 0xff);
+        m2mem->e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_XH] = (uint8_t)(adb->mouse.mx >> 8);
+        delta_x = 0;
+    } else {
+        m2mem->e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_XL] = (uint8_t)(adb->mouse.mx0 & 0xff);
+        m2mem->e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_XH] = (uint8_t)(adb->mouse.mx0 >> 8);
+    }
+    if (delta_y > 63 || delta_y < -63) {
+        m2mem->e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_YL] = (uint8_t)(adb->mouse.my & 0xff);
+        m2mem->e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_YH] = (uint8_t)(adb->mouse.my >> 8);
+        delta_y = 0;
+    } else {
+        m2mem->e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_YL] = (uint8_t)(adb->mouse.my0 & 0xff);
+        m2mem->e1_bank[CLEM_ADB_MOUSE_IIGS_ROM_YH] = (uint8_t)(adb->mouse.my0 >> 8);
+    }
+    if (delta_x != 0 || delta_y != 0) {
+        _clem_adb_glu_queue_mouse(adb, delta_x, delta_y);
+    }
+    adb->mouse.mx0 = adb->mouse.mx;
+    adb->mouse.my0 = adb->mouse.my;
+}
+
 static void _clem_adb_glu_mouse_talk(struct ClemensDeviceADB *adb) {
     //  populate our mouse data register - this will pull all events from the
     //  queue, compressing multiple events over the frame into a single event
@@ -1520,8 +1631,9 @@ static void _clem_adb_glu_mouse_talk(struct ClemensDeviceADB *adb) {
     uint16_t mouse_reg;
 
     //  this approach will result in lost events if they are not consumed
-    //  fase enough.  reevaluate
+    //  fast enough.  reevaluate
     if (adb->mouse.size <= 0) {
+        //  TODO: what if autopoll is disabled?
         _clem_adb_glu_queue_mouse(adb, 0, 0);
     }
     mouse_reg = _clem_adb_glu_unqueue_mouse(adb);
@@ -1832,16 +1944,21 @@ void clem_gameport_sync(struct ClemensDeviceGameport *gameport, struct ClemensCl
     gameport->ts_last_frame = clocks->ts;
 }
 
-void clem_adb_glu_sync(struct ClemensDeviceADB *adb, uint32_t delta_us) {
+void clem_adb_glu_sync(struct ClemensDeviceADB *adb, struct ClemensDeviceMega2Memory *m2mem,
+                       uint32_t delta_us) {
     adb->poll_timer_us += delta_us;
     adb->keyb.timer_us += delta_us;
 
-    /*  On poll expiration, update device registers */
+    /*  On poll expiration, update device registers
+     */
     while (adb->poll_timer_us >= CLEM_MEGA2_CYCLES_PER_60TH) {
         /* IIgs prohibits the mouse from issuing SRQs for incoming mouse data,
            so we only do this for keyboards at this time.
         */
         if (adb->mode_flags & CLEM_ADB_MODE_AUTOPOLL_MOUSE) {
+            /* TODO: when doesn't this happen?  The mouse may be updated otherwise
+                     with the current code */
+            _clem_adb_glu_mouse_tracking(adb, m2mem);
             _clem_adb_glu_mouse_talk(adb);
         }
         if (adb->mode_flags & CLEM_ADB_MODE_AUTOPOLL_KEYB) {
@@ -1968,7 +2085,11 @@ void clem_adb_device_input(struct ClemensDeviceADB *adb, const struct ClemensInp
         _clem_adb_glu_queue_mouse(adb, 0, 0);
         break;
     case kClemensInputType_MouseMove:
+        adb->mouse.tracking_enabled = false;
         _clem_adb_glu_queue_mouse(adb, input->value_a, input->value_b);
+        break;
+    case kClemensInputType_MouseMoveAbsolute:
+        _clem_adb_glu_queue_tracked_mouse(adb, input->value_a, input->value_b);
         break;
     case kClemensInputType_Paddle:
         _clem_adb_gameport_paddle(
@@ -2236,7 +2357,6 @@ static uint8_t _clem_adb_read_modkeys(struct ClemensDeviceADB *adb) {
 }
 
 static uint8_t _clem_adb_read_mouse_data(struct ClemensDeviceADB *adb, uint8_t flags) {
-    //  alternate readying X and Y based on the current status flags
     uint8_t result = 0x00;
     if (adb->cmd_status & CLEM_ADB_C027_MOUSE_Y) {
         result |= (adb->mouse_reg[0] >> 8);

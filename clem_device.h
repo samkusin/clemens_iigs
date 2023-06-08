@@ -11,7 +11,7 @@
  */
 
 #ifdef __cplusplus
-extern "C" {
+extern "C" {    
 #endif
 
 void clem_rtc_reset(struct ClemensDeviceRTC *rtc, clem_clocks_duration_t latency);
@@ -86,7 +86,8 @@ void clem_gameport_sync(struct ClemensDeviceGameport *gameport, struct ClemensCl
  * @param adb ADB device data (1 ms worth of cycles?)
  * @param clocks Microsecond increment since last sync
  */
-void clem_adb_glu_sync(struct ClemensDeviceADB *adb, uint32_t delta_us);
+void clem_adb_glu_sync(struct ClemensDeviceADB *adb, struct ClemensDeviceMega2Memory* m2mem, 
+                       uint32_t delta_us);
 
 /**
  * @brief Executed from the memory subsystem for MMIO
