@@ -200,6 +200,8 @@ ClemensCommandQueue::DispatchResult
 ClemensBackend::main(ClemensBackendState &backendState,
                      const ClemensCommandQueue::ResultBuffer &commandResults,
                      PublishStateDelegate delegate) {
+    constexpr clem_clocks_time_t kClocksPerSecond =
+        1e9 * CLEM_CLOCKS_14MHZ_CYCLE / CLEM_14MHZ_CYCLE_NS;
 
     std::optional<unsigned> hitBreakpoint;
 
@@ -232,7 +234,9 @@ ClemensBackend::main(ClemensBackendState &backendState,
             runSampler_.disableFastMode();
         }
 
-        GS_->setLocalEpochTime(get_local_epoch_time_delta_in_seconds());
+        if (clocksInSecondPeriod_ >= kClocksPerSecond) {
+            updateRTC();
+        }
 
         //  TODO: GS_->beginTimeslice();
         auto &machine = GS_->getMachine();
@@ -274,6 +278,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
 
         runSampler_.update((clem_clocks_duration_t)(machine.tspec.clocks_spent - lastClocksSpent),
                            machine.cpu.cycles_spent);
+        clocksInSecondPeriod_ += machine.tspec.clocks_spent - lastClocksSpent;
     }
 
     auto &machine = GS_->getMachine();
@@ -529,9 +534,15 @@ bool ClemensBackend::unserialize(const std::string &path) {
         return false;
     GS_->unmount();
     GS_ = std::move(gs);
+    updateRTC();
     GS_->mount();
     breakpoints_ = std::move(breakpoints);
     return true;
+}
+
+void ClemensBackend::updateRTC() {
+    GS_->setLocalEpochTime(get_local_epoch_time_delta_in_seconds());
+    clocksInSecondPeriod_ = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

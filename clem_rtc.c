@@ -164,6 +164,33 @@ uint8_t _clem_rtc_clock_read(struct ClemensDeviceRTC *rtc) {
     return 0;
 }
 
+void _clem_rtc_clock_write(struct ClemensDeviceRTC *rtc, uint8_t data) {
+    unsigned opt = rtc->index & 0xff;
+    if (opt & 1) {
+        if (rtc->index & 0x80000000) {
+            /* hi portion of clock data */
+            if (opt & 0x4) {
+                rtc->seconds_since_1904 = rtc->seconds_since_1904 & 0x00ffffff;
+                rtc->seconds_since_1904 |= ((unsigned)data << 24);
+            } else {
+                rtc->seconds_since_1904 = rtc->seconds_since_1904 & 0xff00ffff;
+                rtc->seconds_since_1904 |= ((unsigned)data << 16);
+            }
+        } else {
+            /* lo portion of clock data */
+            if (opt & 0x4) {
+                rtc->seconds_since_1904 = rtc->seconds_since_1904 & 0xffff00ff;
+                rtc->seconds_since_1904 |= ((unsigned)data << 8);
+            } else {
+                rtc->seconds_since_1904 = rtc->seconds_since_1904 & 0xffffff00;
+                rtc->seconds_since_1904 |= data;
+            }
+        }
+        return;
+    }
+    CLEM_WARN("clem_rtc: clock write bad opt (%02X)", opt);
+}
+
 void clem_rtc_command(struct ClemensDeviceRTC *rtc, clem_clocks_time_t ts, unsigned op) {
     /* A command involves 1 or more data bytes being sent to or received
         by the RTC controller.  This is done serially in hardware, but here we
@@ -243,6 +270,15 @@ void clem_rtc_command(struct ClemensDeviceRTC *rtc, clem_clocks_time_t ts, unsig
             }
             break;
         case CLEM_RTC_EXECUTE_WRITE_CLOCK:
+            if (has_recv_started) {
+                if (is_write_cmd) {
+                    CLEM_LOG("RTC: write clock data: %02X", rtc->data_c033);
+                    _clem_rtc_clock_write(rtc, rtc->data_c033);
+                    //  _clem_rtc_bram_write(rtc, rtc->data_c033);
+                } else {
+                    CLEM_WARN("RTC: unexpected ctrl $02X, state: %02X", rtc->ctl_c034, rtc->state);
+                }
+            }
             break;
         default:
             break;

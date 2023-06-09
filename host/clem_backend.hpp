@@ -180,6 +180,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
 
     bool serialize(const std::string &path) const;
     bool unserialize(const std::string &path);
+    void updateRTC();
 
   private:
     Config config_;
@@ -204,6 +205,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
 
     std::optional<int> stepsRemaining_;
     int64_t clocksRemainingInTimeslice_;
+    uint64_t clocksInSecondPeriod_;
 };
 
 #endif
