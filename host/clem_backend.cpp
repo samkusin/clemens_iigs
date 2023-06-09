@@ -173,6 +173,7 @@ ClemensBackend::ClemensBackend(std::string romPath, const Config &config)
     switch (config_.type) {
     case Config::Type::Apple2GS:
         GS_ = std::make_unique<ClemensAppleIIGS>(romPath, config_.GS, *this);
+        GS_->setLocalEpochTime(get_local_epoch_time_delta_in_seconds());
         GS_->mount();
         break;
     }
@@ -231,8 +232,6 @@ ClemensBackend::main(ClemensBackendState &backendState,
         } else {
             runSampler_.disableFastMode();
         }
-
-        GS_->setLocalEpochTime(get_local_epoch_time_delta_in_seconds());
 
         //  TODO: GS_->beginTimeslice();
         auto &machine = GS_->getMachine();
@@ -529,6 +528,7 @@ bool ClemensBackend::unserialize(const std::string &path) {
         return false;
     GS_->unmount();
     GS_ = std::move(gs);
+    GS_->setLocalEpochTime(get_local_epoch_time_delta_in_seconds());
     GS_->mount();
     breakpoints_ = std::move(breakpoints);
     return true;
@@ -589,7 +589,10 @@ void ClemensBackend::onClemensInstruction(struct ClemensInstruction *inst, const
 //
 void ClemensBackend::onCommandReset() { GS_->reset(); }
 
-void ClemensBackend::onCommandRun() { stepsRemaining_ = std::nullopt; }
+void ClemensBackend::onCommandRun() {
+    GS_->setLocalEpochTime(get_local_epoch_time_delta_in_seconds());
+    stepsRemaining_ = std::nullopt;
+}
 
 void ClemensBackend::onCommandBreakExecution() { stepsRemaining_ = 0; }
 
