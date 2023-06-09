@@ -173,7 +173,6 @@ ClemensBackend::ClemensBackend(std::string romPath, const Config &config)
     switch (config_.type) {
     case Config::Type::Apple2GS:
         GS_ = std::make_unique<ClemensAppleIIGS>(romPath, config_.GS, *this);
-        GS_->setLocalEpochTime(get_local_epoch_time_delta_in_seconds());
         GS_->mount();
         break;
     }
@@ -201,6 +200,8 @@ ClemensCommandQueue::DispatchResult
 ClemensBackend::main(ClemensBackendState &backendState,
                      const ClemensCommandQueue::ResultBuffer &commandResults,
                      PublishStateDelegate delegate) {
+    constexpr clem_clocks_time_t kClocksPerSecond =
+        1e9 * CLEM_CLOCKS_14MHZ_CYCLE / CLEM_14MHZ_CYCLE_NS;
 
     std::optional<unsigned> hitBreakpoint;
 
@@ -231,6 +232,10 @@ ClemensBackend::main(ClemensBackendState &backendState,
             runSampler_.enableFastMode();
         } else {
             runSampler_.disableFastMode();
+        }
+
+        if (clocksInSecondPeriod_ >= kClocksPerSecond) {
+            updateRTC();
         }
 
         //  TODO: GS_->beginTimeslice();
@@ -273,6 +278,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
 
         runSampler_.update((clem_clocks_duration_t)(machine.tspec.clocks_spent - lastClocksSpent),
                            machine.cpu.cycles_spent);
+        clocksInSecondPeriod_ += machine.tspec.clocks_spent - lastClocksSpent;
     }
 
     auto &machine = GS_->getMachine();
@@ -528,10 +534,15 @@ bool ClemensBackend::unserialize(const std::string &path) {
         return false;
     GS_->unmount();
     GS_ = std::move(gs);
-    GS_->setLocalEpochTime(get_local_epoch_time_delta_in_seconds());
+    updateRTC();
     GS_->mount();
     breakpoints_ = std::move(breakpoints);
     return true;
+}
+
+void ClemensBackend::updateRTC() {
+    GS_->setLocalEpochTime(get_local_epoch_time_delta_in_seconds());
+    clocksInSecondPeriod_ = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -589,10 +600,7 @@ void ClemensBackend::onClemensInstruction(struct ClemensInstruction *inst, const
 //
 void ClemensBackend::onCommandReset() { GS_->reset(); }
 
-void ClemensBackend::onCommandRun() {
-    GS_->setLocalEpochTime(get_local_epoch_time_delta_in_seconds());
-    stepsRemaining_ = std::nullopt;
-}
+void ClemensBackend::onCommandRun() { stepsRemaining_ = std::nullopt; }
 
 void ClemensBackend::onCommandBreakExecution() { stepsRemaining_ = 0; }
 
