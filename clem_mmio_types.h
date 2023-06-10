@@ -182,11 +182,11 @@ struct ClemensDeviceEnsoniq {
     uint8_t osc_flags[32]; /**< Oscillator table (Interrupts) */
     uint8_t osc_stack[32]; /**< Oscillator completion / interrupt stack */
 
-    unsigned address;       /**< 16-bit address into RAM or registers */
-    unsigned ram_read_cntr; /**< RAM read counter, reset on address change */
-    bool addr_auto_inc;     /**< Address auto incremented on access */
-    bool is_access_ram;     /**< If true, sound RAM, if false, registers */
-    bool is_busy;           /**< DOC busy */
+    unsigned address;   /**< 16-bit address into RAM or registers */
+    uint8_t data_reg;   /**< For read operations on RAM, accounts for the 1 read op lag, */
+    bool addr_auto_inc; /**< Address auto incremented on access */
+    bool is_access_ram; /**< If true, sound RAM, if false, registers */
+    bool is_busy;       /**< DOC busy */
 };
 
 struct ClemensDeviceAudio {

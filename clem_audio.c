@@ -110,7 +110,7 @@ static uint16_t s_ensoniq_ptr_bits_mask[8] = {0xff00, 0xfe00, 0xfc00, 0xf800,
 
 void clem_ensoniq_reset(struct ClemensDeviceEnsoniq *doc) {
     doc->address = 0;
-    doc->ram_read_cntr = 0;
+    doc->data_reg = 0;
     doc->dt_budget = 0;
     doc->cycle = 0;
     doc->addr_auto_inc = false;
@@ -360,7 +360,6 @@ void clem_ensoniq_write_ctl(struct ClemensDeviceEnsoniq *doc, uint8_t value) {
 }
 
 void clem_ensoniq_write_data(struct ClemensDeviceEnsoniq *doc, uint8_t value) {
-    doc->ram_read_cntr = 0;
     if (doc->is_access_ram) {
         doc->sound_ram[doc->address & 0xffff] = value;
     } else {
@@ -387,6 +386,7 @@ void clem_ensoniq_write_data(struct ClemensDeviceEnsoniq *doc, uint8_t value) {
             break;
         }
     }
+    doc->data_reg = value;
     if (doc->addr_auto_inc) {
         ++doc->address;
     }
@@ -407,40 +407,37 @@ uint8_t clem_ensoniq_read_ctl(struct ClemensDeviceEnsoniq *doc, uint8_t flags) {
 }
 
 uint8_t clem_ensoniq_read_data(struct ClemensDeviceEnsoniq *doc, uint8_t flags) {
-    uint8_t result = 0x00;
+    uint8_t result = doc->data_reg;
     /* refer to HW Ref Chapter 5 - p 107, Read operation,
-        first time read operations upon changing the address
-        require double reads - likely for some kind of switch
-        over/state reset on the hardware.  Will have to evalaute
-        how firmware and ROM handles this (i.e. it appears
-        when we read the interrupt register on the DOC, it's read
-        twice, following the convention here)
+        basically reads lag by one cycle.  It's uncertain to me whether this
+        is just for RAM as the hardware ref says, versus all read accesses
+        to registers as well.  Note: it appears when we read the interrupt
+        register on the DOC, it's read twice.
     */
-    if (doc->is_access_ram) {
-        result = doc->sound_ram[doc->address & 0xffff];
-    } else {
-        result = doc->reg[doc->address & 0xff];
-    }
     if (CLEM_IS_IO_NO_OP(flags))
         return result;
 
-    if (doc->ram_read_cntr > 0) {
-        if (!doc->is_access_ram) {
-            switch (doc->address & 0xff) {
-            case CLEM_ENSONIQ_REG_OSC_OIR:
-                //  retrieve next IRQ or clear OIR
-                _clem_ensoniq_next_irq(doc);
-                break;
-            default:
-                break;
-            }
-        }
-        if (doc->addr_auto_inc) {
-            ++doc->address;
+    if (doc->is_access_ram) {
+        doc->data_reg = doc->sound_ram[doc->address & 0xffff];
+    } else {
+        doc->data_reg = doc->reg[doc->address & 0xff];
+    }
+
+    if (!doc->is_access_ram) {
+        switch (doc->address & 0xff) {
+        case CLEM_ENSONIQ_REG_OSC_OIR:
+            //  retrieve next IRQ or clear OIR
+            _clem_ensoniq_next_irq(doc);
+            break;
+        default:
+            break;
         }
     }
 
-    ++doc->ram_read_cntr;
+    if (doc->addr_auto_inc) {
+        ++doc->address;
+    }
+
     return result;
 }
 
@@ -591,12 +588,10 @@ void clem_sound_write_switch(struct ClemensDeviceAudio *glu, uint8_t ioreg, uint
     case CLEM_MMIO_REG_AUDIO_ADRLO:
         glu->doc.address &= 0xff00;
         glu->doc.address |= value;
-        glu->doc.ram_read_cntr = 0;
         break;
     case CLEM_MMIO_REG_AUDIO_ADRHI:
         glu->doc.address &= 0x00ff;
         glu->doc.address |= ((unsigned)(value) << 8);
-        glu->doc.ram_read_cntr = 0;
         break;
     case CLEM_MMIO_REG_SPKR:
         glu->a2_speaker = !glu->a2_speaker;
