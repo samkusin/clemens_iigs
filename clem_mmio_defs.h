@@ -383,6 +383,7 @@
 /** Timer (internal, C023 partial) device flags */
 #define CLEM_MMIO_TIMER_1SEC_ENABLED 0x00000040
 #define CLEM_MMIO_TIMER_QSEC_ENABLED 0x00000100
+#define CLEM_MMIO_TIMER_QSEC_IRQ     0x00010000
 
 /** Used for emulator detection at c04f
  * Apple II Technical Notes #201 (IIgs)

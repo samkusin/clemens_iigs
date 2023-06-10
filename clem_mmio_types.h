@@ -307,6 +307,7 @@ struct ClemensVGC {
 
     bool scanline_irq_enable;
     bool vbl_started; /**< Limits VBL IRQ */
+    bool irq_vbl;     /**< Used for C046 INTFLAG and cleared via C047 CLRVBLINT */
 
     uint32_t irq_line; /**< IRQ flags passed to machine */
 };

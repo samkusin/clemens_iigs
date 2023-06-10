@@ -149,6 +149,7 @@ void clem_vgc_reset(struct ClemensVGC *vgc) {
     vgc->text_bg_color = CLEM_VGC_COLOR_MEDIUM_BLUE;
     vgc->scanline_irq_enable = false;
     vgc->vbl_started = false;
+    vgc->irq_vbl = false;
     vgc->vbl_counter = 0;
 
     for (row = 0; row < CLEM_VGC_SHGR_SCANLINE_COUNT * 16; ++row) {
@@ -254,6 +255,7 @@ void clem_vgc_sync(struct ClemensVGC *vgc, struct ClemensClock *clock, const uin
         if (vgc->v_counter >= CLEM_VGC_VBL_NTSC_LOWER_BOUND && !vgc->vbl_started) {
             if (vgc->mode_flags & CLEM_VGC_ENABLE_VBL_IRQ) {
                 vgc->irq_line |= CLEM_IRQ_VGC_BLANK;
+                vgc->irq_vbl = true;
             }
             vgc->vbl_started = true;
         }
