@@ -272,9 +272,7 @@ void clem_rtc_command(struct ClemensDeviceRTC *rtc, clem_clocks_time_t ts, unsig
         case CLEM_RTC_EXECUTE_WRITE_CLOCK:
             if (has_recv_started) {
                 if (is_write_cmd) {
-                    CLEM_LOG("RTC: write clock data: %02X", rtc->data_c033);
                     _clem_rtc_clock_write(rtc, rtc->data_c033);
-                    //  _clem_rtc_bram_write(rtc, rtc->data_c033);
                 } else {
                     CLEM_WARN("RTC: unexpected ctrl $02X, state: %02X", rtc->ctl_c034, rtc->state);
                 }

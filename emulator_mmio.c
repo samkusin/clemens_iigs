@@ -487,10 +487,13 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     clem_gameport_sync(&mmio->dev_adb.gameport, &clock);
 
     /* background execution of some async devices on the 60 hz timer */
-    /* TODO: ADB should occur on the VBL */
+    /* TODO: ADB autopoll should occur on the VBL, also mega2 cycles aren't 1us (close!)
+       ADB should use clocks like all other subsystems (ADB was the second subsystem written
+       for this emulator!) */
+    clem_adb_glu_sync(&mmio->dev_adb, &m2mem, delta_mega2_cycles);
+
     while (mmio->timer_60hz_us >= CLEM_MEGA2_CYCLES_PER_60TH) {
         clem_timer_sync(&mmio->dev_timer, CLEM_MEGA2_CYCLES_PER_60TH);
-        clem_adb_glu_sync(&mmio->dev_adb, &m2mem, CLEM_MEGA2_CYCLES_PER_60TH);
         if (clem->resb_counter <= 0 && mmio->dev_adb.keyb.reset_key) {
             /* TODO: move into its own utility */
             clem->resb_counter = 2;

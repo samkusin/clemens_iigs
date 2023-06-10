@@ -1763,7 +1763,31 @@ static uint8_t _clem_adb_glu_read_memory(struct ClemensDeviceADB *adb, uint8_t a
             break;
         }
     } else {
+        /* Any address above $1FFF wraps around to $0000 (only bits 0-12 are used)
+           ROM 01 checksum = 0xf772
+           ROM 03 checksum = 0x2672 (likely?)
+           Either way, the self-test logic accepts either checksum as OK.
+
+           Since we emulate the ADB, it's ROM contents aren't really important
+           unless I'm proven wrong by a title or IIGS firmware.  Just as long
+           as we can obtain a checksum by adding 2 16-bit words together to
+           get one of the above checksum values.
+           */
+        page &= 0x1f;
         result = 0x00;
+        if (page == 0x1f) {
+            if (address == 0x01) {
+                if (adb->version >= 0x06) {
+                    // ROM 3?
+                    result = 0x26;
+                } else {
+                    // ROM 1 or 0?
+                    result = 0xf7;
+                }
+            } else if (address == 0x00) {
+                result = 0x72;
+            }
+        }
     }
     return result;
 }

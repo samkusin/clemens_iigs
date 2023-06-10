@@ -77,7 +77,7 @@
     - Most interrupt features that aren't needed on the IIGS
 */
 
-#define CLEM_SCC_DEBUG
+// #define CLEM_SCC_DEBUG
 
 #ifdef CLEM_SCC_DEBUG
 #define CLEM_SCC_LOG(...) CLEM_LOG(__VA_ARGS__)
