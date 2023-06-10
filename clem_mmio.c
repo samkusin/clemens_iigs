@@ -304,17 +304,22 @@ static uint8_t _clem_mmio_mega2_inten_get(ClemensMMIO *mmio) {
 static uint8_t _clem_mmio_inttype_c046(ClemensMMIO *mmio) {
     uint8_t result = 0x0; // mmio->irq_line ? CLEM_MMIO_INTTYPE_IRQ : 0;
 
-    if (mmio->irq_line & CLEM_IRQ_TIMER_QSEC) {
+    if (mmio->dev_timer.flags & CLEM_MMIO_TIMER_QSEC_IRQ) {
         result |= CLEM_MMIO_INTTYPE_QSEC;
     }
-    if (mmio->irq_line & CLEM_IRQ_VGC_BLANK) {
+    if (mmio->vgc.irq_vbl) {
         result |= CLEM_MMIO_INTTYPE_VBL;
     }
 
     /* TODO: AN3, Mouse */
 
-    /* TODO: other flags, mouse, VBL, */
     return result;
+}
+
+static void _clem_mmio_clrvblint_c047(ClemensMMIO *mmio) {
+    mmio->vgc.irq_vbl = false;
+    mmio->dev_timer.flags &= ~CLEM_MMIO_TIMER_QSEC_IRQ;
+    _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_QSEC | CLEM_IRQ_VGC_BLANK);
 }
 
 static void _clem_mmio_vgc_irq_c023_set(ClemensMMIO *mmio, uint8_t data) {
@@ -789,7 +794,7 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         break;
     case CLEM_MMIO_REG_CLRVBLINT:
         if (!(flags & CLEM_OP_IO_NO_OP)) {
-            _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_QSEC | CLEM_IRQ_VGC_BLANK);
+            _clem_mmio_clrvblint_c047(mmio);
         }
         break;
     case CLEM_MMIO_REG_EMULATOR:
@@ -1100,7 +1105,7 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
         _clem_mmio_mega2_inten_set(mmio, data);
         break;
     case CLEM_MMIO_REG_CLRVBLINT:
-        _clem_mmio_clear_irq(mmio, CLEM_IRQ_TIMER_QSEC | CLEM_IRQ_VGC_BLANK);
+        _clem_mmio_clrvblint_c047(mmio);
         break;
     case CLEM_MMIO_REG_EMULATOR:
         mmio->emulator_detect = CLEM_MMIO_EMULATOR_DETECT_START;

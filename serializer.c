@@ -39,6 +39,7 @@ struct ClemensSerializerRecord kVGC[] = {
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, text_language),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensVGC, scanline_irq_enable),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensVGC, vbl_started),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensVGC, irq_vbl),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensVGC, irq_line),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
