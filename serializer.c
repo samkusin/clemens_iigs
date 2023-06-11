@@ -123,7 +123,7 @@ struct ClemensSerializerRecord kEnsoniq[] = {
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceEnsoniq, kClemensSerializerTypeUInt8,
                                  osc_stack, 32, 0),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceEnsoniq, address),
-    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceEnsoniq, ram_read_cntr),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceEnsoniq, data_reg),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceEnsoniq, addr_auto_inc),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceEnsoniq, is_access_ram),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceEnsoniq, is_busy),

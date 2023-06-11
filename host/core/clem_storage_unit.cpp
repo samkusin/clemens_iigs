@@ -255,6 +255,7 @@ void ClemensStorageUnit::update(ClemensMMIO &mmio) {
                 spdlog::error("ClemensStorageUnit - {}: disk was ejected but the event was not "
                               "intercepted - DATA LOSS!!!",
                               ClemensDiskUtilities::getDriveName(driveType));
+                status.unmount();
             }
         }
     }
