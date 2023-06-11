@@ -12,14 +12,19 @@
 #define NOMINMAX
 #endif
 
+#include <Shlwapi.h>
 #include <Windows.h>
+
+#pragma comment(lib, "Shlwapi.lib")
 static unsigned win32GetDriveLettersBitmask() { return ::GetLogicalDrives(); }
+static int win32GetDriveLetterFromPath(const char *path) { return PathGetDriveNumberA(path); }
 static struct tm *getTimeSpecFromTime(struct tm *tspec, std::time_t timet) {
     localtime_s(tspec, &timet);
     return tspec;
 }
 #else
 static unsigned win32GetDriveLettersBitmask() { return 0; }
+static int win32GetDriveLetterFromPath(const char *path) { return -1; }
 static struct tm *getTimeSpecFromTime(struct tm *tspec, std::time_t timet) {
     return localtime_r(&timet, tspec);
 }
@@ -85,32 +90,74 @@ void ClemensFileBrowser::frame(ImVec2 size) {
     //  Current Volume Combo (Win32 Only)
     //  Current Path Edit Box
     ImGui::BeginChild("#FileBrowser", size);
-    auto cwdIter = cwd.begin();
-    unsigned driveLetterMask = win32GetDriveLettersBitmask();
-    if (driveLetterMask) {
-        //  "C:" combo
-        ++cwdIter;
-    }
-    for (; cwdIter != cwd.end(); ++cwdIter) {
-        auto name = (*cwdIter).string();
-        auto nextX = ImGui::GetCursorPosX() + ImGui::GetStyle().FramePadding.x +
-                     ImGui::CalcTextSize(name.c_str()).x;
-        if (nextX >= ImGui::GetContentRegionMax().x) {
-            ImGui::NewLine();
-        }
-        if (ImGui::Button(name.c_str())) {
-            auto it = cwd.begin();
-            std::filesystem::path selectedWorkingDirectory;
-            for (auto itEnd = cwdIter; it != itEnd; ++it) {
-                selectedWorkingDirectory /= *it;
+    ImGui::BeginGroup();
+    {
+        auto cwdIter = cwd.begin();
+        unsigned driveLetterMask = win32GetDriveLettersBitmask();
+        if (driveLetterMask) {
+            char letter[4];
+            int driveLetterIndex = win32GetDriveLetterFromPath(cwd.string().c_str());
+            if (driveLetterIndex >= 0) {
+                letter[0] = 'A' + driveLetterIndex;
+                letter[1] = ':';
+                letter[2] = '\0';
+            } else {
+                letter[0] = '\0';
             }
-            selectedWorkingDirectory /= *it;
-            currentDirectoryPath_ = selectedWorkingDirectory;
-            forceRefresh();
+            ImGui::SetNextItemWidth(ImGui::GetFont()->GetCharAdvance('C') * 4);
+            if (ImGui::BeginCombo("##DriveLetter", letter,
+                                  ImGuiComboFlags_PopupAlignLeft | ImGuiComboFlags_NoArrowButton)) {
+                driveLetterIndex = 0;
+                while (driveLetterMask) {
+                    if (driveLetterMask & 1) {
+                        letter[0] = 'A' + driveLetterIndex;
+                        letter[1] = ':';
+                        letter[2] = '\0';
+                        if (ImGui::Selectable(letter)) {
+                            //  navigate to root of the selected drive letter
+                            //  if we don't change the letter string, filesystem
+                            //  seems to navigate to the current directory for
+                            //  the selected drive letter - which seems inconsistent
+                            //  and bug prone (maybe not - don't change this until need arises.)
+                            cwdIter = cwd.end();
+                            letter[2] = '\\';
+                            letter[3] = '\0';
+                            currentDirectoryPath_ = std::filesystem::path(letter);
+                            forceRefresh();
+                        }
+                    }
+                    ++driveLetterIndex;
+                    driveLetterMask >>= 1;
+                }
+                ImGui::EndCombo();
+            }
+            if (cwdIter != cwd.end()) {
+                ++cwdIter;
+            }
+            ImGui::SameLine();
         }
-        ImGui::SameLine();
+        for (; cwdIter != cwd.end(); ++cwdIter) {
+            auto name = (*cwdIter).string();
+            auto nextX = ImGui::GetCursorPosX() + ImGui::GetStyle().FramePadding.x +
+                         ImGui::CalcTextSize(name.c_str()).x;
+            if (nextX >= ImGui::GetContentRegionMax().x) {
+                ImGui::NewLine();
+            }
+            if (ImGui::Button(name.c_str())) {
+                auto it = cwd.begin();
+                std::filesystem::path selectedWorkingDirectory;
+                for (auto itEnd = cwdIter; it != itEnd; ++it) {
+                    selectedWorkingDirectory /= *it;
+                }
+                selectedWorkingDirectory /= *it;
+                currentDirectoryPath_ = selectedWorkingDirectory;
+                forceRefresh();
+            }
+            ImGui::SameLine();
+        }
+        ImGui::NewLine();
     }
-    ImGui::NewLine();
+    ImGui::EndGroup();
     //  Listbox
     ImVec4 evenRowColor = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
     ImVec4 oddRowColor = ImVec4(evenRowColor.x * 0.75f, evenRowColor.y * 0.75f,
