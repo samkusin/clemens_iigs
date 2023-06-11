@@ -1416,7 +1416,8 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     config_.save();
 
     interop.mouseLock = emulatorHasMouseFocus_;
-    interop.mouseShow = !mouseInEmulatorScreen_;
+    interop.mouseShow =
+        !mouseInEmulatorScreen_ || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
 
     return getViewType();
 }

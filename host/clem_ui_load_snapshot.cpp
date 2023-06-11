@@ -7,6 +7,8 @@
 #include "imgui.h"
 #include "spdlog/spdlog.h"
 
+#include "clem_l10n.hpp"
+
 #include <filesystem>
 
 bool ClemensLoadSnapshotUI::isStarted() const { return mode_ != Mode::None; }
@@ -59,22 +61,70 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue
                 ImGui::EndListBox();
             }
             ImGui::Separator();
-            if (ImGui::Button("Ok") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            ImGui::BeginDisabled(snapshotName_[0] == '\0');
+            if (ImGui::Button(CLEM_L10N_OK_LABEL) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
                 isOk = true;
             }
+            ImGui::EndDisabled();
             ImGui::SameLine();
-            if (ImGui::Button("Cancel") && !isOk) {
+            if (ImGui::Button(CLEM_L10N_CANCEL_LABEL) && !isOk) {
                 ImGui::CloseCurrentPopup();
                 mode_ = Mode::Cancelled;
             }
+            ImGui::SameLine();
+            ImGui::BeginDisabled(snapshotName_[0] == '\0');
+            if (ImGui::Button(CLEM_L10N_LABEL(kLabelDelete))) {
+                //  open a delete prompt
+                ImGui::OpenPopup(CLEM_L10N_LABEL(kModalDeleteSnapshot));
+            }
+            ImGui::EndDisabled();
             if (isOk && snapshotName_[0] != '\0') {
                 ImGui::CloseCurrentPopup();
                 backend.loadMachine(snapshotName_);
                 spdlog::info("ClemensLoadSnapshotUI - loading...");
                 mode_ = Mode::WaitForResponse;
             }
+            bool deleteError = false;
+            if (ImGui::BeginPopupModal(CLEM_L10N_LABEL(kModalDeleteSnapshot), NULL,
+                                       ImGuiWindowFlags_AlwaysAutoResize)) {
+                ImGui::Spacing();
+                ImGui::Text(CLEM_L10N_LABEL(kLabelDeleteConfirm), snapshotName_);
+                ImGui::Spacing();
+
+                ImGui::Separator();
+                if (ImGui::Button(CLEM_L10N_LABEL(kLabelDelete))) {
+                    std::error_code errc{};
+                    auto snapshotPath = std::filesystem::path(snapshotDir_) / snapshotName_;
+                    if (!std::filesystem::remove(snapshotPath, errc)) {
+                        spdlog::error("Unable to delete snapshot {} (error={})",
+                                      snapshotPath.string(), errc.message());
+                        deleteError = true;
+                    }
+                    snapshotName_[0] = '\0';
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button(CLEM_L10N_CANCEL_LABEL)) {
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
+            if (deleteError) {
+                ImGui::OpenPopup("Error");
+            }
+            if (ImGui::BeginPopupModal("Error", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+                ImGui::Spacing();
+                ImGui::Text(CLEM_L10N_LABEL(kLabelDeleteFailed));
+                ImGui::Spacing();
+                ImGui::Separator();
+                if (ImGui::Button(CLEM_L10N_OK_LABEL)) {
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
             ImGui::EndPopup();
         }
+
     } break;
     case Mode::WaitForResponse:
         break;
