@@ -643,11 +643,16 @@ void ClemensBackend::onCommandInputEvent(const ClemensInputEvent &inputEvent) {
 }
 
 bool ClemensBackend::onCommandInsertDisk(ClemensDriveType driveType, std::string diskPath) {
-    return GS_->getStorage().insertDisk(GS_->getMMIO(), driveType, diskPath);
+    bool result = GS_->getStorage().insertDisk(GS_->getMMIO(), driveType, diskPath);
+    if (result) {
+        GS_->saveConfig();
+    }
+    return result;
 }
 
 void ClemensBackend::onCommandEjectDisk(ClemensDriveType driveType) {
     GS_->getStorage().ejectDisk(GS_->getMMIO(), driveType);
+    GS_->saveConfig();
 }
 
 bool ClemensBackend::onCommandWriteProtectDisk(ClemensDriveType driveType, bool wp) {
@@ -656,7 +661,9 @@ bool ClemensBackend::onCommandWriteProtectDisk(ClemensDriveType driveType, bool 
 }
 
 bool ClemensBackend::onCommandInsertSmartPortDisk(unsigned driveIndex, std::string diskPath) {
-    return GS_->getStorage().assignSmartPortDisk(GS_->getMMIO(), driveIndex, diskPath);
+    bool result = GS_->getStorage().assignSmartPortDisk(GS_->getMMIO(), driveIndex, diskPath);
+    GS_->saveConfig();
+    return result;
 }
 
 void ClemensBackend::onCommandEjectSmartPortDisk(unsigned) {
