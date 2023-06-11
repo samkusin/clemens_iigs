@@ -1104,6 +1104,9 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
     case CLEM_MMIO_REG_MEGA2_INTEN:
         _clem_mmio_mega2_inten_set(mmio, data);
         break;
+    case CLEM_MMIO_REG_DIAG_INTTYPE:
+        //  no-op, likely a 16-bit write that bleeds over to -1 or +1 register index
+        break;
     case CLEM_MMIO_REG_CLRVBLINT:
         _clem_mmio_clrvblint_c047(mmio);
         break;

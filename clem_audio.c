@@ -186,26 +186,13 @@ void _clem_ensoniq_reset_osc(struct ClemensDeviceEnsoniq *doc, unsigned osc_inde
     doc->osc_flags[osc_index] &= ~CLEM_ENSONIQ_OSC_FLAG_CYCLE;
 }
 
-uint8_t clem_ensoniq_oscillator_cycle(struct ClemensDeviceEnsoniq *doc, unsigned osc_index,
-                                      unsigned osc_limit, uint8_t ctl) {
-    //  Data is read from sound RAM and sent to one of up to eight output channels
-    //  address calculation
-    //  ACC <- FREQ + ACC
-    //  OFF <- ACC
-    //  TODO: precalc these values when their registers change - may save a few
-    //        cycles if needed
-    unsigned freq_ctl = (((uint16_t)doc->reg[CLEM_ENSONIQ_REG_OSC_FCHI + osc_index]) << 8) |
-                        doc->reg[CLEM_ENSONIQ_REG_OSC_FCLOW + osc_index];
-    //  page aligned pointer into sound RAM
-    uint16_t ptr = ((uint16_t)doc->reg[CLEM_ENSONIQ_REG_OSC_PTR + osc_index]) << 8;
-    //  offset into the wavetable
-    unsigned acc = (doc->acc[osc_index] + freq_ctl) & 0x00ffffff; // 24-bit
-    unsigned resolution = (doc->reg[CLEM_ENSONIQ_REG_OSC_SIZE + osc_index] & 0x07) + 1;
-    unsigned size = ((doc->reg[CLEM_ENSONIQ_REG_OSC_SIZE + osc_index] >> 3) & 0x07);
-    unsigned channel = ((ctl & 0xf0) >> 4) & 0x7;
-    unsigned other_osc_index = osc_index ^ 1;
+static inline uint16_t _clem_ensoniq_calc_waveform_ptr(struct ClemensDeviceEnsoniq *doc,
+                                                       unsigned osc_index) {
 
-    doc->acc[osc_index] = acc;
+    unsigned acc = doc->acc[osc_index] & 0x00ffffff; // 24-bit
+    unsigned size = ((doc->reg[CLEM_ENSONIQ_REG_OSC_SIZE + osc_index] >> 3) & 0x07);
+    unsigned resolution = (doc->reg[CLEM_ENSONIQ_REG_OSC_SIZE + osc_index] & 0x07) + 1;
+    uint16_t ptr = ((uint16_t)doc->reg[CLEM_ENSONIQ_REG_OSC_PTR + osc_index]) << 8;
     //  use 16-bits of the accumulator, the resolution determines *which* 16 bits
     // size = 0, use 8 bits of accumulator at ADR0-7
     //      = 1, use 9 bits of accumulator at ADR0-8
@@ -214,6 +201,26 @@ uint8_t clem_ensoniq_oscillator_cycle(struct ClemensDeviceEnsoniq *doc, unsigned
     acc = (acc >> (8 - size)) & 0x7fff;
     ptr &= s_ensoniq_ptr_bits_mask[size];
     ptr |= acc;
+    return ptr;
+}
+
+uint8_t clem_ensoniq_oscillator_cycle(struct ClemensDeviceEnsoniq *doc, unsigned osc_index,
+                                      unsigned osc_limit, uint8_t ctl) {
+    //  Data is read from sound RAM and sent to one of up to eight output channels
+    //  address calculation
+    //  ACC <- FREQ + ACC
+    //  OFF <- ACC
+    //  TODO: precalc these values when their registers change - may save a few
+    //        cycles if needed
+    //  page aligned pointer into sound RAM
+    //  offset into the wavetable
+    uint16_t ptr = _clem_ensoniq_calc_waveform_ptr(doc, osc_index);
+    unsigned channel = ((ctl & 0xf0) >> 4) & 0x7;
+    unsigned other_osc_index = osc_index ^ 1;
+    unsigned freq_ctl = (((uint16_t)doc->reg[CLEM_ENSONIQ_REG_OSC_FCHI + osc_index]) << 8) |
+                        doc->reg[CLEM_ENSONIQ_REG_OSC_FCLOW + osc_index];
+
+    doc->acc[osc_index] = (doc->acc[osc_index] + freq_ctl) & 0x00ffffff; // next
 
     //  handle wraparound to start of wavetable, which triggers interrupts and
     //  changes oscillator state based on control mode (one-shot, sync, swap)
@@ -364,8 +371,9 @@ void clem_ensoniq_write_data(struct ClemensDeviceEnsoniq *doc, uint8_t value) {
         doc->sound_ram[doc->address & 0xffff] = value;
     } else {
         uint8_t oldvalue = doc->reg[doc->address & 0xff];
+        uint8_t reg_idx = doc->address & 0xff;
         /* TODO: write to specific registers that require special handling */
-        switch (doc->address & 0xff) {
+        switch (reg_idx) {
         case CLEM_ENSONIQ_REG_OSC_OIR:
             // appears to be a NOP (no mention of writing to E0 in the cortland docs,
             // and having apps write the IRQ status seems dangerous for hardware to allow)
@@ -376,13 +384,22 @@ void clem_ensoniq_write_data(struct ClemensDeviceEnsoniq *doc, uint8_t value) {
                 CLEM_LOG("DOC: OSC Enable set a value > expected maximum 64 (%02x)", value);
                 value &= 0x7f;
             }
-            doc->reg[doc->address & 0xff] = value;
+            doc->reg[reg_idx] = value;
             break;
         case CLEM_ENSONIQ_REG_OSC_ADC:
             // should be a no-op
             break;
         default:
-            doc->reg[doc->address & 0xff] = value;
+            doc->reg[reg_idx] = value;
+            if (reg_idx >= 0xa0 && reg_idx < 0xc0) {
+                if ((oldvalue ^ value) & CLEM_ENSONIQ_OSC_CTL_HALT) {
+                    if (oldvalue & CLEM_ENSONIQ_OSC_CTL_HALT) {
+                        //  switching oscillator on
+                        doc->ptr[reg_idx - 0xa0] =
+                            _clem_ensoniq_calc_waveform_ptr(doc, reg_idx - 0xa0);
+                    }
+                }
+            }
             break;
         }
     }
