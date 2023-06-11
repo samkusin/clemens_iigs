@@ -3,6 +3,9 @@
 
 #define CLEM_L10N_LABEL(_name_) ClemensL10N::_name_[ClemensL10N::kLanguageDefault]
 
+#define CLEM_L10N_OK_LABEL     ClemensL10N::kLabelOk[ClemensL10N::kLanguageDefault]
+#define CLEM_L10N_CANCEL_LABEL ClemensL10N::kLabelCancel[ClemensL10N::kLanguageDefault]
+
 namespace ClemensL10N {
 
 extern const char *kExitMessage[];
@@ -27,6 +30,14 @@ extern const char *kSettingsROMFileError[];
 extern const char *kEmulatorHelp[];
 extern const char *kDiskSelectionHelp[];
 extern const char *kDebuggerHelp[];
+
+extern const char *kModalDeleteSnapshot[];
+
+extern const char *kLabelDelete[];
+extern const char *kLabelOk[];
+extern const char *kLabelCancel[];
+extern const char *kLabelDeleteConfirm[];
+extern const char *kLabelDeleteFailed[];
 
 constexpr unsigned kLanguageDefault = 0;
 
