@@ -5,6 +5,8 @@
 
 #include <cstdint>
 
+//  TODO: move into a new utility header for debugger tracing/listing
+
 struct ClemensTraceExecutedInstruction {
     uint64_t seq;
     uint32_t cycles_spent;

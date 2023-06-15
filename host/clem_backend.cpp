@@ -154,11 +154,6 @@ void ClemensRunSampler::update(clem_clocks_duration_t clocksSpent, unsigned cycl
     avgVBLsPerFrame = (double)sampledVblsSpent / vblsBuffer.size();
 }
 
-void ClemensBackendState::reset() {
-    config.reset();
-    message.reset();
-}
-
 ClemensBackend::ClemensBackend(std::string romPath, const Config &config)
     : config_(config), gsConfigUpdated_(false),
       interpreter_(cinek::FixedStack(kInterpreterMemorySize, malloc(kInterpreterMemorySize))),

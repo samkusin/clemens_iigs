@@ -114,7 +114,7 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue
             }
             if (ImGui::BeginPopupModal("Error", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
                 ImGui::Spacing();
-                ImGui::Text(CLEM_L10N_LABEL(kLabelDeleteFailed));
+                ImGui::TextUnformatted(CLEM_L10N_LABEL(kLabelDeleteFailed));
                 ImGui::Spacing();
                 ImGui::Separator();
                 if (ImGui::Button(CLEM_L10N_OK_LABEL)) {
