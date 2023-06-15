@@ -329,13 +329,15 @@ void ClemensDebugger::layoutConsoleLines(ImVec2 dimensions) {
         case Command:
             ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(0, 255, 255, 255));
             break;
+        case Opcode:
+            ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(0, 255, 0, 255));
+            break;
         default:
+            ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)ImColor(255, 255, 255, 255));
             break;
         }
         ImGui::TextUnformatted(consoleLines_.at(index).text.c_str());
-        if (line.type != Info) {
-            ImGui::PopStyleColor();
-        }
+        ImGui::PopStyleColor();
     }
     if (consoleChanged_) {
         ImGui::SetScrollHereY();

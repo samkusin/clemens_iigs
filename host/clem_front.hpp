@@ -1,7 +1,10 @@
 #ifndef CLEM_HOST_FRONT_HPP
 #define CLEM_HOST_FRONT_HPP
 
+#include "cinek/keyframe.hpp"
+#include "clem_assets.hpp"
 #include "clem_command_queue.hpp"
+#include "clem_disk.h"
 #include "clem_host_platform.h"
 #include "clem_host_view.hpp"
 
@@ -16,6 +19,7 @@
 
 #include "cinek/buffer.hpp"
 #include "cinek/circular_buffer.hpp"
+#include "cinek/equation.hpp"
 #include "cinek/fixedstack.hpp"
 #include "clem_audio.hpp"
 #include "imgui.h"
@@ -84,9 +88,9 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     void doMachineDiagnosticsDisplay();
     void doMachineDiskDisplay(float width);
     void doMachineDiskStatus(ClemensDriveType driveType, float width);
+    void doMachineSmartDriveStatus(unsigned driveIndex, float width, bool allowSelect);
 
     void doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size, bool isSpinning);
-    void doMachineSmartDriveStatus(unsigned driveIndex, float width, bool allowSelect);
 
     void doDebugView(ImVec2 anchor, ImVec2 size);
     void doSetupUI(ImVec2 anchor, ImVec2 dimensions);
@@ -212,6 +216,19 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     std::optional<ClemensDriveType> browseDriveType_;
     std::optional<unsigned> browseSmartDriveIndex_;
     std::optional<float> delayRebootTimer_;
+
+    struct Animation {
+        using Keyframe = cinek::keyframe<ImVec2>;
+        Keyframe a; //  t = 0
+        Keyframe b; //  t = end
+        cinek::equation<ImVec2> transition;
+        enum class Mode { A, AToB, BToA, B };
+        Mode mode = Mode::A;
+        double t = 0.0f;
+    };
+
+    Animation diskWidgetAnimations_[kClemensDrive_Count];
+    Animation smartPortWidgetAnimation_;
 
     //  Used for debugging client-side features (i.e. audio playback, framerate)
     struct DebugDiagnostics {
