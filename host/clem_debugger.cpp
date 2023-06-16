@@ -8,6 +8,7 @@
 #include "fmt/core.h"
 #include "imgui.h"
 
+#include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <cstdio>
@@ -517,7 +518,8 @@ void ClemensDebugger::imguiMemoryEditorWrite(ImU8 *mem_ptr, size_t off, ImU8 val
     self->commandQueue_.debugMemoryWrite((uint16_t)(off & 0xffff), value);
 }
 
-void ClemensDebugger::doMachineDebugIORegister(uint8_t *ioregsold, uint8_t *ioregs, uint8_t reg) {
+void ClemensDebugger::doMachineDebugIORegister(uint8_t * /*ioregsold */, uint8_t * /*ioregs */,
+                                               uint8_t /*reg*/) {
     /*
     auto &desc = sDebugIODescriptors[reg];
     bool changed = ioregsold[reg] != ioregs[reg];
