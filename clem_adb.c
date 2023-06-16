@@ -2521,3 +2521,45 @@ uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_
     }
     return 0;
 }
+
+#include <stdio.h>
+
+void clem_temp_generate_ascii_to_adb_table() {
+    FILE *fp = fopen("ascii_to_adb.h", "w");
+    unsigned ch, j;
+    uint8_t *adb_row;
+    if (!fp) {
+        fprintf(stderr, "Could not create ascii_to_adb.h\n");
+        return;
+    }
+
+    for (ch = 0; ch < 256; ch++) {
+        for (j = 0; j < CLEM_ADB_KEY_CODE_LIMIT; j++) {
+            adb_row = &g_a2_to_ascii[j][0];
+            if (ch == adb_row[0]) {
+                //  test default
+                fprintf(fp, "{0x%04x},\n", (j & 0xff));
+                break;
+            } else if (ch == adb_row[1]) {
+                //  test ctrl
+                fprintf(fp, "{0x%04x},\n", ((uint16_t)(CLEM_ADB_KEY_MOD_CTRL) << 8) | (j & 0xff));
+                break;
+            } else if (ch == adb_row[2]) {
+                //  test ctrl
+                fprintf(fp, "{0x%04x},\n", ((uint16_t)(CLEM_ADB_KEY_MOD_SHIFT) << 8) | (j & 0xff));
+                break;
+            } else if (ch == adb_row[3]) {
+                //  test ctrl
+                fprintf(fp, "{0x%04x},\n",
+                        ((uint16_t)(CLEM_ADB_KEY_MOD_SHIFT + CLEM_ADB_KEY_MOD_CTRL) << 8) |
+                            (j & 0xff));
+                break;
+            }
+        }
+        if (j == CLEM_ADB_KEY_CODE_LIMIT) {
+            fprintf(fp, "{0x0000},\n");
+        }
+    }
+
+    fclose(fp);
+}

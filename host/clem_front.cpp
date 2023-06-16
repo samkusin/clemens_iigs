@@ -581,6 +581,8 @@ static std::string getCommandTypeName(ClemensBackendCommand::Type type) {
 
 const uint64_t ClemensFrontend::kFrameSeqNoInvalid = std::numeric_limits<uint64_t>::max();
 
+extern "C" void clem_temp_generate_ascii_to_adb_table();
+
 ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
                                  const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
@@ -597,6 +599,8 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       settingsView_(config_) {
 
     ClemensTraceExecutedInstruction::initialize();
+
+    clem_temp_generate_ascii_to_adb_table();
 
     initDebugIODescriptors();
     clem_joystick_open_devices(CLEM_HOST_JOYSTICK_PROVIDER_DEFAULT);
@@ -654,11 +658,47 @@ void ClemensFrontend::input(ClemensInputEvent input) {
     }
 }
 
-void ClemensFrontend::pasteText(const char *text, unsigned textSizeLimit) {
+void ClemensFrontend::pasteText(const char *utf8, unsigned textSizeLimit) {
     if (emulatorHasKeyboardFocus_) {
-        spdlog::info(text);
+        size_t textSize = strnlen(utf8, textSizeLimit);
+
+        //  Using ImGui utilities for ingesting of UTF8 codepoints
+        //  This could be ported to a more general routine for usage outside of
+        //  this project.
+
+        const char *text_cur = utf8;
+        const char *text_end = utf8 + textSize;
+        unsigned code;
+        while (text_cur < text_end) {
+            unsigned offset = ImTextCharFromUtf8(&code, text_cur, text_end);
+            text_cur += offset;
+            if (code == IM_UNICODE_CODEPOINT_INVALID)
+                continue;
+            if (!offset)
+                break;
+            //  remaining codepoints are fed to our 'ASCII to ADB' pipeline
+            //  where keyboard settings matter (US, French, etc.)
+            //
+            //  Any codepoints with > 2 bytes are thrown out for now
+            if (code > 255) {
+                // percent encode the bytes
+                unsigned shift = 32;
+                while (shift) {
+                    uint8_t b;
+                    shift -= 8;
+                    b = ((code >> shift) & 0xff);
+                    if (b) {
+                        clipboardTextAscii_.push_back('%');
+                        clipboardTextAscii_.push_back('0' + (b >> 4));
+                        clipboardTextAscii_.push_back('0' + (b & 0xf));
+                    }
+                }
+            } else {
+                clipboardTextAscii_.push_back((uint8_t)(code & 0xff));
+            }
+        }
     } else {
-        ImGui::SetClipboardText(text);
+        ImGui::SetClipboardText(utf8);
     }
 }
 
@@ -833,6 +873,9 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     //  send commands to emulator thread
     //  get results from emulator thread
     //    video, audio, machine state, etc
+    if (interop.exitApp)
+        return getViewType();
+
     constexpr double kUIFlashCycleTime = 1.0;
     appTime_ += deltaTime;
 
@@ -840,10 +883,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         nextUIFlashCycleAppTime_ = std::floor(appTime_ / kUIFlashCycleTime) * kUIFlashCycleTime;
         nextUIFlashCycleAppTime_ += kUIFlashCycleTime;
     }
-
-    if (interop.exitApp)
-        return getViewType();
-
     uiFlashAlpha_ = std::sin((nextUIFlashCycleAppTime_ - appTime_) * M_PI / kUIFlashCycleTime);
 
     pollJoystickDevices();
@@ -895,6 +934,10 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
         stagedBackendQueue_.queue(backendQueue_);
     }
     readyForFrame_.notify_one();
+
+    if (frameReadState_.isRunning) {
+        dispatchClipboardToEmulator();
+    }
 
     //  render video
     //  video is rendered to a texture and the UVs of the display on the virtual
@@ -2964,24 +3007,12 @@ void ClemensFrontend::rebootInternal() {
     }
 }
 
+void ClemensFrontend::dispatchClipboardToEmulator() {
+    //  characters from clipboard are guaranteed to be iso latin 1 compliant
+    //  translate to ADB keystrokes
+    //  all ascii characters can derive from a keyboard input
+}
+
 void ClemensFrontend::onDebuggerCommandReboot() { rebootInternal(); }
 
 void ClemensFrontend::onDebuggerCommandShutdown() { setGUIMode(GUIMode::ShutdownEmulator); }
-
-/*
-
-void ClemensFrontend::cmdMinimode(std::string_view operand) {
-    auto [params, cmd, paramCount] = gatherMessageParams(operand);
-    if (paramCount != 0) {
-        CLEM_TERM_COUT.print(TerminalLine::Error, "Minimode innvalid parameters.");
-        return;
-    }
-    config_.hybridInterfaceEnabled = false;
-    config_.setDirty();
-}
-
-void ClemensFrontend::cmdScript(std::string_view command) {
-    backendQueue_.runScript(std::string(command));
-}
-
-*/

@@ -85,14 +85,6 @@
     = 780 bytes per sector base
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#ifdef __cplusplus
-}
-#endif
-
 /* Note, these values are for nibbilized data that are most useful for WOZ images.
 
    Gaps are derived from Beneath Apple DOS/ProDOS - evaluate if DOS values

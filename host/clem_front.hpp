@@ -167,6 +167,9 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     bool mouseInEmulatorScreen_;
 
     std::string snapshotRootPath_;
+    std::vector<uint8_t> clipboardTextAscii_;
+
+    void dispatchClipboardToEmulator();
 
   private:
     enum class DebugIOMode { Core };

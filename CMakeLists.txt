@@ -34,6 +34,7 @@ add_library(clemens_65816_mmio STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_drive.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_drive35.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_iwm.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_locale.c"    
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_mmio.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_rtc.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_scc.c"
