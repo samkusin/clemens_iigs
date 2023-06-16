@@ -232,7 +232,7 @@ static bool _clem_scc_brg_tick(struct ClemensDeviceSCCChannel *channel) {
     return (channel->brg_counter & CLEM_SCC_BRG_STATUS_PULSE_FLAG) != 0;
 }
 
-inline unsigned _clem_scc_count_1_bits(uint8_t v, unsigned bps) {
+static inline unsigned _clem_scc_count_1_bits(uint8_t v, unsigned bps) {
     //   TODO: this could be a generated lookup table that returns even/odd
     unsigned cnt = 0;
     while (bps--) {
@@ -243,18 +243,18 @@ inline unsigned _clem_scc_count_1_bits(uint8_t v, unsigned bps) {
     return cnt;
 }
 
-inline bool _clem_scc_do_parity_even(uint8_t v, unsigned bps) {
+static inline bool _clem_scc_do_parity_even(uint8_t v, unsigned bps) {
     //  if odd number of 1 bits, return true so the encoder can add another 1 bit (even total)
     return _clem_scc_count_1_bits(v, bps) & 1;
 }
 
-inline bool _clem_scc_do_parity_odd(uint8_t v, unsigned bps) {
+static inline bool _clem_scc_do_parity_odd(uint8_t v, unsigned bps) {
     //  if even number of 1 bits, return true so the encoder can add another 1 bit (odd total)
     return !(_clem_scc_count_1_bits(v, bps) & 1);
 }
 
-inline void _clem_scc_channel_error(struct ClemensDeviceSCCChannel *channel, uint8_t err,
-                                    bool special) {
+static inline void _clem_scc_channel_error(struct ClemensDeviceSCCChannel *channel, uint8_t err,
+                                           bool special) {
     channel->rxd_error |= err; // the error latch
     if (special) {
         channel->rx_condition |= err;

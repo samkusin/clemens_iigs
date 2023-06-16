@@ -39,6 +39,8 @@ void PushStyleButtonEnabled();
 void PushStyleButtonDisabled();
 void PopStyleButton();
 
+ImFont *Get80ColumnFont();
+
 } // namespace ClemensHostImGui
 
 #endif

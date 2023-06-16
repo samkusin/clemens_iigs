@@ -262,8 +262,5 @@ template <typename T0, typename... Ts> struct ck_sizeof_max<T0, Ts...> {
 #define strcasecmp  _stricmp
 #endif
 
-typedef double CKTime;
-typedef double CKTimeDelta;
-
 /* CINEK_DEFS_H */
 #endif

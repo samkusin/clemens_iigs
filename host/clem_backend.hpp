@@ -3,7 +3,7 @@
 
 #include "cinek/fixedstack.hpp"
 #include "clem_command_queue.hpp"
-#include "clem_host_shared.hpp"
+#include "clem_frame_state.hpp"
 #include "clem_interpreter.hpp"
 
 #include "cinek/circular_buffer.hpp"
@@ -54,42 +54,6 @@ struct ClemensRunSampler {
     void update(clem_clocks_duration_t clocksSpent, unsigned cyclesSpent);
     void enableFastMode();
     void disableFastMode();
-};
-
-struct ClemensBackendState {
-    ClemensMachine *machine;
-    ClemensMMIO *mmio;
-    double fps;
-    bool isRunning;
-    bool isTracing;
-    bool isIWMTracing;
-    bool mmioWasInitialized;
-
-    ClemensAppleIIGS::Frame *frame;
-
-    unsigned hostCPUID;
-    int logLevel;
-    const ClemensBackendOutputText *logBufferStart;
-    const ClemensBackendOutputText *logBufferEnd;
-    const ClemensBackendBreakpoint *bpBufferStart;
-    const ClemensBackendBreakpoint *bpBufferEnd;
-    std::optional<unsigned> bpHitIndex;
-    const ClemensBackendExecutedInstruction *logInstructionStart;
-    const ClemensBackendExecutedInstruction *logInstructionEnd;
-
-    uint8_t ioPageValues[256]; // 0xc000 - 0xc0ff
-    uint8_t debugMemoryPage;
-
-    float machineSpeedMhz;
-    float avgVBLsPerFrame;
-    bool fastEmulationOn;
-
-    // valid if a debugMessage() command was issued from the frontend
-    std::optional<std::string> message;
-    // valid if the configuration changed (i.e BRAM, disk status)
-    std::optional<ClemensAppleIIGSConfig> config;
-
-    void reset();
 };
 
 struct ClemensBackendConfig {

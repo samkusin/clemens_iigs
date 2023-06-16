@@ -290,4 +290,6 @@ void PushStyleButtonDisabled() {
 
 void PopStyleButton() { ImGui::PopStyleColor(3); }
 
+ImFont *Get80ColumnFont() { return g_fonts[kFontNarrow]; }
+
 } // namespace ClemensHostImGui
