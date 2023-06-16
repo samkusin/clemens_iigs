@@ -654,6 +654,14 @@ void ClemensFrontend::input(ClemensInputEvent input) {
     }
 }
 
+void ClemensFrontend::pasteText(const char *text, unsigned textSizeLimit) {
+    if (emulatorHasKeyboardFocus_) {
+        spdlog::info(text);
+    } else {
+        ImGui::SetClipboardText(text);
+    }
+}
+
 void ClemensFrontend::lostFocus() {
     emulatorHasMouseFocus_ = false;
     emulatorHasKeyboardFocus_ = false;

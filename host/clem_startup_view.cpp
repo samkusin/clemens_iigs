@@ -294,4 +294,6 @@ bool ClemensStartupView::validateDirectories() {
 
 void ClemensStartupView::input(ClemensInputEvent) {}
 
+void ClemensStartupView::pasteText(const char *, unsigned) {}
+
 void ClemensStartupView::lostFocus() {}

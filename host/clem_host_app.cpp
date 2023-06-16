@@ -9,6 +9,7 @@
 #include "clem_imgui.hpp"
 
 #include <array>
+#include <clocale>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -48,6 +49,7 @@ static sg_pass_action g_sgPassAction;
 static unsigned g_ADBKeyToggleMask = 0;
 static cinek::ByteBuffer g_systemFontLoBuffer;
 static cinek::ByteBuffer g_systemFontHiBuffer;
+static const unsigned kClipboardTextLimit = 8192;
 
 //  Keyboard customization
 //  Typically the OS specific "super" key is used to augment key combinations that
@@ -271,10 +273,6 @@ static void onInit(void *userdata) {
 #if defined(CLEMENS_PLATFORM_WINDOWS)
     CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #endif
-
-    spdlog::set_level(spdlog::level::info);
-    spdlog::flush_on(spdlog::level::err);
-    spdlog::info("Setting up host frameworks");
 
     sg_desc desc = {};
     desc.context = sapp_sgcontext();
@@ -534,6 +532,12 @@ static void onEvent(const sapp_event *evt, void *) {
         clemInput.value_a = (int16_t)(std::floor(evt->mouse_dx));
         clemInput.value_b = (int16_t)(std::floor(evt->mouse_dy));
         break;
+    case SAPP_EVENTTYPE_CLIPBOARD_PASTED:
+        if (g_Host) {
+            g_Host->pasteText(sapp_get_clipboard_string(), kClipboardTextLimit);
+        }
+        clemInput.type = kClemensInputType_None;
+        break;
     default:
         clemInput.type = kClemensInputType_None;
         break;
@@ -564,6 +568,14 @@ static void onCleanup(void *userdata) {
 sapp_desc sokol_main(int argc, char *argv[]) {
     sapp_desc sapp = {};
 
+    if (const char *loc = std::setlocale(LC_ALL, "en_US.UTF-8")) {
+        fprintf(stdout, "locale: %s\n", loc);
+    }
+
+    spdlog::set_level(spdlog::level::info);
+    spdlog::flush_on(spdlog::level::err);
+    spdlog::info("Setting up host frameworks");
+
     sapp.user_data = new SharedAppData(argc, argv);
     sapp.height = 900;
     sapp.width = 1440;
@@ -575,6 +587,8 @@ sapp_desc sokol_main(int argc, char *argv[]) {
     sapp.win32_console_create = true;
     sapp.win32_console_attach = true;
     sapp.logger.func = sokolLogger;
+    sapp.clipboard_size = kClipboardTextLimit;
+    sapp.enable_clipboard = true;
 
     return sapp;
 }

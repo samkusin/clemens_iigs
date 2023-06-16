@@ -23,6 +23,8 @@ class ClemensHostView {
     virtual ViewType frame(int width, int height, double deltaTime, FrameAppInterop &interop) = 0;
     //  application input from OS
     virtual void input(ClemensInputEvent input) = 0;
+    //  paste text from the clipboard
+    virtual void pasteText(const char *text, unsigned textSizeLimit) = 0;
     //  application lost focus
     virtual void lostFocus() = 0;
 };

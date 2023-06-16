@@ -18,6 +18,7 @@ class ClemensStartupView : public ClemensHostView {
     ViewType getViewType() const final { return ViewType::Startup; }
     ViewType frame(int width, int height, double deltaTime, FrameAppInterop &interop) final;
     void input(ClemensInputEvent) final;
+    void pasteText(const char *text, unsigned textSizeLimit) final;
     void lostFocus() final;
 
   private:
