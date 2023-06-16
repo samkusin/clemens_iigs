@@ -1746,7 +1746,7 @@ void ClemensFrontend::doMachineDiskDisplay(float width) {
     ImGui::PopStyleColor(3);
 }
 
-void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float width) {
+void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float /*width */) {
     ClemensDiskDriveStatus driveStatus{};
     auto driveName = ClemensDiskUtilities::getDriveName(driveType);
 
@@ -1936,7 +1936,7 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float widt
     }
 }
 
-void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float width,
+void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float /*width */,
                                                 bool allowSelect) {
     ClemensDiskDriveStatus driveStatus{};
 

@@ -6,6 +6,8 @@
 //  Copyright © 2016 Cinekine. All rights reserved.
 //
 
+#include <cmath>
+
 namespace cinek {
 
 template <typename _property>

@@ -24,7 +24,7 @@ static struct tm *getTimeSpecFromTime(struct tm *tspec, std::time_t timet) {
 }
 #else
 static unsigned win32GetDriveLettersBitmask() { return 0; }
-static int win32GetDriveLetterFromPath(const char *path) { return -1; }
+static int win32GetDriveLetterFromPath(const char * /*path */) { return -1; }
 static struct tm *getTimeSpecFromTime(struct tm *tspec, std::time_t timet) {
     return localtime_r(&timet, tspec);
 }
