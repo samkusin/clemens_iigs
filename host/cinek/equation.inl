@@ -66,7 +66,7 @@ void equation<_property>::calc(property_type &out, const keyframe_type &left,
         }
     } break;
     case transition_type::kSine: {
-        scalar = -0.5f * (std::cosf(M_PI * scalar) - 1);
+        scalar = -0.5f * (std::cos(M_PI * scalar) - 1);
     } break;
     default:
         break;
