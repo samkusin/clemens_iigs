@@ -86,6 +86,8 @@ class ClemensAppleIIGS {
     void saveConfig();
     //  Enables opcode logging
     void enableOpcodeLogging(bool enable);
+    //  Sends a UTF8 character from the input stream
+    unsigned consume_utf8_input(const char* in, const char* inEnd);
 
     //  Direct access to emulator state
     ClemensStorageUnit &getStorage() { return storage_; }

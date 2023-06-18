@@ -130,6 +130,10 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
             cmd.operand = msgResponse;
             break;
         }
+        case Command::SendText: {
+            listener.onCommandSendText(std::move(cmd.operand));
+            break;
+        }
         case Command::Undefined:
             break;
         }
@@ -427,6 +431,10 @@ void ClemensCommandQueue::enableFastDiskEmulation(bool enable) {
 
 void ClemensCommandQueue::debugMessage(std::string msg) {
     queue(Command{Command::DebugMessage, std::move(msg)});
+}
+
+void ClemensCommandQueue::sendText(std::string text) {
+    queue(Command{Command::SendText, std::move(text)});
 }
 
 void ClemensCommandQueue::queue(const Command &cmd) { queue_.push(cmd); }

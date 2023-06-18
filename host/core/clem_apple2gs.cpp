@@ -594,3 +594,8 @@ void ClemensAppleIIGS::emulatorOpcodeCallback(struct ClemensInstruction *inst, c
     auto *host = reinterpret_cast<ClemensAppleIIGS *>(this_ptr);
     host->listener_.onClemensInstruction(inst, operand);
 }
+
+unsigned ClemensAppleIIGS::consume_utf8_input(const char* in, const char* inEnd) {
+    const char* cur = clemens_clipboard_push_utf8_atom(&mmio_, in, inEnd);
+    return (unsigned)(cur - in);
+}

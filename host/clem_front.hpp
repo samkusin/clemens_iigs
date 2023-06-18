@@ -26,6 +26,7 @@
 
 #include <array>
 #include <condition_variable>
+#include <deque>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -46,12 +47,14 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     ViewType getViewType() const final { return ViewType::Main; }
     ViewType frame(int width, int height, double deltaTime, FrameAppInterop &interop) final;
     void input(ClemensInputEvent input) final;
+    bool emulatorHasFocus() const final;
     void pasteText(const char *text, unsigned textSizeLimit) final;
     void lostFocus() final;
 
   private:
     void onDebuggerCommandReboot() override;
     void onDebuggerCommandShutdown() override;
+    void onDebuggerCommandPaste() override;
 
   private:
     template <typename TBufferType> friend struct FormatView;
@@ -165,11 +168,9 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     bool emulatorHasKeyboardFocus_;
     bool emulatorHasMouseFocus_;
     bool mouseInEmulatorScreen_;
+    bool pasteClipboardToEmulator_;
 
     std::string snapshotRootPath_;
-    std::vector<uint8_t> clipboardTextAscii_;
-
-    void dispatchClipboardToEmulator();
 
   private:
     enum class DebugIOMode { Core };

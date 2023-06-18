@@ -136,6 +136,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     bool onCommandRunScript(std::string command) final;
     void onCommandFastDiskEmulation(bool enabled) final;
     std::string onCommandDebugMessage(std::string msg) final;
+    void onCommandSendText(std::string msg) final;
 
     //  internal
     bool isRunning() const;
@@ -170,6 +171,9 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     std::optional<int> stepsRemaining_;
     int64_t clocksRemainingInTimeslice_;
     uint64_t clocksInSecondPeriod_;
+
+    std::string clipboardText_;
+    unsigned clipboardHead_;
 };
 
 #endif

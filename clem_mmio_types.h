@@ -76,6 +76,11 @@ struct ClemensDeviceGameport {
     uint8_t ann_mask;
 };
 
+struct ClemensDeviceClipboard {
+    unsigned tail;
+    unsigned char keys[CLEM_ADB_CLIPBOARD_BUFFER_LIMIT];
+};
+
 struct ClemensDeviceADB {
     unsigned state;
     unsigned version;        /* Different ROMs expect different versions */
@@ -102,6 +107,7 @@ struct ClemensDeviceADB {
     struct ClemensDeviceKeyboard keyb;
     struct ClemensDeviceMouse mouse;
     struct ClemensDeviceGameport gameport;
+    struct ClemensDeviceClipboard clipboard;
 
     uint8_t ram[256]; /**< Microcontroller RAM */
 

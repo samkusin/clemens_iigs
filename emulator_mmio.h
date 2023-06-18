@@ -218,6 +218,16 @@ const uint8_t *clemens_get_ascii_from_a2code(unsigned input);
 /**
  * @brief
  *
+ * @param mmio
+ * @param utf8_str
+ * @return const char* Pointer to the next item, utf8_end if there are no more atoms, or equal to
+ * utf8_str if the internal queue is full
+ */
+const char *clemens_clipboard_push_utf8_atom(ClemensMMIO *mmio, const char *utf8_str, const char* utf8_end);
+
+/**
+ * @brief
+ *
  * @param clem
  * @param seconds_since_1904
  */

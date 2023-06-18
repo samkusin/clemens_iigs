@@ -583,6 +583,8 @@ void ClemensDebugger::executeCommand(std::string_view command) {
         cmdSave(operand);
     } else if (action == "load") {
         cmdLoad(operand);
+    } else if (action == "paste") {
+        listener_.onDebuggerCommandPaste();
     } else {
         commandQueue_.runScript(std::string(command));
     }

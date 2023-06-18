@@ -592,7 +592,7 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
       frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)), lastFrameCPUPins_{},
       lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0), lastFrameNMIs_(0),
-      emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false), mouseInEmulatorScreen_(false),
+      emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false), mouseInEmulatorScreen_(false), pasteClipboardToEmulator_(false),
       debugIOMode_(DebugIOMode::Core), vgcDebugMinScanline_(0), vgcDebugMaxScanline_(0),
       joystickSlotCount_(0), guiMode_(GUIMode::None), guiPrevMode_(GUIMode::None), appTime_(0.0),
       nextUIFlashCycleAppTime_(0.0), uiFlashAlpha_(1.0f), debugger_(backendQueue_, *this),
@@ -658,48 +658,14 @@ void ClemensFrontend::input(ClemensInputEvent input) {
     }
 }
 
+bool ClemensFrontend::emulatorHasFocus() const {
+    return emulatorHasMouseFocus_ || emulatorHasKeyboardFocus_;
+}
+
 void ClemensFrontend::pasteText(const char *utf8, unsigned textSizeLimit) {
-    if (emulatorHasKeyboardFocus_) {
-        size_t textSize = strnlen(utf8, textSizeLimit);
-
-        //  Using ImGui utilities for ingesting of UTF8 codepoints
-        //  This could be ported to a more general routine for usage outside of
-        //  this project.
-
-        const char *text_cur = utf8;
-        const char *text_end = utf8 + textSize;
-        unsigned code;
-        while (text_cur < text_end) {
-            unsigned offset = ImTextCharFromUtf8(&code, text_cur, text_end);
-            text_cur += offset;
-            if (code == IM_UNICODE_CODEPOINT_INVALID)
-                continue;
-            if (!offset)
-                break;
-            //  remaining codepoints are fed to our 'ASCII to ADB' pipeline
-            //  where keyboard settings matter (US, French, etc.)
-            //
-            //  Any codepoints with > 2 bytes are thrown out for now
-            if (code > 255) {
-                // percent encode the bytes
-                unsigned shift = 32;
-                while (shift) {
-                    uint8_t b;
-                    shift -= 8;
-                    b = ((code >> shift) & 0xff);
-                    if (b) {
-                        clipboardTextAscii_.push_back('%');
-                        clipboardTextAscii_.push_back('0' + (b >> 4));
-                        clipboardTextAscii_.push_back('0' + (b & 0xf));
-                    }
-                }
-            } else {
-                clipboardTextAscii_.push_back((uint8_t)(code & 0xff));
-            }
-        }
-    } else {
-        ImGui::SetClipboardText(utf8);
-    }
+    size_t textSize = strnlen(utf8, textSizeLimit);
+    std::string clipboardText(utf8, textSize);
+    backendQueue_.sendText(std::move(clipboardText));
 }
 
 void ClemensFrontend::lostFocus() {
@@ -935,10 +901,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
     }
     readyForFrame_.notify_one();
 
-    if (frameReadState_.isRunning) {
-        dispatchClipboardToEmulator();
-    }
-
     //  render video
     //  video is rendered to a texture and the UVs of the display on the virtual
     //  monitor are stored in screenUVs
@@ -1108,10 +1070,13 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInt
 
     config_.save();
 
+    interop.pasteFromClipboard = pasteClipboardToEmulator_;
     interop.mouseLock = emulatorHasMouseFocus_;
     interop.mouseShow =
         !mouseInEmulatorScreen_ || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
-
+    
+    pasteClipboardToEmulator_ = false;
+    
     return getViewType();
 }
 
@@ -3007,12 +2972,47 @@ void ClemensFrontend::rebootInternal() {
     }
 }
 
+/*
 void ClemensFrontend::dispatchClipboardToEmulator() {
     //  characters from clipboard are guaranteed to be iso latin 1 compliant
     //  translate to ADB keystrokes
     //  all ascii characters can derive from a keyboard input
+    if (clipboardTextAscii_.empty())
+        return;
+    uint16_t adbCode = clem_iso_latin_1_to_adb_key_and_modifier(clipboardTextAscii_.front(), 0);
+    if (adbCode) {
+        uint16_t adbMod = adbCode >> 8;
+        ClemensInputEvent evt{};
+        evt.type = kClemensInputType_KeyDown;
+        if (adbMod & CLEM_ADB_KEY_MOD_STATE_SHIFT) {
+            evt.value_a = CLEM_ADB_KEY_LSHIFT;
+            backendQueue_.inputEvent(evt);
+        }
+        if (adbMod & CLEM_ADB_KEY_MOD_STATE_CTRL) {
+            evt.value_a = CLEM_ADB_KEY_LCTRL;
+            backendQueue_.inputEvent(evt);
+        }
+        evt.value_a = adbCode & 0xff;
+        backendQueue_.inputEvent(evt);
+
+        evt.type = kClemensInputType_KeyUp;
+        evt.value_a = adbCode & 0xff;
+        backendQueue_.inputEvent(evt);
+        if (adbMod & CLEM_ADB_KEY_MOD_STATE_SHIFT) {
+            evt.value_a = CLEM_ADB_KEY_LSHIFT;
+            backendQueue_.inputEvent(evt);
+        }
+        if (adbMod & CLEM_ADB_KEY_MOD_STATE_CTRL) {
+            evt.value_a = CLEM_ADB_KEY_LCTRL;
+            backendQueue_.inputEvent(evt);
+        }
+    }
+    clipboardTextAscii_.pop_front();
 }
+*/
 
 void ClemensFrontend::onDebuggerCommandReboot() { rebootInternal(); }
 
 void ClemensFrontend::onDebuggerCommandShutdown() { setGUIMode(GUIMode::ShutdownEmulator); }
+
+void ClemensFrontend::onDebuggerCommandPaste() { pasteClipboardToEmulator_ = true; }

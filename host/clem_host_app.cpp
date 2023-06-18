@@ -419,11 +419,17 @@ static void onFrame(void *) {
         interop.mouseLock = sapp_mouse_locked();
         interop.mouseShow = sapp_mouse_shown();
         interop.exitApp = exitApp;
+        interop.pasteFromClipboard = false;
 
         auto nextViewType = g_Host->frame(frameWidth, frameHeight, deltaTime, interop);
         sapp_lock_mouse(interop.mouseLock);
         if (interop.mouseShow != sapp_mouse_shown()) {
             sapp_show_mouse(interop.mouseShow);
+        }
+        if (interop.pasteFromClipboard) {
+            //  this is separate from ImGui's clipboard support so that the emulator controls when
+            //  it receives clipboard data
+            g_Host->pasteText(sapp_get_clipboard_string(), kClipboardTextLimit);
         }
         exitApp = interop.exitApp;
 
@@ -531,12 +537,6 @@ static void onEvent(const sapp_event *evt, void *) {
         clemInput.type = kClemensInputType_MouseMove;
         clemInput.value_a = (int16_t)(std::floor(evt->mouse_dx));
         clemInput.value_b = (int16_t)(std::floor(evt->mouse_dy));
-        break;
-    case SAPP_EVENTTYPE_CLIPBOARD_PASTED:
-        if (g_Host) {
-            g_Host->pasteText(sapp_get_clipboard_string(), kClipboardTextLimit);
-        }
-        clemInput.type = kClemensInputType_None;
         break;
     default:
         clemInput.type = kClemensInputType_None;
