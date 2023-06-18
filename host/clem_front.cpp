@@ -1,6 +1,7 @@
 //  Boo...
 #include "cinek/equation.hpp"
 #include "cinek/keyframe.hpp"
+
 #include <algorithm>
 #define _USE_MATH_DEFINES
 
@@ -834,7 +835,7 @@ void ClemensFrontend::pollJoystickDevices() {
     backendQueue_.inputEvent(inputs[1]);
 }
 
-auto ClemensFrontend::frame(int width, int height, double deltaTime, FrameAppInterop &interop)
+auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHostInterop &interop)
     -> ViewType {
     //  send commands to emulator thread
     //  get results from emulator thread

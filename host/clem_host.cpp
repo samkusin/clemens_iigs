@@ -13,3 +13,13 @@
 #include "sokol/sokol_glue.h"
 #include "sokol/sokol_imgui.h"
 #include "sokol/sokol_time.h"
+
+
+void clemens_host_init(struct ClemensHostInterop* ) {
+
+}
+
+void clemens_host_terminate() {
+
+}
+

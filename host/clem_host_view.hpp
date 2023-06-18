@@ -2,26 +2,21 @@
 #define CLEM_HOST_APP_VIEW_HPP
 
 #include "clem_mmio_types.h"
+#include "clem_host.hpp"
 
 #include <cstdint>
 
 class ClemensHostView {
   public:
     enum class ViewType { Startup, Main };
-    struct FrameAppInterop {
-        bool mouseShow; // show or hide the mouse
-        bool mouseLock; // enable mouse lock
-        bool exitApp;   // terminate the app
-        bool pasteFromClipboard; // trigger an automatic paste from the system clipboard
-    };
-
+ 
   public:
     virtual ~ClemensHostView() = default;
 
     // reflection on the host view being executed
     virtual ViewType getViewType() const = 0;
     // per frame execution, returning the next view type
-    virtual ViewType frame(int width, int height, double deltaTime, FrameAppInterop &interop) = 0;
+    virtual ViewType frame(int width, int height, double deltaTime, ClemensHostInterop &interop) = 0;
     //  application input from OS
     virtual void input(ClemensInputEvent input) = 0;
     //  is the emulator accepting input events

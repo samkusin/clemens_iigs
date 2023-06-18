@@ -45,7 +45,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     ~ClemensFrontend();
 
     ViewType getViewType() const final { return ViewType::Main; }
-    ViewType frame(int width, int height, double deltaTime, FrameAppInterop &interop) final;
+    ViewType frame(int width, int height, double deltaTime, ClemensHostInterop &interop) final;
     void input(ClemensInputEvent input) final;
     bool emulatorHasFocus() const final;
     void pasteText(const char *text, unsigned textSizeLimit) final;

@@ -62,10 +62,6 @@ void open_system_folder_view(const char *folder_path) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void clem_host_platform_init(void) {}
-
-void clem_host_platform_terminate(void) {}
-
 @interface ClemensGameControllerDispatch : NSObject {
   NSPointerArray *controllers;
 }

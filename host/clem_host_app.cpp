@@ -7,6 +7,7 @@
 #endif
 
 #include "clem_imgui.hpp"
+#include "clem_host.hpp"
 
 #include <array>
 #include <clocale>
@@ -50,6 +51,7 @@ static unsigned g_ADBKeyToggleMask = 0;
 static cinek::ByteBuffer g_systemFontLoBuffer;
 static cinek::ByteBuffer g_systemFontHiBuffer;
 static const unsigned kClipboardTextLimit = 8192;
+static ClemensHostInterop g_interop {};
 
 //  Keyboard customization
 //  Typically the OS specific "super" key is used to augment key combinations that
@@ -267,7 +269,7 @@ static cinek::ByteBuffer loadFont(const char *pathname) {
 static void onInit(void *userdata) {
     auto *appdata = reinterpret_cast<SharedAppData *>(userdata);
 
-    clem_host_platform_init();
+    clemens_host_init(&g_interop);
     stm_setup();
 
 #if defined(CLEMENS_PLATFORM_WINDOWS)
@@ -405,7 +407,7 @@ static void onFrame(void *) {
 
     uint64_t deltaTicks = stm_laptime(&g_lastTime);
     double deltaTime = stm_sec(deltaTicks);
-    bool exitApp = false;
+    bool exitApp = g_interop.exitApp;
 
     simgui_frame_desc_t imguiFrameDesc = {};
     imguiFrameDesc.delta_time = deltaTime;
@@ -415,23 +417,22 @@ static void onFrame(void *) {
 
     simgui_new_frame(imguiFrameDesc);
     if (g_Host) {
-        ClemensHostView::FrameAppInterop interop;
-        interop.mouseLock = sapp_mouse_locked();
-        interop.mouseShow = sapp_mouse_shown();
-        interop.exitApp = exitApp;
-        interop.pasteFromClipboard = false;
+        g_interop.mouseLock = sapp_mouse_locked();
+        g_interop.mouseShow = sapp_mouse_shown();
+        g_interop.pasteFromClipboard = false;
 
-        auto nextViewType = g_Host->frame(frameWidth, frameHeight, deltaTime, interop);
-        sapp_lock_mouse(interop.mouseLock);
-        if (interop.mouseShow != sapp_mouse_shown()) {
-            sapp_show_mouse(interop.mouseShow);
+        auto nextViewType = g_Host->frame(frameWidth, frameHeight, deltaTime, g_interop);
+        sapp_lock_mouse(g_interop.mouseLock);
+        if (g_interop.mouseShow != sapp_mouse_shown()) {
+            sapp_show_mouse(g_interop.mouseShow);
         }
-        if (interop.pasteFromClipboard) {
+        if (g_interop.pasteFromClipboard) {
             //  this is separate from ImGui's clipboard support so that the emulator controls when
             //  it receives clipboard data
             g_Host->pasteText(sapp_get_clipboard_string(), kClipboardTextLimit);
+            g_interop.pasteFromClipboard = false;
         }
-        exitApp = interop.exitApp;
+        exitApp = g_interop.exitApp;
 
         if (nextViewType != g_Host->getViewType()) {
             auto *oldHost = g_Host;
@@ -562,16 +563,18 @@ static void onCleanup(void *userdata) {
 
     simgui_shutdown();
     sg_shutdown();
-    clem_host_platform_terminate();
+    clemens_host_terminate();
 }
 
 sapp_desc sokol_main(int argc, char *argv[]) {
     sapp_desc sapp = {};
 
+    //  TODO: investigate other locales based on localization features
     if (const char *loc = std::setlocale(LC_ALL, "en_US.UTF-8")) {
         fprintf(stdout, "locale: %s\n", loc);
     }
-
+    //  TODO: logging startup should go here
+    
     spdlog::set_level(spdlog::level::info);
     spdlog::flush_on(spdlog::level::err);
     spdlog::info("Setting up host frameworks");

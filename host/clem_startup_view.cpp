@@ -119,7 +119,7 @@ void setupLogger(const ClemensConfiguration &config) {
 ClemensStartupView::ClemensStartupView() : mode_(Mode::Initial), config_(findConfiguration()) {}
 
 auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
-                               FrameAppInterop &interop) -> ViewType {
+                               ClemensHostInterop &interop) -> ViewType {
     auto nextView = ViewType::Startup;
 
     switch (mode_) {
