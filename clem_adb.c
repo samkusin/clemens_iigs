@@ -1655,10 +1655,11 @@ static void _clem_adb_glu_mouse_talk(struct ClemensDeviceADB *adb) {
 
     //  this approach will result in lost events if they are not consumed
     //  fast enough.  reevaluate
-    if (adb->mouse.size <= 0) {
-        //  TODO: what if autopoll is disabled?
-        _clem_adb_glu_queue_mouse(adb, 0, 0);
-    }
+    if (adb->mouse.size <= 0)
+        return;
+    //  TODO: what if autopoll is disabled?
+    //        _clem_adb_glu_queue_mouse(adb, 0, 0);
+    //    }
     mouse_reg = _clem_adb_glu_unqueue_mouse(adb);
     //  do not populate the data register until our client has had some time
     //  to read in the X,Y.
