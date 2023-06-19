@@ -1339,6 +1339,7 @@ static uint8_t _clem_adb_glu_keyb_parse(struct ClemensDeviceADB *adb, uint8_t ke
             if (key_index != adb->keyb.last_a2_key_down) {
                 adb->keyb.timer_us = 0;
                 adb->keyb.repeat_count = 0;
+                adb->keyb.repeat_key_mod = false;
                 adb->keyb.last_a2_key_down = key_index;
             }
         } else if (key_index == adb->keyb.last_a2_key_down) {
@@ -1385,11 +1386,6 @@ static uint8_t _clem_adb_glu_keyb_parse(struct ClemensDeviceADB *adb, uint8_t ke
         }
     }
 
-    /* FIXME: sketchy - is this doing what a  modifier key latch does? */
-    if ((modifiers ^ old_modifiers) && !adb->is_asciikey_down) {
-        adb->has_modkey_changed = true;
-    }
-
     return key_event;
 }
 
@@ -1407,12 +1403,14 @@ static void _clem_adb_glu_keyb_talk(struct ClemensDeviceADB *adb) {
             if (timer_ms >= adb->keyb.delay_ms) {
                 _clem_adb_glu_queue_key(adb, adb->keyb.last_a2_key_down);
                 ++adb->keyb.repeat_count;
+                adb->keyb.repeat_key_mod = true;
                 adb->keyb.timer_us = 0;
             }
         } else {
             if (timer_ms >= (1000 / adb->keyb.rate_per_sec)) {
                 _clem_adb_glu_queue_key(adb, adb->keyb.last_a2_key_down);
                 ++adb->keyb.repeat_count;
+                adb->keyb.repeat_key_mod = true;
                 adb->keyb.timer_us = 0;
             }
         }
@@ -1462,13 +1460,16 @@ static void _clem_adb_glu_clipboard_paste(struct ClemensDeviceADB *adb) {
     //  For now, simply inject into io_key_last_ascii which is read by the A2
     //  registers
     unsigned i;
-    if (adb->io_key_last_ascii & 0x80 || adb->clipboard.tail == 0) return;
+    if (adb->io_key_last_ascii & 0x80 || adb->clipboard.tail == 0)
+        return;
     adb->io_key_last_ascii = 0x80 | adb->clipboard.keys[0];
+
     --adb->clipboard.tail;
-    CLEM_LOG("SKS: clipboard tail %u, key %02X (%c)", adb->clipboard.tail, adb->clipboard.keys[0],  adb->clipboard.keys[0]);            
+    CLEM_LOG("SKS: clipboard tail %u, key %02X (%c), mods %04X", adb->clipboard.tail,
+             adb->clipboard.keys[0], adb->clipboard.keys[0], adb->keyb_reg[2]);
     adb->cmd_status |= CLEM_ADB_C027_KEY_FULL;
     for (i = 0; i < adb->clipboard.tail; ++i) {
-        adb->clipboard.keys[i] = adb->clipboard.keys[i+1];
+        adb->clipboard.keys[i] = adb->clipboard.keys[i + 1];
     }
 }
 
@@ -1646,7 +1647,7 @@ static void _clem_adb_glu_mouse_tracking(struct ClemensDeviceADB *adb,
 
 static void _clem_adb_glu_mouse_talk(struct ClemensDeviceADB *adb) {
     //  populate our mouse data register - this will pull all events from the
-    //  queue, compressing multiple events over the frame into a single event
+    //  queue, combining multiple events over the frame into a single event
     //  to be saved onto the data register.
     //  if mouse interrupts are enabled *and* a valid mouse event is avaiable,
     //  then issue the IRQ (CLEM_IRQ_ADB_MOUSE_EVT)
@@ -2012,7 +2013,7 @@ void clem_adb_glu_sync(struct ClemensDeviceADB *adb, struct ClemensDeviceMega2Me
         //        and Apple II registers as they are strobed in (and when the ADB status
         //        for the key is cleared)
         //        need to determine if STROBE and ADB will conflict (i.e. IRQ handler?)
-        //  
+        //
         //        this will require practical testing with GS applications that take
         //        keyboard input vs Apple II ones (at the BASIC prompt, for example
         //)
@@ -2050,7 +2051,6 @@ void clem_adb_glu_sync(struct ClemensDeviceADB *adb, struct ClemensDeviceMega2Me
 
     adb->irq_line |= adb->irq_dispatch;
     adb->irq_dispatch = 0;
-
     if (adb->irq_line & (CLEM_IRQ_ADB_KEYB_SRQ + CLEM_IRQ_ADB_MOUSE_SRQ)) {
         adb->cmd_flags |= CLEM_ADB_C026_SRQ;
     }
@@ -2310,14 +2310,18 @@ static void _clem_adb_write_cmd(struct ClemensDeviceADB *adb, uint8_t value) {
     }
 }
 
+static void _clem_adb_key_strobe(struct ClemensDeviceADB *adb) {
+    adb->io_key_last_ascii &= ~0x80;
+    adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
+    // adb->keyb.repeat_key_mod = false;
+    CLEM_LOG("SKS: STROBE CLR W %c", adb->io_key_last_ascii);
+    _clem_adb_glu_clipboard_paste(adb);
+}
+
 void clem_adb_write_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_t value) {
     switch (ioreg) {
     case CLEM_MMIO_REG_ANYKEY_STROBE:
-        /* always clear strobe bit */
-        adb->io_key_last_ascii &= ~0x80;
-        adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
-        CLEM_LOG("SKS: STROBE CLR W %c", adb->io_key_last_ascii);
-        _clem_adb_glu_clipboard_paste(adb);
+        _clem_adb_key_strobe(adb);
         break;
     case CLEM_MMIO_REG_ADB_MODKEY:
         CLEM_WARN("ADB: IO Write %02X (MODKEY)", ioreg);
@@ -2411,14 +2415,11 @@ static uint8_t _clem_adb_read_modkeys(struct ClemensDeviceADB *adb) {
     if (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_SHIFT) {
         modkeys |= 0x01;
     }
-    if (adb->is_asciikey_down) {
-        /* FIXME: should this be any key like c010, or anykey at all? HW Ref
-           implies a 'key is being held down' - and we're assuming ascii vs
-           scan code here... */
+    if (adb->keyb.repeat_key_mod) {
         modkeys |= 0x08;
     }
-    if (adb->has_modkey_changed) {
-        modkeys |= 0x20;
+    if (!adb->is_asciikey_down) {
+        modkeys |= 0x20; // no ascii key press (modifiers could be active)
     }
     return modkeys;
 }
@@ -2448,19 +2449,14 @@ uint8_t clem_adb_read_mega2_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, 
     case CLEM_MMIO_REG_KEYB_READ:
         if (!is_noop) {
             // TODO - should we move KEY_FULL clear to STROBE?
-            //adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
+            // adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
             // CLEM_LOG("c0%02x: %02X", ioreg, adb->io_key_last_ascii);
         }
         return adb->io_key_last_ascii;
     case CLEM_MMIO_REG_ANYKEY_STROBE:
         /* clear strobe bit and return any-key status */
         if (!is_noop) {
-            adb->io_key_last_ascii &= ~0x80;
-            adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
-            CLEM_LOG("SKS: STROBE CLR R");
-            _clem_adb_glu_clipboard_paste(adb);
-            //  CLEM_LOG("c0%02x: %02X, %02X", ioreg, adb->is_asciikey_down,
-            //  adb->io_key_last_ascii & 0x7f);
+            _clem_adb_key_strobe(adb);
         }
         return (adb->is_asciikey_down ? 0x80 : 0x00) | (adb->io_key_last_ascii & 0x7f);
     case CLEM_MMIO_REG_MEGA2_MOUSE_DX:

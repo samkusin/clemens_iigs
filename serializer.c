@@ -68,6 +68,7 @@ struct ClemensSerializerRecord kADBKeyboard[] = {
     CLEM_SERIALIZER_RECORD_INT32(struct ClemensDeviceKeyboard, repeat_count),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceKeyboard, last_a2_key_down),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceKeyboard, reset_key),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceKeyboard, repeat_key_mod),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
 struct ClemensSerializerRecord kADBMouse[] = {
@@ -223,7 +224,6 @@ struct ClemensSerializerRecord kADB[] = {
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensDeviceADB, mode_flags),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, is_keypad_down),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, is_asciikey_down),
-    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensDeviceADB, has_modkey_changed),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensDeviceADB, io_key_last_ascii),
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensDeviceADB, kClemensSerializerTypeUInt16, keyb_reg, 4,
                                  0),
