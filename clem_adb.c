@@ -33,6 +33,7 @@
  *       https://llx.com/Neil/a2/adb.html
  *  "ADB - The Untold Story: Space Aliens Ate My Mouse"
  *      https://developer.apple.com/library/archive/technotes/hw/hw_01.html
+ *  https://developer.apple.com/library/archive/documentation/mac/pdf/Devices/ADB_Manager.pdf
  *
  *  and some eyeballing/reassurance from... KEGS.
  *
@@ -62,6 +63,7 @@
 #define CLEM_ADB_CMD_SYNC               0x07
 #define CLEM_ADB_CMD_WRITE_RAM          0x08
 #define CLEM_ADB_CMD_READ_MEM           0x09
+#define CLEM_ADB_CMD_READ_MODES         0x0A
 #define CLEM_ADB_CMD_UNDOCUMENTED_12    0x12
 #define CLEM_ADB_CMD_UNDOCUMENTED_13    0x13
 #define CLEM_ADB_CMD_VERSION            0x0d
@@ -105,6 +107,7 @@
 /* ADB Mode Flags */
 #define CLEM_ADB_MODE_AUTOPOLL_KEYB  0x00000001
 #define CLEM_ADB_MODE_AUTOPOLL_MOUSE 0x00000002
+#define CLEM_ADB_MODE_BUFFER_KEYB    0x00000010
 
 /**
  * SRQs are disabled for all devices on reset
@@ -1687,6 +1690,10 @@ static void _clem_adb_glu_set_mode_flags(struct ClemensDeviceADB *adb, unsigned 
         adb->cmd_status &= ~CLEM_ADB_C027_MOUSE_FULL;
         CLEM_LOG("ADB: Disable Mouse Autopoll");
     }
+    if (mode_flags & 0x10) {
+        adb->mode_flags |= CLEM_ADB_MODE_BUFFER_KEYB;
+        CLEM_LOG("ADB: Enable Keyboard Buffer Mode (?)");
+    }
     if (mode_flags & 0x000000fc) {
         CLEM_WARN("ADB: SetMode %02X Unimplemented", mode_flags & 0x000000fc);
     }
@@ -1705,9 +1712,26 @@ static void _clem_adb_glu_clear_mode_flags(struct ClemensDeviceADB *adb, unsigne
             CLEM_LOG("ADB: Enable Mouse Autopoll");
         }
     }
+    if (mode_flags & 0x10) {
+        adb->mode_flags &= ~CLEM_ADB_MODE_BUFFER_KEYB;
+        CLEM_LOG("ADB: Disable Keyboard Buffer Mode (?)");
+    }
     if (mode_flags & 0x000000fc) {
         CLEM_WARN("ADB: ClearMode %02X Unimplemented", mode_flags & 0x000000fc);
     }
+}
+
+static uint8_t _clem_adb_read_mode_flags(struct ClemensDeviceADB *adb) {
+    //  flip bit 0,1 as enable should read zero for each autopoll
+    //  vs our mode_flags with enable read as one
+    uint8_t mode_flags = 0;
+    if (!(adb->mode_flags & CLEM_ADB_MODE_AUTOPOLL_KEYB))
+        mode_flags |= 0x1;
+    if (!(adb->mode_flags & CLEM_ADB_MODE_AUTOPOLL_MOUSE))
+        mode_flags |= 0x2;
+    if (!(adb->mode_flags & CLEM_ADB_MODE_BUFFER_KEYB))
+        mode_flags |= 0x10;
+    return mode_flags;
 }
 
 static void _clem_adb_glu_set_config(struct ClemensDeviceADB *adb, uint8_t keyb_mouse_adr,
@@ -1853,7 +1877,7 @@ void _clem_adb_glu_set_register(struct ClemensDeviceADB *adb, unsigned device_re
 void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
     unsigned device_command = 0;
     unsigned device_address = 0;
-    uint8_t data[8];
+    uint8_t tmp;
 
     switch (adb->cmd_reg) {
     case CLEM_ADB_CMD_ABORT:
@@ -1895,6 +1919,12 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
         _clem_adb_glu_result_init(adb, 1);
         _clem_adb_glu_result_data(
             adb, _clem_adb_glu_read_memory(adb, adb->cmd_data[0], adb->cmd_data[1]));
+        return;
+    case CLEM_ADB_CMD_READ_MODES:
+        tmp = _clem_adb_read_mode_flags(adb);
+        CLEM_DEBUG("ADB: READ MODES: %02X", tmp);
+        _clem_adb_glu_result_init(adb, 1);
+        _clem_adb_glu_result_data(adb, tmp);
         return;
     case CLEM_ADB_CMD_VERSION:
         CLEM_DEBUG("ADB: GET VERSION (%02X)", adb->version);
@@ -2234,6 +2264,9 @@ static void _clem_adb_start_cmd(struct ClemensDeviceADB *adb, uint8_t value) {
     case CLEM_ADB_CMD_READ_MEM:
         _clem_adb_expect_data(adb, 2); /* address, ram(00)/rom(>00) */
         break;
+    case CLEM_ADB_CMD_READ_MODES:
+        _clem_adb_expect_data(adb, 0);
+        break;
     case CLEM_ADB_CMD_VERSION:
         _clem_adb_expect_data(adb, 0);
         break;
@@ -2312,11 +2345,13 @@ static void _clem_adb_write_cmd(struct ClemensDeviceADB *adb, uint8_t value) {
 }
 
 static void _clem_adb_key_strobe(struct ClemensDeviceADB *adb) {
-    adb->io_key_last_ascii &= ~0x80;
-    adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
-    // adb->keyb.repeat_key_mod = false;
-    CLEM_LOG("SKS: STROBE CLR W %c", adb->io_key_last_ascii);
-    _clem_adb_glu_clipboard_paste(adb);
+    if (adb->io_key_last_ascii & 0x80) {
+        adb->io_key_last_ascii &= ~0x80;
+        adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
+        // adb->keyb.repeat_key_mod = false;
+        CLEM_LOG("SKS: STROBE CLR W %c", adb->io_key_last_ascii);
+        _clem_adb_glu_clipboard_paste(adb);
+    }
 }
 
 void clem_adb_write_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_t value) {
