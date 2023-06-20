@@ -122,6 +122,7 @@ void clem_adb_reset(struct ClemensDeviceADB *adb) {
     adb->mode_flags = CLEM_ADB_MODE_AUTOPOLL_KEYB | CLEM_ADB_MODE_AUTOPOLL_MOUSE;
     adb->keyb.reset_key = false;
     adb->keyb.size = 0;
+    adb->keyb.paste_ticks = 0;
     adb->mouse.size = 0;
     adb->mouse.tracking_enabled = false;
     adb->mouse.valid_clamp_box = false;
@@ -1465,6 +1466,9 @@ static void _clem_adb_glu_clipboard_paste(struct ClemensDeviceADB *adb) {
     unsigned i;
     if (adb->io_key_last_ascii & 0x80 || adb->clipboard.tail == 0)
         return;
+    if (((adb->keyb.paste_ticks++) % 16) != 0)
+        return;
+
     adb->io_key_last_ascii = 0x80 | adb->clipboard.keys[0];
 
     --adb->clipboard.tail;
@@ -2048,7 +2052,9 @@ void clem_adb_glu_sync(struct ClemensDeviceADB *adb, struct ClemensDeviceMega2Me
         //        this will require practical testing with GS applications that take
         //        keyboard input vs Apple II ones (at the BASIC prompt, for example
         //)
-        if (adb->mode_flags & CLEM_ADB_MODE_AUTOPOLL_KEYB) {
+        if (adb->clipboard.tail > 0) {
+            _clem_adb_glu_clipboard_paste(adb);
+        } else if (adb->mode_flags & CLEM_ADB_MODE_AUTOPOLL_KEYB) {
             _clem_adb_glu_keyb_talk(adb);
         } else if (adb->keyb_reg[3] & CLEM_ADB_GLU_REG3_MASK_SRQ) {
             if (adb->keyb.size > 0) {
@@ -2210,7 +2216,6 @@ void clem_adb_clipboard_push_ascii_char(struct ClemensDeviceADB *adb, unsigned c
         return;
     }
     adb->clipboard.keys[adb->clipboard.tail++] = ch;
-    _clem_adb_glu_clipboard_paste(adb);
 }
 
 /*  Some of this logic comes from the IIgs  HW and FW references and its
@@ -2348,9 +2353,7 @@ static void _clem_adb_key_strobe(struct ClemensDeviceADB *adb) {
     if (adb->io_key_last_ascii & 0x80) {
         adb->io_key_last_ascii &= ~0x80;
         adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
-        // adb->keyb.repeat_key_mod = false;
         CLEM_LOG("SKS: STROBE CLR W %c", adb->io_key_last_ascii);
-        _clem_adb_glu_clipboard_paste(adb);
     }
 }
 
