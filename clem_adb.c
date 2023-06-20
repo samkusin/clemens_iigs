@@ -113,7 +113,6 @@
  * SRQs are disabled for all devices on reset
  * Autopoll enabled for all devices on reset
  */
-#define CLEM_ADB_GLU_SRQ_60HZ_CYCLES 600
 
 void clem_adb_reset(struct ClemensDeviceADB *adb) {
     int i;
@@ -122,7 +121,6 @@ void clem_adb_reset(struct ClemensDeviceADB *adb) {
     adb->mode_flags = CLEM_ADB_MODE_AUTOPOLL_KEYB | CLEM_ADB_MODE_AUTOPOLL_MOUSE;
     adb->keyb.reset_key = false;
     adb->keyb.size = 0;
-    adb->keyb.paste_ticks = 0;
     adb->mouse.size = 0;
     adb->mouse.tracking_enabled = false;
     adb->mouse.valid_clamp_box = false;
@@ -1379,7 +1377,7 @@ static uint8_t _clem_adb_glu_keyb_parse(struct ClemensDeviceADB *adb, uint8_t ke
 
     //  TODO: paste text will override this (and set KEY_FULL itself)
     if (ascii_key != 0xff) {
-        CLEM_LOG("SKS: ascii: %02X", ascii_key);
+        // CLEM_LOG("SKS: ascii: %02X", ascii_key);
         if (is_key_down) {
             adb->io_key_last_ascii = 0x80 | ascii_key;
             /* via HWRef, but FWRef contradicts? */
@@ -1462,18 +1460,37 @@ static void _clem_adb_glu_keyb_talk(struct ClemensDeviceADB *adb) {
 
 static void _clem_adb_glu_clipboard_paste(struct ClemensDeviceADB *adb) {
     //  For now, simply inject into io_key_last_ascii which is read by the A2
-    //  registers
+    //  registers.
+    //  Do not paste if a user has already pressed a key (until release)
+    //
+    //  NOTE:  This doesn't work correctly for GS applications due to how
+    //         keyboard input is processed in the Toolbox.
+    //
+    //         Basically keys are read from $C000, and cleared via a write to $C010
+    //         during a VBL in the IRQ handler.  Effectively this queues keys via
+    //         PostEvent onto the system queue at the refresh rate, which can fill
+    //         the queue after just 20-30 characters.  This happens faster than many
+    //         GS applications can pull key events from the queue, resulting in lost
+    //         keys.
+    //
+    //         A better solution for our paste logic to leverage the scrap
+    //         manager toolset and inject data onto its clipboard.  This perhaps
+    //         is more work than its worth for now, since there should be other
+    //         methods, like serial communication or writing files via Ciderpress.
+    //
+    //         This might be a good segway into developing emulated firmware that
+    //         could paste data to, or copy data from the scrap manager... but that
+    //         is at best a side project that could take weeks.
+    //
     unsigned i;
-    if (adb->io_key_last_ascii & 0x80 || adb->clipboard.tail == 0)
-        return;
-    if (((adb->keyb.paste_ticks++) % 16) != 0)
+    if (adb->io_key_last_ascii & 0x80 || adb->clipboard.tail == 0 || adb->is_asciikey_down)
         return;
 
     adb->io_key_last_ascii = 0x80 | adb->clipboard.keys[0];
-
     --adb->clipboard.tail;
-    CLEM_LOG("SKS: clipboard tail %u, key %02X (%c), mods %04X", adb->clipboard.tail,
-             adb->clipboard.keys[0], adb->clipboard.keys[0], adb->keyb_reg[2]);
+
+    // CLEM_LOG("SKS: clipboard tail %u, key %02X (%c), mods %04X", adb->clipboard.tail,
+    //          adb->clipboard.keys[0], adb->clipboard.keys[0], adb->keyb_reg[2]);
     adb->cmd_status |= CLEM_ADB_C027_KEY_FULL;
     for (i = 0; i < adb->clipboard.tail; ++i) {
         adb->clipboard.keys[i] = adb->clipboard.keys[i + 1];
@@ -2353,7 +2370,7 @@ static void _clem_adb_key_strobe(struct ClemensDeviceADB *adb) {
     if (adb->io_key_last_ascii & 0x80) {
         adb->io_key_last_ascii &= ~0x80;
         adb->cmd_status &= ~CLEM_ADB_C027_KEY_FULL;
-        CLEM_LOG("SKS: STROBE CLR W %c", adb->io_key_last_ascii);
+        // CLEM_LOG("SKS: STROBE CLR W %c", adb->io_key_last_ascii);
     }
 }
 

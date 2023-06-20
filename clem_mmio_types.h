@@ -45,7 +45,6 @@ struct ClemensDeviceKeyboard {
     int rate_per_sec;
     int timer_us;
     int repeat_count;
-    uint8_t paste_ticks;
     uint8_t last_a2_key_down;
     bool reset_key;
     bool repeat_key_mod;
