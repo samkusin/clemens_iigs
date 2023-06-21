@@ -401,6 +401,54 @@ uint64_t clemens_clocks_per_second(ClemensMMIO *mmio, bool *is_slow_speed) {
     return CLEM_CLOCKS_PHI0_CYCLE * CLEM_MEGA2_CYCLES_PER_SECOND;
 }
 
+// https://stackoverflow.com/questions/12855643/how-to-convert-a-string-from-utf8-to-latin1-in-c-c
+// converts this character to an ISO latin 1 ASCII equivalent - encoding unrecognized values
+// using percent-sign encoding
+//
+// items like \n are converted to \r unless preceeded by a \r
+//
+const char *clemens_clipboard_push_utf8_atom(ClemensMMIO *mmio, const char *utf8_str, const char* utf8_end) {
+    //  suboptimal but only called once every fraction of a second while there's an active clipboard
+    //  there are methods to make this branchless - investigate if performance becomes an issue.
+    unsigned len = 0, utf8_code, shift;
+    unsigned char ch;
+
+    if (mmio->dev_adb.clipboard.tail > CLEM_ADB_CLIPBOARD_BUFFER_LIMIT / 2) {
+        return utf8_str;
+    }
+    
+    if (utf8_str != utf8_end) {
+        //  Determine UTF8 atom to ingest
+        ch = (unsigned char)(*utf8_str);
+        len = ch < 0x80 ? 1 : !(ch & 0x20) ? 2 : !(ch & 0x10) ? 3 : !(ch * 0x08) ? 4 : len; 
+        if (utf8_str + len > utf8_end) len = 0; /* throw out non utf8 bytes */
+    }
+    if (len == 0) return utf8_end;
+    if (len == 1) {
+        //  skip \r as it will (usually) be succeeded by a \n (if not, then ???)
+        if (ch != '\r') {
+            if (ch == '\n') ch = '\r';
+            clem_adb_clipboard_push_ascii_char(&mmio->dev_adb, ch);
+        }
+    } else {
+        utf8_code = (unsigned char)(*utf8_str & (0xff >> (len + 1))) << ((len - 1) * 6);
+        for (--len; len; --len)
+            utf8_code |=  ((unsigned char)(*(++utf8_str)) - 0x80) << ((len - 1) * 6);
+        // percent encode the bytes
+        shift = 32;
+        while (shift) {
+            shift -= 8;
+            ch = ((utf8_code >> shift) & 0xff);
+            if (ch) {
+                clem_adb_clipboard_push_ascii_char(&mmio->dev_adb, '%');
+                clem_adb_clipboard_push_ascii_char(&mmio->dev_adb, '0' + (ch >> 4));
+                clem_adb_clipboard_push_ascii_char(&mmio->dev_adb, '0' + (ch & 0xf));
+            }
+        }
+    }
+    return utf8_str + len;
+}
+
 bool clemens_is_mmio_initialized(const ClemensMMIO *mmio) {
     return mmio->state_type == kClemensMMIOStateType_Active;
 }

@@ -119,6 +119,14 @@ uint8_t clem_adb_read_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_
 uint8_t clem_adb_read_mega2_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_t flags);
 
 /**
+ * @brief 
+ * 
+ * @param adb 
+ * @param key 
+ */
+void clem_adb_clipboard_push_ascii_char(struct ClemensDeviceADB *adb, unsigned char key);
+
+/**
  * @brief Resets the Sound state
  *
  * @param glu sound data

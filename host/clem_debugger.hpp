@@ -108,6 +108,7 @@ class ClemensDebuggerListener {
 
     virtual void onDebuggerCommandReboot() = 0;
     virtual void onDebuggerCommandShutdown() = 0;
+    virtual void onDebuggerCommandPaste() = 0;
 };
 
 #endif

@@ -16,8 +16,10 @@ class ClemensStartupView : public ClemensHostView {
 
   public:
     ViewType getViewType() const final { return ViewType::Startup; }
-    ViewType frame(int width, int height, double deltaTime, FrameAppInterop &interop) final;
+    ViewType frame(int width, int height, double deltaTime, ClemensHostInterop &interop) final;
     void input(ClemensInputEvent) final;
+    bool emulatorHasFocus() const final { return false; }
+    void pasteText(const char *text, unsigned textSizeLimit) final;
     void lostFocus() final;
 
   private:

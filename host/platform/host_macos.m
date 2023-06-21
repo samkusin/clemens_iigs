@@ -15,7 +15,7 @@
 //                     in other situations, these calls are wrapped in
 //                     @autoreleasepool { }
 
-unsigned clem_host_get_processor_number() {
+unsigned clem_host_get_processor_number(void) {
   //  There seems to be no easy way to do this on macOS and especially since the
   //  introduction of Apple silicon.
   //  Since this is only for debugging/diagnostic purposes, it's not essential
@@ -61,10 +61,6 @@ void open_system_folder_view(const char *folder_path) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-void clem_host_platform_init() {}
-
-void clem_host_platform_terminate() {}
 
 @interface ClemensGameControllerDispatch : NSObject {
   NSPointerArray *controllers;
@@ -185,7 +181,7 @@ void clem_host_platform_terminate() {}
 
 static ClemensGameControllerDispatch *controllerDispatch_ = nil;
 
-static void _open_gamecontrollers() {
+static void _open_gamecontrollers(void) {
   controllerDispatch_ = [[ClemensGameControllerDispatch alloc] init];
   NSNotificationCenter *notificationCenter =
       [NSNotificationCenter defaultCenter];
@@ -221,7 +217,7 @@ unsigned clem_joystick_poll(ClemensHostJoystick *joysticks) {
   return index;
 }
 
-void clem_joystick_close_devices() {
+void clem_joystick_close_devices(void) {
   if (controllerDispatch_ != nil) {
     NSNotificationCenter *notificationCenter =
         [NSNotificationCenter defaultCenter];

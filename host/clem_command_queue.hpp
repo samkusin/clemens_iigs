@@ -33,6 +33,7 @@ class ClemensCommandQueueListener {
     virtual bool onCommandRunScript(std::string command) = 0;
     virtual void onCommandFastDiskEmulation(bool enabled) = 0;
     virtual std::string onCommandDebugMessage(std::string msg) = 0;
+    virtual void onCommandSendText(std::string text) = 0;
 };
 
 class ClemensCommandQueue {
@@ -94,6 +95,8 @@ class ClemensCommandQueue {
     void enableFastDiskEmulation(bool enable);
     //  TODO: remove in place of interpreter commands
     void debugMessage(std::string msg);
+    //  Sends text to the emulator's keyboard queue
+    void sendText(std::string text);
 
   private:
     bool insertDisk(ClemensCommandQueueListener &listener, const std::string_view &inputParam);

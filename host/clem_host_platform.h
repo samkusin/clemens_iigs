@@ -69,20 +69,6 @@ typedef struct {
     bool isConnected;
 } ClemensHostJoystick;
 
-/**
- * @brief Starts any platform specific systems
- *
- * This may equate to a no-op on some platforms, but gives our application
- * a change to perform any platform specific initialization not handled by
- * the cross-platform application framework used.
- */
-void clem_host_platform_init(void);
-
-/**
- * @brief Reverses clem_host_platform_init()
- *
- */
-void clem_host_platform_terminate(void);
 
 /**
  * @brief Returns the current processor the local thread is running on

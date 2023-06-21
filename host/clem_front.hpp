@@ -26,6 +26,7 @@
 
 #include <array>
 #include <condition_variable>
+#include <deque>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -44,13 +45,16 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     ~ClemensFrontend();
 
     ViewType getViewType() const final { return ViewType::Main; }
-    ViewType frame(int width, int height, double deltaTime, FrameAppInterop &interop) final;
+    ViewType frame(int width, int height, double deltaTime, ClemensHostInterop &interop) final;
     void input(ClemensInputEvent input) final;
+    bool emulatorHasFocus() const final;
+    void pasteText(const char *text, unsigned textSizeLimit) final;
     void lostFocus() final;
 
   private:
     void onDebuggerCommandReboot() override;
     void onDebuggerCommandShutdown() override;
+    void onDebuggerCommandPaste() override;
 
   private:
     template <typename TBufferType> friend struct FormatView;
@@ -72,12 +76,13 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
                               const ClemensCommandQueue::ResultBuffer &results);
     void processBackendResult(const ClemensBackendResult &result);
 
-    void doEmulatorInterface(ImVec2 dimensions, const ViewToMonitorTranslation &viewToMonitor,
-                             double deltaTime);
+    void doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
+                             const ViewToMonitorTranslation &viewToMonitor, double deltaTime);
 
     void doDebuggerLayout(ImVec2 anchor, ImVec2 dimensions,
                           const ViewToMonitorTranslation &viewToMonitor);
 
+    void doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop);
     void doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions);
     void doUserMenuDisplay(float width);
     void doMachinePeripheralDisplay(float width);
@@ -164,6 +169,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     bool emulatorHasKeyboardFocus_;
     bool emulatorHasMouseFocus_;
     bool mouseInEmulatorScreen_;
+    bool pasteClipboardToEmulator_;
 
     std::string snapshotRootPath_;
 

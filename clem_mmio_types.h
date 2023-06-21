@@ -47,6 +47,7 @@ struct ClemensDeviceKeyboard {
     int repeat_count;
     uint8_t last_a2_key_down;
     bool reset_key;
+    bool repeat_key_mod;
 };
 
 struct ClemensDeviceMouse {
@@ -76,14 +77,18 @@ struct ClemensDeviceGameport {
     uint8_t ann_mask;
 };
 
+struct ClemensDeviceClipboard {
+    unsigned tail;
+    unsigned char keys[CLEM_ADB_CLIPBOARD_BUFFER_LIMIT];
+};
+
 struct ClemensDeviceADB {
     unsigned state;
-    unsigned version;        /* Different ROMs expect different versions */
-    unsigned poll_timer_us;  /* 60 hz timer (machine time) */
-    unsigned mode_flags;     /* ADB modes */
-    bool is_keypad_down;     /* Used to determine keypad modifier status */
-    bool is_asciikey_down;   /* Used to determine c010 anykey down status */
-    bool has_modkey_changed; /* FIXME: Used for modifier key latch? */
+    unsigned version;       /* Different ROMs expect different versions */
+    unsigned poll_timer_us; /* 60 hz timer (machine time) */
+    unsigned mode_flags;    /* ADB modes */
+    bool is_keypad_down;    /* Used to determine keypad modifier status */
+    bool is_asciikey_down;  /* Used to determine c010 anykey down status */
 
     uint8_t io_key_last_ascii; /* The last ascii key pressed, bit 7 strobe */
 
@@ -102,6 +107,7 @@ struct ClemensDeviceADB {
     struct ClemensDeviceKeyboard keyb;
     struct ClemensDeviceMouse mouse;
     struct ClemensDeviceGameport gameport;
+    struct ClemensDeviceClipboard clipboard;
 
     uint8_t ram[256]; /**< Microcontroller RAM */
 

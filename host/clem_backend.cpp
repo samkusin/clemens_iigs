@@ -171,6 +171,8 @@ ClemensBackend::ClemensBackend(std::string romPath, const Config &config)
         GS_->mount();
         break;
     }
+
+    clipboardHead_ = 0;
 }
 
 ClemensBackend::~ClemensBackend() {}
@@ -245,6 +247,11 @@ ClemensBackend::main(ClemensBackendState &backendState,
                 lastClocksSpent = machine.tspec.clocks_spent; // clocks being reset
             }
             if (test(machineResult, ClemensAppleIIGS::ResultFlags::VerticalBlank)) {
+                if (clipboardHead_ < clipboardText_.size()) {
+                    clipboardHead_ +=
+                        GS_->consume_utf8_input(clipboardText_.data() + clipboardHead_,
+                                                clipboardText_.data() + clipboardText_.size());
+                }
                 emulatorVblCounter--;
             }
             if (stepsRemaining_.has_value()) {
@@ -846,4 +853,10 @@ std::string ClemensBackend::onCommandDebugMessage(std::string msg) {
         }
     }
     return fmt::format("OK:{} {},{}", cmd, params[2], params[3]);
+}
+
+void ClemensBackend::onCommandSendText(std::string text) {
+    clipboardText_.erase(0, clipboardHead_);
+    clipboardHead_ = 0;
+    clipboardText_.append(text);
 }

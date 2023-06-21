@@ -362,7 +362,6 @@ void ClemensDebugger::console(ImVec2 anchor, ImVec2 dimensions) {
         contentRegion.y - kInputHeight - 3 * style.ItemSpacing.y - 2 * style.FramePadding.y;
 
     layoutConsoleLines(ImVec2(contentRegion.x, kConsoleHeight));
-    ImGui::Separator();
     ImGui::SetCursorPosY(contentRegion.y - style.ItemSpacing.y - kInputHeight);
     ImGui::Separator();
     ImGui::AlignTextToFramePadding();
@@ -583,6 +582,8 @@ void ClemensDebugger::executeCommand(std::string_view command) {
         cmdSave(operand);
     } else if (action == "load") {
         cmdLoad(operand);
+    } else if (action == "paste") {
+        listener_.onDebuggerCommandPaste();
     } else {
         commandQueue_.runScript(std::string(command));
     }
