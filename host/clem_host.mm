@@ -24,9 +24,9 @@
 
 @implementation ClemensHostSystem {
   struct ClemensHostInterop *hostInterop;
-  NSMenuItem* powerMenuItem;
-  NSMenuItem* rebootMenuItem;
-  NSMenuItem* shutdownMenuItem;
+  NSMenuItem *powerMenuItem;
+  NSMenuItem *rebootMenuItem;
+  NSMenuItem *shutdownMenuItem;
 }
 
 + (id)instance {
@@ -117,7 +117,7 @@
   [menubar setSubmenu:filemenu forItem:fileMenuItem];
 
   // Edit Menu
-    NSMenu *editmenu = [[NSMenu alloc] initWithTitle:@"Edit"];
+  NSMenu *editmenu = [[NSMenu alloc] initWithTitle:@"Edit"];
   menuItem = [[NSMenuItem alloc] initWithTitle:@"Paste Text Input"
                                         action:@selector(menuPasteText:)
                                  keyEquivalent:@""];
@@ -130,22 +130,22 @@
   [menubar setSubmenu:editmenu forItem:editMenuItem];
 
   // Machine Menu
-    NSMenu *machmenu = [[NSMenu alloc] initWithTitle:@"Machine"];
+  NSMenu *machmenu = [[NSMenu alloc] initWithTitle:@"Machine"];
   powerMenuItem = [[NSMenuItem alloc] initWithTitle:@"Power"
-                                        action:@selector(menuPower:)
-                                 keyEquivalent:@""];
+                                             action:@selector(menuPower:)
+                                      keyEquivalent:@""];
   [powerMenuItem setTarget:self];
   [machmenu addItem:powerMenuItem];
 
   rebootMenuItem = [[NSMenuItem alloc] initWithTitle:@"Reboot"
-                                        action:@selector(menuReboot:)
-                                 keyEquivalent:@""];
+                                              action:@selector(menuReboot:)
+                                       keyEquivalent:@""];
   [rebootMenuItem setTarget:self];
   [machmenu addItem:rebootMenuItem];
 
   shutdownMenuItem = [[NSMenuItem alloc] initWithTitle:@"Shutdown"
-                                        action:@selector(menuShutdown:)
-                                 keyEquivalent:@""];
+                                                action:@selector(menuShutdown:)
+                                         keyEquivalent:@""];
   [shutdownMenuItem setTarget:self];
   [machmenu addItem:shutdownMenuItem];
 
@@ -153,7 +153,6 @@
                                                 action:nil
                                          keyEquivalent:@""];
   [menubar setSubmenu:machmenu forItem:machMenuItem];
-
 
   // View Menu
   //    Pause or Run
@@ -168,21 +167,21 @@
 }
 
 - (void)update {
-    if (hostInterop->poweredOn) {
-        [rebootMenuItem setEnabled:TRUE];
-                [rebootMenuItem setAction:@selector(menuReboot:)];
-        [shutdownMenuItem setEnabled:TRUE];
-                        [shutdownMenuItem setAction:@selector(menuShutdown:)];
-        [powerMenuItem setEnabled:FALSE];
-        [powerMenuItem setAction:nil];
-    } else {
-        [rebootMenuItem setEnabled:FALSE];
-                        [rebootMenuItem setAction:nil];
-        [shutdownMenuItem setEnabled:FALSE];
-                                [shutdownMenuItem setAction:nil];
-        [powerMenuItem setEnabled:TRUE];
-         [powerMenuItem setAction:@selector(menuPower:)];
-    }
+  if (hostInterop->poweredOn) {
+    [rebootMenuItem setEnabled:TRUE];
+    [rebootMenuItem setAction:@selector(menuReboot:)];
+    [shutdownMenuItem setEnabled:TRUE];
+    [shutdownMenuItem setAction:@selector(menuShutdown:)];
+    [powerMenuItem setEnabled:FALSE];
+    [powerMenuItem setAction:nil];
+  } else {
+    [rebootMenuItem setEnabled:FALSE];
+    [rebootMenuItem setAction:nil];
+    [shutdownMenuItem setEnabled:FALSE];
+    [shutdownMenuItem setAction:nil];
+    [powerMenuItem setEnabled:TRUE];
+    [powerMenuItem setAction:@selector(menuPower:)];
+  }
 }
 
 @end
@@ -194,8 +193,6 @@ void clemens_host_init(ClemensHostInterop *interop) {
   interop->nativeMenu = true;
 }
 
-void clemens_host_update() {
-    [[ClemensHostSystem instance] update];
-}
+void clemens_host_update() { [[ClemensHostSystem instance] update]; }
 
 void clemens_host_terminate() {}
