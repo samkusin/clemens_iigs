@@ -2071,7 +2071,8 @@ void clem_adb_glu_sync(struct ClemensDeviceADB *adb, struct ClemensDeviceMega2Me
         //)
         if (adb->clipboard.tail > 0) {
             _clem_adb_glu_clipboard_paste(adb);
-        } else if (adb->mode_flags & CLEM_ADB_MODE_AUTOPOLL_KEYB) {
+        }
+        if (adb->mode_flags & CLEM_ADB_MODE_AUTOPOLL_KEYB) {
             _clem_adb_glu_keyb_talk(adb);
         } else if (adb->keyb_reg[3] & CLEM_ADB_GLU_REG3_MASK_SRQ) {
             if (adb->keyb.size > 0) {

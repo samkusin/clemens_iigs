@@ -71,7 +71,7 @@
   // View Menu
   //    Pause or Run
   //    Debugger or Main Display
-  //    Enter/Exit Fullscreen 
+  //    Enter/Exit Fullscreen
 
   // Help Menu
 
@@ -91,6 +91,7 @@ void clemens_host_init(ClemensHostInterop *interop) {
   //  create a menu and attach to the current application
   [[ClemensHostSystem instance] setInterop:interop];
   [[ClemensHostSystem instance] buildMenus];
+  interop->nativeMenu = true;
 }
 
 void clemens_host_terminate() {}

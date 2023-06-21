@@ -76,12 +76,13 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
                               const ClemensCommandQueue::ResultBuffer &results);
     void processBackendResult(const ClemensBackendResult &result);
 
-    void doEmulatorInterface(ImVec2 dimensions, const ViewToMonitorTranslation &viewToMonitor,
-                             double deltaTime);
+    void doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
+                             const ViewToMonitorTranslation &viewToMonitor, double deltaTime);
 
     void doDebuggerLayout(ImVec2 anchor, ImVec2 dimensions,
                           const ViewToMonitorTranslation &viewToMonitor);
 
+    void doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop);
     void doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions);
     void doUserMenuDisplay(float width);
     void doMachinePeripheralDisplay(float width);

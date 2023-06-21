@@ -362,7 +362,6 @@ void ClemensDebugger::console(ImVec2 anchor, ImVec2 dimensions) {
         contentRegion.y - kInputHeight - 3 * style.ItemSpacing.y - 2 * style.FramePadding.y;
 
     layoutConsoleLines(ImVec2(contentRegion.x, kConsoleHeight));
-    ImGui::Separator();
     ImGui::SetCursorPosY(contentRegion.y - style.ItemSpacing.y - kInputHeight);
     ImGui::Separator();
     ImGui::AlignTextToFramePadding();

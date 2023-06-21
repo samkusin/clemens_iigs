@@ -4,13 +4,13 @@
 struct ClemensHostInterop {
     bool mouseLock;
     bool mouseShow;
+    bool nativeMenu;
     bool pasteFromClipboard;
     bool exitApp;
 };
 
-void clemens_host_init(ClemensHostInterop* interop);
+void clemens_host_init(ClemensHostInterop *interop);
 
 void clemens_host_terminate();
-
 
 #endif
