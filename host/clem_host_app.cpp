@@ -419,20 +419,22 @@ static void onFrame(void *) {
     if (g_Host) {
         g_interop.mouseLock = sapp_mouse_locked();
         g_interop.mouseShow = sapp_mouse_shown();
-        g_interop.pasteFromClipboard = false;
+        g_interop.poweredOn = false;
 
         auto nextViewType = g_Host->frame(frameWidth, frameHeight, deltaTime, g_interop);
         sapp_lock_mouse(g_interop.mouseLock);
         if (g_interop.mouseShow != sapp_mouse_shown()) {
             sapp_show_mouse(g_interop.mouseShow);
         }
-        if (g_interop.pasteFromClipboard) {
+        if (g_interop.action == ClemensHostInterop::PasteFromClipboard) {
             //  this is separate from ImGui's clipboard support so that the emulator controls when
             //  it receives clipboard data
             g_Host->pasteText(sapp_get_clipboard_string(), kClipboardTextLimit);
-            g_interop.pasteFromClipboard = false;
         }
+        g_interop.action = ClemensHostInterop::None;
         exitApp = g_interop.exitApp;
+
+        clemens_host_update();
 
         if (nextViewType != g_Host->getViewType()) {
             auto *oldHost = g_Host;

@@ -1,6 +1,7 @@
 //  Boo...
 #include "cinek/equation.hpp"
 #include "cinek/keyframe.hpp"
+#include "clem_host.hpp"
 
 #include <algorithm>
 #define _USE_MATH_DEFINES
@@ -84,7 +85,7 @@ ImU32 getWidgetHoverColor(const ClemensFrontend &) { return kWidgetHoverColor; }
 ImU32 getWidgetActiveColor(const ClemensFrontend &) { return kWidgetActiveColor; }
 ImU32 getWidgetToggleOnColor(const ClemensFrontend &) { return kWidgetToggleOnColor; }
 ImU32 getWidgetToggleOffColor(const ClemensFrontend &) { return kWidgetToggleOffColor; }
-ImU32 getMenuColor(const ClemensFrontend &) { return kWidgetColor; }
+ImU32 getMenuColor(const ClemensFrontend &) { return kDarkFrameColor; }
 
 ImTextureID getImTextureOfAsset(ClemensHostAssets::ImageId id) {
     return (ImTextureID)(ClemensHostAssets::getImage(id));
@@ -969,6 +970,40 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     if (!interop.nativeMenu) {
         doMainMenu(interfaceAnchor, interop);
     }
+    switch (interop.action) {
+    case ClemensHostInterop::About:
+        setGUIMode(GUIMode::Help);
+        break;
+    case ClemensHostInterop::LoadSnapshot:
+        if (isBackendRunning()) {
+            if (!isEmulatorStarting()) {
+                setGUIMode(GUIMode::LoadSnapshot);
+            }
+        } else {
+            setGUIMode(GUIMode::LoadSnapshotAfterPowerOn);
+        }
+        break;
+    case ClemensHostInterop::SaveSnapshot:
+        if (isBackendRunning() && !isEmulatorStarting()) {
+            setGUIMode(GUIMode::SaveSnapshot);
+        }
+        break;
+    case ClemensHostInterop::PasteFromClipboard:
+        pasteClipboardToEmulator_ = true;
+        break;
+    case ClemensHostInterop::Power:
+        setGUIMode(GUIMode::RebootEmulator);
+        break;
+    case ClemensHostInterop::Reboot:
+        rebootInternal();
+        break;
+    case ClemensHostInterop::Shutdown:
+        setGUIMode(GUIMode::ShutdownEmulator);
+        break;
+    case ClemensHostInterop::None:
+        break;
+    }
+
     doEmulatorInterface(interfaceAnchor, ImVec2(width, height), viewToMonitor, deltaTime);
 
     if (isBackendTerminated) {
@@ -1077,12 +1112,14 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
 
     config_.save();
 
-    interop.pasteFromClipboard = pasteClipboardToEmulator_;
+    if (pasteClipboardToEmulator_) {
+        interop.action = ClemensHostInterop::PasteFromClipboard;
+        pasteClipboardToEmulator_ = false;
+    }
     interop.mouseLock = emulatorHasMouseFocus_;
     interop.mouseShow =
         !mouseInEmulatorScreen_ || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
-
-    pasteClipboardToEmulator_ = false;
+    interop.poweredOn =  isBackendRunning();
 
     return getViewType();
 }
@@ -1252,26 +1289,18 @@ void ClemensFrontend::doDebuggerLayout(ImVec2 anchor, ImVec2 dimensions,
 }
 
 void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
-    ImGui::PushStyleColor(ImGuiCol_MenuBarBg, ClemensHostStyle::getFrameColor(*this));
+    ImGui::PushStyleColor(ImGuiCol_MenuBarBg, ClemensHostStyle::getMenuColor(*this));
     // ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32_BLACK);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x,
                                                            ImGui::GetTextLineHeight() * 0.5f));
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("Load Snapshot", NULL, false, !isEmulatorStarting())) {
-                if (isBackendRunning()) {
-                    if (!isEmulatorStarting()) {
-                        setGUIMode(GUIMode::LoadSnapshot);
-                    }
-                } else {
-                    setGUIMode(GUIMode::LoadSnapshotAfterPowerOn);
-                }
+                interop.action = ClemensHostInterop::LoadSnapshot;
             }
             if (ImGui::MenuItem("Save Snapshot", NULL, false,
                                 isBackendRunning() && !isEmulatorStarting())) {
-                if (isBackendRunning() && !isEmulatorStarting()) {
-                    setGUIMode(GUIMode::SaveSnapshot);
-                }
+                interop.action = ClemensHostInterop::SaveSnapshot;
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Quit", NULL)) {
@@ -1284,22 +1313,22 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
             //}
             // ImGui::Separator();
             if (ImGui::MenuItem("Paste Text Input", NULL)) {
-                pasteClipboardToEmulator_ = true;
+                interop.action = ClemensHostInterop::PasteFromClipboard;
             }
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Machine")) {
             if (guiMode_ == GUIMode::Setup) {
                 if (ImGui::MenuItem("Power", NULL)) {
-                    setGUIMode(GUIMode::RebootEmulator);
+                    interop.action = ClemensHostInterop::Power;
                 }
             } else {
                 if (ImGui::MenuItem("Reboot", NULL, false,
                                     isBackendRunning() && !isEmulatorStarting())) {
-                    rebootInternal();
+                    interop.action = ClemensHostInterop::Reboot;
                 }
                 if (ImGui::MenuItem("Shutdown", NULL)) {
-                    setGUIMode(GUIMode::ShutdownEmulator);
+                    interop.action = ClemensHostInterop::Shutdown;
                 }
             }
             ImGui::EndMenu();
@@ -1307,7 +1336,7 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
         if (ImGui::BeginMenu("Help")) {
             ImGui::Separator();
             if (ImGui::MenuItem("About")) {
-                setGUIMode(GUIMode::Help);
+                interop.action = ClemensHostInterop::About;
             }
             ImGui::EndMenu();
         }

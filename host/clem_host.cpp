@@ -19,7 +19,7 @@ void clemens_host_init(struct ClemensHostInterop* ) {
 
 }
 
-void clemens_host_terminate() {
+void clemens_host_update() {}
 
-}
+void clemens_host_terminate() {}
 
