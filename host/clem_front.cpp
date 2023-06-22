@@ -705,6 +705,8 @@ void ClemensFrontend::runBackend(std::unique_ptr<ClemensBackend> backend) {
         readyForFrame_.wait(lk, [this]() { return frameLastSeqNo_ == frameSeqNo_; });
         lk.unlock();
         results = backend->step(stagedBackendQueue_);
+        // sync audio
+        audio_.queue(backend->renderAudioFrame());
     }
 
     std::lock_guard<std::mutex> lk(frameMutex_);
@@ -1103,7 +1105,9 @@ void ClemensFrontend::syncBackend(bool copyState) {
     //  wait another UI frame (slow emulator)
     std::lock_guard<std::mutex> frameLock(frameMutex_);
     if (frameLastSeqNo_ != frameSeqNo_ && copyState) {
-        //  new frame data located in the write frame
+        //  new frame data located in the write frame, obtained from the
+        //  backendState_ which is guaranteed to remain untouched until
+        //  the last frame sequence number is updated.
         debugger_.lastFrame(frameReadState_);
 
         lastFrameCPURegs_ = frameReadState_.cpu.regs;

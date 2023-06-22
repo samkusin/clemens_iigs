@@ -289,6 +289,10 @@ auto ClemensBackend::step(ClemensCommandQueue& commands) -> ClemensCommandQueue:
     return result;
 }
 
+ClemensAudio ClemensBackend::renderAudioFrame() {
+    return GS_->renderAudio();
+}
+
 void ClemensBackend::post(ClemensBackendState &backendState) {
     auto &machine = GS_->getMachine();
     auto &mmio = GS_->getMMIO();

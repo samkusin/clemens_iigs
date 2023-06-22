@@ -87,6 +87,8 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
 
     //  Executes a single emulator timeslice
     ClemensCommandQueue::DispatchResult step(ClemensCommandQueue& commands);
+    //  Obtain current audio frame (following calls to step())
+    ClemensAudio renderAudioFrame();
     //  Populate a backend state
     void post(ClemensBackendState& backendState);
 
