@@ -116,50 +116,40 @@ void FrameState::copyState(const ClemensBackendState &state, LastCommandState &c
     //      This code could be moved into a separate module just to make this
     //      rather lengthy block of code more maintainable.
     //
-    frame.monitor = state.frame->monitor;
+    frame.monitor = state.frame.monitor;
     //  copy scanlines as this data may become invalid on a frame-to-frame
     //  basis
-    frame.text = state.frame->text;
+    frame.text = state.frame.text;
     if (frame.text.format != kClemensVideoFormat_None) {
         frame.text.scanlines =
-            frameMemory.allocateArray<ClemensScanline>(state.frame->text.scanline_limit);
-        memcpy(frame.text.scanlines, state.frame->text.scanlines,
-               sizeof(ClemensScanline) * state.frame->text.scanline_limit);
+            frameMemory.allocateArray<ClemensScanline>(state.frame.text.scanline_limit);
+        memcpy(frame.text.scanlines, state.frame.text.scanlines,
+               sizeof(ClemensScanline) * state.frame.text.scanline_limit);
     }
-    frame.graphics = state.frame->graphics;
+    frame.graphics = state.frame.graphics;
     if (frame.graphics.format != kClemensVideoFormat_None) {
         frame.graphics.scanlines =
-            frameMemory.allocateArray<ClemensScanline>(state.frame->graphics.scanline_limit);
-        memcpy(frame.graphics.scanlines, state.frame->graphics.scanlines,
-               sizeof(ClemensScanline) * state.frame->graphics.scanline_limit);
+            frameMemory.allocateArray<ClemensScanline>(state.frame.graphics.scanline_limit);
+        memcpy(frame.graphics.scanlines, state.frame.graphics.scanlines,
+               sizeof(ClemensScanline) * state.frame.graphics.scanline_limit);
         // need to save off the rgb color buffer since the original memory belongs
         // to the backend
-        frame.graphics.rgb = frameMemory.allocateArray<uint16_t>(frame.graphics.rgb_buffer_size);
-        memcpy(frame.graphics.rgb, state.frame->graphics.rgb,
-               state.frame->graphics.rgb_buffer_size);
+        if (state.frame.graphics.rgb_buffer_size > 0) {
+            frame.graphics.rgb_buffer_size = state.frame.graphics.rgb_buffer_size;
+            frame.graphics.rgb =
+                frameMemory.allocateArray<uint16_t>(frame.graphics.rgb_buffer_size);
+            memcpy(frame.graphics.rgb, state.frame.graphics.rgb,
+                   state.frame.graphics.rgb_buffer_size);
+        }
     }
-    frame.diskDriveStatuses = state.frame->diskDriveStatuses;
-    frame.smartPortStatuses = state.frame->smartPortStatuses;
+    frame.diskDriveStatuses = state.frame.diskDriveStatuses;
+    frame.smartPortStatuses = state.frame.smartPortStatuses;
 
     e0bank = frameMemory.allocateArray<uint8_t>(CLEM_IIGS_BANK_SIZE);
     clemens_out_bin_data(state.machine, e0bank, CLEM_IIGS_BANK_SIZE, 0xe0, 0x0000);
     e1bank = frameMemory.allocateArray<uint8_t>(CLEM_IIGS_BANK_SIZE);
     clemens_out_bin_data(state.machine, e1bank, CLEM_IIGS_BANK_SIZE, 0xe1, 0x0000);
 
-    //  audio data - note, that the actual buffer and some fixed attributes like
-    //  stride are all that's needed by the frontend to render audio
-    //  frames are accumulated into an audio buffer residing in "last command state"
-    //  just in case the front-end refresh rate ends up being slower than the
-    //  backend
-    frame.audio = state.frame->audio;
-    if (frame.audio.data) {
-        auto audioBufferSize = int32_t(frame.audio.frame_count * frame.audio.frame_stride);
-        auto audioBufferRange = commandState.audioBuffer.forwardSize(audioBufferSize, false);
-        memcpy(audioBufferRange.first, frame.audio.data, cinek::length(audioBufferRange));
-        frame.audio.data = NULL;
-    } else {
-        commandState.audioBuffer.reset();
-    }
     //  replicate card states needed by the frontend
     for (unsigned slotIndex = 0; slotIndex < CLEM_CARD_SLOT_COUNT; ++slotIndex) {
         if (state.mmio->card_slot[slotIndex]) {

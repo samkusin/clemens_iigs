@@ -19,7 +19,7 @@ struct ClemensBackendState {
     bool isIWMTracing;
     bool mmioWasInitialized;
 
-    ClemensAppleIIGSFrame *frame;
+    ClemensAppleIIGSFrame frame;
 
     unsigned hostCPUID;
     int logLevel;
@@ -117,7 +117,6 @@ struct LastCommandState {
     LogOutputNode *logNodeTail = nullptr;
     LogInstructionNode *logInstructionNode = nullptr;
     LogInstructionNode *logInstructionNodeTail = nullptr;
-    cinek::ByteBuffer audioBuffer;
     bool isFastEmulationOn;
 };
 

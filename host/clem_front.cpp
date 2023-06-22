@@ -131,6 +131,7 @@ namespace {
 constexpr int kClemensScreenWidth = 720;
 constexpr int kClemensScreenHeight = 480;
 constexpr float kClemensAspectRatio = float(kClemensScreenWidth) / kClemensScreenHeight;
+constexpr double kMachineFrameDuration = 1.0 / 60.00;
 
 //  Delay user-initiated reboot after reset by this amount in seconds
 //  This was done in response to a bug related to frequent reboots that appears fixed
@@ -591,9 +592,9 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
                                  const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
     : config_(config), displayProvider_(systemFontLoBuffer, systemFontHiBuffer),
-      display_(displayProvider_), audio_(), logLevel_(CLEM_DEBUG_LOG_INFO), uiFrameTimeDelta_(0.0),
-      frameSeqNo_(kFrameSeqNoInvalid), frameLastSeqNo_(kFrameSeqNoInvalid),
-      frameWriteMemory_(kFrameMemorySize, malloc(kFrameMemorySize)),
+      display_(displayProvider_), audio_(), logLevel_(CLEM_DEBUG_LOG_INFO),
+      dtEmulatorNextUpdateInterval_(0.0), frameSeqNo_(kFrameSeqNoInvalid),
+      frameLastSeqNo_(kFrameSeqNoInvalid),
       frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)), lastFrameCPUPins_{},
       lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0), lastFrameNMIs_(0),
       emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false), mouseInEmulatorScreen_(false),
@@ -614,11 +615,6 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
         config_.gs.audioSamplesPerSecond = audio_.getAudioFrequency();
     }
 
-    auto audioBufferSize = config_.gs.audioSamplesPerSecond * audio_.getBufferStride() / 2;
-    lastCommandState_.audioBuffer =
-        cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
-    thisFrameAudioBuffer_ = cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
-
     snapshotRootPath_ =
         (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_SNAPSHOT_DIR).string();
 
@@ -635,10 +631,7 @@ ClemensFrontend::~ClemensFrontend() {
     stopBackend();
     audio_.stop();
     clem_joystick_close_devices();
-    delete[] thisFrameAudioBuffer_.getHead();
-    delete[] lastCommandState_.audioBuffer.getHead();
 
-    free(frameWriteMemory_.getHead());
     free(frameReadMemory_.getHead());
 }
 
@@ -696,61 +689,37 @@ void ClemensFrontend::startBackend() {
     spdlog::info("Starting new emulator backend");
     config_.poweredOn = true;
     auto backend = std::make_unique<ClemensBackend>(romPath, backendConfig);
+    dtEmulatorNextUpdateInterval_ = 0.0;
     backendThread_ = std::thread(&ClemensFrontend::runBackend, this, std::move(backend));
-
-    uiFrameTimeDelta_ = 0.0;
     backendQueue_.reset();
     backendQueue_.run();
 }
 
 void ClemensFrontend::runBackend(std::unique_ptr<ClemensBackend> backend) {
-    ClemensBackendState state;
-
     ClemensCommandQueue::DispatchResult results{};
-    // double frameTimeLag = 0.0f;
-
-    // results = backend->main(commands, state)).second
     while (!results.second) {
-        //  TODO: need to account for lag!!!
+        std::unique_lock<std::mutex> lk(frameMutex_);
+        backend->post(backendState_);
+        std::copy(results.first.begin(), results.first.end(), std::back_inserter(lastCommandState_.results));
+        frameSeqNo_++;
+        readyForFrame_.wait(lk, [this]() { return frameLastSeqNo_ == frameSeqNo_; });
+        lk.unlock();
+        results = backend->step(stagedBackendQueue_);
+    }
 
-        results = backend->main(state, results.first,
-                                [this](ClemensCommandQueue &commands,
-                                       const ClemensCommandQueue::ResultBuffer &lastFrameResults,
-                                       const ClemensBackendState &state) {
-                                    std::unique_lock<std::mutex> lk(frameMutex_);
-                                    readyForFrame_.wait(lk, [this]() {
-                                        return (uiFrameTimeDelta_ > 0.0) ||
-                                               !stagedBackendQueue_.isEmpty();
-                                    });
-                                    // CK_TODO("Need to account for lag!!!")
-                                    frameSeqNo_++;
-                                    backendStateDelegate(state, lastFrameResults);
-                                    commands.queue(stagedBackendQueue_);
-                                    // frameTimeLag += uiFrameTimeDelta_;
-                                    uiFrameTimeDelta_ = 0.0;
-                                });
-        if (results.second) {
-            std::lock_guard<std::mutex> lk(frameMutex_);
-            ClemensAppleIIGSConfig config;
-            if (backend->queryConfig(config)) {
-                lastCommandState_.gsConfig = config;
-            } else {
-                spdlog::warn("Configuration was not retrieved on termination of emulated machine!");
-            }
-        }
-        //  TODO: check for config change
-        //        mutex configuration
-        //        save it!
+    std::lock_guard<std::mutex> lk(frameMutex_);
+    ClemensAppleIIGSConfig config;
+    if (backend->queryConfig(config)) {
+        lastCommandState_.gsConfig = config;
+    } else {
+        spdlog::warn("Configuration was not retrieved on termination of emulated machine!");
     }
 }
 
 void ClemensFrontend::stopBackend() {
     if (backendThread_.joinable()) {
         backendQueue_.terminate();
-        {
-            std::lock_guard<std::mutex> lk(frameMutex_);
-            stagedBackendQueue_.queue(backendQueue_);
-        }
+        syncBackend(false);
         readyForFrame_.notify_one();
         backendThread_.join();
     }
@@ -765,13 +734,66 @@ void ClemensFrontend::stopBackend() {
 
 bool ClemensFrontend::isBackendRunning() const { return backendThread_.joinable(); }
 
-void ClemensFrontend::backendStateDelegate(const ClemensBackendState &state,
+void ClemensFrontend::backendStateDelegate(const ClemensBackendState &,
                                            const ClemensCommandQueue::ResultBuffer &results) {
 
-    //  prevent reallocation of the results vector
-    std::copy(results.begin(), results.end(), std::back_inserter(lastCommandState_.results));
+    //  audio frame is queued directly to ClemensAudio()
+    //  input audio frames are from the last backend time slice
 
-    frameWriteState_.copyState(state, lastCommandState_, frameWriteMemory_);
+    /*
+     //  audio data - note, that the actual buffer and some fixed attributes like
+    //  stride are all that's needed by the frontend to render audio
+    //  frames are accumulated into an audio buffer residing in "last command state"
+    //  just in case the front-end refresh rate ends up being slower than the
+    //  backend
+    frame.audio = state.frame->audio;
+    if (frame.audio.data) {
+        auto audioBufferSize = int32_t(frame.audio.frame_count * frame.audio.frame_stride);
+        auto audioBufferRange = commandState.audioBuffer.forwardSize(audioBufferSize, false);
+        memcpy(audioBufferRange.first, frame.audio.data, cinek::length(audioBufferRange));
+        frame.audio.data = NULL;
+    } else {
+        commandState.audioBuffer.reset();
+    }
+
+        auto audioBufferSize = config_.gs.audioSamplesPerSecond * audio_.getBufferStride() / 2;
+    lastCommandState_.audioBuffer =
+        cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
+    thisFrameAudioBuffer_ = cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
+
+      // render audio
+    ClemensAudio audioFrame;
+    unsigned numBlankAudioFrames = 0;
+    unsigned minAudioFrames = unsigned(audio_.getAudioFrequency() * deltaTime);
+
+    audioFrame.data = thisFrameAudioBuffer_.getHead();
+    audioFrame.frame_start = 0;
+    audioFrame.frame_stride = audio_.getBufferStride();
+    audioFrame.frame_count = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
+    if (audioFrame.frame_count > 0) {
+        if (audioFrame.frame_count < minAudioFrames) {
+            numBlankAudioFrames = minAudioFrames - audioFrame.frame_count;
+        }
+    } else {
+        //  this prevents looped playback of the last samples added to the buffer
+        numBlankAudioFrames = minAudioFrames;
+    }
+    //  fill in silence if necessary
+    if (numBlankAudioFrames > 0) {
+        if (numBlankAudioFrames >=
+            (unsigned)(thisFrameAudioBuffer_.getRemaining() / audioFrame.frame_stride)) {
+            numBlankAudioFrames = thisFrameAudioBuffer_.getRemaining() / audioFrame.frame_stride;
+        }
+        auto audioFrames =
+            thisFrameAudioBuffer_.forwardSize(numBlankAudioFrames * audioFrame.frame_stride, false);
+        memset(audioFrames.first, 0, cinek::length(audioFrames));
+        audioFrame.frame_count += numBlankAudioFrames;
+    }
+    audioFrame.frame_total = audioFrame.frame_count;
+    audio_.queue(audioFrame, deltaTime);
+    thisFrameAudioBuffer_.reset();
+
+    */
 }
 
 void ClemensFrontend::pollJoystickDevices() {
@@ -846,6 +868,18 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     if (interop.exitApp)
         return getViewType();
 
+    pollJoystickDevices();
+
+    bool isNewFrame = false;
+    dtEmulatorNextUpdateInterval_ -= deltaTime;
+    if (dtEmulatorNextUpdateInterval_ <= 0.0) {
+        syncBackend(true);
+        readyForFrame_.notify_one();
+        dtEmulatorNextUpdateInterval_ =
+            std::max(0.0, dtEmulatorNextUpdateInterval_ + kMachineFrameDuration);
+        isNewFrame = true;
+    }
+
     constexpr double kUIFlashCycleTime = 1.0;
     appTime_ += deltaTime;
 
@@ -854,56 +888,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         nextUIFlashCycleAppTime_ += kUIFlashCycleTime;
     }
     uiFlashAlpha_ = std::sin((nextUIFlashCycleAppTime_ - appTime_) * M_PI / kUIFlashCycleTime);
-
-    pollJoystickDevices();
-
-    bool isNewFrame = false;
-    bool isBackendTerminated = false;
-    {
-        std::lock_guard<std::mutex> frameLock(frameMutex_);
-        isNewFrame = frameLastSeqNo_ != frameSeqNo_;
-        if (isNewFrame) {
-            debugger_.lastFrame(frameReadState_);
-
-            lastFrameCPURegs_ = frameReadState_.cpu.regs;
-            lastFrameCPUPins_ = frameReadState_.cpu.pins;
-            lastFrameIRQs_ = frameReadState_.irqs;
-            lastFrameNMIs_ = frameReadState_.nmis;
-            lastFrameIWM_ = frameReadState_.iwm;
-            lastFrameADBStatus_ = frameReadState_.adb;
-            if (frameReadState_.ioPage) {
-                memcpy(lastFrameIORegs_, frameReadState_.ioPage, 256);
-            }
-
-            std::swap(frameWriteMemory_, frameReadMemory_);
-            std::swap(frameWriteState_, frameReadState_);
-
-            if (debugger_.thisFrame(lastCommandState_, frameReadState_)) {
-                emulatorHasMouseFocus_ = false;
-            }
-
-            logLevel_ = frameReadState_.logLevel;
-
-            if (!lastCommandState_.results.empty()) {
-                for (auto &result : lastCommandState_.results) {
-                    processBackendResult(result);
-                }
-                lastCommandState_.results.clear();
-            }
-
-            std::swap(lastCommandState_.audioBuffer, thisFrameAudioBuffer_);
-        }
-        uiFrameTimeDelta_ = deltaTime;
-
-        if (lastCommandState_.gsConfig.has_value()) {
-            config_.gs = *lastCommandState_.gsConfig;
-            lastCommandState_.gsConfig = std::nullopt;
-            config_.setDirty();
-        }
-
-        stagedBackendQueue_.queue(backendQueue_);
-    }
-    readyForFrame_.notify_one();
 
     //  render video
     //  video is rendered to a texture and the UVs of the display on the virtual
@@ -933,38 +917,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         viewToMonitor.workSize.x = frameReadState_.frame.monitor.width;
         viewToMonitor.workSize.y = frameReadState_.frame.monitor.height;
     }
-
-    // render audio
-    ClemensAudio audioFrame;
-    unsigned numBlankAudioFrames = 0;
-    unsigned minAudioFrames = unsigned(audio_.getAudioFrequency() * deltaTime);
-
-    audioFrame.data = thisFrameAudioBuffer_.getHead();
-    audioFrame.frame_start = 0;
-    audioFrame.frame_stride = audio_.getBufferStride();
-    audioFrame.frame_count = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
-    if (audioFrame.frame_count > 0) {
-        if (audioFrame.frame_count < minAudioFrames) {
-            numBlankAudioFrames = minAudioFrames - audioFrame.frame_count;
-        }
-    } else {
-        //  this prevents looped playback of the last samples added to the buffer
-        numBlankAudioFrames = minAudioFrames;
-    }
-    //  fill in silence if necessary
-    if (numBlankAudioFrames > 0) {
-        if (numBlankAudioFrames >=
-            (unsigned)(thisFrameAudioBuffer_.getRemaining() / audioFrame.frame_stride)) {
-            numBlankAudioFrames = thisFrameAudioBuffer_.getRemaining() / audioFrame.frame_stride;
-        }
-        auto audioFrames =
-            thisFrameAudioBuffer_.forwardSize(numBlankAudioFrames * audioFrame.frame_stride, false);
-        memset(audioFrames.first, 0, cinek::length(audioFrames));
-        audioFrame.frame_count += numBlankAudioFrames;
-    }
-    audioFrame.frame_total = audioFrame.frame_count;
-    audio_.queue(audioFrame, deltaTime);
-    thisFrameAudioBuffer_.reset();
 
     ImVec2 interfaceAnchor(0.0f, 0.0f);
     if (!interop.nativeMenu) {
@@ -1005,10 +957,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     }
 
     doEmulatorInterface(interfaceAnchor, ImVec2(width, height), viewToMonitor, deltaTime);
-
-    if (isBackendTerminated) {
-        fflush(stdout);
-    }
 
     switch (guiMode_) {
     case GUIMode::Setup:
@@ -1119,7 +1067,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     interop.mouseLock = emulatorHasMouseFocus_;
     interop.mouseShow =
         !mouseInEmulatorScreen_ || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
-    interop.poweredOn =  isBackendRunning();
+    interop.poweredOn = isBackendRunning();
 
     return getViewType();
 }
@@ -1148,6 +1096,51 @@ void ClemensFrontend::setGUIMode(GUIMode guiMode) {
     }
     guiMode_ = guiMode;
     spdlog::info("ClemensFrontend - setGUIMode() {}", kGUIModeNames[static_cast<int>(guiMode_)]);
+}
+
+void ClemensFrontend::syncBackend(bool copyState) {
+    //  check if a new frame of data is available.  if none available, we'll
+    //  wait another UI frame (slow emulator)
+    std::lock_guard<std::mutex> frameLock(frameMutex_);
+    if (frameLastSeqNo_ != frameSeqNo_ && copyState) {
+        //  new frame data located in the write frame
+        debugger_.lastFrame(frameReadState_);
+
+        lastFrameCPURegs_ = frameReadState_.cpu.regs;
+        lastFrameCPUPins_ = frameReadState_.cpu.pins;
+        lastFrameIRQs_ = frameReadState_.irqs;
+        lastFrameNMIs_ = frameReadState_.nmis;
+        lastFrameIWM_ = frameReadState_.iwm;
+        lastFrameADBStatus_ = frameReadState_.adb;
+        if (frameReadState_.ioPage) {
+            memcpy(lastFrameIORegs_, frameReadState_.ioPage, 256);
+        }
+
+        frameReadState_.copyState(backendState_, lastCommandState_, frameReadMemory_);
+        backendState_.reset();
+
+        if (debugger_.thisFrame(lastCommandState_, frameReadState_)) {
+            emulatorHasMouseFocus_ = false;
+        }
+
+        logLevel_ = frameReadState_.logLevel;
+
+        if (!lastCommandState_.results.empty()) {
+            for (auto &result : lastCommandState_.results) {
+                processBackendResult(result);
+            }
+            lastCommandState_.results.clear();
+        }
+
+        if (lastCommandState_.gsConfig.has_value()) {
+            config_.gs = *lastCommandState_.gsConfig;
+            lastCommandState_.gsConfig = std::nullopt;
+            config_.setDirty();
+        }
+    }
+
+    stagedBackendQueue_.queue(backendQueue_);
+    frameLastSeqNo_ = frameSeqNo_;
 }
 
 void ClemensFrontend::processBackendResult(const ClemensBackendResult &result) {
@@ -1227,6 +1220,16 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
         } else {
             doMachineViewLayout(kMonitorViewAnchor, kMonitorViewSize, viewToMonitor);
         }
+        bool mode80 = true;
+        ImGui::PushFont(mode80 ? ClemensHostImGui::Get80ColumnFont() : NULL);
+        const float kCharSize = ImGui::GetFont()->GetCharAdvance('W');
+        ImVec2 debugViewSize((kMainStyle.WindowPadding.x + kMainStyle.FramePadding.x) * 2 +
+                                 kCharSize * 20,
+                             kLineSpacing * 8);
+        doDebugView(ImVec2(kMonitorViewAnchor.x + kMonitorViewSize.x - debugViewSize.x,
+                           kMonitorViewAnchor.y),
+                    debugViewSize);
+        ImGui::PopFont();
     }
     doSidePanelLayout(kSideBarAnchor, kSideBarSize);
     doInfoStatusLayout(kInfoStatusAnchor, kInfoStatusSize, kMonitorViewAnchor.x);
@@ -1415,8 +1418,9 @@ void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
         ImGui::Indent();
         ImGui::Text("%uK", config_.gs.memory);
         ImGui::Unindent();
+        ImGui::Separator();
     }
-    ImGui::Separator();
+
     if (ImGui::CollapsingHeader("Devices", ImGuiTreeNodeFlags_DefaultOpen)) {
         for (unsigned slot = 0; slot < joystickSlotCount_; ++slot) {
             ImColor color = joysticks_[slot].isConnected ? ImColor(255, 255, 255, 255)
@@ -1579,15 +1583,26 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
                                      " " CLEM_HOST_OPEN_APPLE_UTF8 " ");
     ImGui::SameLine(0.0f, ImGui::GetFont()->GetCharAdvance('A') * 2);
 
-    float rightSideWidth =
-        (ImGui::GetStyle().FrameBorderSize + ImGui::GetStyle().FramePadding.x) * 2 +
-        ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0.0f, "RESET0").x;
+    const auto &style = ImGui::GetStyle();
 
-    ImVec2 inputInstructionSize = ImVec2(dimensions.x - ImGui::GetCursorPos().x - rightSideWidth,
+    float resetStatusWidth =
+        (style.FrameBorderSize + style.FramePadding.x) * 2 +
+        ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0.0f, "RESET0").x;
+    float fpsStatusWidth =
+        (style.FrameBorderSize + style.FramePadding.x) * 2 +
+        ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0.0f, "FPS:999.9").x;
+    ImVec2 inputInstructionSize = ImVec2(dimensions.x - ImGui::GetCursorPos().x - resetStatusWidth -
+                                             fpsStatusWidth - style.ItemSpacing.x,
                                          ImGui::GetTextLineHeight() + statusItemPaddingHeight);
     doViewInputInstructions(inputInstructionSize);
 
-    ImGui::SameLine(anchor.x + dimensions.x - rightSideWidth);
+    ImGui::SameLine(anchor.x + dimensions.x - resetStatusWidth - fpsStatusWidth -
+                    style.ItemSpacing.x);
+    ClemensHostImGui::StatusBarField(isResetDown ? ClemensHostImGui::StatusBarFlags_Active
+                                                 : ClemensHostImGui::StatusBarFlags_Inactive,
+                                     "%5.2f mhz", frameReadState_.machineSpeedMhz);
+
+    ImGui::SameLine(anchor.x + dimensions.x - resetStatusWidth);
     ClemensHostImGui::StatusBarField(isResetDown ? ClemensHostImGui::StatusBarFlags_Active
                                                  : ClemensHostImGui::StatusBarFlags_Inactive,
                                      "RESET");
@@ -2786,28 +2801,63 @@ void ClemensFrontend::doMachineDebugSoundDisplay() {
 void ClemensFrontend::doDebugView(ImVec2 anchor, ImVec2 size) {
     auto *state = frameReadState_.e1bank;
     ImGui::SetNextWindowPos(anchor, ImGuiCond_Once);
-    ImGui::SetNextWindowSize(size);
+    ImGui::SetNextWindowSize(size, ImGuiCond_Once);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 128));
     if (ImGui::Begin("Debug View", NULL)) {
-
-        ImGui::BeginTable("Diagnostics", 2);
-        {
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted("Mouse.Host");
-            ImGui::TableNextColumn();
-            ImGui::Text("(%d,%d)", diagnostics_.mouseX, diagnostics_.mouseY);
-            if (state) {
+        if (ImGui::CollapsingHeader("Stats", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::BeginTable("##Stats", 2);
+            {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::TextUnformatted("Mouse.E1ROM");
+                ImGui::TextUnformatted("EMU");
                 ImGui::TableNextColumn();
-                ImGui::Text("(%u,%u)", ((uint16_t)(state[0x192]) << 8) | state[0x190],
-                            ((uint16_t)(state[0x193]) << 8) | state[0x191]);
+                ImGui::Text("%5.2f fps", frameReadState_.fps);
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("GUI");
+                ImGui::TableNextColumn();
+                ImGui::Text("%5.2f fps", ImGui::GetIO().Framerate);
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("Time");
+                ImGui::TableNextColumn();
+                uint64_t emulatorTime = 0;
+                if (frameSeqNo_ != kFrameSeqNoInvalid) {
+                    emulatorTime =
+                        (uint64_t)(clem_calc_secs_from_clocks(&frameReadState_.emulatorClock) *
+                                   1000);
+                }
+                unsigned hours = emulatorTime / 3600000;
+                unsigned minutes = (emulatorTime % 3600000) / 60000;
+                unsigned seconds = ((emulatorTime % 3600000) % 60000) / 1000;
+                unsigned milliseconds = ((emulatorTime % 3600000) % 60000) % 1000;
+                ImGui::Text("%02u:%02u:%02u.%01u", hours, minutes, seconds, milliseconds);
             }
+            ImGui::EndTable();
+            ImGui::Separator();
         }
-        ImGui::EndTable();
+        if (ImGui::CollapsingHeader("Mouse", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::BeginTable("##Mouse", 2);
+            {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("Host");
+                ImGui::TableNextColumn();
+                ImGui::Text("(%d,%d)", diagnostics_.mouseX, diagnostics_.mouseY);
+                if (state) {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted("E1ROM");
+                    ImGui::TableNextColumn();
+                    ImGui::Text("(%u,%u)", ((uint16_t)(state[0x192]) << 8) | state[0x190],
+                                ((uint16_t)(state[0x193]) << 8) | state[0x191]);
+                }
+            }
+            ImGui::EndTable();
+            ImGui::Separator();
+        }
     }
+
     ImGui::End();
     ImGui::PopStyleColor();
 }
