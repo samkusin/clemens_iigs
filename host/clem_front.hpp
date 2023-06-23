@@ -73,8 +73,6 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
 
     //  the backend state delegate is run on a separate thread and notifies
     //  when a frame has been published
-    void backendStateDelegate(const ClemensBackendState &state,
-                              const ClemensCommandQueue::ResultBuffer &results);
     void processBackendResult(const ClemensBackendResult &result);
 
     void doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,

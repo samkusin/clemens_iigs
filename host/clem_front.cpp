@@ -76,7 +76,7 @@ static ImU32 kWidgetActiveColor = IM_COL32(0xCA, 0xCA, 0xC8, 0xff);
 static ImU32 kWidgetHoverColor = IM_COL32(0xAA, 0xAA, 0xA8, 0xff);
 static ImU32 kWidgetColor = IM_COL32(0x96, 0x96, 0x95, 0xff);
 static ImU32 kWidgetToggleOffColor = IM_COL32(0x22, 0x22, 0x22, 0xff);
-static ImU32 kMenuColor = IM_COL32(0xCA, 0xCA, 0xC8, 0xff);
+static ImU32 kMenuColor = IM_COL32(0x4a, 0x4a, 0x33, 0xff);
 
 ImU32 getFrameColor(const ClemensFrontend &) { return kDarkFrameColor; }
 ImU32 getInsetColor(const ClemensFrontend &) { return kDarkInsetColor; }
@@ -85,7 +85,7 @@ ImU32 getWidgetHoverColor(const ClemensFrontend &) { return kWidgetHoverColor; }
 ImU32 getWidgetActiveColor(const ClemensFrontend &) { return kWidgetActiveColor; }
 ImU32 getWidgetToggleOnColor(const ClemensFrontend &) { return kWidgetToggleOnColor; }
 ImU32 getWidgetToggleOffColor(const ClemensFrontend &) { return kWidgetToggleOffColor; }
-ImU32 getMenuColor(const ClemensFrontend &) { return kDarkFrameColor; }
+ImU32 getMenuColor(const ClemensFrontend &) { return kMenuColor; }
 
 ImTextureID getImTextureOfAsset(ClemensHostAssets::ImageId id) {
     return (ImTextureID)(ClemensHostAssets::getImage(id));
@@ -700,7 +700,8 @@ void ClemensFrontend::runBackend(std::unique_ptr<ClemensBackend> backend) {
     while (!results.second) {
         std::unique_lock<std::mutex> lk(frameMutex_);
         backend->post(backendState_);
-        std::copy(results.first.begin(), results.first.end(), std::back_inserter(lastCommandState_.results));
+        std::copy(results.first.begin(), results.first.end(),
+                  std::back_inserter(lastCommandState_.results));
         frameSeqNo_++;
         readyForFrame_.wait(lk, [this]() { return frameLastSeqNo_ == frameSeqNo_; });
         lk.unlock();
@@ -735,68 +736,6 @@ void ClemensFrontend::stopBackend() {
 }
 
 bool ClemensFrontend::isBackendRunning() const { return backendThread_.joinable(); }
-
-void ClemensFrontend::backendStateDelegate(const ClemensBackendState &,
-                                           const ClemensCommandQueue::ResultBuffer &results) {
-
-    //  audio frame is queued directly to ClemensAudio()
-    //  input audio frames are from the last backend time slice
-
-    /*
-     //  audio data - note, that the actual buffer and some fixed attributes like
-    //  stride are all that's needed by the frontend to render audio
-    //  frames are accumulated into an audio buffer residing in "last command state"
-    //  just in case the front-end refresh rate ends up being slower than the
-    //  backend
-    frame.audio = state.frame->audio;
-    if (frame.audio.data) {
-        auto audioBufferSize = int32_t(frame.audio.frame_count * frame.audio.frame_stride);
-        auto audioBufferRange = commandState.audioBuffer.forwardSize(audioBufferSize, false);
-        memcpy(audioBufferRange.first, frame.audio.data, cinek::length(audioBufferRange));
-        frame.audio.data = NULL;
-    } else {
-        commandState.audioBuffer.reset();
-    }
-
-        auto audioBufferSize = config_.gs.audioSamplesPerSecond * audio_.getBufferStride() / 2;
-    lastCommandState_.audioBuffer =
-        cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
-    thisFrameAudioBuffer_ = cinek::ByteBuffer(new uint8_t[audioBufferSize], audioBufferSize);
-
-      // render audio
-    ClemensAudio audioFrame;
-    unsigned numBlankAudioFrames = 0;
-    unsigned minAudioFrames = unsigned(audio_.getAudioFrequency() * deltaTime);
-
-    audioFrame.data = thisFrameAudioBuffer_.getHead();
-    audioFrame.frame_start = 0;
-    audioFrame.frame_stride = audio_.getBufferStride();
-    audioFrame.frame_count = thisFrameAudioBuffer_.getSize() / audioFrame.frame_stride;
-    if (audioFrame.frame_count > 0) {
-        if (audioFrame.frame_count < minAudioFrames) {
-            numBlankAudioFrames = minAudioFrames - audioFrame.frame_count;
-        }
-    } else {
-        //  this prevents looped playback of the last samples added to the buffer
-        numBlankAudioFrames = minAudioFrames;
-    }
-    //  fill in silence if necessary
-    if (numBlankAudioFrames > 0) {
-        if (numBlankAudioFrames >=
-            (unsigned)(thisFrameAudioBuffer_.getRemaining() / audioFrame.frame_stride)) {
-            numBlankAudioFrames = thisFrameAudioBuffer_.getRemaining() / audioFrame.frame_stride;
-        }
-        auto audioFrames =
-            thisFrameAudioBuffer_.forwardSize(numBlankAudioFrames * audioFrame.frame_stride, false);
-        memset(audioFrames.first, 0, cinek::length(audioFrames));
-        audioFrame.frame_count += numBlankAudioFrames;
-    }
-    audioFrame.frame_total = audioFrame.frame_count;
-    audio_.queue(audioFrame, deltaTime);
-    thisFrameAudioBuffer_.reset();
-
-    */
-}
 
 void ClemensFrontend::pollJoystickDevices() {
     std::array<ClemensHostJoystick, CLEM_HOST_JOYSTICK_LIMIT> joysticks;
@@ -2872,7 +2811,9 @@ void ClemensFrontend::doSetupUI(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::Begin("Settings", NULL,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
     ImGui::Spacing();
-    settingsView_.frame();
+    if (settingsView_.frame()) {
+        setGUIMode(GUIMode::RebootEmulator);
+    }
     ImGui::End();
 }
 
