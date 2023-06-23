@@ -584,6 +584,10 @@ void ClemensDebugger::executeCommand(std::string_view command) {
         cmdLoad(operand);
     } else if (action == "paste") {
         listener_.onDebuggerCommandPaste();
+    } else if (action == "bsave") {
+        cmdBsave(operand);
+    } else if (action == "bload") {
+        cmdBload(operand);
     } else {
         commandQueue_.runScript(std::string(command));
     }
@@ -906,6 +910,45 @@ void ClemensDebugger::cmdDisk(std::string_view operand) {
     }
 }
 
+void ClemensDebugger::cmdBload(std::string_view operand) {
+    auto [params, cmd, paramCount] = gatherMessageParams(operand);
+    if (paramCount != 2) {
+        CLEM_TERM_COUT.format(Error, "usage: bload <pathname>, <address>");
+        return;
+    }
+    //  assumed hex numbers
+    unsigned address;
+    if (std::from_chars(params[1].data(), params[1].data() + params[1].size(), address, 16).ec !=
+        std::errc{}) {
+        CLEM_TERM_COUT.format(Error, "Address must be a hexadecimal integer");
+        return;
+    }
+
+    commandQueue_.bload(std::string(params[0]), address);
+}
+
+void ClemensDebugger::cmdBsave(std::string_view operand) {
+    auto [params, cmd, paramCount] = gatherMessageParams(operand);
+    if (paramCount != 3) {
+        CLEM_TERM_COUT.format(Error, "usage: bsave <pathname>, <address>, <length>");
+        return;
+    }
+    //  assumed hex numbers
+    unsigned address, length;
+    if (std::from_chars(params[1].data(), params[1].data() + params[1].size(), address, 16).ec !=
+        std::errc{}) {
+        CLEM_TERM_COUT.format(Error, "Address must be a hexadecimal integer");
+        return;
+    }
+    if (std::from_chars(params[2].data(), params[2].data() + params[2].size(), length, 16).ec !=
+        std::errc{}) {
+        CLEM_TERM_COUT.format(Error, "Length must be a hexadecimal integer");
+        return;
+    }
+
+    commandQueue_.bsave(std::string(params[0]), address, length);
+}
+
 void ClemensDebugger::cmdHelp(std::string_view operand) {
     if (!operand.empty()) {
         CLEM_TERM_COUT.print(Warn, "Command specific help not yet supported.");
@@ -938,6 +981,10 @@ void ClemensDebugger::cmdHelp(std::string_view operand) {
         Info, "save <pathname>             - saves a snapshot into the snapshots folder");
     CLEM_TERM_COUT.print(
         Info, "load <pathname>             - loads a snapshot into the snapshots folder");
+    CLEM_TERM_COUT.print(
+        Info, "bsave <pathname>,<address>,<length>  - saves binary to file from location in memory");
+    CLEM_TERM_COUT.print(
+        Info, "bload <pathname>,<address>             - loads binary to address");
 
     CLEM_TERM_COUT.newline();
 }

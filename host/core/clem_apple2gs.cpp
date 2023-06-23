@@ -604,3 +604,11 @@ unsigned ClemensAppleIIGS::consume_utf8_input(const char* in, const char* inEnd)
     const char* cur = clemens_clipboard_push_utf8_atom(&mmio_, in, inEnd);
     return (unsigned)(cur - in);
 }
+
+bool ClemensAppleIIGS::writeDataToMemory(const uint8_t* data, unsigned address, unsigned length) {
+    return false;
+}
+
+bool ClemensAppleIIGS::readDataFromMemory(uint8_t*data , unsigned address, unsigned length) {
+    return false;
+}

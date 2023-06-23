@@ -93,6 +93,10 @@ class ClemensAppleIIGS {
     void enableOpcodeLogging(bool enable);
     //  Sends a UTF8 character from the input stream
     unsigned consume_utf8_input(const char* in, const char* inEnd);
+    //  Performs batch memory operations on the GS using current memory/IO settings
+    //  (i.e. not binary dump directly from FPI banks)
+    bool writeDataToMemory(const uint8_t* data, unsigned address, unsigned length);
+    bool readDataFromMemory(uint8_t*data , unsigned address, unsigned length);
 
     //  Direct access to emulator state
     ClemensStorageUnit &getStorage() { return storage_; }

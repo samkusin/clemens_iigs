@@ -28,6 +28,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <ios>
 
 namespace {
 
@@ -194,7 +195,7 @@ bool ClemensBackend::isRunning() const {
 #endif
 #endif
 
-auto ClemensBackend::step(ClemensCommandQueue& commands) -> ClemensCommandQueue::DispatchResult {
+auto ClemensBackend::step(ClemensCommandQueue &commands) -> ClemensCommandQueue::DispatchResult {
     constexpr clem_clocks_time_t kClocksPerSecond =
         1e9 * CLEM_CLOCKS_14MHZ_CYCLE / CLEM_14MHZ_CYCLE_NS;
 
@@ -289,9 +290,7 @@ auto ClemensBackend::step(ClemensCommandQueue& commands) -> ClemensCommandQueue:
     return result;
 }
 
-ClemensAudio ClemensBackend::renderAudioFrame() {
-    return GS_->renderAudio();
-}
+ClemensAudio ClemensBackend::renderAudioFrame() { return GS_->renderAudio(); }
 
 void ClemensBackend::post(ClemensBackendState &backendState) {
     auto &machine = GS_->getMachine();
@@ -345,7 +344,6 @@ void ClemensBackend::post(ClemensBackendState &backendState) {
     GS_->finishFrame(backendState.frame);
     hitBreakpoint_ = std::nullopt;
 }
-
 
 #if defined(__GNUC__)
 #if !defined(__clang__)
@@ -515,7 +513,6 @@ bool ClemensBackend::unserialize(const std::string &path) {
             //  if any of the paths require remapping, abort here and the frontend should offer
             //  the option to remap paths - which will be passed to the unserializer on a second
             //  pass
-
 
             //  read debug settings
             mpack_expect_map(reader);
@@ -866,4 +863,45 @@ void ClemensBackend::onCommandSendText(std::string text) {
     clipboardText_.erase(0, clipboardHead_);
     clipboardHead_ = 0;
     clipboardText_.append(text);
+}
+
+bool ClemensBackend::onCommandBinaryLoad(std::string pathname, unsigned address) {
+    std::ifstream input(pathname, std::ios_base::binary);
+    if (!input.is_open()) {
+        localLog(CLEM_DEBUG_LOG_WARN, "Unable to open {} for binary load.", pathname);
+        return false;
+    }
+    auto length = input.seekg(0, std::ios_base::seekdir::end).tellg();
+    input.seekg(0, std::ios_base::seekdir::beg);
+    std::vector<uint8_t> data(length);
+    if (input.read((char *)data.data(), data.size()).fail()) {
+        localLog(CLEM_DEBUG_LOG_WARN, "Unable to read {} bytes from {} for binary load.", length,
+                 pathname);
+        return false;
+    }
+    input.close();
+
+    return GS_->writeDataToMemory(data.data(), address, (unsigned)data.size());
+}
+
+bool ClemensBackend::onCommandBinarySave(std::string pathname, unsigned address, unsigned length) {
+    std::ofstream output(pathname, std::ios_base::binary);
+    if (!output.is_open()) {
+        localLog(CLEM_DEBUG_LOG_WARN, "Unable to open {} for binary write.", pathname);
+        return false;
+    }
+    std::vector<uint8_t> data(length);
+    if (!GS_->readDataFromMemory(data.data(), address, (unsigned)data.size())) {
+        localLog(CLEM_DEBUG_LOG_WARN,
+                 "Unable to read {} bytes from ${:x} for binary save to {}.", length, address,
+                 pathname);
+        return false;
+    }
+    if (output.write((char *)data.data(), data.size()).fail()) {
+        localLog(CLEM_DEBUG_LOG_WARN, "Unable to save {} bytes to {} for binary save.", length,
+                 pathname);
+        return false;
+    }
+
+    return true;
 }

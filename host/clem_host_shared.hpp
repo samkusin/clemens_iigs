@@ -78,7 +78,9 @@ struct ClemensBackendCommand {
         RunScript,
         FastDiskEmulation,
         DebugMessage,
-        SendText
+        SendText,
+        SaveBinary,
+        LoadBinary
     };
     Type type = Undefined;
     std::string operand;
