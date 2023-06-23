@@ -10,6 +10,7 @@
 #define CLEMENS_PLATFORM_WINDOWS
 //  A larger value to cover more edge cases but likely not all
 #define CLEMENS_PATH_MAX 1024
+#define CLEMENS_PLATFORM_ID "Win32"
 
 #elif defined(__linux__)
 
@@ -17,11 +18,14 @@
 //  A larger value to cover PATH_MAX but perhaps not all usecases
 #define CLEMENS_PATH_MAX 4096
 
+#define CLEMENS_PLATFORM_ID "Linux"
+
 #elif defined(__APPLE__)
 #include <TargetConditionals.h>
 
 #if TARGET_OS_MAC
 #define CLEMENS_PLATFORM_MACOS
+#define CLEMENS_PLATORM_ID "MacOS"
 #endif
 
 //  A larger value to cover PATH_MAX but perhaps not all usecases

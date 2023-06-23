@@ -59,6 +59,7 @@ struct ClemensRunSampler {
 struct ClemensBackendConfig {
     int logLevel;
     std::string dataRootPath;
+    std::string imageRootPath;
     std::string snapshotRootPath;
     std::string traceRootPath;
     std::vector<ClemensBackendBreakpoint> breakpoints;

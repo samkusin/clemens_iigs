@@ -16,6 +16,8 @@ struct ClemensHostInterop {
         Power,
         Shutdown,
         Reboot,
+        Help,
+        DiskHelp,
         About
     } action;
     

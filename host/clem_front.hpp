@@ -83,7 +83,6 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
 
     void doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop);
     void doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions);
-    void doUserMenuDisplay(float width);
     void doMachinePeripheralDisplay(float width);
     void doDebuggerQuickbar(float width);
     void doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float dividerXPos);
@@ -198,6 +197,8 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
         LoadSnapshotAfterPowerOn,
         SaveSnapshot,
         Help,
+        HelpShortcuts,
+        HelpDisk,
         RebootEmulator,
         StartingEmulator,
         ShutdownEmulator

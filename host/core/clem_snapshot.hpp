@@ -42,6 +42,7 @@ class ClemensSnapshot {
 
   private:
     std::string path_;
+    std::string origin_;
     enum class ValidationStep { None, Header, Metadata, Machine, Custom };
     ValidationStep validationStep_;
     std::string validationData_;

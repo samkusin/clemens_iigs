@@ -508,6 +508,16 @@ bool ClemensBackend::unserialize(const std::string &path) {
 
     auto gs = snapshot.unserialize(
         *this, [&breakpoints](mpack_reader_t *reader, ClemensAppleIIGS &) -> bool {
+            //  detect if this snapshot requires remapping storage paths to the local host
+            //  if platforms, differ then all paths will be remapped
+            //  otherwise check each path and check if the file's parent directory exists
+            //  if not, then mark as -to-remap-
+            //  if any of the paths require remapping, abort here and the frontend should offer
+            //  the option to remap paths - which will be passed to the unserializer on a second
+            //  pass
+
+
+            //  read debug settings
             mpack_expect_map(reader);
             mpack_expect_cstr_match(reader, "breakpoints");
             uint32_t breakpointCount = mpack_expect_array_max(reader, 1024);
@@ -526,6 +536,7 @@ bool ClemensBackend::unserialize(const std::string &path) {
             }
             mpack_done_array(reader);
             mpack_done_map(reader);
+
             return mpack_reader_error(reader) == mpack_ok;
         });
     if (!gs)
