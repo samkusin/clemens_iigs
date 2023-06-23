@@ -68,12 +68,11 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     void startBackend();
     void runBackend(std::unique_ptr<ClemensBackend> backend);
     void stopBackend();
+    void syncBackend(bool copyState);
     bool isBackendRunning() const;
 
     //  the backend state delegate is run on a separate thread and notifies
     //  when a frame has been published
-    void backendStateDelegate(const ClemensBackendState &state,
-                              const ClemensCommandQueue::ResultBuffer &results);
     void processBackendResult(const ClemensBackendResult &result);
 
     void doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
@@ -122,6 +121,8 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
 
     ClemensDisplay display_;
     ClemensAudioDevice audio_;
+    ClemensBackendState backendState_;
+    ClemensCommandQueue::DispatchResult backendCommandResutls_;
 
     std::unique_ptr<ClemensBackend> backend_;
     int logLevel_;
@@ -138,7 +139,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     std::thread backendThread_;
     ClemensCommandQueue backendQueue_;
     ClemensCommandQueue stagedBackendQueue_;
-    double uiFrameTimeDelta_;
+    double dtEmulatorNextUpdateInterval_;
 
     // These counters are used to identify unique frames between the two threads
     // frameSeqNo is updated per executed emulator frame.  The UI thread will
@@ -153,9 +154,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     std::condition_variable readyForFrame_;
     std::mutex frameMutex_;
 
-    cinek::FixedStack frameWriteMemory_;
     cinek::FixedStack frameReadMemory_;
-    ClemensFrame::FrameState frameWriteState_;
     ClemensFrame::FrameState frameReadState_;
     ClemensFrame::LastCommandState lastCommandState_;
     cinek::ByteBuffer thisFrameAudioBuffer_;

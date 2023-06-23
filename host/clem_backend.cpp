@@ -1,5 +1,6 @@
 #include "clem_backend.hpp"
 
+#include "clem_command_queue.hpp"
 #include "core/clem_apple2gs.hpp"
 #include "core/clem_apple2gs_config.hpp"
 #include "core/clem_disk_asset.hpp"
@@ -193,19 +194,14 @@ bool ClemensBackend::isRunning() const {
 #endif
 #endif
 
-ClemensCommandQueue::DispatchResult
-ClemensBackend::main(ClemensBackendState &backendState,
-                     const ClemensCommandQueue::ResultBuffer &commandResults,
-                     PublishStateDelegate delegate) {
+auto ClemensBackend::step(ClemensCommandQueue& commands) -> ClemensCommandQueue::DispatchResult {
     constexpr clem_clocks_time_t kClocksPerSecond =
         1e9 * CLEM_CLOCKS_14MHZ_CYCLE / CLEM_14MHZ_CYCLE_NS;
 
-    std::optional<unsigned> hitBreakpoint;
+    logOutput_.clear();
+    loggedInstructions_.clear();
 
     bool isMachineRunning = isRunning();
-
-    ClemensAppleIIGS::Frame frame{};
-
     if (isMachineRunning && GS_->isOk()) {
         //  Run the emulator in either 'step' or 'run' mode.
         //
@@ -259,7 +255,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
             }
 
             if (!breakpoints_.empty()) {
-                if ((hitBreakpoint = checkHitBreakpoint()).has_value()) {
+                if ((hitBreakpoint_ = checkHitBreakpoint()).has_value()) {
                     stepsRemaining_ = 0;
                     break;
                 }
@@ -283,13 +279,28 @@ ClemensBackend::main(ClemensBackendState &backendState,
         clocksInSecondPeriod_ += machine.tspec.clocks_spent - lastClocksSpent;
     }
 
+    auto result = commands.dispatchAll(*this);
+    //  if we're starting a run, reset the sampler so framerate can be calculated correctly
+    if (isMachineRunning != isRunning()) {
+        if (!isMachineRunning) {
+            runSampler_.reset();
+        }
+    }
+    return result;
+}
+
+ClemensAudio ClemensBackend::renderAudioFrame() {
+    return GS_->renderAudio();
+}
+
+void ClemensBackend::post(ClemensBackendState &backendState) {
     auto &machine = GS_->getMachine();
     auto &mmio = GS_->getMMIO();
 
     backendState.machine = &machine;
     backendState.mmio = &mmio;
     backendState.fps = runSampler_.sampledFramesPerSecond;
-    backendState.isRunning = isMachineRunning;
+    backendState.isRunning = isRunning();
     if (programTrace_ != nullptr) {
         backendState.isTracing = true;
         backendState.isIWMTracing = programTrace_->isIWMLoggingEnabled();
@@ -299,7 +310,7 @@ ClemensBackend::main(ClemensBackendState &backendState,
     }
     backendState.mmioWasInitialized = clemens_is_mmio_initialized(&mmio);
 
-    backendState.frame = &GS_->getFrame(frame);
+    GS_->getFrame(backendState.frame);
     if (gsConfigUpdated_) {
         backendState.config = gsConfig_;
         gsConfigUpdated_ = false;
@@ -310,8 +321,8 @@ ClemensBackend::main(ClemensBackendState &backendState,
     backendState.logBufferEnd = logOutput_.data() + logOutput_.size();
     backendState.bpBufferStart = breakpoints_.data();
     backendState.bpBufferEnd = breakpoints_.data() + breakpoints_.size();
-    if (hitBreakpoint.has_value()) {
-        backendState.bpHitIndex = *hitBreakpoint;
+    if (hitBreakpoint_.has_value()) {
+        backendState.bpHitIndex = *hitBreakpoint_;
     } else {
         backendState.bpHitIndex = std::nullopt;
     }
@@ -331,25 +342,10 @@ ClemensBackend::main(ClemensBackendState &backendState,
     backendState.avgVBLsPerFrame = runSampler_.avgVBLsPerFrame;
     backendState.fastEmulationOn = runSampler_.emulatorVblsPerFrame > 1;
 
-    ClemensCommandQueue commands;
-    delegate(commands, commandResults, backendState);
-
-    GS_->finishFrame(frame);
-
-    logOutput_.clear();
-    loggedInstructions_.clear();
-    backendState.reset();
-
-    auto result = commands.dispatchAll(*this);
-    //  if we're starting a run, reset the sampler so framerate can be calculated correctly
-    if (isMachineRunning != isRunning()) {
-        if (!isMachineRunning) {
-            runSampler_.reset();
-        }
-    }
-
-    return result;
+    GS_->finishFrame(backendState.frame);
+    hitBreakpoint_ = std::nullopt;
 }
+
 
 #if defined(__GNUC__)
 #if !defined(__clang__)

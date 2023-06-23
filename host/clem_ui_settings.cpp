@@ -24,8 +24,8 @@ void ClemensSettingsUI::start() {
     romFileExists_ = !config_.romFilename.empty() && std::filesystem::exists(config_.romFilename);
 }
 
-void ClemensSettingsUI::frame() {
-
+bool ClemensSettingsUI::frame() {
+    bool startMachine = false;
     switch (mode_) {
     case Mode::None:
         break;
@@ -92,6 +92,12 @@ void ClemensSettingsUI::frame() {
         }
         ImGui::EndTable();
 
+        ImGui::NewLine();
+        if (ImGui::Button("Power On", ImVec2(ImGui::GetFont()->GetCharAdvance('W') * 20, ImGui::GetTextLineHeight() * 2))) {
+            startMachine = true;
+        }
+        ImGui::NewLine();
+
         ImGui::SeparatorText(CLEM_L10N_LABEL(kSettingsTabEmulation));
         ImGui::BeginTable("Emulation", 2, ImGuiTableFlags_SizingStretchSame);
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
@@ -128,4 +134,6 @@ void ClemensSettingsUI::frame() {
         break;
     }
     }
+
+    return startMachine;
 }

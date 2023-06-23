@@ -11,7 +11,7 @@ class ClemensSettingsUI {
     void start();
     void stop();
 
-    void frame();
+    bool frame();
 
   private:
     ClemensConfiguration &config_;

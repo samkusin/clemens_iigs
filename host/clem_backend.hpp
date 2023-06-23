@@ -85,14 +85,12 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     ClemensBackend(std::string romPath, const Config &config);
     virtual ~ClemensBackend();
 
-    using PublishStateDelegate =
-        std::function<void(ClemensCommandQueue &, const ClemensCommandQueue::ResultBuffer &,
-                           const ClemensBackendState &)>;
-
     //  Executes a single emulator timeslice
-    ClemensCommandQueue::DispatchResult
-    main(ClemensBackendState &backendState, const ClemensCommandQueue::ResultBuffer &commandResults,
-         PublishStateDelegate delegate);
+    ClemensCommandQueue::DispatchResult step(ClemensCommandQueue& commands);
+    //  Obtain current audio frame (following calls to step())
+    ClemensAudio renderAudioFrame();
+    //  Populate a backend state
+    void post(ClemensBackendState& backendState);
 
     //  these methods do not queue instructions to execute on the runner
     //  and must be executed instead on the runner thread.  They are made public
@@ -158,6 +156,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     std::vector<ClemensBackendOutputText> logOutput_;
     std::vector<ClemensBackendBreakpoint> breakpoints_;
     std::vector<ClemensBackendExecutedInstruction> loggedInstructions_;
+    std::optional<unsigned> hitBreakpoint_;
 
     uint64_t nextTraceSeq_;
     std::unique_ptr<ClemensProgramTrace> programTrace_;

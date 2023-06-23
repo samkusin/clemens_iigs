@@ -550,6 +550,19 @@ auto ClemensAppleIIGS::stepMachine() -> ResultFlags {
     return resultFlags;
 }
 
+ClemensAudio ClemensAppleIIGS::renderAudio() {
+    ClemensAudio audio {};
+    if (clemens_get_audio(&audio, &mmio_)) {
+        if (mockingboard_) {
+            float *audio_frame_head =
+                reinterpret_cast<float *>(audio.data + audio.frame_start * audio.frame_stride);
+            clem_card_ay3_render(mockingboard_, audio_frame_head, audio.frame_count,
+                                 audio.frame_stride / sizeof(float), configAudioSamplesPerSecond_);
+        }
+    }
+    return audio;
+}
+
 auto ClemensAppleIIGS::getFrame(Frame &frame) -> Frame & {
     if (!isOk())
         return frame;
@@ -557,15 +570,7 @@ auto ClemensAppleIIGS::getFrame(Frame &frame) -> Frame & {
     clemens_get_monitor(&frame.monitor, &mmio_);
     clemens_get_text_video(&frame.text, &mmio_);
     clemens_get_graphics_video(&frame.graphics, &machine_, &mmio_);
-    if (clemens_get_audio(&frame.audio, &mmio_)) {
-        if (mockingboard_) {
-            auto &audio = frame.audio;
-            float *audio_frame_head =
-                reinterpret_cast<float *>(audio.data + audio.frame_start * audio.frame_stride);
-            clem_card_ay3_render(mockingboard_, audio_frame_head, audio.frame_count,
-                                 audio.frame_stride / sizeof(float), configAudioSamplesPerSecond_);
-        }
-    }
+    clemens_get_audio(&frame.audio, &mmio_);
 
     for (unsigned i = 0; i < (unsigned)frame.diskDriveStatuses.size(); ++i) {
         auto driveType = static_cast<ClemensDriveType>(i);

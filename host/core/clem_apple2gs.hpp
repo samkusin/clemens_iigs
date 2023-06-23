@@ -78,6 +78,11 @@ class ClemensAppleIIGS {
     void input(const ClemensInputEvent &input);
     //  Executes a single emulation step
     ResultFlags stepMachine();
+    //  Render current audio frame.  This will not advance the audio frame buffer
+    //  which is done by finishFrame().  This should be done after rendering a sufficient number 
+    //  of 'frames' - which may be VBL frames, or whatever the application decides
+    //  should be an audio 'frame'
+    ClemensAudio renderAudio();
     //  Retrieves frame information for display/audio/disks
     Frame &getFrame(Frame &frame);
     //  Finishes the frame

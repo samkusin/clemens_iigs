@@ -241,6 +241,8 @@ ClemensVideo *clemens_get_graphics_video(ClemensVideo *video, ClemensMachine *cl
     bool use_page_2 = (mmio->mmap_register & CLEM_MEM_IO_MMAP_TXTPAGE2) &&
                       !(mmio->mmap_register & CLEM_MEM_IO_MMAP_80COLSTORE);
     video->vbl_counter = vgc->vbl_counter;
+    video->rgb_buffer_size = 0;
+    video->rgb = NULL;
     video->has_640_mode_scanlines = false;
     if (vgc->mode_flags & CLEM_VGC_SUPER_HIRES) {
         video->format = kClemensVideoFormat_Super_Hires;

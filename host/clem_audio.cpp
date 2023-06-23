@@ -61,7 +61,7 @@ void ClemensAudioDevice::stop() {
 unsigned ClemensAudioDevice::getAudioFrequency() const { return saudio_sample_rate(); }
 unsigned ClemensAudioDevice::getBufferStride() const { return queuedFrameStride_; }
 
-unsigned ClemensAudioDevice::queue(ClemensAudio &audio, float /*deltaTime */) {
+unsigned ClemensAudioDevice::queue(const ClemensAudio &audio) {
     if (!audio.frame_count || !queuedFrameBuffer_)
         return 0;
 

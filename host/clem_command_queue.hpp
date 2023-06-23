@@ -43,6 +43,7 @@ class ClemensCommandQueue {
 
     void queue(ClemensCommandQueue &other);
     bool isEmpty() const { return queue_.isEmpty(); }
+    size_t getSize() const { return queue_.size(); }
 
     //  execute all commands
     DispatchResult dispatchAll(ClemensCommandQueueListener &listener);
