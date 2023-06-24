@@ -25,7 +25,7 @@
 
 #if TARGET_OS_MAC
 #define CLEMENS_PLATFORM_MACOS
-#define CLEMENS_PLATORM_ID "MacOS"
+#define CLEMENS_PLATFORM_ID "MacOS"
 #endif
 
 //  A larger value to cover PATH_MAX but perhaps not all usecases

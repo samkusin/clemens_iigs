@@ -97,7 +97,7 @@ bool ClemensSnapshot::serialize(
     //  metadata
     mpack_build_map(&writer);
     mpack_write_kv(&writer, "timestamp", (int64_t)time(NULL));
-    mpack_write_kv(&writer, "origin", CLEMENS_PLATORM_ID);
+    mpack_write_kv(&writer, "origin", CLEMENS_PLATFORM_ID);
     mpack_write_cstr(&writer, "disks");
     mpack_start_array(&writer, kClemensDrive_Count);
     for (unsigned i = 0; i < kClemensDrive_Count; i++) {
