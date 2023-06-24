@@ -699,6 +699,7 @@ void ClemensFrontend::startBackend() {
 
 void ClemensFrontend::runBackend(std::unique_ptr<ClemensBackend> backend) {
     ClemensCommandQueue::DispatchResult results{};
+    backendState_.reset();
     while (!results.second) {
         std::unique_lock<std::mutex> lk(frameMutex_);
         backend->post(backendState_);
@@ -1032,6 +1033,8 @@ void ClemensFrontend::setGUIMode(GUIMode guiMode) {
                                           "LoadSnapshotAfterPowerOn",
                                           "SaveSnapshot",
                                           "Help",
+                                          "HelpShortcuts",
+                                          "HelpDisk",
                                           "RebootEmulator",
                                           "StartingEmulator",
                                           "ShutdownEmulator"};

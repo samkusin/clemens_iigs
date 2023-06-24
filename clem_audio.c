@@ -348,7 +348,7 @@ void clem_ensoniq_mono(struct ClemensDeviceEnsoniq *doc, unsigned osc_max_channe
     *right = 0.0f;
 
     for (unsigned channel_idx = 0; channel_idx < osc_max_channels; ++channel_idx) {
-        *left += doc->voice[channel_idx];
+        *left += (doc->voice[channel_idx] * 0.50f);
     }
     if (*left > 1.0f)
         *left = 1.0f;
@@ -547,9 +547,9 @@ void clem_sound_glu_sync(struct ClemensDeviceAudio *glu, struct ClemensClock *cl
                     /* click! - two speaker pulses = 1 complete wave */
                     glu->a2_speaker_frame_count = 0;
                     if (!glu->a2_speaker_tense) {
-                        glu->a2_speaker_level = 0.75f;
+                        glu->a2_speaker_level = 0.50f;
                     } else {
-                        glu->a2_speaker_level = -0.75f;
+                        glu->a2_speaker_level = -0.50f;
                     }
                     glu->a2_speaker_tense = !glu->a2_speaker_tense;
                     glu->a2_speaker = false;

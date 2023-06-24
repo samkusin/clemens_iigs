@@ -502,9 +502,9 @@ unsigned _ay3_render(struct ClemensAY38913 *psg, clem_clocks_duration_t duration
         sample[1] = _ay3_amp_modify(psg, 1, sample[1], envelope, sample_dt);
         sample[2] = _ay3_amp_modify(psg, 2, sample[2], envelope, sample_dt);
         current = out[channel];
-        current += sample[0] * 0.75f;
-        current += sample[1] * 0.75f;
-        current += sample[2] * 0.75f;
+        current += sample[0] * 0.33f;
+        current += sample[1] * 0.33f;
+        current += sample[2] * 0.33f;
         if (current > 1.0f)
             current = 1.0f;
         else if (current < -1.0f)
