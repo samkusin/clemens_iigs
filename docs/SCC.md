@@ -39,7 +39,16 @@ Signal names followed by emulated port pin with peripheral.
 The Zilog supports more signals that may be unused by the IIGS (i.e. like DCD.)
 Implementation will depend on practical need.
 
-## Interrupt and Timings
+## Terminal Emulation
+
+- Simple interrupts
+- Device layer (like cards) with 
+  - DTR
+  - CTS (HSKI)
+  - DCD (GPI)
+  - RTS (TX_D_HI)
+  - TxD
+  - RxD
 
 
 ## References
