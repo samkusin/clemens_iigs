@@ -52,8 +52,8 @@ with a rich user frontend.
 
 ## Getting Started <a name="getting-started"></a>
 
-Please see the [README](https://github.com/samkusin/clemens_iigs#readme) for the 
-basics, installation and identifying a ROM image for starting the emulator.  
+Please see the [README](README.md) for the basics, installation and identifying
+a ROM image for starting the emulator.  
 
 This section will briefly cover what's required to get a system up and running
 once installed and a proper ROM image has been set up on the settings screen.
