@@ -1,5 +1,6 @@
 #include "clem_apple2gs.hpp"
 
+#include "clem_mem.h"
 #include "clem_prodos_disk.hpp"
 #include "clem_storage_unit.hpp"
 
@@ -551,7 +552,7 @@ auto ClemensAppleIIGS::stepMachine() -> ResultFlags {
 }
 
 ClemensAudio ClemensAppleIIGS::renderAudio() {
-    ClemensAudio audio {};
+    ClemensAudio audio{};
     if (clemens_get_audio(&audio, &mmio_)) {
         if (mockingboard_) {
             float *audio_frame_head =
@@ -600,15 +601,25 @@ void ClemensAppleIIGS::emulatorOpcodeCallback(struct ClemensInstruction *inst, c
     host->listener_.onClemensInstruction(inst, operand);
 }
 
-unsigned ClemensAppleIIGS::consume_utf8_input(const char* in, const char* inEnd) {
-    const char* cur = clemens_clipboard_push_utf8_atom(&mmio_, in, inEnd);
+unsigned ClemensAppleIIGS::consume_utf8_input(const char *in, const char *inEnd) {
+    const char *cur = clemens_clipboard_push_utf8_atom(&mmio_, in, inEnd);
     return (unsigned)(cur - in);
 }
 
-bool ClemensAppleIIGS::writeDataToMemory(const uint8_t* data, unsigned address, unsigned length) {
-    return false;
+bool ClemensAppleIIGS::writeDataToMemory(const uint8_t *data, unsigned address, unsigned length) {
+    if (address > 0xffffff)
+        return false;
+    for (unsigned i = 0; i < length; ++i) {
+        clem_write(&machine_, data[i], (uint16_t)((address + i) & 0xffff), (uint8_t)(((address + i) >> 16) & 0xff), 0);
+    }
+    return true;
 }
 
-bool ClemensAppleIIGS::readDataFromMemory(uint8_t*data , unsigned address, unsigned length) {
-    return false;
+bool ClemensAppleIIGS::readDataFromMemory(uint8_t *data, unsigned address, unsigned length) {
+    if (address > 0xffffff)
+        return false;
+    for (unsigned i = 0; i < length; ++i) {
+        clem_read(&machine_, &data[i], (uint16_t)((address + i) & 0xffff), (uint8_t)(((address + i) >> 16) & 0xff), 0);
+    }
+    return true;
 }

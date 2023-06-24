@@ -2756,7 +2756,7 @@ void ClemensFrontend::doDebugView(ImVec2 anchor, ImVec2 size) {
     ImGui::SetNextWindowPos(anchor, ImGuiCond_Once);
     ImGui::SetNextWindowSize(size, ImGuiCond_Once);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 128));
-    if (ImGui::Begin("Debug View", NULL)) {
+    if (ImGui::Begin("Debug View", NULL, 0)) {
         if (ImGui::CollapsingHeader("Stats", ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::BeginTable("##Stats", 2);
             {

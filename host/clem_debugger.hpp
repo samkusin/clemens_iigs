@@ -102,6 +102,7 @@ class ClemensDebugger {
     void cmdDump(std::string_view operand);
     void cmdBload(std::string_view operand);
     void cmdBsave(std::string_view operand);
+    void cmdPwd(std::string_view operand);
 };
 
 class ClemensDebuggerListener {

@@ -136,12 +136,12 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
             break;
         }
         case Command::SaveBinary:
-            if (saveBinary(listener, cmd.operand)) {
+            if (!saveBinary(listener, cmd.operand)) {
                 commandFailed = true;
             }
             break;
         case Command::LoadBinary:
-            if (loadBinary(listener, cmd.operand)) {
+            if (!loadBinary(listener, cmd.operand)) {
                 commandFailed = true;
             }
             break;
