@@ -871,8 +871,8 @@ bool ClemensBackend::onCommandBinaryLoad(std::string pathname, unsigned address)
         localLog(CLEM_DEBUG_LOG_WARN, "Unable to open '{}' for binary load.", pathname);
         return false;
     }
-    auto length = input.seekg(0, std::ios_base::seekdir::end).tellg();
-    input.seekg(0, std::ios_base::seekdir::beg);
+    auto length = input.seekg(0, std::ios::end).tellg();
+    input.seekg(0, std::ios::beg);
     std::vector<uint8_t> data(length);
     if (input.read((char *)data.data(), data.size()).fail()) {
         localLog(CLEM_DEBUG_LOG_WARN, "Unable to read {} bytes from '{}' for binary load.", length,
