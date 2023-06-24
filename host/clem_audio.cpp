@@ -149,10 +149,11 @@ void ClemensAudioDevice::mixClemensAudio(float *audioOut, int num_frames, int nu
     //  clemens generates an output mix == to the hardware mixer to avoid having
     //  to upsample here.
     uint32_t queuedAvailable = queuedFrameTail_ - queuedFrameHead_;
+    uint32_t remainingFrames = num_frames;
+    float *frameOut = audioOut;
     if (queuedAvailable != 0) {
         auto frameLimit = std::min(queuedAvailable, (uint32_t)num_frames);
         const uint8_t *inData = queuedFrameBuffer_ + queuedFrameHead_ * queuedFrameStride_;
-        float *frameOut = audioOut;
 
         for (uint32_t frameIndex = 0; frameIndex < frameLimit; ++frameIndex) {
             auto *frameIn = reinterpret_cast<const float *>(inData);
@@ -162,6 +163,12 @@ void ClemensAudioDevice::mixClemensAudio(float *audioOut, int num_frames, int nu
             frameOut += num_channels;
         }
         queuedFrameHead_ += frameLimit;
+        remainingFrames -= frameLimit;
+    }
+    for (; remainingFrames > 0; --remainingFrames) {
+        frameOut[0] = 0.0f;
+        frameOut[1] = 0.0f;
+        frameOut += num_channels;
     }
 }
 

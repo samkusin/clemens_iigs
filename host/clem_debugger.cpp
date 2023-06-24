@@ -12,8 +12,10 @@
 #include <charconv>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <tuple>
 
 template <typename TBufferType> struct FormatView2 {
@@ -388,7 +390,7 @@ void ClemensDebugger::auxillary(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::SetNextWindowPos(anchor);
     ImGui::SetNextWindowSize(dimensions);
     ImGui::Begin("DebuggerAuxillary", nullptr,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
 
     if (frameState_) {
         // float localContentWidth = ImGui::GetWindowContentRegionWidth();
@@ -414,7 +416,7 @@ void ClemensDebugger::cpuStateTable(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::SetNextWindowPos(anchor);
     ImGui::SetNextWindowSize(dimensions);
     ImGui::Begin("CPUAndMachineState", nullptr,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
     ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(kCharSize, 2.0f));
     if (frameState_) {
         auto &regs = frameState_->cpu.regs;
@@ -584,6 +586,12 @@ void ClemensDebugger::executeCommand(std::string_view command) {
         cmdLoad(operand);
     } else if (action == "paste") {
         listener_.onDebuggerCommandPaste();
+    } else if (action == "bsave") {
+        cmdBsave(operand);
+    } else if (action == "bload") {
+        cmdBload(operand);
+    } else if (action == "cwd") {
+        cmdPwd(operand);
     } else {
         commandQueue_.runScript(std::string(command));
     }
@@ -906,6 +914,55 @@ void ClemensDebugger::cmdDisk(std::string_view operand) {
     }
 }
 
+void ClemensDebugger::cmdBload(std::string_view operand) {
+    auto [params, cmd, paramCount] = gatherMessageParams(operand);
+    if (paramCount != 2) {
+        CLEM_TERM_COUT.format(Error, "usage: bload <pathname>, <address>");
+        return;
+    }
+    //  assumed hex numbers
+    unsigned address;
+    if (std::from_chars(params[1].data(), params[1].data() + params[1].size(), address, 16).ec !=
+        std::errc{}) {
+        CLEM_TERM_COUT.format(Error, "Address must be a hexadecimal integer");
+        return;
+    }
+
+    commandQueue_.bload(std::string(params[0]), address);
+}
+
+void ClemensDebugger::cmdBsave(std::string_view operand) {
+    auto [params, cmd, paramCount] = gatherMessageParams(operand);
+    if (paramCount != 3) {
+        CLEM_TERM_COUT.format(Error, "usage: bsave <pathname>, <address>, <length>");
+        return;
+    }
+    //  assumed hex numbers
+    unsigned address, length;
+    if (std::from_chars(params[1].data(), params[1].data() + params[1].size(), address, 16).ec !=
+        std::errc{}) {
+        CLEM_TERM_COUT.format(Error, "Address must be a hexadecimal integer");
+        return;
+    }
+    if (std::from_chars(params[2].data(), params[2].data() + params[2].size(), length, 16).ec !=
+        std::errc{}) {
+        CLEM_TERM_COUT.format(Error, "Length must be a hexadecimal integer");
+        return;
+    }
+
+    commandQueue_.bsave(std::string(params[0]), address, length);
+}
+
+void ClemensDebugger::cmdPwd(std::string_view ) {
+    std::error_code ec{};
+    auto curPath = std::filesystem::current_path(ec);
+    if (ec) {
+        CLEM_TERM_COUT.format(Error, "pwd error {}", ec.message());
+    } else {
+        CLEM_TERM_COUT.print(Info, curPath.string());    
+    }
+}
+
 void ClemensDebugger::cmdHelp(std::string_view operand) {
     if (!operand.empty()) {
         CLEM_TERM_COUT.print(Warn, "Command specific help not yet supported.");
@@ -938,6 +995,12 @@ void ClemensDebugger::cmdHelp(std::string_view operand) {
         Info, "save <pathname>             - saves a snapshot into the snapshots folder");
     CLEM_TERM_COUT.print(
         Info, "load <pathname>             - loads a snapshot into the snapshots folder");
+    CLEM_TERM_COUT.print(
+        Info, "bsave <pathname>,<address>,<length>  - saves binary to file from location in memory");
+    CLEM_TERM_COUT.print(
+        Info, "bload <pathname>,<address>             - loads binary to address");
+    CLEM_TERM_COUT.print(
+        Info, "pwd                         - current working directory");
 
     CLEM_TERM_COUT.newline();
 }

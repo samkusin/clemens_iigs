@@ -34,6 +34,8 @@ class ClemensCommandQueueListener {
     virtual void onCommandFastDiskEmulation(bool enabled) = 0;
     virtual std::string onCommandDebugMessage(std::string msg) = 0;
     virtual void onCommandSendText(std::string text) = 0;
+    virtual bool onCommandBinaryLoad(std::string pathname, unsigned address) = 0;
+    virtual bool onCommandBinarySave(std::string pathname, unsigned address, unsigned length) = 0;
 };
 
 class ClemensCommandQueue {
@@ -98,6 +100,10 @@ class ClemensCommandQueue {
     void debugMessage(std::string msg);
     //  Sends text to the emulator's keyboard queue
     void sendText(std::string text);
+    //  Save binary to disk
+    void bsave(std::string pathname, unsigned address, unsigned length);
+    //  Load binary from disk
+    void bload(std::string pathname, unsigned address);
 
   private:
     bool insertDisk(ClemensCommandQueueListener &listener, const std::string_view &inputParam);
@@ -114,7 +120,9 @@ class ClemensCommandQueue {
     bool delBreakpoint(ClemensCommandQueueListener &listener, const std::string_view &inputParam);
     bool programTrace(ClemensCommandQueueListener &listener, const std::string_view &inputParam);
     bool runScriptCommand(ClemensCommandQueueListener &listener, const std::string_view &command);
-
+    bool saveBinary(ClemensCommandQueueListener &listener, const std::string_view& command);
+    bool loadBinary(ClemensCommandQueueListener &listener, const std::string_view& command);
+    
     using Command = ClemensBackendCommand;
     cinek::CircularBuffer<Command, 16> queue_;
 

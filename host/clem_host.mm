@@ -74,6 +74,14 @@
   hostInterop->action = ClemensHostInterop::Shutdown;
 }
 
+- (void)menuShortcutsHelp:(id)sender {
+  hostInterop->action = ClemensHostInterop::Help;
+}
+
+- (void)menuDiskHelp:(id)sender {
+  hostInterop->action = ClemensHostInterop::DiskHelp;
+}
+
 //  TODO: localized strings!
 - (void)buildMenus {
   NSMenu *menubar = [NSMenu new];
@@ -153,6 +161,25 @@
                                                 action:nil
                                          keyEquivalent:@""];
   [menubar setSubmenu:machmenu forItem:machMenuItem];
+
+  // Help Menu
+  NSMenu *helpmenu = [[NSMenu alloc] initWithTitle:@"Help"];
+  menuItem = [[NSMenuItem alloc] initWithTitle:@"Keyboard Shortcuts"
+                                             action:@selector(menuShortcutsHelp:)
+                                      keyEquivalent:@""];
+  [menuItem setTarget:self];
+  [helpmenu addItem:menuItem];
+
+  menuItem = [[NSMenuItem alloc] initWithTitle:@"Disk Selection"
+                                             action:@selector(menuDiskHelp:)
+                                      keyEquivalent:@""];
+  [menuItem setTarget:self];
+  [helpmenu addItem:menuItem];
+
+  NSMenuItem *helpMenuItem = [menubar addItemWithTitle:@""
+                                                action:nil
+                                         keyEquivalent:@""];
+  [menubar setSubmenu:helpmenu forItem:helpMenuItem];
 
   // View Menu
   //    Pause or Run

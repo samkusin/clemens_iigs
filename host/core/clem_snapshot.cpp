@@ -2,6 +2,7 @@
 #include "clem_apple2gs.hpp"
 
 #include "clem_disk.h"
+#include "clem_host_platform.h"
 #include "clem_smartport.h"
 #include "external/cross_endian.h"
 #include "external/mpack.h"
@@ -96,6 +97,7 @@ bool ClemensSnapshot::serialize(
     //  metadata
     mpack_build_map(&writer);
     mpack_write_kv(&writer, "timestamp", (int64_t)time(NULL));
+    mpack_write_kv(&writer, "origin", CLEMENS_PLATFORM_ID);
     mpack_write_cstr(&writer, "disks");
     mpack_start_array(&writer, kClemensDrive_Count);
     for (unsigned i = 0; i < kClemensDrive_Count; i++) {
@@ -252,12 +254,17 @@ std::pair<ClemensSnapshotMetadata, bool>
 ClemensSnapshot::unserializeMetadata(mpack_reader_t &reader) {
     std::pair<ClemensSnapshotMetadata, bool> result;
     char path[1024];
+    char origin[8];
     uint32_t arraySize;
 
     validation(ValidationStep::Metadata);
     mpack_expect_map(&reader);
     mpack_expect_cstr_match(&reader, "timestamp");
     result.first.timestamp = mpack_expect_i64(&reader);
+    mpack_expect_cstr_match(&reader, "origin");
+    mpack_expect_cstr(&reader, origin, sizeof(origin));
+    origin_ = origin;
+
     mpack_expect_cstr_match(&reader, "disks");
     arraySize = mpack_expect_array_max(&reader, kClemensDrive_Count);
     for (unsigned i = 0; i < arraySize; i++) {

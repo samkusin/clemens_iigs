@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <charconv>
+#include <string_view>
 #include <utility>
 
 //  State affected to translate from the old main() to the new main()
@@ -134,6 +135,16 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
             listener.onCommandSendText(std::move(cmd.operand));
             break;
         }
+        case Command::SaveBinary:
+            if (!saveBinary(listener, cmd.operand)) {
+                commandFailed = true;
+            }
+            break;
+        case Command::LoadBinary:
+            if (!loadBinary(listener, cmd.operand)) {
+                commandFailed = true;
+            }
+            break;
         case Command::Undefined:
             break;
         }
@@ -425,6 +436,58 @@ void ClemensCommandQueue::inputMachine(ClemensCommandQueueListener &listener,
 #endif
 #endif
 
+bool ClemensCommandQueue::saveBinary(ClemensCommandQueueListener &listener,
+                                     const std::string_view &command) {
+    std::string pathname;
+    unsigned address = 0;
+    unsigned length = 0;
+    auto tokenPos = command.find(',');
+    auto tokenStart = std::string_view::size_type(0);
+    if (tokenPos == std::string_view::npos)
+        return false;
+
+    pathname = command.substr(tokenStart, tokenPos);
+    tokenStart = tokenPos + 1;
+    tokenPos = command.find(',', tokenStart);
+    if (tokenPos == std::string_view::npos)
+        return false;
+
+    std::string_view paramStr = command.substr(tokenStart, tokenPos - tokenStart);
+    if (std::from_chars(paramStr.data(), paramStr.data() + paramStr.size(), address, 16).ec !=
+        std::errc{}) {
+        return false;
+    }
+    tokenStart = tokenPos + 1;
+    paramStr = command.substr(tokenStart);
+    if (std::from_chars(paramStr.data(), paramStr.data() + paramStr.size(), length, 16).ec !=
+        std::errc{}) {
+        return false;
+    }
+
+    return listener.onCommandBinarySave(pathname, address, length);
+}
+
+bool ClemensCommandQueue::loadBinary(ClemensCommandQueueListener &listener,
+                                     const std::string_view &command) {
+    std::string pathname;
+    unsigned address = 0;
+    auto tokenPos = command.find(',');
+    auto tokenStart = std::string_view::size_type(0);
+    if (tokenPos == std::string_view::npos)
+        return false;
+
+    pathname = command.substr(tokenStart, tokenPos);
+    tokenStart = tokenPos + 1;
+   
+    std::string_view paramStr = command.substr(tokenStart);
+    if (std::from_chars(paramStr.data(), paramStr.data() + paramStr.size(), address, 16).ec !=
+        std::errc{}) {
+        return false;
+    }
+   
+    return listener.onCommandBinaryLoad(pathname, address);
+}
+
 void ClemensCommandQueue::enableFastDiskEmulation(bool enable) {
     queue(Command{Command::FastDiskEmulation, fmt::format("{}", enable ? 1 : 0)});
 }
@@ -435,6 +498,15 @@ void ClemensCommandQueue::debugMessage(std::string msg) {
 
 void ClemensCommandQueue::sendText(std::string text) {
     queue(Command{Command::SendText, std::move(text)});
+}
+
+void ClemensCommandQueue::bsave(std::string pathname, unsigned address, unsigned length) {
+    // pathname,address,length (address and length are always hex)
+    queue(Command{Command::SaveBinary, fmt::format("{},{:x},{:x}", pathname, address, length)});
+}
+
+void ClemensCommandQueue::bload(std::string pathname, unsigned address) {
+    queue(Command{Command::LoadBinary, fmt::format("{},{:x}", pathname, address)});
 }
 
 void ClemensCommandQueue::queue(const Command &cmd) { queue_.push(cmd); }

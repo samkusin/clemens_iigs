@@ -59,6 +59,7 @@ struct ClemensRunSampler {
 struct ClemensBackendConfig {
     int logLevel;
     std::string dataRootPath;
+    std::string imageRootPath;
     std::string snapshotRootPath;
     std::string traceRootPath;
     std::vector<ClemensBackendBreakpoint> breakpoints;
@@ -135,6 +136,8 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     void onCommandFastDiskEmulation(bool enabled) final;
     std::string onCommandDebugMessage(std::string msg) final;
     void onCommandSendText(std::string msg) final;
+    bool onCommandBinaryLoad(std::string pathname, unsigned address) final;
+    bool onCommandBinarySave(std::string pathname, unsigned address, unsigned length) final;
 
     //  internal
     bool isRunning() const;

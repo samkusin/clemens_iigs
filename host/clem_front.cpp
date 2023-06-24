@@ -676,6 +676,8 @@ void ClemensFrontend::startBackend() {
     ClemensBackendConfig backendConfig{};
 
     backendConfig.dataRootPath = config_.dataDirectory;
+    backendConfig.imageRootPath =
+        (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_LIBRARY_DIR).string();
     backendConfig.snapshotRootPath = snapshotRootPath_;
     backendConfig.traceRootPath =
         (std::filesystem::path(config_.dataDirectory) / CLEM_HOST_TRACES_DIR).string();
@@ -867,6 +869,12 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     case ClemensHostInterop::About:
         setGUIMode(GUIMode::Help);
         break;
+    case ClemensHostInterop::Help:
+        setGUIMode(GUIMode::HelpShortcuts);
+        break;
+    case ClemensHostInterop::DiskHelp:
+        setGUIMode(GUIMode::HelpDisk);
+        break;
     case ClemensHostInterop::LoadSnapshot:
         if (isBackendRunning()) {
             if (!isEmulatorStarting()) {
@@ -929,6 +937,8 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         }
         break;
     case GUIMode::Help:
+    case GUIMode::HelpShortcuts:
+    case GUIMode::HelpDisk:
         doHelpScreen(width, height);
         break;
     case GUIMode::RebootEmulator:
@@ -1280,6 +1290,12 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Help")) {
+            if (ImGui::MenuItem("Keyboard Shortcuts")) {
+                interop.action = ClemensHostInterop::Help;
+            }
+            if (ImGui::MenuItem("Disk Selection")) {
+                interop.action = ClemensHostInterop::DiskHelp;
+            }
             ImGui::Separator();
             if (ImGui::MenuItem("About")) {
                 interop.action = ClemensHostInterop::About;
@@ -1325,32 +1341,6 @@ void ClemensFrontend::doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions) {
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus);
     doDebuggerQuickbar(quickBarSize.x);
     ImGui::End();
-}
-
-void ClemensFrontend::doUserMenuDisplay(float /* width */) {
-    const ImGuiStyle &style = ImGui::GetStyle();
-    const ImVec2 kIconSize(24.0f, 24.0f);
-    ImGui::Spacing();
-    // ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
-    //                     ImVec2(style.ItemSpacing.x * 1.25f, style.ItemSpacing.y));
-    //  Button Group 2
-    ImGui::SameLine();
-
-    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-    ImGui::SameLine();
-    ClemensHostImGui::PushStyleButtonEnabled();
-    if (ClemensHostImGui::IconButton(
-            "Help", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kHelp), kIconSize)) {
-        setGUIMode(GUIMode::Help);
-    }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-        ImGui::SetTooltip("Help");
-    }
-    ClemensHostImGui::PopStyleButton();
-
-    // ImGui::PopStyleVar();
-    ImGui::Spacing();
-    ImGui::Separator();
 }
 
 void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
@@ -1556,13 +1546,29 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
 }
 
 void ClemensFrontend::doDebuggerQuickbar(float /*width */) {
-    const ImGuiStyle &style = ImGui::GetStyle();
-    float lineHeight = ImGui::GetWindowHeight() - (style.FramePadding.y + style.FrameBorderSize -
-                                                   style.WindowBorderSize + style.WindowPadding.y) *
-                                                      2;
+    float lineHeight = ImGui::GetTextLineHeight() * 1.25f;
     const ImVec2 kIconSize(lineHeight, lineHeight);
     if (isBackendRunning()) {
         ClemensHostImGui::PushStyleButtonEnabled();
+        ImGui::SameLine();
+
+        if (ClemensHostImGui::IconButton(
+                "Power", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kPowerButton),
+                kIconSize)) {
+            setGUIMode(GUIMode::ShutdownEmulator);
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+            ImGui::SetTooltip("Shutdown");
+        }
+        ImGui::SameLine();
+        if (ClemensHostImGui::IconButton(
+                "Reboot", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kPowerCycle),
+                kIconSize)) {
+              rebootInternal();
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+            ImGui::SetTooltip("Reboot");
+        }
         ImGui::SameLine();
         if (frameReadState_.isRunning) {
             if (ClemensHostImGui::IconButton(
@@ -1593,7 +1599,11 @@ void ClemensFrontend::doDebuggerQuickbar(float /*width */) {
             config_.setDirty();
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-            ImGui::SetTooltip("Enter debugger mode");
+            if (config_.hybridInterfaceEnabled) {
+                ImGui::SetTooltip("Enter standard mode");
+            } else {
+                ImGui::SetTooltip("Enter debugger mode");
+            }
         }
         ImGui::SameLine();
         if (ClemensHostImGui::IconButton(
@@ -2746,7 +2756,7 @@ void ClemensFrontend::doDebugView(ImVec2 anchor, ImVec2 size) {
     ImGui::SetNextWindowPos(anchor, ImGuiCond_Once);
     ImGui::SetNextWindowSize(size, ImGuiCond_Once);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 128));
-    if (ImGui::Begin("Debug View", NULL)) {
+    if (ImGui::Begin("Debug View", NULL, 0)) {
         if (ImGui::CollapsingHeader("Stats", ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::BeginTable("##Stats", 2);
             {
@@ -2958,11 +2968,15 @@ void ClemensFrontend::doHelpScreen(int width, int height) {
                 ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kEmulatorHelp));
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("Hotkeys")) {
+            if (ImGui::BeginTabItem(
+                    "Hotkeys", NULL,
+                    guiMode_ == GUIMode::HelpShortcuts ? ImGuiTabItemFlags_SetSelected : 0)) {
                 ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kGSKeyboardCommands));
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("Disk Selection")) {
+            if (ImGui::BeginTabItem("Disk Selection", NULL,
+                                    guiMode_ == GUIMode::HelpDisk ? ImGuiTabItemFlags_SetSelected
+                                                                  : 0)) {
                 ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kDiskSelectionHelp));
                 ImGui::EndTabItem();
             }
@@ -2974,6 +2988,10 @@ void ClemensFrontend::doHelpScreen(int width, int height) {
         }
 
         ImGui::EndPopup();
+    }
+    if (guiMode_ == GUIMode::HelpShortcuts || guiMode_ == GUIMode::HelpDisk) {
+        //  hacky method to automatically trigger the shortcuts tab from the main menu
+        setGUIMode(GUIMode::Help);
     }
     if (!isOpen) {
         setGUIMode(GUIMode::Emulator);
