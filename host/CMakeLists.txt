@@ -35,9 +35,9 @@ target_include_directories(clemens_host_shared
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ext)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(clemens_host_shared 
+    target_compile_options(clemens_host_shared
         PUBLIC -Wall -Wextra -Wno-missing-field-initializers -pedantic)
-    target_compile_options(clemens_host_shared 
+    target_compile_options(clemens_host_shared
         PUBLIC $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-fno-exceptions -fno-rtti>)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     # Removing MSVC options that are less necessary for game / simulation
@@ -51,10 +51,6 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     # specific to MSVC's implementation
     #
     # Remove Exceptions and RTTI ON defaults to eliminate warnings when we disable them
-
-    # TODO: this should be part of a toolchain file
-    string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-    string(REGEX REPLACE "/EHsc*" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
     target_compile_definitions(clemens_host_shared
         PUBLIC _CRT_SECURE_NO_WARNINGS _ITERATOR_DEBUG_LEVEL=0)

@@ -11,32 +11,32 @@
 #include <vector>
 
 struct ClemensBackendState {
-    ClemensMachine *machine;
-    ClemensMMIO *mmio;
-    double fps;
-    bool isRunning;
-    bool isTracing;
-    bool isIWMTracing;
-    bool mmioWasInitialized;
+    ClemensMachine *machine = NULL;
+    ClemensMMIO *mmio = NULL;
+    double fps = 0.0;
+    bool isRunning = false;
+    bool isTracing = false;
+    bool isIWMTracing = false;
+    bool mmioWasInitialized = false;
 
     ClemensAppleIIGSFrame frame;
 
-    unsigned hostCPUID;
-    int logLevel;
-    const ClemensBackendOutputText *logBufferStart;
-    const ClemensBackendOutputText *logBufferEnd;
-    const ClemensBackendBreakpoint *bpBufferStart;
-    const ClemensBackendBreakpoint *bpBufferEnd;
+    unsigned hostCPUID = 0;
+    int logLevel = 0;
+    const ClemensBackendOutputText *logBufferStart = NULL;
+    const ClemensBackendOutputText *logBufferEnd = NULL;
+    const ClemensBackendBreakpoint *bpBufferStart = NULL;
+    const ClemensBackendBreakpoint *bpBufferEnd = NULL;
     std::optional<unsigned> bpHitIndex;
-    const ClemensBackendExecutedInstruction *logInstructionStart;
-    const ClemensBackendExecutedInstruction *logInstructionEnd;
+    const ClemensBackendExecutedInstruction *logInstructionStart = NULL;
+    const ClemensBackendExecutedInstruction *logInstructionEnd = NULL;
 
     uint8_t ioPageValues[256]; // 0xc000 - 0xc0ff
-    uint8_t debugMemoryPage;
+    uint8_t debugMemoryPage = 0;
 
-    float machineSpeedMhz;
-    float avgVBLsPerFrame;
-    bool fastEmulationOn;
+    float machineSpeedMhz = 0.0f;
+    float avgVBLsPerFrame = 0.0f;
+    bool fastEmulationOn = false;
 
     // valid if a debugMessage() command was issued from the frontend
     std::optional<std::string> message;

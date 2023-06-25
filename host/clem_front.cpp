@@ -51,6 +51,8 @@
 
 #include "cinek/equation.inl"
 
+// #define CLEMENS_HOST_PROFILE_ENABLED
+
 /*
 namespace cinek {
 template <>
@@ -699,6 +701,15 @@ void ClemensFrontend::startBackend() {
 
 void ClemensFrontend::runBackend(std::unique_ptr<ClemensBackend> backend) {
     ClemensCommandQueue::DispatchResult results{};
+    backendState_.reset();
+
+#ifdef CLEMENS_HOST_PROFILE_ENABLED
+    std::chrono::high_resolution_clock::time_point f_start;
+    std::chrono::high_resolution_clock::time_point f_end;
+    auto f_cumulative = std::chrono::high_resolution_clock::duration::zero();
+    unsigned f_count = 0;
+#endif
+
     while (!results.second) {
         std::unique_lock<std::mutex> lk(frameMutex_);
         backend->post(backendState_);
@@ -707,7 +718,24 @@ void ClemensFrontend::runBackend(std::unique_ptr<ClemensBackend> backend) {
         frameSeqNo_++;
         readyForFrame_.wait(lk, [this]() { return frameLastSeqNo_ == frameSeqNo_; });
         lk.unlock();
+#ifdef CLEMENS_HOST_PROFILE_ENABLED
+        f_start = std::chrono::high_resolution_clock::now();
+#endif
         results = backend->step(stagedBackendQueue_);
+#ifdef CLEMENS_HOST_PROFILE_ENABLED
+        f_end = std::chrono::high_resolution_clock::now();
+        f_cumulative += (f_end - f_start);
+        f_count++;
+        if (f_count == 60) {
+            auto f_avg_time = f_cumulative / f_count;
+            spdlog::info("SKS: f_avg_time = {} us",
+                         std::chrono::duration_cast<std::chrono::microseconds>(f_avg_time).count());
+
+            f_cumulative = std::chrono::high_resolution_clock::duration::zero();
+            f_count = 0;
+        }
+#endif
+
         // sync audio
         audio_.queue(backend->renderAudioFrame());
     }
@@ -816,11 +844,10 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     bool isNewFrame = false;
     dtEmulatorNextUpdateInterval_ -= deltaTime;
     if (dtEmulatorNextUpdateInterval_ <= 0.0) {
-        syncBackend(true);
+        isNewFrame = syncBackend(true);
         readyForFrame_.notify_one();
         dtEmulatorNextUpdateInterval_ =
             std::max(0.0, dtEmulatorNextUpdateInterval_ + kMachineFrameDuration);
-        isNewFrame = true;
     }
 
     constexpr double kUIFlashCycleTime = 1.0;
@@ -1032,6 +1059,8 @@ void ClemensFrontend::setGUIMode(GUIMode guiMode) {
                                           "LoadSnapshotAfterPowerOn",
                                           "SaveSnapshot",
                                           "Help",
+                                          "HelpShortcuts",
+                                          "HelpDisk",
                                           "RebootEmulator",
                                           "StartingEmulator",
                                           "ShutdownEmulator"};
@@ -1049,9 +1078,10 @@ void ClemensFrontend::setGUIMode(GUIMode guiMode) {
     spdlog::info("ClemensFrontend - setGUIMode() {}", kGUIModeNames[static_cast<int>(guiMode_)]);
 }
 
-void ClemensFrontend::syncBackend(bool copyState) {
+bool ClemensFrontend::syncBackend(bool copyState) {
     //  check if a new frame of data is available.  if none available, we'll
     //  wait another UI frame (slow emulator)
+    bool newFrame = false;
     std::lock_guard<std::mutex> frameLock(frameMutex_);
     if (frameLastSeqNo_ != frameSeqNo_ && copyState) {
         //  new frame data located in the write frame, obtained from the
@@ -1090,10 +1120,12 @@ void ClemensFrontend::syncBackend(bool copyState) {
             lastCommandState_.gsConfig = std::nullopt;
             config_.setDirty();
         }
+        newFrame = true;
     }
 
     stagedBackendQueue_.queue(backendQueue_);
     frameLastSeqNo_ = frameSeqNo_;
+    return newFrame;
 }
 
 void ClemensFrontend::processBackendResult(const ClemensBackendResult &result) {
@@ -1564,7 +1596,7 @@ void ClemensFrontend::doDebuggerQuickbar(float /*width */) {
         if (ClemensHostImGui::IconButton(
                 "Reboot", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kPowerCycle),
                 kIconSize)) {
-              rebootInternal();
+            rebootInternal();
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
             ImGui::SetTooltip("Reboot");
@@ -1846,7 +1878,8 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float /*wi
             }
             buttonAnchor.y = bottomRightPos.y - buttonSize.y - style.FramePadding.y;
             if (isBackendRunning()) {
-                //  TODO: we don't persist write protected status in the configuration, so there's
+                //  TODO: we don't persist write protected status in the configuration, so
+                //  there's
                 //        nowhere to persist this attribute until the machine is on.
                 //        yes, 2IMG and WOZ do persist the write protect status but DSK,DO,PO do
                 //        not.
@@ -2006,7 +2039,8 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float /*wid
             /*
             buttonAnchor.y = bottomRightPos.y - buttonSize.y - style.FramePadding.y;
             if (isBackendRunning()) {
-                //  TODO: we don't persist write protected status in the configuration, so there's
+                //  TODO: we don't persist write protected status in the configuration, so
+            there's
                 //        nowhere to persist this attribute until the machine is on.
                 //        yes, 2IMG and WOZ do persist the write protect status but DSK,DO,PO do
                 //        not.
@@ -2020,8 +2054,8 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float /*wid
 
                 ImGui::SetCursorScreenPos(buttonAnchor);
                 if (ClemensHostImGui::IconButton(
-                        "Lock", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kLockDisk),
-                        buttonSize)) {
+                        "Lock",
+            ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kLockDisk), buttonSize)) {
                     backendQueue_.writeProtectDisk(driveType, !driveStatus.isWriteProtected);
                 }
 

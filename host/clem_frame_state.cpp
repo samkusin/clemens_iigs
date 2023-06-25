@@ -1,6 +1,7 @@
 #include "clem_frame_state.hpp"
 
 #include "clem_mem.h"
+#include "core/clem_apple2gs_config.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 
@@ -11,6 +12,7 @@
 void ClemensBackendState::reset() {
     config.reset();
     message.reset();
+    frame = ClemensAppleIIGSFrame();
 }
 
 namespace ClemensFrame {

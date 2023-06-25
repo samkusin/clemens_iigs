@@ -68,7 +68,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     void startBackend();
     void runBackend(std::unique_ptr<ClemensBackend> backend);
     void stopBackend();
-    void syncBackend(bool copyState);
+    bool syncBackend(bool copyState);
     bool isBackendRunning() const;
 
     //  the backend state delegate is run on a separate thread and notifies

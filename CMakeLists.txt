@@ -1,18 +1,20 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(clemens_65816 LANGUAGES C)
-
-option(BUILD_TESTING "Build tests" ON)
-
 set (CMAKE_C_STANDARD 11)
 set (CMAKE_CXX_STANDARD 17)
 
-set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+set (CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerOptions.cmake")
+
+project(clemens_65816 C CXX)
+
+
+option(BUILD_TESTING "Build tests" ON)
 
 add_library(clemens_65816 STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_debug.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_mem.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/emulator.c")
+
 
 target_include_directories(clemens_65816
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
@@ -34,7 +36,7 @@ add_library(clemens_65816_mmio STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_drive.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_drive35.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_iwm.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/clem_locale.c"    
+    "${CMAKE_CURRENT_SOURCE_DIR}/clem_locale.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_mmio.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_rtc.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_scc.c"

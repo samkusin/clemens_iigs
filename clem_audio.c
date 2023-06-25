@@ -257,12 +257,13 @@ uint8_t clem_ensoniq_oscillator_cycle(struct ClemensDeviceEnsoniq *doc, unsigned
 uint32_t clem_ensoniq_sync(struct ClemensDeviceEnsoniq *doc, clem_clocks_duration_t dt_clocks) {
     // 1 oscillator x 2 at minimum enabled - i.e. we always enable 2 by default
     unsigned osc_cnt = (doc->reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1) + 1;
+    unsigned osc_cnt_2 = osc_cnt + 2;
 
     doc->dt_budget += dt_clocks;
 
     while (doc->dt_budget >= CLEM_ENSONIQ_CLOCKS_PER_CYCLE) {
         // 2 extra cycles after running through all active oscillators
-        unsigned osc_cycle = doc->cycle % (osc_cnt + 2);
+        unsigned osc_cycle = doc->cycle % osc_cnt_2;
         if (osc_cycle < osc_cnt) {
             uint8_t ctl = doc->reg[CLEM_ENSONIQ_REG_OSC_CTRL + osc_cycle];
             if (ctl & CLEM_ENSONIQ_OSC_CTL_HALT) {
@@ -348,7 +349,7 @@ void clem_ensoniq_mono(struct ClemensDeviceEnsoniq *doc, unsigned osc_max_channe
     *right = 0.0f;
 
     for (unsigned channel_idx = 0; channel_idx < osc_max_channels; ++channel_idx) {
-        *left += doc->voice[channel_idx];
+        *left += (doc->voice[channel_idx] * 0.50f);
     }
     if (*left > 1.0f)
         *left = 1.0f;
@@ -547,9 +548,9 @@ void clem_sound_glu_sync(struct ClemensDeviceAudio *glu, struct ClemensClock *cl
                     /* click! - two speaker pulses = 1 complete wave */
                     glu->a2_speaker_frame_count = 0;
                     if (!glu->a2_speaker_tense) {
-                        glu->a2_speaker_level = 0.75f;
+                        glu->a2_speaker_level = 0.50f;
                     } else {
-                        glu->a2_speaker_level = -0.75f;
+                        glu->a2_speaker_level = -0.50f;
                     }
                     glu->a2_speaker_tense = !glu->a2_speaker_tense;
                     glu->a2_speaker = false;
