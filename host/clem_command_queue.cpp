@@ -380,7 +380,7 @@ bool ClemensCommandQueue::delBreakpoint(ClemensCommandQueueListener &listener,
 #endif
 #endif
 static const char *sInputKeys[] = {"",      "keyD", "keyU",   "mouseD", "mouseU",
-                                   "mouse", "padl", "nopadl", NULL};
+                                   "mouse", "mouseABS", "padl", "nopadl", NULL};
 
 void ClemensCommandQueue::inputEvent(const ClemensInputEvent &input) {
     CK_ASSERT_RETURN(*sInputKeys[input.type] != '\0');
