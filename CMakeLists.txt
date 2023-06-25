@@ -3,11 +3,9 @@ cmake_minimum_required(VERSION 3.15)
 set (CMAKE_C_STANDARD 11)
 set (CMAKE_CXX_STANDARD 17)
 
-if(MSVC)
-set (CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VSCompilerOptions.cmake")
-endif()
+set (CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerOptions.cmake")
 
-project(clemens_65816 C)
+project(clemens_65816 C CXX)
 
 
 option(BUILD_TESTING "Build tests" ON)
