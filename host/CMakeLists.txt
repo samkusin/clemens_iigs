@@ -108,14 +108,18 @@ set(SOKOL_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ext/sokol/sokol_glue.h")
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(clemens_ICON_FILE "")
     set(PLATFORM_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_windows.c"
         "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.cpp")
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(clemens_ICON_FILE "")
     set(PLATFORM_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_linux.c"
         "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.cpp")
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(clemens_ICON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.icns")
+    set_source_files_properties(${clemens_ICON_FILE} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
     set(PLATFORM_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_macos.m"
         "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.mm")
@@ -147,7 +151,7 @@ set(PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_ui_settings.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/clem_startup_view.cpp")
 
-add_executable(clemens_iigs ${PROJECT_SOURCES})
+add_executable(clemens_iigs ${clemens_ICON_FILE} ${PROJECT_SOURCES})
 target_link_libraries(clemens_iigs
     PRIVATE
         clemens_host_core
@@ -184,8 +188,9 @@ elseif(APPLE)
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${CLEM_HOST_VERSION_MAJOR}.${CLEM_HOST_VERSION_MINOR}.${CLEM_HOST_VERSION_PATCH}"
         MACOSX_BUNDLE_COPYRIGHT "Copyright ${CLEM_HOST_COPYRIGHT_YEAR} Samir Sinha DBA Cinekine"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/macos_bundle_info_plist.in"
-        #MACOSX_BUNDLE_ICON_FILE ${PROJECT_SOURCE_DIR}/packaging/exampleApp.icns
+        MACOSX_BUNDLE_ICON_FILE icon.icns
         XCODE_ATTRIBUTE_EXECUTABLE_NAME "Clemens IIGS")
+
 endif()
 
 # handle packaging - this is an abbreviated form of the CPack packaging scripts

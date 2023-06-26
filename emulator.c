@@ -2919,6 +2919,13 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
             _clem_read_pba(clem, &tmp_bnk0, &tmp_pc);
             _clem_read_pba(clem, &tmp_bnk1, &tmp_pc);
             _clem_debug_memory_dump(clem, tmp_bnk1, tmp_bnk0, tmp_data);
+        } else if (tmp_data == 0x02) {
+            //  Instruction with data pushed onto the stack: 
+            //  [type]
+            //  [adrhi]
+            //  [adrlo]
+            //_clem_opc_pull_reg_8(clem,)
+            //  passed to the appropriate handler
         }
         break;
     //  Jump, JSR,
