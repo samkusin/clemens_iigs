@@ -95,6 +95,9 @@ configure_file(version.h.in version.h)
 if(APPLE)
     enable_language(OBJC)
 endif()
+if(MSVC)
+    enable_language(RC)
+endif()
 
 # build header-only source
 # build imgui
@@ -109,7 +112,9 @@ set(SOKOL_SOURCES
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(clemens_ICON_FILE "")
+    enable_language(RC)
     set(PLATFORM_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/clemens.rc"
         "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_windows.c"
         "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.cpp")
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
