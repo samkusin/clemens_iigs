@@ -26,5 +26,7 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>${MACOSX_BUNDLE_COPYRIGHT}</string>
+	<key>CFBundleIconFile</key>
+	<string>icon.icns</string>
 </dict>
 </plist>
