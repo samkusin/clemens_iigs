@@ -9,8 +9,9 @@
 #include "clem_mmio_types.h"
 #include "emulator.h"
 #include "emulator_mmio.h"
-#include "iocards/mockingboard.h"
 #include "serializer.h"
+
+#include "devices/mockingboard.h"
 
 #include "external/mpack.h"
 #include "fmt/core.h"

@@ -1116,6 +1116,7 @@ void clem_card_mockingboard_initialize(ClemensCard *card) {
     card->io_read = &io_read;
     card->io_write = &io_write;
     card->io_name = &io_name;
+    card->io_dma = NULL;
 }
 
 void clem_card_mockingboard_uninitialize(ClemensCard *card) {

@@ -3,7 +3,7 @@
 #include "clem_disk_asset.hpp"
 
 #include "clem_2img.h"
-#include "smartport/prodos_hdd32.h"
+#include "devices/prodos_hdd32.h"
 
 #include <cassert>
 #include <cstring>

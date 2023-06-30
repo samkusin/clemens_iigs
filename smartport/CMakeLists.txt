@@ -1,6 +1,7 @@
 
 set(SMARTPORT_DEVICE_SOURCES
-"${CMAKE_CURRENT_SOURCE_DIR}/prodos_hdd32.c")
+    "${CMAKE_CURRENT_SOURCE_DIR}/prodos_hdd32.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/hddcard.c")
 
 add_library(clemens_65816_smartport_devices STATIC
 ${SMARTPORT_DEVICE_SOURCES})

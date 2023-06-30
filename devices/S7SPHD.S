@@ -5,23 +5,25 @@ SCRNHOLE7       equ  $07f8
 BASIC           equ  $E000
 SLOOP           equ  $FABA          ; Disk controller slot search loop entry
 
-LOC0            equ  $00
-LOC1            equ  $01
+ZP_LOC0            equ  $00
+ZP_LOC1            equ  $01
+ZP_PRODOS_CMD      equ  $42
 
-*******************************************************************************
+***************************************************************
 * Entry point for the Boot cycle of this slot
 * Bytes 01, 03, 05, have the appropriate ProDOS signature bytes
-* Some of this is 'inspired' by the existing ROM at $C500, but will not support
-* SmartPort features on this slot for now...
+* Some of this is 'inspired' by the existing ROM at $C500, but 
+* will not support SmartPort features on this slot for now...
 *
 * 'SlotEntry' - boot cycle
 * 'ProDOSEntry'- device driver entry point
-*           - $42 - command (0 = status, 1 = read, 2 = write, 3 = format)
+*           - $42 - command (0 = status, 1 = read, 2 = write, 
+*                            3 = format)
 *           - $43 - unit
 *           - $44, $45 - pointer to data buffer (in/out)
 *           - $46, $47 - block index
 *           (See Table 6.4 Beneath Apple ProDOS)
-*******************************************************************************
+***************************************************************
 SlotEntry       equ   *
                 lda   #$20
                 lda   #$00
@@ -29,11 +31,11 @@ SlotEntry       equ   *
                 cmp   #$03          ; #$00 would be a smartport device
                 bcs   :bootEntry
 *
-* ProDOS entry point will set carry to 0 indicating a ProDOS call based on
-* contents of $42, etc.
+* ProDOS entry point will set carry to 0 indicating a ProDOS 
+* call based on contents of $42, etc.
 *
-* Boot entry point will set carry to 1 indicating a preset ProDOS call to
-* read sector 0 into $800
+* Boot entry point will set carry to 1 indicating a preset
+* ProDOS call to read sector 0 into $800
 *
 DriverEntry     clc
 :bootEntry      phb                 ; restore data bank on exit
@@ -50,7 +52,11 @@ DriverEntry     clc
 * Boot mode if carry flag was set initially - which means initialize the
 * ProDOS command for READ into $0800 here
 *
-
+                ldx   #5
+]next_x         lda   BootCommand,x
+                sta   ZP_PRODOS_CMD,x
+                dex
+                bpl   ]next_x 
 *
 * Once this emulator specific call finishes, we have two paths to deal with
 * If Boot, then process the boot flow
@@ -87,10 +93,11 @@ DriverEntry     clc
                 plb                 ; restore data bank
                 jmp   $0801
 
-:bootNone       lda   LOC1
+:bootNone       lda   ZP_LOC1
                 cmp   ACTIVE_PERIP_SLOT
                 bne   :bootExit
                 jmp   SLOOP
 :bootExit       jmp   BASIC
+BootCommand     hex   01,70,00,08,00,00 ; READ BLK 0 S7,D1 TO $800
                 ds    $C7FF-*
-                db   :DriverEntry-SLOT_ENTRY
+                db    DriverEntry-SlotEntry

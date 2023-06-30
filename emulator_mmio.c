@@ -532,6 +532,11 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
             card_irqs |= (CLEM_IRQ_SLOT_1 << i);
         if (card_result & CLEM_CARD_NMI)
             card_nmis |= (1 << i);
+        if (card_result & CLEM_CARD_DMA) {
+            if ((*mmio->card_slot[0]->io_dma)() == 1) {
+                //  write data
+            }
+        }
     }
 
     clem_vgc_sync(&mmio->vgc, &clock, clem->mem.mega2_bank_map[0], clem->mem.mega2_bank_map[1]);

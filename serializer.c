@@ -337,6 +337,7 @@ struct ClemensSerializerRecord kMMIO[] = {
     CLEM_SERIALIZER_RECORD_UINT64(ClemensMMIO, mega2_cycles),
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, timer_60hz_us),
     CLEM_SERIALIZER_RECORD_INT32(ClemensMMIO, card_expansion_rom_index),
+    CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, dma_addr),
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, irq_line),
     CLEM_SERIALIZER_RECORD_UINT32(ClemensMMIO, nmi_line),
     CLEM_SERIALIZER_RECORD_CUSTOM(ClemensMMIO, card_slot_expansion_memory,

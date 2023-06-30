@@ -93,6 +93,7 @@ typedef uint8_t *(*ClemensSerializerAllocateCb)(unsigned /* type */, unsigned /*
 #define CLEM_OP_IO_CARD   0x40
 #define CLEM_OP_IO_DEVSEL 0x80
 
+#define CLEM_CARD_DMA 0x00000001
 #define CLEM_CARD_NMI 0x40000000
 #define CLEM_CARD_IRQ 0x80000000
 
@@ -129,12 +130,15 @@ typedef struct {
                     void *context);
     void (*io_write)(struct ClemensClock *clock, uint8_t data, uint8_t adr, uint8_t flags,
                      void *context);
+    /* Reports IRQ and/or DMA request status */
     uint32_t (*io_sync)(struct ClemensClock *clock, void *context);
+    /* executed once per cycle if io_sync() returns DMA, this returns 1 if a write */
+    uint32_t (*io_dma)(uint8_t* data_bank, uint16_t* adr, uint8_t is_adr_bus);
     const char *(*io_name)(void *context);
 } ClemensCard;
 
 /* Serial port interface */
-#define CLEM_SCC_PORT_DTR     0x01
+#define CLEM_SCC_PORT_DTR     0x01r
 #define CLEM_SCC_PORT_HSKI    0x02
 #define CLEM_SCC_PORT_TX_D_LO 0x04
 #define CLEM_SCC_PORT_TX_D_HI 0x08

@@ -4,7 +4,7 @@
 #include "cinek/buffer.hpp"
 #include "clem_shared.h"
 #include "core/clem_disk_asset.hpp"
-#include "smartport/prodos_hdd32.h"
+#include "devices/prodos_hdd32.h"
 
 #include "clem_2img.h"
 
@@ -35,6 +35,9 @@ class ClemensProDOSDisk {
     bool serialize(mpack_writer_t *writer, ClemensSmartPortDevice &device);
     bool unserialize(mpack_reader_t *reader, ClemensSmartPortDevice &device,
                      ClemensUnserializerContext context);
+
+    //  direct access to the HDD for use by the card interface if needed
+    ClemensProdosHDD32& getInterface() { return interface_; }
 
   private:
     static uint8_t doReadBlock(void *userContext, unsigned driveIndex, unsigned blockIndex,
