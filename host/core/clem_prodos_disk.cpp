@@ -13,7 +13,6 @@
 #include "external/mpack.h"
 #include "spdlog/spdlog.h"
 
-//  storage_ will contain g
 
 ClemensProDOSDisk::ClemensProDOSDisk() {}
 

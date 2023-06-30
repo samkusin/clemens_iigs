@@ -106,8 +106,8 @@ bool ClemensSnapshot::serialize(
     }
     mpack_finish_array(&writer);
     mpack_write_cstr(&writer, "smartDisks");
-    mpack_start_array(&writer, CLEM_SMARTPORT_DRIVE_LIMIT);
-    for (unsigned i = 0; i < CLEM_SMARTPORT_DRIVE_LIMIT; i++) {
+    mpack_start_array(&writer, kClemensSmartPortDiskLimit);
+    for (unsigned i = 0; i < kClemensSmartPortDiskLimit; i++) {
         mpack_write_cstr(&writer, gs.getStorage().getSmartPortStatus(i).assetPath.c_str());
     }
     mpack_finish_array(&writer);
@@ -273,7 +273,7 @@ ClemensSnapshot::unserializeMetadata(mpack_reader_t &reader) {
     }
     mpack_done_array(&reader);
     mpack_expect_cstr_match(&reader, "smartDisks");
-    arraySize = mpack_expect_array_max(&reader, CLEM_SMARTPORT_DRIVE_LIMIT);
+    arraySize = mpack_expect_array_max(&reader, kClemensSmartPortDiskLimit);
     for (unsigned i = 0; i < arraySize; i++) {
         mpack_expect_cstr(&reader, path, sizeof(path));
         result.first.smartDisks[i] = path;

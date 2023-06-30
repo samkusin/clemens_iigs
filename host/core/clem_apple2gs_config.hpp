@@ -3,11 +3,15 @@
 
 #include "clem_disk_status.hpp"
 #include "clem_mmio_types.h"
+#include "clem_smartport.h"
 
 #include <array>
 #include <string>
 
+constexpr unsigned kClemensSmartPortDiskLimit = CLEM_SMARTPORT_DRIVE_LIMIT + 1;
+
 constexpr const char *kClemensCardMockingboardName = "mockingboard_c";
+constexpr const char *kClemensCardHardDiskName = "hddcard";
 
 struct ClemensAppleIIGSConfig {
     //  RAM in Kilobytes, not counting Mega 2 memory
@@ -18,7 +22,7 @@ struct ClemensAppleIIGSConfig {
     std::array<uint8_t, CLEM_RTC_BRAM_SIZE> bram;
     //  Drive images (can be empty)
     std::array<std::string, kClemensDrive_Count> diskImagePaths;
-    std::array<std::string, CLEM_SMARTPORT_DRIVE_LIMIT> smartPortImagePaths;
+    std::array<std::string, kClemensSmartPortDiskLimit> smartPortImagePaths;
     //  Card namaes
     std::array<std::string, CLEM_CARD_SLOT_COUNT> cardNames;
 };
@@ -29,7 +33,7 @@ struct ClemensAppleIIGSFrame {
     ClemensVideo text;
     ClemensAudio audio;
     std::array<ClemensDiskDriveStatus, kClemensDrive_Count> diskDriveStatuses;
-    std::array<ClemensDiskDriveStatus, CLEM_SMARTPORT_DRIVE_LIMIT> smartPortStatuses;
+    std::array<ClemensDiskDriveStatus, kClemensSmartPortDiskLimit> smartPortStatuses;
     ClemensAppleIIGSFrame() : monitor{}, graphics{}, text{}, audio{}  {}
 };
 

@@ -1,8 +1,7 @@
 #ifndef CLEM_HOST_SERIALIZER_HPP
 #define CLEM_HOST_SERIALIZER_HPP
 
-#include "clem_disk.h"
-#include "clem_smartport.h"
+#include "clem_apple2gs_config.hpp"
 #include "external/mpack.h"
 
 #include <array>
@@ -19,7 +18,7 @@ class ClemensSystemListener;
 struct ClemensSnapshotMetadata {
     time_t timestamp;
     std::array<std::string, kClemensDrive_Count> disks;
-    std::array<std::string, CLEM_SMARTPORT_DRIVE_LIMIT> smartDisks;
+    std::array<std::string, kClemensSmartPortDiskLimit> smartDisks;
 };
 
 class ClemensSnapshot {

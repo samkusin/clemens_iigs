@@ -5,7 +5,9 @@
 #include "clem_disk.h"
 #include "clem_mmio_types.h"
 #include "clem_smartport.h"
+#include "core/clem_apple2gs_config.hpp"
 #include "core/clem_disk_asset.hpp"
+#include "core/clem_disk_status.hpp"
 #include "core/clem_prodos_disk.hpp"
 #include "emulator_mmio.h"
 #include "external/mpack.h"
@@ -50,28 +52,8 @@ void ClemensStorageUnit::allocateBuffers() {
     smartDiskStatuses_.fill(ClemensDiskDriveStatus{});
 }
 
-ClemensSmartPortUnit *ClemensStorageUnit::getSmartPortUnit(ClemensMMIO &mmio, unsigned driveIndex) {
-    ClemensSmartPortUnit *unit = clemens_smartport_unit_get(&mmio, driveIndex);
-    if (!unit) {
-        spdlog::error(
-            "ClemensStorageUnit::assignSmartPortDisk - Invalid smartport unit {} specified",
-            driveIndex);
-        return NULL;
-    }
-    if (smartDiskStatuses_[driveIndex].isMounted()) {
-        spdlog::error("ClemensStorageUnit::assignSmartPortDisk - Drive unit {} is already mounted",
-                      driveIndex);
-        return NULL;
-    }
-    return unit;
-}
-
 bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex,
                                              const std::string &imagePath) {
-    ClemensSmartPortUnit *unit = getSmartPortUnit(mmio, driveIndex);
-    if (!unit)
-        return false;
-
     auto asset = ClemensDiskAsset(imagePath);
     if (asset.imageType() != ClemensDiskAsset::Image2IMG &&
         asset.imageType() != ClemensDiskAsset::ImageProDOS) {
@@ -87,9 +69,21 @@ bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIn
         smartDiskStatuses_[driveIndex].mountFailed();
         return false;
     }
-    smartDiskStatuses_[driveIndex].mount(imagePath);
+    auto origin = ClemensDiskDriveStatus::Origin::None;
+    if (driveIndex < CLEM_SMARTPORT_DRIVE_LIMIT) {
+        if (clemens_assign_smartport_disk(&mmio, driveIndex, &device)) {
+            origin = ClemensDiskDriveStatus::Origin::DiskPort;
+        }
+    } else if (driveIndex < kClemensSmartPortDiskLimit) {
+        origin = ClemensDiskDriveStatus::Origin::CardPort;
+    }
+    if (origin == ClemensDiskDriveStatus::Origin::None) {
+        spdlog::error("ClemensStorageUnit - smart{}: {} failed to mount", driveIndex, imagePath);
+        return false;
+    }
     spdlog::info("ClemensStorageUnit - smart{}: {} mounted", driveIndex, imagePath);
-    return clemens_assign_smartport_disk(&mmio, driveIndex, &device);
+    smartDiskStatuses_[driveIndex].mount(imagePath, origin);
+    return true;
 }
 
 void ClemensStorageUnit::saveSmartPortDisk(ClemensMMIO &, unsigned driveIndex) {
@@ -103,7 +97,9 @@ bool ClemensStorageUnit::ejectSmartPortDisk(ClemensMMIO &mmio, unsigned driveInd
         return false;
 
     struct ClemensSmartPortDevice device {};
-    clemens_remove_smartport_disk(&mmio, driveIndex, &device);
+    if (smartDiskStatuses_[driveIndex].origin == ClemensDiskDriveStatus::Origin::DiskPort) {
+        clemens_remove_smartport_disk(&mmio, driveIndex, &device);
+    }
     smartDisks_[driveIndex].release(device);
     smartDiskStatuses_[driveIndex].unmount();
     spdlog::info("ClemensStorageUnit - smart{}: ejected", driveIndex);
@@ -172,7 +168,7 @@ bool ClemensStorageUnit::mountDisk(ClemensMMIO &mmio, const std::string &path,
         diskStatuses_[driveType].mountFailed();
         return false;
     }
-    diskStatuses_[driveType].mount(path);
+    diskStatuses_[driveType].mount(path, ClemensDiskDriveStatus::Origin::DiskPort);
     spdlog::info("ClemensStorageUnit - {}: {} mounted",
                  ClemensDiskUtilities::getDriveName(driveType), path);
     return true;
@@ -268,10 +264,16 @@ void ClemensStorageUnit::update(ClemensMMIO &mmio) {
             status.isWriteProtected = false;
             continue;
         }
-        auto *drive = clemens_smartport_unit_get(&mmio, driveIndex);
-        status.isSpinning = drive->bus_enabled;
-        status.isEjecting = false;
-        status.isWriteProtected = false; // TODO: smartport write protection?
+        if (status.origin == ClemensDiskDriveStatus::Origin::DiskPort) {
+            auto *drive = clemens_smartport_unit_get(&mmio, driveIndex);
+            status.isSpinning = drive->bus_enabled;
+            status.isEjecting = false;
+            status.isWriteProtected = false; // TODO: smartport write protection?
+        } else {
+            status.isSpinning = false;
+            status.isEjecting = false;
+            status.isWriteProtected = false; // TODO: smartport write protection?     
+        }
     }
 }
 
@@ -386,7 +388,8 @@ bool ClemensStorageUnit::unserialize(ClemensMMIO &mmio, mpack_reader_t *reader,
             success = false;
             break;
         }
-        diskStatuses_[driveType].mount(diskAssets_[driveType].path());
+        diskStatuses_[driveType].mount(diskAssets_[driveType].path(),
+                                       ClemensDiskDriveStatus::Origin::DiskPort);
     }
     mpack_done_array(reader);
 
@@ -398,7 +401,8 @@ bool ClemensStorageUnit::unserialize(ClemensMMIO &mmio, mpack_reader_t *reader,
             success = false;
             break;
         }
-        smartDiskStatuses_[driveIndex].mount(smartDiskAssets_[driveIndex].path());
+        smartDiskStatuses_[driveIndex].mount(smartDiskAssets_[driveIndex].path(),
+                                             ClemensDiskDriveStatus::Origin::DiskPort);
     }
     mpack_done_array(reader);
 

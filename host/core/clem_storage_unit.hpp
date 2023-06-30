@@ -5,6 +5,7 @@
 #include "cinek/buffertypes.hpp"
 #include "cinek/fixedstack.hpp"
 #include "clem_disk.h"
+#include "core/clem_apple2gs_config.hpp"
 #include "core/clem_disk_asset.hpp"
 #include "core/clem_disk_status.hpp"
 #include "core/clem_prodos_disk.hpp"
@@ -33,6 +34,7 @@ class ClemensStorageUnit {
   public:
     ClemensStorageUnit();
     ~ClemensStorageUnit();
+    
 
     bool assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex, const std::string &imagePath);
     void saveSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex);
@@ -41,9 +43,6 @@ class ClemensStorageUnit {
     void saveDisk(ClemensMMIO &mmio, ClemensDriveType driveType);
     bool ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType);
     void writeProtectDisk(ClemensMMIO &mmio, ClemensDriveType driveType, bool wp);
-    bool assignHardDisk(ClemensMMIO &mmio, const std::string &path);
-    void saveHardDisk(ClemensMMIO &mmio);
-    bool ejectHardDisk(ClemensMMIO &mmio);
 
     void saveAllDisks(ClemensMMIO &mmio);
     void ejectAllDisks(ClemensMMIO &mmio);
@@ -65,15 +64,14 @@ class ClemensStorageUnit {
     void saveHardDisk(unsigned driveIndex, ClemensProDOSDisk &disk);
 
     ClemensDrive *getDrive(ClemensMMIO &mmio, ClemensDriveType driveType);
-    ClemensSmartPortUnit *getSmartPortUnit(ClemensMMIO &mmio, unsigned driveIndex);
 
   private:
     std::array<ClemensDiskAsset, kClemensDrive_Count> diskAssets_;
     std::array<ClemensDiskDriveStatus, kClemensDrive_Count> diskStatuses_;
 
-    std::array<ClemensProDOSDisk, CLEM_SMARTPORT_DRIVE_LIMIT> smartDisks_;
-    std::array<ClemensDiskAsset, CLEM_SMARTPORT_DRIVE_LIMIT> smartDiskAssets_;
-    std::array<ClemensDiskDriveStatus, CLEM_SMARTPORT_DRIVE_LIMIT> smartDiskStatuses_;
+    std::array<ClemensProDOSDisk, kClemensSmartPortDiskLimit> smartDisks_;
+    std::array<ClemensDiskAsset, kClemensSmartPortDiskLimit> smartDiskAssets_;
+    std::array<ClemensDiskDriveStatus, kClemensSmartPortDiskLimit> smartDiskStatuses_;
 
     //  The slab contains the backing buffers for ClemensNibbleDisk, ClemensProDOSDisk,
     //  and scratch space for decoding disk assets, which remain fixed upon construction

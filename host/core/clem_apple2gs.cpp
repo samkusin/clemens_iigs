@@ -7,10 +7,12 @@
 #include "clem_defs.h"
 #include "clem_disk.h"
 #include "clem_mmio_types.h"
+#include "core/clem_apple2gs_config.hpp"
 #include "emulator.h"
 #include "emulator_mmio.h"
 #include "serializer.h"
 
+#include "devices/hddcard.h"
 #include "devices/mockingboard.h"
 
 #include "external/mpack.h"
@@ -54,6 +56,10 @@ ClemensCard *createCard(const char *name) {
         card = new ClemensCard;
         memset(card, 0, sizeof(*card));
         clem_card_mockingboard_initialize(card);
+    } else if (!strcmp(name, kClemensCardHardDiskName)) {
+        card = new ClemensCard;
+        memset(card, 0, sizeof(*card));
+        clem_card_hdd_initialize(card);
     }
     return card;
 }
@@ -65,6 +71,8 @@ void destroyCard(ClemensCard *card) {
     const char *name = card->io_name(card->context);
     if (!strcmp(name, kClemensCardMockingboardName)) {
         clem_card_mockingboard_uninitialize(card);
+    } else if (!strcmp(name, kClemensCardHardDiskName)) {
+        clem_card_hdd_uninitialize(card);
     }
     delete card;
 }
@@ -76,7 +84,7 @@ ClemensAppleIIGS::ClemensAppleIIGS(const std::string &romPath, const Config &con
     : listener_(listener), status_(Status::Offline),
       slab_(calculateSlabMemoryRequirements(config),
             malloc(calculateSlabMemoryRequirements(config))),
-      machine_{}, mmio_{}, storage_(), mockingboard_(nullptr) {
+      machine_{}, mmio_{}, storage_(), mockingboard_(nullptr), hddcard_(nullptr) {
 
     // Ensure a valid ROM buffer regardless of whether a valid ROM was loaded
     // In the error case, we'll want to have a placeholder ROM.
@@ -141,6 +149,8 @@ ClemensAppleIIGS::ClemensAppleIIGS(const std::string &romPath, const Config &con
             mmio_.card_slot[cardIdx] = createCard(cardName.c_str());
             if (cardName == kClemensCardMockingboardName) {
                 mockingboard_ = mmio_.card_slot[cardIdx];
+            } else if (cardName == kClemensCardHardDiskName) {
+                hddcard_ = mmio_.card_slot[cardIdx];
             }
         } else {
             mmio_.card_slot[cardIdx] = NULL;
@@ -176,7 +186,7 @@ ClemensAppleIIGS::ClemensAppleIIGS(const std::string &romPath, const Config &con
 
 ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener &listener)
     : listener_(listener), status_(Status::Offline), machine_{}, mmio_{}, storage_(),
-      mockingboard_(nullptr) {
+      mockingboard_(nullptr), hddcard_(nullptr) {
 
     std::string componentName = "root";
     char buf[1024];
@@ -274,10 +284,12 @@ ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener
             if (mpack_peek_tag(reader).type == mpack_type_nil) {
                 mpack_expect_nil(reader);
             } else if (cardNames_[index] == kClemensCardMockingboardName) {
-
                 clem_card_mockingboard_unserialize(reader, mmio_.card_slot[index],
                                                    unserializerAllocateHook, this);
                 mockingboard_ = mmio_.card_slot[index];
+            } else if (cardNames_[index] == kClemensCardHardDiskName) {
+                clem_card_hdd_unserialize(reader, mmio_.card_slot[index], unserializerAllocateHook, this);
+                hddcard_ = mmio_.card_slot[index];
             } else {
                 localLog(CLEM_DEBUG_LOG_WARN, "ClemensAppleIIGS(): invalid card entry {}",
                          cardNames_[index]);
@@ -460,6 +472,8 @@ std::pair<std::string, bool> ClemensAppleIIGS::save(mpack_writer_t *writer) {
             mpack_write_cstr(writer, "card");
             if (cardNames_[slotIndex] == kClemensCardMockingboardName) {
                 clem_card_mockingboard_serialize(writer, mmio_.card_slot[slotIndex]);
+            } else if (cardNames_[slotIndex] == kClemensCardHardDiskName) {
+                clem_card_hdd_serialize(writer, mmio_.card_slot[slotIndex]);
             } else {
                 mpack_write_nil(writer);
             }

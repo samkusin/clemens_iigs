@@ -16,16 +16,17 @@
 
 static constexpr unsigned kClemensWOZMaxSupportedVersion = 2;
 
-void ClemensDiskDriveStatus::mount(const std::string &path) {
+void ClemensDiskDriveStatus::mount(const std::string &path, Origin o) {
     assetPath = path;
     isEjecting = false;
     isSpinning = false;
     isWriteProtected = false;
     isSaved = false;
     error = Error::None;
+    origin = o;
 }
 
-void ClemensDiskDriveStatus::unmount() { mount(""); }
+void ClemensDiskDriveStatus::unmount() { mount("", Origin::None); }
 
 void ClemensDiskDriveStatus::saveFailed() {
     error = Error::SaveFailed;
