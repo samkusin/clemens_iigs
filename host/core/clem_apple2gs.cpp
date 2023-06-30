@@ -197,45 +197,6 @@ ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener
     unsigned index;
     ClemensUnserializerContext unserializerContext;
 
-    /*
-    //  Initialize the Machine
-    const unsigned kFPIROMBankCount = 1;
-    const unsigned kFPIRAMBankCount = 64;
-    const uint32_t kClocksPerFastCycle = CLEM_CLOCKS_PHI2_FAST_CYCLE;
-    const uint32_t kClocksPerSlowCycle = CLEM_CLOCKS_PHI0_CYCLE;
-
-    slab_ = cinek::FixedStack(kMachineSlabMaximumSize, malloc(kMachineSlabMaximumSize));
-
-    cinek::ByteBuffer romBuffer{};
-    if (romBuffer.isEmpty()) {
-        //  TODO: load a dummy ROM, for a truly placeholder infinite loop ROM
-        romBuffer =
-            cinek::ByteBuffer((uint8_t *)slab_.allocate(CLEM_IIGS_BANK_SIZE), CLEM_IIGS_BANK_SIZE);
-        memset(romBuffer.forwardSize(CLEM_IIGS_BANK_SIZE).first, 0, CLEM_IIGS_BANK_SIZE);
-        auto *rom = romBuffer.getHead();
-        rom[CLEM_6502_RESET_VECTOR_LO_ADDR] = 0x62;
-        rom[CLEM_6502_RESET_VECTOR_HI_ADDR] = 0xfa;
-        //  BRA -2 (infinite loop)
-        rom[0xfa62] = 0x80;
-        rom[0xfa63] = 0xFE;
-    }
-
-    // slab_ = cinek::FixedStack(slabSize, malloc(slabSize));
-
-    int initResult = clemens_init(
-        &machine_, kClocksPerSlowCycle, kClocksPerFastCycle, romBuffer.getHead(), kFPIROMBankCount,
-        slab_.allocate(CLEM_IIGS_BANK_SIZE), slab_.allocate(CLEM_IIGS_BANK_SIZE),
-        slab_.allocate(kFPIRAMBankCount * CLEM_IIGS_BANK_SIZE), kFPIRAMBankCount);
-    if (initResult != 0) {
-        fmt::print(stderr, "Clemens library failed to initialize with err code ({})\n", initResult);
-        status_ = Status::Failed;
-        return;
-    }
-    clem_mmio_init(&mmio_, &machine_.dev_debug, machine_.mem.bank_page_map,
-                   slab_.allocate(2048 * CLEM_CARD_SLOT_COUNT), kFPIRAMBankCount, kFPIROMBankCount,
-                   machine_.mem.mega2_bank_map[0], machine_.mem.mega2_bank_map[1], &machine_.tspec);
-    clem_mmio_reset(&mmio_, &machine_.tspec);
-    */
     unserializerContext.allocCb = unserializerAllocateHook;
     unserializerContext.allocUserPtr = this;
 
@@ -270,6 +231,20 @@ ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener
     if (mpack_reader_error(reader) != mpack_ok)
         goto load_done;
 
+    componentName = "storage";
+    mpack_expect_cstr_match(reader, componentName.c_str());
+    if (!storage_.unserialize(mmio_, reader, unserializerContext))
+        goto load_done;
+
+    for (unsigned driveIndex = 0; driveIndex < (unsigned)diskNames_.size(); ++driveIndex) {
+        auto driveType = static_cast<ClemensDriveType>(driveIndex);
+        diskNames_[driveIndex] = storage_.getDriveStatus(driveType).assetPath;
+    }
+    for (unsigned driveIndex = 0; driveIndex < (unsigned)smartDiskNames_.size(); ++driveIndex) {
+        smartDiskNames_[driveIndex] = storage_.getSmartPortStatus(driveIndex).assetPath;
+    }
+
+    //  must come after storage so that we can map the hdd card properly
     componentName = "cards";
     mpack_expect_cstr_match(reader, componentName.c_str());
     cardCount = mpack_expect_array_max(reader, CLEM_CARD_SLOT_COUNT);
@@ -301,19 +276,6 @@ ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener
     mpack_done_array(reader);
     if (mpack_reader_error(reader) != mpack_ok)
         goto load_done;
-
-    componentName = "storage";
-    mpack_expect_cstr_match(reader, componentName.c_str());
-    if (!storage_.unserialize(mmio_, reader, unserializerContext))
-        goto load_done;
-
-    for (unsigned driveIndex = 0; driveIndex < (unsigned)diskNames_.size(); ++driveIndex) {
-        auto driveType = static_cast<ClemensDriveType>(driveIndex);
-        diskNames_[driveIndex] = storage_.getDriveStatus(driveType).assetPath;
-    }
-    for (unsigned driveIndex = 0; driveIndex < (unsigned)smartDiskNames_.size(); ++driveIndex) {
-        smartDiskNames_[driveIndex] = storage_.getSmartPortStatus(driveIndex).assetPath;
-    }
 
     success = true;
 load_done:
@@ -460,6 +422,12 @@ std::pair<std::string, bool> ClemensAppleIIGS::save(mpack_writer_t *writer) {
     if (mpack_writer_error(writer) != mpack_ok)
         goto save_done;
 
+    //  serialize storage unit
+    componentName = "storage";
+    mpack_write_cstr(writer, componentName.c_str());
+    if (!storage_.serialize(mmio_, writer))
+        goto save_done;
+
     //  serialize cards in slot order
     componentName = "cards";
     mpack_write_cstr(writer, componentName.c_str());
@@ -484,12 +452,6 @@ std::pair<std::string, bool> ClemensAppleIIGS::save(mpack_writer_t *writer) {
     }
     mpack_finish_array(writer);
     if (mpack_writer_error(writer) != mpack_ok)
-        goto save_done;
-
-    //  serialize storage unit
-    componentName = "storage";
-    mpack_write_cstr(writer, componentName.c_str());
-    if (!storage_.serialize(mmio_, writer))
         goto save_done;
 
     result = true;
