@@ -533,9 +533,9 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
         if (card_result & CLEM_CARD_NMI)
             card_nmis |= (1 << i);
         if (card_result & CLEM_CARD_DMA) {
-            if ((*mmio->card_slot[0]->io_dma)() == 1) {
+            //if ((*mmio->card_slot[0]->io_dma)() == 1) {
                 //  write data
-            }
+            //}
         }
     }
 

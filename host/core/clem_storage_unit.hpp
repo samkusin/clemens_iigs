@@ -41,6 +41,9 @@ class ClemensStorageUnit {
     void saveDisk(ClemensMMIO &mmio, ClemensDriveType driveType);
     bool ejectDisk(ClemensMMIO &mmio, ClemensDriveType driveType);
     void writeProtectDisk(ClemensMMIO &mmio, ClemensDriveType driveType, bool wp);
+    bool assignHardDisk(ClemensMMIO &mmio, const std::string &path);
+    void saveHardDisk(ClemensMMIO &mmio);
+    bool ejectHardDisk(ClemensMMIO &mmio);
 
     void saveAllDisks(ClemensMMIO &mmio);
     void ejectAllDisks(ClemensMMIO &mmio);
@@ -68,9 +71,9 @@ class ClemensStorageUnit {
     std::array<ClemensDiskAsset, kClemensDrive_Count> diskAssets_;
     std::array<ClemensDiskDriveStatus, kClemensDrive_Count> diskStatuses_;
 
-    std::array<ClemensProDOSDisk, CLEM_SMARTPORT_DRIVE_LIMIT> hardDisks_;
-    std::array<ClemensDiskAsset, CLEM_SMARTPORT_DRIVE_LIMIT> hardDiskAssets_;
-    std::array<ClemensDiskDriveStatus, CLEM_SMARTPORT_DRIVE_LIMIT> hardDiskStatuses_;
+    std::array<ClemensProDOSDisk, CLEM_SMARTPORT_DRIVE_LIMIT> smartDisks_;
+    std::array<ClemensDiskAsset, CLEM_SMARTPORT_DRIVE_LIMIT> smartDiskAssets_;
+    std::array<ClemensDiskDriveStatus, CLEM_SMARTPORT_DRIVE_LIMIT> smartDiskStatuses_;
 
     //  The slab contains the backing buffers for ClemensNibbleDisk, ClemensProDOSDisk,
     //  and scratch space for decoding disk assets, which remain fixed upon construction
