@@ -5,9 +5,14 @@ SCRNHOLE7       equ  $07f8
 BASIC           equ  $E000
 SLOOP           equ  $FABA          ; Disk controller slot search loop entry
 
-ZP_LOC0            equ  $00
-ZP_LOC1            equ  $01
-ZP_PRODOS_CMD      equ  $42
+ZP_LOC0         equ  $00
+ZP_LOC1         equ  $01
+ZP_PRODOS_CMD   equ  $42
+
+IO_CONTROL      equ  $C080          ; Write control, Read Handshake
+IO_COMMAND      equ  $C081          ; Write command bytes
+IO_RESULT0      equ  $C082          ; results for status = X
+IO_RESULT1      equ  $C083          ; results for status = Y
 
 ***************************************************************
 * Entry point for the Boot cycle of this slot
@@ -42,10 +47,10 @@ DriverEntry     clc
                 phk
                 plb                 ; ensure bank 00 data access
                 php                 ; carry flag saved along with pre-call state
-                lda   #$c7
+                lda   SlotHiAddr
                 sta   ACTIVE_PERIP_SLOT
                 pla                 ; save carry state for boot vs prodos exit
-                sta   SCRNHOLE7+7
+                sta   SCRNHOLE7+7   ; TODO, offset by ACTIVE_PERIP_SLOT & 0xf0
                 ror                 ; check carry
                 bcc   :prodosCall
 *
@@ -53,10 +58,10 @@ DriverEntry     clc
 * ProDOS command for READ into $0800 here
 *
                 ldx   #5
-]next_x         lda   BootCommand,x
+]next           lda   BootCommand,x
                 sta   ZP_PRODOS_CMD,x
                 dex
-                bpl   ]next_x 
+                bpl   ]next
 *
 * Once this emulator specific call finishes, we have two paths to deal with
 * If Boot, then process the boot flow
@@ -64,14 +69,42 @@ DriverEntry     clc
 *   indicating error or not.
 *
 * Contents on stack: DBR, RTS
+* 
+* Control and Command protocol
+* CTL: write $00 to start a command (this will cancel any current command)
+* CTL: read until bit 7 is lo (ready, idle)
+* CMD: write command bytes
+* CTL: when done, Write $80 to control fire the command
+* CTL: Read where bit 7 is hi for being in progress
+*                 bit 0 is hi if error
+* CMD: Read the error code until CTL is set back $00
 :prodosCall     sei
-                wdm   #$02
-                asc   'CLEM'        ; signature for the emulator, otherwise NOP
-                pha                 ; result code saved for later
-                lda   SCRNHOLE7+7   ; original carry status = 1 for boot flow
-                and   #$01
+                ldx   IOOffset
+                stz   IO_CONTROL,x  ; start the command
+]retry          lda   IO_CONTROL,x  ; wait until ready      
+                bmi   ]retry
+                ldy   #0            ; copy command bytes
+]next           lda   ZP_PRODOS_CMD,y
+                sta   IO_COMMAND,x
+                iny
+                cpy   #6
+                bne   ]next
+                lda   #$80          ; fire the command
+                sta   IO_CONTROL,x
+]retry          lda   IO_CONTROL,x  ; wait until ready
+                bmi   ]retry                
+                ror                 ; carry contains error if any
+                lda   IO_COMMAND,x  ; error code
+                pha                 ; store code onto stack
+                lda   SCRNHOLE7+7
+                and   #1            ; carry bit from saved processor status
                 bne   :bootCheck
-                pla                 ; restore prodos device result
+                txy
+                lda   IO_RESULT0,y
+                tax                 ; store aux result into X
+                lda   IO_RESULT0,y
+                tay                 ; store aux result into Y
+                pla                 ; obtain prodos result again
                 plb
                 cli
                 rts
@@ -82,7 +115,7 @@ DriverEntry     clc
 *                 else jump to $801
 *   On failure, bring up error screen
 *
-:bootCheck      pla                 ; restore prodos device result
+:bootCheck      pla                 ; obtain prodos result from stack
                 plb
                 cli
                 bcs   :bootNone
@@ -99,5 +132,8 @@ DriverEntry     clc
                 jmp   SLOOP
 :bootExit       jmp   BASIC
 BootCommand     hex   01,70,00,08,00,00 ; READ BLK 0 S7,D1 TO $800
+                ds    $C7F0-*
+SlotHiAddr      db    $C7
+IOOffset        db    $70
                 ds    $C7FF-*
                 db    DriverEntry-SlotEntry
