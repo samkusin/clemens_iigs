@@ -1761,6 +1761,7 @@ void clem_mmio_reset(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) {
     clem_vgc_reset(&mmio->vgc);
     clem_iwm_reset(&mmio->dev_iwm, tspec);
     clem_scc_reset(&mmio->dev_scc, tspec);
+    mmio->dma_addr = 0;
 }
 
 void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,

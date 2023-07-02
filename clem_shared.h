@@ -133,7 +133,7 @@ typedef struct {
     /* Reports IRQ and/or DMA request status */
     uint32_t (*io_sync)(struct ClemensClock *clock, void *context);
     /* executed once per cycle if io_sync() returns DMA, this returns 1 if a write */
-    uint32_t (*io_dma)(uint8_t* data_bank, uint16_t* adr, uint8_t is_adr_bus);
+    uint32_t (*io_dma)(uint8_t* data_bank, uint16_t* adr, uint8_t is_adr_bus, void* context);
     const char *(*io_name)(void *context);
 } ClemensCard;
 
