@@ -494,7 +494,6 @@ typedef struct ClemensMMIO {
     int32_t card_expansion_rom_index; // card slot has the mutex on C800-CFFF
 
     /* All ticks are mega2 cycles */
-    uint32_t dma_addr; // bit 31 = address/data cycle bit, b23-16 bank, b15-0 address
     uint32_t irq_line; // see CLEM_IRQ_XXX flags, if !=0 triggers irqb
     uint32_t nmi_line; // see ClEM_NMI_XXX flags
 } ClemensMMIO;

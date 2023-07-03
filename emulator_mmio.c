@@ -469,7 +469,7 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     ClemensCard* card;
     uint8_t dma_bank, dma_data;
     uint16_t dma_addr;
-    bool dma_latch;
+    uint8_t dma_latch;
 
     if (!cpu->pins.resbIn) {
         //  don't actually process MMIO until reset cycle has completed (resbIn==true)
@@ -539,21 +539,18 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
             //  run one dma per mega2 cycle - perhaps this is overkill given
             //  our use-case
             for (cyc = 0; cyc < delta_mega2_cycles; ++cyc) {
-                dma_latch = (mmio->dma_addr & 0x80000000) != 0;
-                dma_bank = (mmio->dma_addr >> 16) & 0xff;
-                dma_addr = (mmio->dma_addr & 0xffff);
-                clem_read(clem, &dma_data, dma_addr, dma_bank, 0);
-                if ((*card->io_dma)(&dma_data, &dma_addr, !dma_latch, card->context)) {
-                    if (dma_latch) {
-                        clem_write(clem, dma_data, dma_addr, dma_bank, 0);     
-                    }
+                //  address bus half-cycle
+                dma_latch = (*card->io_dma)(&dma_bank, &dma_addr, true, card->context);
+                if (!dma_latch) {
+                    //  read data half-cycle
+                    clem_read(clem, &dma_data, dma_addr, dma_bank, 0);
                 }
-                if (!dma_latch) dma_bank = dma_data;
-                dma_latch = !dma_latch;
-                mmio->dma_addr = dma_bank;
-                mmio->dma_addr <<= 16;
-                mmio->dma_addr |= dma_addr;
-                if (dma_latch) mmio->dma_addr |= 0x80000000;
+                //  data half-cycle
+                dma_latch = (*card->io_dma)(&dma_data, &dma_addr, false, card->context);
+                if (dma_latch) {
+                    //  write data half-cycle
+                    clem_write(clem, dma_data, dma_addr, dma_bank, 0);     
+                }
             }
         }
     }

@@ -1785,7 +1785,9 @@ void ClemensFrontend::doMachineDiskDisplay(float width) {
     doMachineDiskStatus(kClemensDrive_5_25_D2, width);
     ImGui::Separator();
     ImGui::Spacing();
-    doMachineSmartDriveStatus(0, width, !isBackendRunning());
+    doMachineSmartDriveStatus(1, "s7d1", !isBackendRunning());
+    ImGui::Separator();
+    doMachineSmartDriveStatus(0, "smart", !isBackendRunning());
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -1983,7 +1985,7 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float /*wi
     }
 }
 
-void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float /*width */,
+void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, const char* label,
                                                 bool allowSelect) {
     ClemensDiskDriveStatus driveStatus{};
 
@@ -2000,7 +2002,7 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, float /*wid
     const float charHeight = ImGui::GetTextLineHeight();
 
     char driveName[32];
-    snprintf(driveName, sizeof(driveName), "dsk%u", driveIndex);
+    strncpy(driveName, label, sizeof(driveName));
 
     ImVec2 iconSize(32.0f, 32.0f);
     const auto clemensDiskIcon = ClemensHostAssets::kDiskHDD;

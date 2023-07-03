@@ -96,6 +96,10 @@ bool ClemensProDOSDisk::save() {
     const uint8_t *dataStart = nullptr;
     const uint8_t *dataEnd = nullptr;
 
+    if (interface_.flush) {
+        (*interface_.flush)(interface_.user_context, interface_.drive_index);
+    }
+
     auto imageType = ClemensDiskAsset::fromAssetPathUsingExtension(assetPath_);
     switch (imageType) {
     case ClemensDiskAsset::Image2IMG:

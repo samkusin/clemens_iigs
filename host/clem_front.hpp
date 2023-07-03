@@ -91,7 +91,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     void doMachineDiagnosticsDisplay();
     void doMachineDiskDisplay(float width);
     void doMachineDiskStatus(ClemensDriveType driveType, float width);
-    void doMachineSmartDriveStatus(unsigned driveIndex, float width, bool allowSelect);
+    void doMachineSmartDriveStatus(unsigned driveIndex, const char* label, bool allowSelect);
 
     void doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size, bool isSpinning);
 

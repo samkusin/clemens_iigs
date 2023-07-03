@@ -102,7 +102,7 @@ DriverEntry     clc
                 txy
                 lda   IO_RESULT0,y
                 tax                 ; store aux result into X
-                lda   IO_RESULT0,y
+                lda   IO_RESULT1,y
                 tay                 ; store aux result into Y
                 pla                 ; obtain prodos result again
                 plb
@@ -135,5 +135,6 @@ BootCommand     hex   01,70,00,08,00,00 ; READ BLK 0 S7,D1 TO $800
                 ds    $C7F0-*
 SlotHiAddr      db    $C7
 IOOffset        db    $70
-                ds    $C7FF-*
+                ds    $C7FE-*
+                db    $87               ; STATUS,READ,WRITE,REMOVEABLE
                 db    DriverEntry-SlotEntry

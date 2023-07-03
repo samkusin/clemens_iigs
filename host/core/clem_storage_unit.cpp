@@ -28,9 +28,9 @@ namespace {
 constexpr unsigned kDecodingBufferSize = 4 * 1024 * 1024;
 constexpr unsigned kSmartPortDiskSize = 32 * 1024 * 1024;
 
-unsigned calculateSlabHeapSize() { return kSmartPortDiskSize + kDecodingBufferSize + 4096; }
+unsigned calculateSlabHeapSize() { return kSmartPortDiskSize * kClemensSmartPortDiskLimit + kDecodingBufferSize + 8192; }
 
-static ClemensCard *findHddCard(ClemensMMIO &mmio) {
+static ClemensCard *findHddCard(ClemensMMIO &mmio, unsigned /*driveIndex*/) {
     //  TODO: woe if we support two hdd cards... will need to rethink in that extreme edge case
     for (unsigned i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
         if (mmio.card_slot[i] &&
@@ -56,6 +56,8 @@ void ClemensStorageUnit::allocateBuffers() {
 
     // create empty backing ProDOS buffer for SmartPort disk
     smartDisks_[0] = ClemensProDOSDisk(cinek::ByteBuffer(
+        slab_.allocateArray<uint8_t>(kSmartPortDiskSize + 4096), kSmartPortDiskSize + 4096));
+    smartDisks_[1] = ClemensProDOSDisk(cinek::ByteBuffer(
         slab_.allocateArray<uint8_t>(kSmartPortDiskSize + 4096), kSmartPortDiskSize + 4096));
 
     // create empty decode scratchpad for saving images to the host's filesystem
@@ -90,7 +92,7 @@ bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIn
         }
     } else if (driveIndex < kClemensSmartPortDiskLimit) {
         //  mount to first found hddcard slot
-        ClemensCard* hddcard = findHddCard(mmio);
+        ClemensCard* hddcard = findHddCard(mmio, driveIndex);
         if (hddcard) {
             clem_card_hdd_mount(hddcard, &smartDisks_[driveIndex].getInterface());
             origin = ClemensDiskDriveStatus::Origin::CardPort;
@@ -118,13 +120,17 @@ bool ClemensStorageUnit::ejectSmartPortDisk(ClemensMMIO &mmio, unsigned driveInd
     struct ClemensSmartPortDevice device {};
     if (smartDiskStatuses_[driveIndex].origin == ClemensDiskDriveStatus::Origin::DiskPort) {
         clemens_remove_smartport_disk(&mmio, driveIndex, &device);
-    } else if (smartDiskStatuses_[driveIndex].origin == ClemensDiskDriveStatus::Origin::DiskPort) {
+    } else if (smartDiskStatuses_[driveIndex].origin == ClemensDiskDriveStatus::Origin::CardPort) {
         //  unmount it from the card if the card is mounted.
-        ClemensCard* hddcard = findHddCard(mmio);
-        clem_card_hdd_unmount(hddcard);
+        ClemensCard* hddcard = findHddCard(mmio, driveIndex);
+        if (hddcard) {
+            device.device_data = clem_card_hdd_unmount(hddcard);
+        }
     }
     saveSmartPortDisk(mmio, driveIndex);
-    smartDisks_[driveIndex].release(device);
+    if (device.device_data != NULL) {
+        smartDisks_[driveIndex].release(device);
+    }
     smartDiskStatuses_[driveIndex].unmount();
     spdlog::info("ClemensStorageUnit - smart{}: ejected", driveIndex);
     return true;
@@ -297,6 +303,18 @@ void ClemensStorageUnit::update(ClemensMMIO &mmio) {
             status.isSpinning = false;
             status.isEjecting = false;
             status.isWriteProtected = false; // TODO: smartport write protection?
+            if (status.origin == ClemensDiskDriveStatus::Origin::CardPort) {
+                ClemensCard* hddcard = findHddCard(mmio, driveIndex);
+                if (hddcard) {
+                    unsigned hddstatus = clem_card_hdd_get_status(hddcard);
+                    if (hddstatus & CLEM_CARD_HDD_STATUS_DRIVE_ON) {
+                        status.isSpinning = true;
+                    }
+                    if (hddstatus & CLEM_CARD_HDD_STATUS_DRIVE_WRITE_PROT) {
+                        status.isWriteProtected = true;
+                    }
+                }
+            }
         }
     }
 }
