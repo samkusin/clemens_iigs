@@ -1,5 +1,6 @@
 #include "clem_configuration.hpp"
 #include "clem_shared.h"
+#include "core/clem_apple2gs_config.hpp"
 #include "core/clem_disk_utils.hpp"
 
 #include "clem_disk.h"
@@ -17,6 +18,7 @@ ClemensConfiguration::ClemensConfiguration()
     gs.audioSamplesPerSecond = 0;
     gs.memory = CLEM_EMULATOR_RAM_DEFAULT;
     gs.cardNames[3] = kClemensCardMockingboardName;
+    gs.cardNames[6] = kClemensCardHardDiskName;
 }
 
 ClemensConfiguration::ClemensConfiguration(std::string pathname, std::string datadir)

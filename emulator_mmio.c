@@ -6,9 +6,9 @@
 #include <string.h>
 
 #include "clem_disk.h"
+#include "clem_mem.h"
 #include "clem_mmio_defs.h"
 
-#include "emulator.h"
 #include "emulator_mmio.h"
 
 #include "clem_debug.h"
@@ -18,8 +18,6 @@
 #include "clem_util.h"
 #include "clem_vgc.h"
 
-#include "clem_2img.h"
-#include "clem_woz.h"
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
@@ -467,7 +465,11 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     uint32_t card_result;
     uint32_t card_irqs;
     uint32_t card_nmis;
-    unsigned i;
+    unsigned i, cyc;
+    ClemensCard* card;
+    uint8_t dma_bank, dma_data;
+    uint16_t dma_addr;
+    uint8_t dma_latch;
 
     if (!cpu->pins.resbIn) {
         //  don't actually process MMIO until reset cycle has completed (resbIn==true)
@@ -525,13 +527,32 @@ void clemens_emulate_mmio(ClemensMachine *clem, ClemensMMIO *mmio) {
     card_nmis = 0;
     card_irqs = 0;
     for (i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
-        if (!mmio->card_slot[i])
+        card = mmio->card_slot[i];
+        if (!card)
             continue;
-        card_result = (*mmio->card_slot[i]->io_sync)(&clock, mmio->card_slot[i]->context);
+        card_result = (*card->io_sync)(&clock, card->context);
         if (card_result & CLEM_CARD_IRQ)
             card_irqs |= (CLEM_IRQ_SLOT_1 << i);
         if (card_result & CLEM_CARD_NMI)
             card_nmis |= (1 << i);
+        if (card_result & CLEM_CARD_DMA) {
+            //  run one dma per mega2 cycle - perhaps this is overkill given
+            //  our use-case
+            for (cyc = 0; cyc < delta_mega2_cycles; ++cyc) {
+                //  address bus half-cycle
+                dma_latch = (*card->io_dma)(&dma_bank, &dma_addr, true, card->context);
+                if (!dma_latch) {
+                    //  read data half-cycle
+                    clem_read(clem, &dma_data, dma_addr, dma_bank, 0);
+                }
+                //  data half-cycle
+                dma_latch = (*card->io_dma)(&dma_data, &dma_addr, false, card->context);
+                if (dma_latch) {
+                    //  write data half-cycle
+                    clem_write(clem, dma_data, dma_addr, dma_bank, 0);     
+                }
+            }
+        }
     }
 
     clem_vgc_sync(&mmio->vgc, &clock, clem->mem.mega2_bank_map[0], clem->mem.mega2_bank_map[1]);

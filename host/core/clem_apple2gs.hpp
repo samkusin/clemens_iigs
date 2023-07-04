@@ -122,13 +122,14 @@ class ClemensAppleIIGS {
     ClemensMMIO mmio_;
     ClemensStorageUnit storage_;
     ClemensCard *mockingboard_;
+    ClemensCard *hddcard_;
 
     // Persisted configuration attributes
     unsigned configMemory_;
     unsigned configAudioSamplesPerSecond_;
     std::array<std::string, CLEM_CARD_SLOT_COUNT> cardNames_;
     std::array<std::string, kClemensDrive_Count> diskNames_;
-    std::array<std::string, CLEM_SMARTPORT_DRIVE_LIMIT> smartDiskNames_;
+    std::array<std::string, kClemensSmartPortDiskLimit> smartDiskNames_;
 };
 
 class ClemensSystemListener {

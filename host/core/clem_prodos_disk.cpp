@@ -3,7 +3,7 @@
 #include "clem_disk_asset.hpp"
 
 #include "clem_2img.h"
-#include "smartport/prodos_hdd32.h"
+#include "devices/prodos_hdd32.h"
 
 #include <cassert>
 #include <cstring>
@@ -13,7 +13,6 @@
 #include "external/mpack.h"
 #include "spdlog/spdlog.h"
 
-//  storage_ will contain g
 
 ClemensProDOSDisk::ClemensProDOSDisk() {}
 
@@ -96,6 +95,10 @@ bool ClemensProDOSDisk::save() {
     assert(!storage_.isEmpty());
     const uint8_t *dataStart = nullptr;
     const uint8_t *dataEnd = nullptr;
+
+    if (interface_.flush) {
+        (*interface_.flush)(interface_.user_context, interface_.drive_index);
+    }
 
     auto imageType = ClemensDiskAsset::fromAssetPathUsingExtension(assetPath_);
     switch (imageType) {

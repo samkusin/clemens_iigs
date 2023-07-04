@@ -1,5 +1,5 @@
 #include "clem_host_utils.hpp"
-#include "iocards/mockingboard.h"
+#include "devices/mockingboard.h"
 
 #include <cstring>
 

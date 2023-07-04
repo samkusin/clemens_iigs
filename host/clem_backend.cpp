@@ -672,9 +672,8 @@ bool ClemensBackend::onCommandInsertSmartPortDisk(unsigned driveIndex, std::stri
     return result;
 }
 
-void ClemensBackend::onCommandEjectSmartPortDisk(unsigned) {
-    // smartPortDrives_[driveIndex].isEjecting = true;
-    //   TODO: handle this in the main loop like we do for regular drives
+void ClemensBackend::onCommandEjectSmartPortDisk(unsigned driveIndex) {
+    GS_->getStorage().ejectSmartPortDisk(GS_->getMMIO(), driveIndex);
 }
 
 void ClemensBackend::onCommandDebugMemoryPage(uint8_t pageIndex) { debugMemoryPage_ = pageIndex; }

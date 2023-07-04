@@ -77,8 +77,8 @@ target_link_libraries(clemens_host_core
         clemens_65816_mmio
         clemens_65816_render
         clemens_65816_serializer
-        clemens_65816_iocards
-        clemens_65816_smartport_devices
+        clemens_65816_smartport
+        clemens_65816_mockingboard
         clemens_host_shared)
 target_include_directories(clemens_host_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 

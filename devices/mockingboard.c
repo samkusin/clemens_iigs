@@ -1039,7 +1039,7 @@ static void io_write(struct ClemensClock *clock, uint8_t data, uint8_t addr, uin
     }
 }
 
-struct ClemensSerializerRecord kAY3[] = {
+static struct ClemensSerializerRecord kAY3[] = {
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensAY38913, kClemensSerializerTypeUInt16,
                                  channel_tone_period, 3, 0),
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensAY38913, envelope_period),
@@ -1076,7 +1076,7 @@ struct ClemensSerializerRecord kAY3[] = {
     CLEM_SERIALIZER_RECORD_FLOAT(struct ClemensAY38913, mixer_envelope_period),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
-struct ClemensSerializerRecord kVIA[] = {
+static struct ClemensSerializerRecord kVIA[] = {
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensVIA6522, kClemensSerializerTypeUInt8, data_dir, 2,
                                  0),
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensVIA6522, kClemensSerializerTypeUInt8, data, 2, 0),
@@ -1095,7 +1095,7 @@ struct ClemensSerializerRecord kVIA[] = {
 
 static const char *io_name(void *context) { return "mockingboard_c"; }
 
-struct ClemensSerializerRecord kCard[] = {
+static struct ClemensSerializerRecord kCard[] = {
     CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(ClemensMockingboardContext, via, 2, struct ClemensVIA6522,
                                          kVIA),
     CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(ClemensMockingboardContext, ay3, 2, struct ClemensAY38913,
@@ -1116,6 +1116,7 @@ void clem_card_mockingboard_initialize(ClemensCard *card) {
     card->io_read = &io_read;
     card->io_write = &io_write;
     card->io_name = &io_name;
+    card->io_dma = NULL;
 }
 
 void clem_card_mockingboard_uninitialize(ClemensCard *card) {

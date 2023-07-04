@@ -1220,8 +1220,7 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
         if (ioreg >= 0x80) {
             _clem_mmio_card_io_write(mmio->card_slot[(ioreg - 0x90) >> 4], &ref_clock, data,
                                      ioreg & 0xf, flags);
-        }
-        if (!is_noop) {
+        } else if (!is_noop) {
             clem_debug_break(mmio->dev_debug, CLEM_DEBUG_BREAK_UNIMPL_IOWRITE, addr, data);
         }
         break;
