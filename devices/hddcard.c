@@ -62,6 +62,7 @@ struct ClemensHddCardContext {
     uint8_t cmd_num;
     uint8_t unit_num;
     uint8_t write_prot;
+    uint8_t drive_index;
     uint16_t dma_addr;
     uint16_t dma_offset;
     uint32_t block_num;
@@ -115,7 +116,7 @@ static void _clem_card_hdd_command(struct ClemensHddCardContext *context) {
     case CLEM_CARD_HDD_COMMAND_WRITE:
         context->dma_offset = 0;
         context->state = CLEM_CARD_HDD_STATE_DMA_R; // read from memory to write on disk
-        if (context->block_num > prodos_block_max ) {
+        if (context->block_num > prodos_block_max) {
             _clem_card_hdd_fail_idle(context, CLEM_CARD_HDD_PRODOS_ERR_IO);
         }
         break;
@@ -139,6 +140,7 @@ static void io_reset(struct ClemensClock *clock, void *ctxptr) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(ctxptr);
     context->state = CLEM_CARD_HDD_STATE_IDLE;
     memset(context->results, 0, sizeof(context->results));
+    context->drive_index = 0xff;
 }
 
 static uint32_t io_sync(struct ClemensClock *clock, void *ctxptr) {
@@ -156,7 +158,7 @@ static uint32_t io_sync(struct ClemensClock *clock, void *ctxptr) {
                 context->hdd->user_context, 0, context->block_num, context->block_data);
             if (context->results[CLEM_CARD_HDD_RES_0] != CLEM_SMARTPORT_STATUS_CODE_OK) {
                 _clem_card_hdd_fail_idle(context, CLEM_CARD_HDD_PRODOS_ERR_IO);
-            } 
+            }
             ++context->block_num;
         }
     } else {
@@ -191,7 +193,7 @@ static uint32_t io_dma(uint8_t *data_bank, uint16_t *adr, uint8_t is_adr_bus, vo
         if (context->cmd_num == CLEM_CARD_HDD_COMMAND_WRITE) {
             // commit block
             if (context->write_prot) {
-                  _clem_card_hdd_fail_idle(context, CLEM_CARD_HDD_PRODOS_ERR_WPROT);
+                _clem_card_hdd_fail_idle(context, CLEM_CARD_HDD_PRODOS_ERR_WPROT);
             } else {
                 context->results[CLEM_CARD_HDD_RES_0] = (*context->hdd->write_block)(
                     context->hdd->user_context, 0, context->block_num, context->block_data);
@@ -332,33 +334,55 @@ void clem_card_hdd_uninitialize(ClemensCard *card) {
     card->io_dma = NULL;
 }
 
-void clem_card_hdd_mount(ClemensCard *card, ClemensProdosHDD32 *hdd) {
+void clem_card_hdd_mount(ClemensCard *card, ClemensProdosHDD32 *hdd, uint8_t drive_index) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
     context->hdd = hdd;
+    context->drive_index = drive_index;
 }
 
 ClemensProdosHDD32 *clem_card_hdd_unmount(ClemensCard *card) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
-    struct ClemensProdosHDD32* hdd = context->hdd;
+    struct ClemensProdosHDD32 *hdd = context->hdd;
     context->hdd = NULL;
+    context->drive_index = 0xff;
     return hdd;
 }
 
 unsigned clem_card_hdd_get_status(ClemensCard *card) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
     unsigned status = 0;
-    if (context->cmd_num == CLEM_CARD_HDD_COMMAND_READ || context->cmd_num == CLEM_CARD_HDD_COMMAND_WRITE) {
+    if (context->cmd_num == CLEM_CARD_HDD_COMMAND_READ ||
+        context->cmd_num == CLEM_CARD_HDD_COMMAND_WRITE) {
         status |= CLEM_CARD_HDD_STATUS_DRIVE_ON;
     }
     return status;
 }
 
-void clem_card_hdd_lock(ClemensCard* card, uint8_t lock) {
+void clem_card_hdd_lock(ClemensCard *card, uint8_t lock) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
     //  note, this will take effect on the next block write
     context->write_prot = lock ? 1 : 0;
 }
 
+uint8_t clem_card_hdd_get_drive_index(ClemensCard *card) {
+    struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
+    return context->drive_index;
+}
+/*
+struct ClemensSerializerRecord kCard[] = {
+    CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(ClemensMockingboardContext, via, 2, struct ClemensVIA6522,
+                                         kVIA),
+    CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(ClemensMockingboardContext, ay3, 2, struct ClemensAY38913,
+                                         kAY3),
+    CLEM_SERIALIZER_RECORD_ARRAY(ClemensMockingboardContext, kClemensSerializerTypeUInt8,
+                                 via_ay3_bus, 2, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(ClemensMockingboardContext, kClemensSerializerTypeUInt8,
+                                 via_ay3_bus_control, 2, 0),
+    CLEM_SERIALIZER_RECORD_DURATION(ClemensMockingboardContext, sync_time_budget),
+    CLEM_SERIALIZER_RECORD_DURATION(ClemensMockingboardContext, ay3_render_slice_duration),
+    CLEM_SERIALIZER_RECORD_CLOCK_OBJECT(ClemensMockingboardContext, last_clocks),
+    CLEM_SERIALIZER_RECORD_EMPTY()};
+*/
 void clem_card_hdd_serialize(mpack_writer_t *writer, ClemensCard *card) {}
 
 void clem_card_hdd_unserialize(mpack_reader_t *reader, ClemensCard *card,

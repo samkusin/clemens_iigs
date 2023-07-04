@@ -1785,9 +1785,10 @@ void ClemensFrontend::doMachineDiskDisplay(float width) {
     doMachineDiskStatus(kClemensDrive_5_25_D2, width);
     ImGui::Separator();
     ImGui::Spacing();
-    doMachineSmartDriveStatus(1, "s7d1", !isBackendRunning());
+    doMachineSmartDriveStatus(1, "s7d1", true, true);
     ImGui::Separator();
-    doMachineSmartDriveStatus(0, "smart", !isBackendRunning());
+    //  TODO: don't allow hotswapping smartport drives yet.
+    doMachineSmartDriveStatus(0, "smart", !isBackendRunning(), false);
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -1986,7 +1987,7 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float /*wi
 }
 
 void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, const char* label,
-                                                bool allowSelect) {
+                                                bool allowSelect, bool allowHotswap) {
     ClemensDiskDriveStatus driveStatus{};
 
     if (isBackendRunning()) {
@@ -1994,7 +1995,7 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, const char*
     } else {
         driveStatus.assetPath = config_.gs.smartPortImagePaths[driveIndex];
     }
-    bool isDisabled = isBackendRunning() && !driveStatus.isMounted();
+    bool isDisabled = !allowHotswap && isBackendRunning() && !driveStatus.isMounted();
     float widgetAlpha = isDisabled ? 0.2f : 1.0f;
 
     const ImGuiStyle &style = ImGui::GetStyle();

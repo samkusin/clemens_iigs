@@ -94,7 +94,7 @@ bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIn
         //  mount to first found hddcard slot
         ClemensCard* hddcard = findHddCard(mmio, driveIndex);
         if (hddcard) {
-            clem_card_hdd_mount(hddcard, &smartDisks_[driveIndex].getInterface());
+            clem_card_hdd_mount(hddcard, &smartDisks_[driveIndex].getInterface(), (uint8_t)(driveIndex & 0xff));
             origin = ClemensDiskDriveStatus::Origin::CardPort;
         }
     }

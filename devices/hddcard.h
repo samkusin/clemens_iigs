@@ -17,7 +17,7 @@ extern "C" {
 
 void clem_card_hdd_initialize(ClemensCard *card);
 void clem_card_hdd_uninitialize(ClemensCard *card);
-void clem_card_hdd_mount(ClemensCard* card, ClemensProdosHDD32* hdd);
+void clem_card_hdd_mount(ClemensCard* card, ClemensProdosHDD32* hdd, uint8_t drive_index);
 ClemensProdosHDD32* clem_card_hdd_unmount(ClemensCard* card);
 void clem_card_hdd_serialize(mpack_writer_t* writer, ClemensCard* card);
 void clem_card_hdd_unserialize(mpack_reader_t* reader, ClemensCard* card,
@@ -25,6 +25,7 @@ void clem_card_hdd_unserialize(mpack_reader_t* reader, ClemensCard* card,
                                         void* context);
 unsigned clem_card_hdd_get_status(ClemensCard *card);
 void clem_card_hdd_lock(ClemensCard* card, uint8_t lock);
+uint8_t clem_card_hdd_get_drive_index(ClemensCard* card);
 
 #ifdef __cplusplus
 }
