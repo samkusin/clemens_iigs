@@ -138,9 +138,14 @@ static const char *io_name(void *context) { return "hddcard"; }
 
 static void io_reset(struct ClemensClock *clock, void *ctxptr) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(ctxptr);
+
+    //  HDD mount NOT reset (hdd, write_prot, drive_index)
     context->state = CLEM_CARD_HDD_STATE_IDLE;
+    context->cmd_num = 0;
+    context->dma_addr = 0;
+    context->dma_offset = 0;
+    context->block_num = 0;
     memset(context->results, 0, sizeof(context->results));
-    context->drive_index = 0xff;
 }
 
 static uint32_t io_sync(struct ClemensClock *clock, void *ctxptr) {
@@ -312,7 +317,7 @@ static void io_write(struct ClemensClock *clock, uint8_t data, uint8_t addr, uin
 void clem_card_hdd_initialize(ClemensCard *card) {
     struct ClemensHddCardContext *context =
         (struct ClemensHddCardContext *)calloc(1, sizeof(struct ClemensHddCardContext));
-    context->hdd = NULL;
+    context->drive_index = CLEM_CARD_HDD_INDEX_NONE;
 
     card->context = context;
     card->io_reset = &io_reset;
@@ -340,11 +345,16 @@ void clem_card_hdd_mount(ClemensCard *card, ClemensProdosHDD32 *hdd, uint8_t dri
     context->drive_index = drive_index;
 }
 
+ClemensProdosHDD32* clem_card_get_mount(ClemensCard* card) {
+    struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
+    return context->hdd; 
+}
+
 ClemensProdosHDD32 *clem_card_hdd_unmount(ClemensCard *card) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
     struct ClemensProdosHDD32 *hdd = context->hdd;
     context->hdd = NULL;
-    context->drive_index = 0xff;
+    context->drive_index = CLEM_CARD_HDD_INDEX_NONE;
     return hdd;
 }
 
@@ -368,22 +378,36 @@ uint8_t clem_card_hdd_get_drive_index(ClemensCard *card) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
     return context->drive_index;
 }
-/*
-struct ClemensSerializerRecord kCard[] = {
-    CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(ClemensMockingboardContext, via, 2, struct ClemensVIA6522,
-                                         kVIA),
-    CLEM_SERIALIZER_RECORD_ARRAY_OBJECTS(ClemensMockingboardContext, ay3, 2, struct ClemensAY38913,
-                                         kAY3),
-    CLEM_SERIALIZER_RECORD_ARRAY(ClemensMockingboardContext, kClemensSerializerTypeUInt8,
-                                 via_ay3_bus, 2, 0),
-    CLEM_SERIALIZER_RECORD_ARRAY(ClemensMockingboardContext, kClemensSerializerTypeUInt8,
-                                 via_ay3_bus_control, 2, 0),
-    CLEM_SERIALIZER_RECORD_DURATION(ClemensMockingboardContext, sync_time_budget),
-    CLEM_SERIALIZER_RECORD_DURATION(ClemensMockingboardContext, ay3_render_slice_duration),
-    CLEM_SERIALIZER_RECORD_CLOCK_OBJECT(ClemensMockingboardContext, last_clocks),
+
+static struct ClemensSerializerRecord kCard[] = {
+    // hdd is fixed up after the initial load by the owning system
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensHddCardContext, state),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensHddCardContext, cmd_num),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensHddCardContext, unit_num),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensHddCardContext, write_prot),
+    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensHddCardContext, drive_index),
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensHddCardContext, dma_addr),
+    CLEM_SERIALIZER_RECORD_UINT16(struct ClemensHddCardContext, dma_offset),
+    CLEM_SERIALIZER_RECORD_UINT32(struct ClemensHddCardContext, block_num),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensHddCardContext, kClemensSerializerTypeUInt8,
+                                 results, 4, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensHddCardContext, kClemensSerializerTypeUInt8,
+                                 block_data, 512, 0),
     CLEM_SERIALIZER_RECORD_EMPTY()};
-*/
-void clem_card_hdd_serialize(mpack_writer_t *writer, ClemensCard *card) {}
+
+void clem_card_hdd_serialize(mpack_writer_t *writer, ClemensCard *card) {
+    struct ClemensSerializerRecord root;
+    memset(&root, 0, sizeof(root));
+    root.type = kClemensSerializerTypeRoot;
+    root.records = &kCard[0];
+    clemens_serialize_object(writer, (uintptr_t)card->context, &root);
+}
 
 void clem_card_hdd_unserialize(mpack_reader_t *reader, ClemensCard *card,
-                               ClemensSerializerAllocateCb alloc_cb, void *context) {}
+                               ClemensSerializerAllocateCb alloc_cb, void *context) {
+                                    struct ClemensSerializerRecord root;
+    memset(&root, 0, sizeof(root));
+    root.type = kClemensSerializerTypeRoot;
+    root.records = &kCard[0];
+    clemens_unserialize_object(reader, (uintptr_t)card->context, &root, alloc_cb, context);
+}

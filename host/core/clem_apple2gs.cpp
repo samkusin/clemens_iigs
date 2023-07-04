@@ -231,20 +231,6 @@ ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener
     if (mpack_reader_error(reader) != mpack_ok)
         goto load_done;
 
-    componentName = "storage";
-    mpack_expect_cstr_match(reader, componentName.c_str());
-    if (!storage_.unserialize(mmio_, reader, unserializerContext))
-        goto load_done;
-
-    for (unsigned driveIndex = 0; driveIndex < (unsigned)diskNames_.size(); ++driveIndex) {
-        auto driveType = static_cast<ClemensDriveType>(driveIndex);
-        diskNames_[driveIndex] = storage_.getDriveStatus(driveType).assetPath;
-    }
-    for (unsigned driveIndex = 0; driveIndex < (unsigned)smartDiskNames_.size(); ++driveIndex) {
-        smartDiskNames_[driveIndex] = storage_.getSmartPortStatus(driveIndex).assetPath;
-    }
-
-    //  must come after storage so that we can map the hdd card properly
     componentName = "cards";
     mpack_expect_cstr_match(reader, componentName.c_str());
     cardCount = mpack_expect_array_max(reader, CLEM_CARD_SLOT_COUNT);
@@ -274,6 +260,19 @@ ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener
         }
     }
     mpack_done_array(reader);
+
+    componentName = "storage";
+    mpack_expect_cstr_match(reader, componentName.c_str());
+    if (!storage_.unserialize(mmio_, reader, unserializerContext))
+        goto load_done;
+
+    for (unsigned driveIndex = 0; driveIndex < (unsigned)diskNames_.size(); ++driveIndex) {
+        auto driveType = static_cast<ClemensDriveType>(driveIndex);
+        diskNames_[driveIndex] = storage_.getDriveStatus(driveType).assetPath;
+    }
+    for (unsigned driveIndex = 0; driveIndex < (unsigned)smartDiskNames_.size(); ++driveIndex) {
+        smartDiskNames_[driveIndex] = storage_.getSmartPortStatus(driveIndex).assetPath;
+    }
     if (mpack_reader_error(reader) != mpack_ok)
         goto load_done;
 
@@ -422,12 +421,6 @@ std::pair<std::string, bool> ClemensAppleIIGS::save(mpack_writer_t *writer) {
     if (mpack_writer_error(writer) != mpack_ok)
         goto save_done;
 
-    //  serialize storage unit
-    componentName = "storage";
-    mpack_write_cstr(writer, componentName.c_str());
-    if (!storage_.serialize(mmio_, writer))
-        goto save_done;
-
     //  serialize cards in slot order
     componentName = "cards";
     mpack_write_cstr(writer, componentName.c_str());
@@ -452,6 +445,12 @@ std::pair<std::string, bool> ClemensAppleIIGS::save(mpack_writer_t *writer) {
     }
     mpack_finish_array(writer);
     if (mpack_writer_error(writer) != mpack_ok)
+        goto save_done;
+
+        //  serialize storage unit
+    componentName = "storage";
+    mpack_write_cstr(writer, componentName.c_str());
+    if (!storage_.serialize(mmio_, writer))
         goto save_done;
 
     result = true;

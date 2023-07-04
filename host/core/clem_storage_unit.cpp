@@ -28,9 +28,14 @@ namespace {
 constexpr unsigned kDecodingBufferSize = 4 * 1024 * 1024;
 constexpr unsigned kSmartPortDiskSize = 32 * 1024 * 1024;
 
-unsigned calculateSlabHeapSize() { return kSmartPortDiskSize * kClemensSmartPortDiskLimit + kDecodingBufferSize + 8192; }
+unsigned calculateSlabHeapSize() {
+    return kSmartPortDiskSize * kClemensSmartPortDiskLimit + kDecodingBufferSize + 8192;
+}
 
-static ClemensCard *findHddCard(ClemensMMIO &mmio, unsigned /*driveIndex*/) {
+static ClemensCard *findHddCard(ClemensMMIO &mmio, unsigned driveIndex) {
+    //  Drive Index maps to a card port device vs smartport?
+    if (driveIndex == 0x00 || driveIndex == CLEM_CARD_HDD_INDEX_NONE)
+        return NULL;
     //  TODO: woe if we support two hdd cards... will need to rethink in that extreme edge case
     for (unsigned i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
         if (mmio.card_slot[i] &&
@@ -92,9 +97,10 @@ bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIn
         }
     } else if (driveIndex < kClemensSmartPortDiskLimit) {
         //  mount to first found hddcard slot
-        ClemensCard* hddcard = findHddCard(mmio, driveIndex);
+        ClemensCard *hddcard = findHddCard(mmio, driveIndex);
         if (hddcard) {
-            clem_card_hdd_mount(hddcard, &smartDisks_[driveIndex].getInterface(), (uint8_t)(driveIndex & 0xff));
+            clem_card_hdd_mount(hddcard, &smartDisks_[driveIndex].getInterface(),
+                                (uint8_t)(driveIndex & 0xff));
             origin = ClemensDiskDriveStatus::Origin::CardPort;
         }
     }
@@ -122,9 +128,10 @@ bool ClemensStorageUnit::ejectSmartPortDisk(ClemensMMIO &mmio, unsigned driveInd
         clemens_remove_smartport_disk(&mmio, driveIndex, &device);
     } else if (smartDiskStatuses_[driveIndex].origin == ClemensDiskDriveStatus::Origin::CardPort) {
         //  unmount it from the card if the card is mounted.
-        ClemensCard* hddcard = findHddCard(mmio, driveIndex);
+        ClemensCard *hddcard = findHddCard(mmio, driveIndex);
         if (hddcard) {
             device.device_data = clem_card_hdd_unmount(hddcard);
+            device.device_id = CLEM_SMARTPORT_DEVICE_ID_PRODOS_HDD32;
         }
     }
     saveSmartPortDisk(mmio, driveIndex);
@@ -304,7 +311,7 @@ void ClemensStorageUnit::update(ClemensMMIO &mmio) {
             status.isEjecting = false;
             status.isWriteProtected = false; // TODO: smartport write protection?
             if (status.origin == ClemensDiskDriveStatus::Origin::CardPort) {
-                ClemensCard* hddcard = findHddCard(mmio, driveIndex);
+                ClemensCard *hddcard = findHddCard(mmio, driveIndex);
                 if (hddcard) {
                     unsigned hddstatus = clem_card_hdd_get_status(hddcard);
                     if (hddstatus & CLEM_CARD_HDD_STATUS_DRIVE_ON) {
@@ -400,11 +407,20 @@ bool ClemensStorageUnit::serialize(ClemensMMIO &mmio, mpack_writer_t *writer) {
     mpack_write_cstr(writer, "smartport.data");
     mpack_start_array(writer, smartDisks_.size());
     for (unsigned i = 0; i < smartDisks_.size(); ++i) {
-        auto *device = clemens_smartport_unit_get(&mmio, i);
-        if (!smartDisks_[i].serialize(writer, device->device)) {
-            success = false;
-            break;
+        if (i < CLEM_SMARTPORT_DRIVE_LIMIT) {
+            auto *device = clemens_smartport_unit_get(&mmio, i);
+            if (!smartDisks_[i].serialize(writer, device->device)) {
+                success = false;
+            }
+        } else {
+            //  non smartport drive serialization (independent of binding to a card)
+            ClemensSmartPortDevice device {};
+            device.device_id = CLEM_SMARTPORT_DEVICE_ID_PRODOS_HDD32;
+            if (!smartDisks_[i].serialize(writer, device)) {
+                success = false;
+            }
         }
+        if (!success) break;
     }
     mpack_finish_array(writer);
 
@@ -443,22 +459,49 @@ bool ClemensStorageUnit::unserialize(ClemensMMIO &mmio, mpack_reader_t *reader,
             success = false;
             break;
         }
-        smartDiskStatuses_[driveIndex].mount(smartDiskAssets_[driveIndex].path(),
-                                             ClemensDiskDriveStatus::Origin::DiskPort);
     }
     mpack_done_array(reader);
 
     mpack_expect_cstr_match(reader, "smartport.data");
     mpack_expect_array(reader);
     for (unsigned i = 0; i < smartDisks_.size(); ++i) {
-        auto *device = clemens_smartport_unit_get(&mmio, i);
-        if (!smartDisks_[i].unserialize(reader, device->device, context)) {
-            success = false;
-            break;
-        }
+        if (i < CLEM_SMARTPORT_DRIVE_LIMIT) {
+            ClemensSmartPortDevice *device = &clemens_smartport_unit_get(&mmio, i)->device;
+            if (!smartDisks_[i].unserialize(reader, *device, context)) {
+                success = false;
+                break;
+            }
+        } else {
+            //  non smartport disks
+            ClemensSmartPortDevice device {};
+            device.device_id = CLEM_SMARTPORT_DEVICE_ID_PRODOS_HDD32;
+            if (!smartDisks_[i].unserialize(reader, device, context)) {
+                success = false;
+                break;
+            }
+        }        
     }
     mpack_done_array(reader);
 
+    //  perform mounting operations if required
+    for (unsigned i = 0; i < smartDiskAssets_.size(); ++i) {
+
+        if (i < CLEM_SMARTPORT_DRIVE_LIMIT) {
+            //  SmartPort disks
+            smartDiskStatuses_[i].mount(smartDiskAssets_[i].path(), ClemensDiskDriveStatus::Origin::DiskPort);
+        } else {
+            //  CardPort disks
+            ClemensCard* card = findHddCard(mmio, i);
+            if (card) {
+                uint8_t cardIndex = clem_card_hdd_get_drive_index(card);
+                if (cardIndex != (uint8_t)i) {
+                    spdlog::warn("ClemensStorageUnit::unserialize() - card_index({}) != drive_index({}). Using drive index!", cardIndex, i);
+                }
+                clem_card_hdd_mount(card, &smartDisks_[i].getInterface(), (uint8_t)i);
+                smartDiskStatuses_[i].mount(smartDiskAssets_[i].path(), ClemensDiskDriveStatus::Origin::CardPort);
+            }
+        }
+    }
     mpack_done_map(reader);
 
     return success;
