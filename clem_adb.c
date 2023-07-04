@@ -104,6 +104,8 @@
 #define CLEM_ADB_DEVICE_KEYBOARD 0x02
 #define CLEM_ADB_DEVICE_MOUSE    0x03
 
+#define CLEM_ADB_DEVICE_ID_APPLE_EXTENDED_KEYB 0x02
+
 /* ADB Mode Flags */
 #define CLEM_ADB_MODE_AUTOPOLL_KEYB  0x00000001
 #define CLEM_ADB_MODE_AUTOPOLL_MOUSE 0x00000002
@@ -119,16 +121,22 @@ void clem_adb_reset(struct ClemensDeviceADB *adb) {
 
     adb->version = CLEM_ADB_ROM_3; /* TODO - input to reset? */
     adb->mode_flags = CLEM_ADB_MODE_AUTOPOLL_KEYB | CLEM_ADB_MODE_AUTOPOLL_MOUSE;
-    adb->keyb.reset_key = false;
-    adb->keyb.size = 0;
-    adb->mouse.size = 0;
-    adb->mouse.tracking_enabled = false;
-    adb->mouse.valid_clamp_box = false;
-    adb->gameport.ann_mask = 0;
-    adb->gameport.btn_mask[0] = adb->gameport.btn_mask[1] = 0;
     adb->irq_dispatch = 0;
     adb->clipboard.tail = 0;
 
+    //  See ADB_Manager.pdf, 5-12 for the source of these values
+    adb->keyb_reg[3] = (CLEM_ADB_DEVICE_KEYBOARD << 8) | CLEM_ADB_DEVICE_ID_APPLE_EXTENDED_KEYB;
+    adb->keyb.reset_key = false;
+    adb->keyb.size = 0;
+    //  TODO: total guess for mouse device ID - maybe not needed?????
+    adb->mouse_reg[3] = (CLEM_ADB_DEVICE_MOUSE << 8) | 0x01;
+    adb->mouse.size = 0;
+    adb->mouse.tracking_enabled = false;
+    adb->mouse.valid_clamp_box = false;
+    
+    adb->gameport.ann_mask = 0;
+    adb->gameport.btn_mask[0] = adb->gameport.btn_mask[1] = 0;
+    
     for (i = 0; i < 4; ++i) {
         adb->gameport.paddle[i] = CLEM_GAMEPORT_PADDLE_AXIS_VALUE_INVALID;
         adb->gameport.paddle_timer_ns[i] = 0;
