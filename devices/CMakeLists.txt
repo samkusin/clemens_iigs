@@ -16,3 +16,11 @@ add_library(clemens_65816_mockingboard STATIC
 
 target_link_libraries(clemens_65816_mockingboard
     PUBLIC clemens_65816_serializer)
+
+
+add_library(clemens_65816_serial_devices STATIC
+    clem_peer.c)
+
+target_link_libraries(clemens_65816_serial_devices
+    PUBLIC clemens_65816_mmio)
+
