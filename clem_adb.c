@@ -65,6 +65,7 @@
 #define CLEM_ADB_CMD_READ_MEM           0x09
 #define CLEM_ADB_CMD_READ_MODES         0x0A
 #define CLEM_ADB_CMD_VERSION            0x0d
+#define CLEM_ADB_CMD_SYSTEM_RESET       0x10
 #define CLEM_ADB_CMD_SEND_ADB_KEYCODE   0x11
 #define CLEM_ADB_CMD_UNDOCUMENTED_12    0x12
 #define CLEM_ADB_CMD_UNDOCUMENTED_13    0x13
@@ -1407,7 +1408,7 @@ static void _clem_adb_glu_keyb_send_to_host(struct ClemensDeviceADB *adb, uint8_
 
     //  TODO: paste text will override this (and set KEY_FULL itself)
     if (ascii_key != 0xff) {
-        CLEM_LOG("SKS: ascii: %02X [%s]", ascii_key, is_key_down ? "down" : "up");
+        //CLEM_LOG("SKS: ascii: %02X [%s]", ascii_key, is_key_down ? "down" : "up");
         if (is_key_down) {
             adb->io_key_last_ascii = 0x80 | ascii_key;
             /* via HWRef, but FWRef contradicts? */
@@ -1992,6 +1993,12 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
         _clem_adb_glu_result_init(adb, 1);
         _clem_adb_glu_result_data(adb, (uint8_t)adb->version);
         return;
+    case CLEM_ADB_CMD_SYSTEM_RESET:
+        CLEM_DEBUG("ADB: SYSTEM RESET");
+        adb->keyb.reset_key = true;
+        //  not that this command result will be handled...
+        _clem_adb_glu_command_done(adb);
+        return;
     case CLEM_ADB_CMD_SEND_ADB_KEYCODE:
         CLEM_DEBUG("ADB: SEND KEY (%02X)", adb->cmd_data[0]);
         _clem_adb_glu_keyb_send_to_host(adb, adb->cmd_data[0]);
@@ -2340,6 +2347,9 @@ static void _clem_adb_start_cmd(struct ClemensDeviceADB *adb, uint8_t value) {
         _clem_adb_expect_data(adb, 0);
         break;
     case CLEM_ADB_CMD_VERSION:
+        _clem_adb_expect_data(adb, 0);
+        break;
+    case CLEM_ADB_CMD_SYSTEM_RESET:
         _clem_adb_expect_data(adb, 0);
         break;
     case CLEM_ADB_CMD_SEND_ADB_KEYCODE:
