@@ -123,12 +123,16 @@ void clem_adb_reset(struct ClemensDeviceADB *adb) {
     adb->version = CLEM_ADB_ROM_3; /* TODO - input to reset? */
     adb->mode_flags = CLEM_ADB_MODE_AUTOPOLL_KEYB | CLEM_ADB_MODE_AUTOPOLL_MOUSE;
     adb->irq_dispatch = 0;
+    adb->irq_line = 0;
+    adb->cmd_status = 0;
+    adb->cmd_flags = 0;
     adb->clipboard.tail = 0;
 
     //  See ADB_Manager.pdf, 5-12 for the source of these values
     adb->keyb_reg[3] = (CLEM_ADB_DEVICE_KEYBOARD << 8) | CLEM_ADB_DEVICE_ID_APPLE_KEYB;
     adb->keyb.reset_key = false;
     adb->keyb.size = 0;
+    adb->keyb.last_a2_key_down = 0xff;
     //  TODO: total guess for mouse device ID - maybe not needed?????
     adb->mouse_reg[3] = (CLEM_ADB_DEVICE_MOUSE << 8) | 0x01;
     adb->mouse.size = 0;
@@ -1285,10 +1289,30 @@ static int g_key_delay_ms[8] = {250, 500, 750, 1000, 0, 0, 0, 0};
 static int g_key_rate_per_sec[8] = {0, 30, 24, 20, 15, 11, 8, 4};
 
 static inline void _clem_adb_glu_queue_key(struct ClemensDeviceADB *adb, uint8_t key) {
+    uint8_t *ascii_table;
+    uint8_t key_index;
+    bool is_key_down;
     if (adb->keyb.size >= CLEM_ADB_KEYB_BUFFER_LIMIT) {
         return;
     }
     adb->keyb.keys[adb->keyb.size++] = key;
+
+    key_index = key & 0x7f;
+    is_key_down = (key & 0x80) == 0; /* up = b7 at this point */
+    ascii_table = clem_adb_ascii_from_a2code(key_index);
+    if (ascii_table[0] != 0xff) {
+        //  this is a repeatable key - reset repeat key state here
+        if (is_key_down) {
+            if (key_index != adb->keyb.last_a2_key_down) {
+                adb->keyb.timer_us = 0;
+                adb->keyb.repeat_count = 0;
+                adb->keyb.repeat_key_mod = false;
+                adb->keyb.last_a2_key_down = key_index;
+            }
+        } else if (key_index == adb->keyb.last_a2_key_down) {
+            adb->keyb.last_a2_key_down = 0xff;
+        }
+    }
 }
 
 static uint8_t _clem_adb_glu_unqueue_key(struct ClemensDeviceADB *adb) {
@@ -1304,50 +1328,6 @@ static uint8_t _clem_adb_glu_unqueue_key(struct ClemensDeviceADB *adb) {
     }
     return key;
 }
-
-/*
-static void _clem_adb_glu_keyb_to_host(struct ClemensDeviceADB *adb) {
-    //Additional parsing needed for MMIO registers
-    if (modifiers & CLEM_ADB_GLU_REG2_KEY_SHIFT) {
-        if (modifiers & CLEM_ADB_GLU_REG2_KEY_CTRL) {
-            ascii_key = ascii_table[3];
-        } else {
-            ascii_key = ascii_table[2];
-        }
-    } else if (modifiers & CLEM_ADB_GLU_REG2_KEY_CTRL) {
-        ascii_key = ascii_table[1];
-    } else {
-        if (ascii_table[4] == CLEM_ADB_KEY_MOD_CAPITAL &&
-            (adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_KEY_CAPS_TOGGLE)) {
-            ascii_key = ascii_table[2];
-        } else {
-            ascii_key = ascii_table[0];
-        }
-    }
-
-    //  special key combos that are detected by reading c026 - inform interrupt
-    //  handler that this has occurred.
-    if (is_key_down && key_index == CLEM_ADB_KEY_ESCAPE) {
-        if ((modifiers & CLEM_ADB_GLU_REG2_KEY_CTRL) && (modifiers & CLEM_ADB_GLU_REG2_KEY_APPLE)) {
-            adb->cmd_flags |= CLEM_ADB_C026_DESK_MGR;
-            _clem_adb_irq_dispatch(adb, CLEM_IRQ_ADB_DATA);
-        }
-    }
-
-    //  TODO: paste text will override this (and set KEY_FULL itself)
-    if (ascii_key != 0xff) {
-        // CLEM_LOG("SKS: ascii: %02X", ascii_key);
-        if (is_key_down) {
-            adb->io_key_last_ascii = 0x80 | ascii_key;
-            // via HWRef, but FWRef contradicts? 
-            adb->cmd_status |= CLEM_ADB_C027_KEY_FULL;
-            adb->is_asciikey_down = true;
-        } else {
-            adb->is_asciikey_down = false;
-        }
-    }
-}
-*/
 
 static void _clem_adb_glu_keyb_parse(struct ClemensDeviceADB *adb, uint8_t key_event) {
     uint8_t key_index = key_event & 0x7f;
@@ -1389,20 +1369,15 @@ static void _clem_adb_glu_keyb_parse(struct ClemensDeviceADB *adb, uint8_t key_e
         adb->keyb_reg[2] &= ~CLEM_ADB_GLU_REG2_MODKEY_MASK;
         adb->keyb_reg[2] |= modifiers;
     }
-    if (ascii_table[0] != 0xff) {
-        //  this is a repeatable key - reset repeat key state here
-        if (is_key_down) {
-            if (key_index != adb->keyb.last_a2_key_down) {
-                adb->keyb.timer_us = 0;
-                adb->keyb.repeat_count = 0;
-                adb->keyb.repeat_key_mod = false;
-                adb->keyb.last_a2_key_down = key_index;
-            }
-        } else if (key_index == adb->keyb.last_a2_key_down) {
-            adb->keyb.last_a2_key_down = 0;
-        }
-    }
-        //  TODO: move this into a separate function to invoke separately from talk()
+}
+
+static void _clem_adb_glu_keyb_send_to_host(struct ClemensDeviceADB *adb, uint8_t key_event) {
+    uint16_t modifiers = adb->keyb_reg[2] & CLEM_ADB_GLU_REG2_MODKEY_MASK;
+    uint8_t key_index = key_event & 0x7f;
+    bool is_key_down = (key_event & 0x80) == 0; /* up = b7 at this point */
+    uint8_t *ascii_table = clem_adb_ascii_from_a2code(key_index);
+    uint8_t ascii_key;
+    
     /* Additional parsing needed for MMIO registers */
     if (modifiers & CLEM_ADB_GLU_REG2_KEY_SHIFT) {
         if (modifiers & CLEM_ADB_GLU_REG2_KEY_CTRL) {
@@ -1432,7 +1407,7 @@ static void _clem_adb_glu_keyb_parse(struct ClemensDeviceADB *adb, uint8_t key_e
 
     //  TODO: paste text will override this (and set KEY_FULL itself)
     if (ascii_key != 0xff) {
-        // CLEM_LOG("SKS: ascii: %02X", ascii_key);
+        CLEM_LOG("SKS: ascii: %02X [%s]", ascii_key, is_key_down ? "down" : "up");
         if (is_key_down) {
             adb->io_key_last_ascii = 0x80 | ascii_key;
             /* via HWRef, but FWRef contradicts? */
@@ -1444,32 +1419,10 @@ static void _clem_adb_glu_keyb_parse(struct ClemensDeviceADB *adb, uint8_t key_e
     }
 }
 
-static void _clem_adb_glu_keyb_talk(struct ClemensDeviceADB *adb) {
+static void _clem_adb_glu_keyb_talk(struct ClemensDeviceADB *adb, bool send_to_host) {
     uint8_t *ascii_table;
     uint8_t key_event;
     bool is_key_down;
-
-    //  handle repeat logic here so that we can queue repeated keys before
-    //      consuming them
-
-    if (adb->keyb.last_a2_key_down && adb->keyb.delay_ms && adb->keyb.rate_per_sec) {
-        int timer_ms = adb->keyb.timer_us / 1000;
-        if (adb->keyb.repeat_count == 0) {
-            if (timer_ms >= adb->keyb.delay_ms) {
-                _clem_adb_glu_queue_key(adb, adb->keyb.last_a2_key_down);
-                ++adb->keyb.repeat_count;
-                adb->keyb.repeat_key_mod = true;
-                adb->keyb.timer_us = 0;
-            }
-        } else {
-            if (timer_ms >= (1000 / adb->keyb.rate_per_sec)) {
-                _clem_adb_glu_queue_key(adb, adb->keyb.last_a2_key_down);
-                ++adb->keyb.repeat_count;
-                adb->keyb.repeat_key_mod = true;
-                adb->keyb.timer_us = 0;
-            }
-        }
-    }
 
     //  TODO: investigate if the logic below is wiping out key events for quick
     //        taps
@@ -1497,18 +1450,49 @@ static void _clem_adb_glu_keyb_talk(struct ClemensDeviceADB *adb) {
             adb->keyb_reg[0] = 0xffff;
         }
     } else {
-        /* Note, this behavior has changed in 0.6 where the last key is shifted
-           high to make space for the next key, versus wiping out the key
-           that's already there.  Unsure if this is OK. */
-        adb->keyb_reg[0] <<= 8;
         _clem_adb_glu_keyb_parse(adb, key_event);
-        adb->keyb_reg[0] |= key_event;
+        adb->keyb_reg[0] = key_event;
+        if (send_to_host) {
+            _clem_adb_glu_keyb_send_to_host(adb, key_event);
+        }
+        adb->keyb_reg[0] <<= 8;
         if (adb->keyb.size > 0 && adb->keyb.keys[0] != CLEM_ADB_KEY_RESET) {
             //  second key input
-            adb->keyb_reg[0] <<= 8;
             key_event = _clem_adb_glu_unqueue_key(adb);
             _clem_adb_glu_keyb_parse(adb, key_event);
             adb->keyb_reg[0] |= key_event;
+            if (send_to_host) {
+                _clem_adb_glu_keyb_send_to_host(adb, key_event);
+            }
+        } else {
+            adb->keyb_reg[0] |= 0xff;
+        }
+    }
+}
+
+static void _clem_adb_glu_keyb_repeat(struct ClemensDeviceADB* adb) {
+    //  handle repeat logic here so that we can queue repeated keys before
+    //      consuming them
+    //  TODO: figure out why an extra keypress occurs after key goes up when
+    //        repeating a key (rarely happens except for 'b' for some reason?)
+    if (adb->keyb.last_a2_key_down != 0xff && adb->keyb.delay_ms && adb->keyb.rate_per_sec) {
+        int timer_ms = adb->keyb.timer_us / 1000;
+        if (adb->keyb.repeat_count == 0) {
+            if (timer_ms >= adb->keyb.delay_ms) {
+                CLEM_LOG("First Repeat %02X", adb->keyb.last_a2_key_down);
+                _clem_adb_glu_queue_key(adb, adb->keyb.last_a2_key_down);
+                ++adb->keyb.repeat_count;
+                adb->keyb.repeat_key_mod = true;
+                adb->keyb.timer_us = 0;
+            }
+        } else {
+            if (timer_ms >= (1000 / adb->keyb.rate_per_sec)) {
+                CLEM_LOG("Next Repeat %02X", adb->keyb.last_a2_key_down);
+                _clem_adb_glu_queue_key(adb, adb->keyb.last_a2_key_down);
+                ++adb->keyb.repeat_count;
+                adb->keyb.repeat_key_mod = true;
+                adb->keyb.timer_us = 0;
+            }
         }
     }
 }
@@ -2010,6 +1994,7 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
         return;
     case CLEM_ADB_CMD_SEND_ADB_KEYCODE:
         CLEM_DEBUG("ADB: SEND KEY (%02X)", adb->cmd_data[0]);
+        _clem_adb_glu_keyb_send_to_host(adb, adb->cmd_data[0]);
         _clem_adb_glu_command_done(adb);
         return;
     case CLEM_ADB_CMD_UNDOCUMENTED_12:
@@ -2055,7 +2040,7 @@ void _clem_adb_glu_command(struct ClemensDeviceADB *adb) {
         break;
 
     case CLEM_ADB_CMD_DEVICE_POLL_0:
-        _clem_adb_glu_keyb_talk(adb);
+        _clem_adb_glu_keyb_talk(adb, false);
         _clem_adb_glu_device_response(adb, 2);
         _clem_adb_glu_result_data(adb, (uint8_t)(adb->keyb_reg[0] & 0xff));
         _clem_adb_glu_result_data(adb, (uint8_t)((adb->keyb_reg[0] >> 8) & 0xff));
@@ -2134,9 +2119,12 @@ void clem_adb_glu_sync(struct ClemensDeviceADB *adb, struct ClemensDeviceMega2Me
         //)
         if (adb->clipboard.tail > 0) {
             _clem_adb_glu_clipboard_paste(adb);
+        } else {
+            _clem_adb_glu_keyb_repeat(adb);
         }
+
         if (adb->mode_flags & CLEM_ADB_MODE_AUTOPOLL_KEYB) {
-            _clem_adb_glu_keyb_talk(adb);
+            _clem_adb_glu_keyb_talk(adb, true);
         } else if (adb->keyb_reg[3] & CLEM_ADB_GLU_REG3_MASK_SRQ) {
             if (adb->keyb.size > 0) {
                 _clem_adb_irq_dispatch(adb, CLEM_IRQ_ADB_KEYB_SRQ);
@@ -2495,6 +2483,7 @@ static uint8_t _clem_adb_read_cmd(struct ClemensDeviceADB *adb, uint8_t flags) {
             } else {
                 adb->irq_line &= ~CLEM_IRQ_ADB_DATA;
             }
+            adb->irq_line &= ~CLEM_IRQ_ADB_KEYB_SRQ;
             adb->cmd_flags = 0;
         }
         break;

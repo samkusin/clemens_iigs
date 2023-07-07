@@ -1754,6 +1754,11 @@ void _clem_mmio_init_page_maps(ClemensMMIO *mmio, struct ClemensMemoryPageMap **
 }
 
 void clem_mmio_reset(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec) {
+    mmio->card_expansion_rom_index = -1;
+    mmio->new_video_c029 &= ~CLEM_MMIO_NEWVIDEO_SUPERHIRES_ENABLE;
+    mmio->mmap_register = CLEM_MEM_IO_MMAP_NSHADOW_SHGR | CLEM_MEM_IO_MMAP_WRLCRAM |
+                                  CLEM_MEM_IO_MMAP_LCBANK2;
+    _clem_mmio_restore_mappings(mmio);
     clem_timer_reset(&mmio->dev_timer);
     clem_rtc_reset(&mmio->dev_rtc, CLEM_CLOCKS_PHI0_CYCLE);
     clem_adb_reset(&mmio->dev_adb);
@@ -1780,7 +1785,6 @@ void clem_mmio_init(ClemensMMIO *mmio, struct ClemensDeviceDebugger *dev_debug,
     mmio->mega2_cycles = 0;
     mmio->last_data_address = 0xffffffff;
     mmio->emulator_detect = CLEM_MMIO_EMULATOR_DETECT_IDLE;
-    mmio->card_expansion_rom_index = -1;
     mmio->fpi_ram_bank_count = fpi_ram_bank_count;
     mmio->fpi_rom_bank_count = fpi_rom_bank_count;
 

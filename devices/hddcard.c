@@ -142,6 +142,7 @@ static void io_reset(struct ClemensClock *clock, void *ctxptr) {
     //  HDD mount NOT reset (hdd, write_prot, drive_index)
     context->state = CLEM_CARD_HDD_STATE_IDLE;
     context->cmd_num = 0;
+    context->unit_num = 0;
     context->dma_addr = 0;
     context->dma_offset = 0;
     context->block_num = 0;
