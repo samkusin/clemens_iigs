@@ -414,13 +414,14 @@ bool ClemensStorageUnit::serialize(ClemensMMIO &mmio, mpack_writer_t *writer) {
             }
         } else {
             //  non smartport drive serialization (independent of binding to a card)
-            ClemensSmartPortDevice device {};
+            ClemensSmartPortDevice device{};
             device.device_id = CLEM_SMARTPORT_DEVICE_ID_PRODOS_HDD32;
             if (!smartDisks_[i].serialize(writer, device)) {
                 success = false;
             }
         }
-        if (!success) break;
+        if (!success)
+            break;
     }
     mpack_finish_array(writer);
 
@@ -473,13 +474,13 @@ bool ClemensStorageUnit::unserialize(ClemensMMIO &mmio, mpack_reader_t *reader,
             }
         } else {
             //  non smartport disks
-            ClemensSmartPortDevice device {};
+            ClemensSmartPortDevice device{};
             device.device_id = CLEM_SMARTPORT_DEVICE_ID_PRODOS_HDD32;
             if (!smartDisks_[i].unserialize(reader, device, context)) {
                 success = false;
                 break;
             }
-        }        
+        }
     }
     mpack_done_array(reader);
 
@@ -488,17 +489,24 @@ bool ClemensStorageUnit::unserialize(ClemensMMIO &mmio, mpack_reader_t *reader,
 
         if (i < CLEM_SMARTPORT_DRIVE_LIMIT) {
             //  SmartPort disks
-            smartDiskStatuses_[i].mount(smartDiskAssets_[i].path(), ClemensDiskDriveStatus::Origin::DiskPort);
-        } else {
+            smartDiskStatuses_[i].mount(smartDiskAssets_[i].path(),
+                                        ClemensDiskDriveStatus::Origin::DiskPort);
+        } else if (!smartDiskAssets_[i].path().empty()) {
             //  CardPort disks
-            ClemensCard* card = findHddCard(mmio, i);
+            ClemensCard *card = findHddCard(mmio, i);
             if (card) {
                 uint8_t cardIndex = clem_card_hdd_get_drive_index(card);
-                if (cardIndex != (uint8_t)i) {
-                    spdlog::warn("ClemensStorageUnit::unserialize() - card_index({}) != drive_index({}). Using drive index!", cardIndex, i);
+                if (cardIndex != CLEM_CARD_HDD_INDEX_NONE) {
+                    //  don't mount if the image doesn't exist?
+                    if (cardIndex != (uint8_t)i) {
+                        spdlog::warn("ClemensStorageUnit::unserialize() - card_index({}) != "
+                                     "drive_index({}). Using drive index!",
+                                     cardIndex, i);
+                    }
+                    clem_card_hdd_mount(card, &smartDisks_[i].getInterface(), (uint8_t)i);
+                    smartDiskStatuses_[i].mount(smartDiskAssets_[i].path(),
+                                                ClemensDiskDriveStatus::Origin::CardPort);
                 }
-                clem_card_hdd_mount(card, &smartDisks_[i].getInterface(), (uint8_t)i);
-                smartDiskStatuses_[i].mount(smartDiskAssets_[i].path(), ClemensDiskDriveStatus::Origin::CardPort);
             }
         }
     }
