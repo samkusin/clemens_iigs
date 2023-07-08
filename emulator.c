@@ -1841,7 +1841,7 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
         break;
     case CLEM_OPC_JMP_INDIRECT:
         _clem_read_pba_16(clem, &tmp_addr, &tmp_pc);
-        _clem_read_16(clem, &tmp_eaddr, tmp_addr, 0x00, CLEM_MEM_FLAG_DATA);
+        _clem_read_16_wrap(clem, &tmp_eaddr, tmp_addr, 0x00, CLEM_MEM_FLAG_DATA);
         tmp_pc = tmp_eaddr;
         _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
         break;
@@ -1853,7 +1853,7 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
             tmp_eaddr = tmp_addr + cpu->regs.X;
         }
         _clem_cycle(clem);
-        _clem_read_16(clem, &tmp_pc, tmp_eaddr, cpu->regs.PBR, CLEM_MEM_FLAG_DATA);
+        _clem_read_16_wrap(clem, &tmp_pc, tmp_eaddr, cpu->regs.PBR, CLEM_MEM_FLAG_DATA);
         _opcode_instruction_define(&opc_inst, IR, tmp_addr, x_status);
         break;
     case CLEM_OPC_JMP_ABSL:
@@ -1865,7 +1865,7 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
         break;
     case CLEM_OPC_JMP_ABSL_INDIRECT:
         _clem_read_pba_16(clem, &tmp_addr, &tmp_pc);
-        _clem_read_16(clem, &tmp_eaddr, tmp_addr, 0x00, CLEM_MEM_FLAG_DATA);
+        _clem_read_16_wrap(clem, &tmp_eaddr, tmp_addr, 0x00, CLEM_MEM_FLAG_DATA);
         clem_read(clem, &tmp_bnk0, tmp_addr + 2, 0x00, CLEM_MEM_FLAG_DATA);
         tmp_pc = tmp_eaddr;
         cpu->regs.PBR = tmp_bnk0;
@@ -2229,14 +2229,14 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
     case CLEM_OPC_PEA_ABS:
         _clem_read_pba_mode_abs(clem, &tmp_addr, &tmp_pc);
         _cpu_sp_dec2(cpu);
-        _clem_write_16(clem, tmp_addr, cpu->regs.S + 1, 0x00);
+        _clem_write_16_wrap(clem, tmp_addr, cpu->regs.S + 1, 0x00);
         _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
         break;
     case CLEM_OPC_PEI_DP_INDIRECT:
         _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
 
         _cpu_sp_dec2(cpu);
-        _clem_write_16(clem, tmp_addr, cpu->regs.S + 1, 0x00);
+        _clem_write_16_wrap(clem, tmp_addr, cpu->regs.S + 1, 0x00);
         _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
         break;
     case CLEM_OPC_PER:
@@ -2244,7 +2244,7 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
         tmp_addr = tmp_pc + (int16_t)tmp_value;
         _clem_cycle(clem);
         _cpu_sp_dec2(cpu);
-        _clem_write_16(clem, tmp_addr, cpu->regs.S + 1, 0x00);
+        _clem_write_16_wrap(clem, tmp_addr, cpu->regs.S + 1, 0x00);
         _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
         break;
     case CLEM_OPC_PHA:
@@ -2287,7 +2287,7 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
         break;
     case CLEM_OPC_PLD:
         _clem_cycle_2(clem);
-        _clem_read_16(clem, &cpu->regs.D, cpu->regs.S + 1, 0x00, CLEM_MEM_FLAG_DATA);
+        _clem_read_16_wrap(clem, &cpu->regs.D, cpu->regs.S + 1, 0x00, CLEM_MEM_FLAG_DATA);
         _cpu_sp_inc2(cpu);
         _cpu_p_flags_n_z_data_16(cpu, cpu->regs.D);
         break;
@@ -2950,7 +2950,7 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
         } else {
             tmp_eaddr = tmp_addr + cpu->regs.X;
         }
-        _clem_read_16(clem, &tmp_pc, tmp_eaddr, cpu->regs.PBR, CLEM_MEM_FLAG_DATA);
+        _clem_read_16_wrap(clem, &tmp_pc, tmp_eaddr, cpu->regs.PBR, CLEM_MEM_FLAG_DATA);
         CLEM_CPU_I_JSR_LOG(cpu, tmp_eaddr);
         _opcode_instruction_define(&opc_inst, IR, tmp_addr, x_status);
         break;
