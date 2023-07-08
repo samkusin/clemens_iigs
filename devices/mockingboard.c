@@ -480,6 +480,7 @@ unsigned _ay3_render(struct ClemensAY38913 *psg, clem_clocks_duration_t duration
     uint32_t queue_index = 0;
     float sample[3];
     float current;
+    float acc;
     float noise;
     unsigned envelope;
 
@@ -502,13 +503,12 @@ unsigned _ay3_render(struct ClemensAY38913 *psg, clem_clocks_duration_t duration
         sample[1] = _ay3_amp_modify(psg, 1, sample[1], envelope, sample_dt);
         sample[2] = _ay3_amp_modify(psg, 2, sample[2], envelope, sample_dt);
         current = out[channel];
-        current += sample[0] * 0.33f;
-        current += sample[1] * 0.33f;
-        current += sample[2] * 0.33f;
-        if (current > 1.0f)
-            current = 1.0f;
-        else if (current < -1.0f)
-            current = -1.0f;
+        acc = (sample[0] + sample[1] + sample[2]) * 0.166667f;
+        current = out[channel] + acc;
+        if (current > 0.75f)
+            current = 0.75f;
+        else if (current < -0.75f)
+            current = -0.75;
         out[channel] = current;
 
         render_ts += render_dt;
