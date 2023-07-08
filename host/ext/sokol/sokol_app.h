@@ -3828,8 +3828,8 @@ _SOKOL_PRIVATE void _sapp_macos_frame(void) {
             selector:@selector(timerFired:)
             userInfo:nil
             repeats:YES];
-        [[NSRunLoop currentRunLoop] addTimer:timer_obj forMode:NSDefaultRunLoopMode];
-        [[NSRunLoop currentRunLoop] addTimer:timer_obj forMode:NSEventTrackingRunLoopMode];
+        //[[NSRunLoop currentRunLoop] addTimer:timer_obj forMode:NSDefaultRunLoopMode];
+        [[NSRunLoop currentRunLoop] addTimer:timer_obj forMode:NSRunLoopCommonModes]; /* SKS */
         timer_obj = nil;
     #endif
     [_sapp.macos.window center];
