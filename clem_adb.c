@@ -2438,6 +2438,9 @@ static void _clem_adb_key_strobe(struct ClemensDeviceADB *adb) {
 }
 
 void clem_adb_write_switch(struct ClemensDeviceADB *adb, uint8_t ioreg, uint8_t value) {
+    if (ioreg > CLEM_MMIO_REG_ANYKEY_STROBE && ioreg < CLEM_MMIO_REG_ANYKEY_STROBE + 16) {
+        ioreg = CLEM_MMIO_REG_ANYKEY_STROBE;
+    }
     switch (ioreg) {
     case CLEM_MMIO_REG_ANYKEY_STROBE:
         _clem_adb_key_strobe(adb);

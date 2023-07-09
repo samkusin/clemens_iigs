@@ -864,6 +864,8 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     case CLEM_MMIO_REG_AN2_ON:
     case CLEM_MMIO_REG_SW0:
     case CLEM_MMIO_REG_SW1:
+    case CLEM_MMIO_REG_SW2:
+    case CLEM_MMIO_REG_SW3:
         result = clem_adb_read_switch(&mmio->dev_adb, ioreg, flags);
         break;
     case CLEM_MMIO_REG_AN3_OFF:
@@ -889,6 +891,9 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
         break;
     case CLEM_MMIO_REG_STATEREG:
         result = _clem_mmio_statereg_c068(mmio);
+        *mega2_access = false;
+        break;
+    case CLEM_MMIO_REG_STATEREG+1:
         *mega2_access = false;
         break;
     case CLEM_MMIO_REG_LC2_RAM_WP:
@@ -1037,6 +1042,21 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
         _clem_mmio_vgc_irq_c023_set(mmio, data);
         break;
     case CLEM_MMIO_REG_ANYKEY_STROBE:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 1:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 2:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 3:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 4:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 5:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 6:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 7:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 8:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 9:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 10:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 11:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 12:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 13:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 14:
+    case CLEM_MMIO_REG_ANYKEY_STROBE + 15:
     case CLEM_MMIO_REG_ADB_MOUSE_DATA:
     case CLEM_MMIO_REG_ADB_MODKEY:
     case CLEM_MMIO_REG_ADB_CMD_DATA:
@@ -1197,6 +1217,10 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
         break;
     case CLEM_MMIO_REG_STATEREG:
         _clem_mmio_statereg_c068_set(mmio, data);
+        *mega2_access = false;
+        break;
+    case CLEM_MMIO_REG_STATEREG + 1:
+        *mega2_access = false;
         break;
     case CLEM_MMIO_REG_IWM_PHASE0_LO:
     case CLEM_MMIO_REG_IWM_PHASE0_HI:
