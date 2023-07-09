@@ -1087,7 +1087,7 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
         break;
     case CLEM_OPC_ADC_DP:
         _clem_read_pba_mode_dp(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
-        _clem_read_data_816(clem, &tmp_value, tmp_addr, 0x00, m_status);
+        _clem_read_data_816(clem,  &tmp_value, tmp_addr, 0x00, m_status);
         if (!(cpu->regs.P & kClemensCPUStatus_Decimal)) {
             _cpu_adc(cpu, tmp_value, m_status);
         } else {
@@ -2234,7 +2234,6 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
         break;
     case CLEM_OPC_PEI_DP_INDIRECT:
         _clem_read_pba_mode_dp_indirect(clem, &tmp_addr, &tmp_pc, &tmp_data, 0, false);
-
         _cpu_sp_dec2(cpu);
         _clem_write_16_wrap(clem, tmp_addr, cpu->regs.S + 1, 0x00);
         _opcode_instruction_define_dp(&opc_inst, IR, tmp_data);
@@ -2245,7 +2244,7 @@ void cpu_execute(struct Clemens65C816 *cpu, ClemensMachine *clem) {
         _clem_cycle(clem);
         _cpu_sp_dec2(cpu);
         _clem_write_16_wrap(clem, tmp_addr, cpu->regs.S + 1, 0x00);
-        _opcode_instruction_define(&opc_inst, IR, tmp_addr, m_status);
+        _opcode_instruction_define(&opc_inst, IR, tmp_value, m_status);
         break;
     case CLEM_OPC_PHA:
         _clem_opc_push_reg_816(clem, cpu->regs.A, m_status);

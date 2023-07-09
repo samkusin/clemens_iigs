@@ -192,7 +192,7 @@ static inline void _clem_read_pba_816(ClemensMachine *clem, uint16_t *out, uint1
         *out = ((uint16_t)tmp_data << 8) | *out;
     }
 }
-
+                        
 static inline void _clem_read_data_816(ClemensMachine *clem, uint16_t *out, uint16_t addr,
                                        uint8_t dbr, bool is8) {
     uint8_t tmp_data;
@@ -331,7 +331,7 @@ static inline void _clem_read_pba_mode_dp(ClemensMachine *clem, uint16_t *eff_ad
 
     _clem_read_pba(clem, offset, pc);
     offset_index += *offset;
-    if (clem->cpu.pins.emulation) {
+    if (clem->cpu.pins.emulation && !(D & 0xff)) {  // page boundary wrap?
         *eff_addr = (D & 0xff00) + ((D & 0xff) + offset_index) % 256;
     } else {
         *eff_addr = D + offset_index;
