@@ -1919,6 +1919,8 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float /*wi
                 if (driveStatus.isMounted()) {
                     assetBrowser_.setCurrentDirectory(
                         std::filesystem::path(driveStatus.assetPath).parent_path().string());
+                } else if (!savedDiskBrowsePaths_[driveType].empty()) {
+                    assetBrowser_.setCurrentDirectory(savedDiskBrowsePaths_[driveType]);
                 } else {
                     assetBrowser_.setCurrentDirectory(std::filesystem::current_path().string());
                 }
@@ -1986,7 +1988,7 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float /*wi
     }
 }
 
-void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, const char* label,
+void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, const char *label,
                                                 bool allowSelect, bool allowHotswap) {
     ClemensDiskDriveStatus driveStatus{};
 
@@ -2083,6 +2085,8 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, const char*
                 if (driveStatus.isMounted()) {
                     assetBrowser_.setCurrentDirectory(
                         std::filesystem::path(driveStatus.assetPath).parent_path().string());
+                } else if (!savedSmartDiskBrowsePaths_[driveIndex].empty()) {
+                    assetBrowser_.setCurrentDirectory(savedSmartDiskBrowsePaths_[driveIndex]);
                 } else {
                     assetBrowser_.setCurrentDirectory(std::filesystem::current_path().string());
                 }
@@ -2167,8 +2171,8 @@ void ClemensFrontend::doMachineDiskBrowserInterface(ImVec2 anchor, ImVec2 dimens
     ImGui::Spacing();
     assetBrowser_.frame(ImGui::GetContentRegionAvail());
     if (assetBrowser_.isDone()) {
+        auto assetPath = assetBrowser_.getCurrentPathname();
         if (assetBrowser_.isSelected()) {
-            auto assetPath = assetBrowser_.getCurrentPathname();
             bool success = true;
             if (assetBrowser_.isSelectedFilePathNewFile()) {
                 std::vector<uint8_t> decodeBuffer;
@@ -2194,6 +2198,8 @@ void ClemensFrontend::doMachineDiskBrowserInterface(ImVec2 anchor, ImVec2 dimens
                 }
             }
         }
+        savedDiskBrowsePaths_[*browseDriveType_] =
+            std::filesystem::path(assetPath).parent_path().string();
         browseDriveType_ = std::nullopt;
     }
     ImGui::End();
@@ -2216,8 +2222,8 @@ void ClemensFrontend::doMachineSmartDiskBrowserInterface(ImVec2 anchor, ImVec2 d
     ImGui::Spacing();
     assetBrowser_.frame(ImGui::GetContentRegionAvail());
     if (assetBrowser_.isDone()) {
+        auto assetPath = assetBrowser_.getCurrentPathname();
         if (assetBrowser_.isSelected()) {
-            auto assetPath = assetBrowser_.getCurrentPathname();
             bool success = true;
             if (assetBrowser_.isSelectedFilePathNewFile()) {
                 auto blockCount = (assetBrowser_.getFileSize() + 511) / 512;
@@ -2239,6 +2245,8 @@ void ClemensFrontend::doMachineSmartDiskBrowserInterface(ImVec2 anchor, ImVec2 d
                 }
             }
         }
+        savedSmartDiskBrowsePaths_[*browseSmartDriveIndex_] =
+            std::filesystem::path(assetPath).parent_path().string();
         browseSmartDriveIndex_ = std::nullopt;
     }
     ImGui::End();

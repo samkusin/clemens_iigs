@@ -22,6 +22,7 @@
 #include "cinek/equation.hpp"
 #include "cinek/fixedstack.hpp"
 #include "clem_audio.hpp"
+#include "core/clem_apple2gs_config.hpp"
 #include "imgui.h"
 
 #include <array>
@@ -222,6 +223,8 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     std::optional<ClemensDriveType> browseDriveType_;
     std::optional<unsigned> browseSmartDriveIndex_;
     std::optional<float> delayRebootTimer_;
+    std::array<std::string, kClemensDrive_Count> savedDiskBrowsePaths_;
+    std::array<std::string, kClemensSmartPortDiskLimit> savedSmartDiskBrowsePaths_;
 
     struct Animation {
         using Keyframe = cinek::keyframe<ImVec2>;
