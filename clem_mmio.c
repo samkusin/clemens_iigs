@@ -146,6 +146,8 @@ static inline void _clem_mmio_newvideo_c029_set(ClemensMMIO *mmio, uint8_t value
     */
     if (setflags & CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY) {
         setflags ^= CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY;
+        CLEM_LOG("clem_mem: c029 linearize memory = %u",
+                 (value & CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY) != 0);
     }
     CLEM_ASSERT(setflags == 0);
     mmio->new_video_c029 = value & ~0x1e; /* bits 1-4 are not used */
@@ -1277,15 +1279,13 @@ static void _clem_mmio_shadow_map(ClemensMMIO *mmio, uint32_t shadow_flags) {
             mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = v;
         }
     }
-    //  HGR1
+    //  HGR1/AUX HGR1
     if ((remap_flags & CLEM_MEM_IO_MMAP_NSHADOW_HGR1) ||
         (remap_flags & CLEM_MEM_IO_MMAP_NSHADOW_AUX) ||
         (remap_flags & CLEM_MEM_IO_MMAP_NSHADOW_SHGR)) {
         for (page_idx = 0x20; page_idx < 0x40; ++page_idx) {
             uint8_t v0 = (shadow_flags & CLEM_MEM_IO_MMAP_NSHADOW_HGR1) ? 0 : 1;
-            uint8_t v1 = (v0 && !inhibit_hgr_bank_01) ? 1 : 0;
-            if (!inhibit_shgr_bank_01 && !v1)
-                v1 = 1;
+            uint8_t v1 = (v0 && !inhibit_hgr_bank_01) || !inhibit_shgr_bank_01 ? 1 : 0;
             mmio->fpi_mega2_main_shadow_map.pages[page_idx] = v0;
             mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = v1;
         }
@@ -1295,9 +1295,7 @@ static void _clem_mmio_shadow_map(ClemensMMIO *mmio, uint32_t shadow_flags) {
         (remap_flags & CLEM_MEM_IO_MMAP_NSHADOW_SHGR)) {
         for (page_idx = 0x40; page_idx < 0x60; ++page_idx) {
             uint8_t v0 = (shadow_flags & CLEM_MEM_IO_MMAP_NSHADOW_HGR2) ? 0 : 1;
-            uint8_t v1 = (v0 && !inhibit_hgr_bank_01) ? 1 : 0;
-            if (!inhibit_shgr_bank_01 && !v1)
-                v1 = 1;
+            uint8_t v1 = (v0 && !inhibit_hgr_bank_01) || !inhibit_shgr_bank_01 ? 1 : 0;
             mmio->fpi_mega2_main_shadow_map.pages[page_idx] = v0;
             mmio->fpi_mega2_aux_shadow_map.pages[page_idx] = v1;
         }
@@ -1366,7 +1364,14 @@ static void _clem_mmio_memory_map(ClemensMMIO *mmio, uint32_t memory_flags) {
     //      here should automatically be shdaowed to the appropriate e0/e1
     //      area for display.
     if (remap_flags & CLEM_MEM_IO_MMAP_OLDVIDEO) {
+        if (remap_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) {
+            remap_flags |= CLEM_MEM_IO_MMAP_NSHADOW_TXT1;
+            remap_flags |= CLEM_MEM_IO_MMAP_NSHADOW_TXT2;
+        }
         if (memory_flags & CLEM_MEM_IO_MMAP_80COLSTORE) {
+            if (memory_flags & CLEM_MEM_IO_MMAP_HIRES) {
+                remap_flags |= (CLEM_MEM_IO_MMAP_NSHADOW_HGR1 | CLEM_MEM_IO_MMAP_NSHADOW_AUX);
+            }
             for (page_idx = 0x04; page_idx < 0x08; ++page_idx) {
                 page_B00 = &page_map_B00->pages[page_idx];
                 page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_TXTPAGE2) ? 0x01 : 00);
@@ -1397,8 +1402,10 @@ static void _clem_mmio_memory_map(ClemensMMIO *mmio, uint32_t memory_flags) {
     }
 
     //  RAMRD/RAMWRT minus the page 1 Apple //e video regions
-    if (remap_flags & (CLEM_MEM_IO_MMAP_RAMRD + CLEM_MEM_IO_MMAP_RAMWRT)) {
+    if (remap_flags & CLEM_MEM_IO_MMAP_RAMWRT) {
         remap_flags |= CLEM_MEM_IO_MMAP_NSHADOW;
+    }
+    if (remap_flags & (CLEM_MEM_IO_MMAP_RAMRD + CLEM_MEM_IO_MMAP_RAMWRT)) {
         for (page_idx = 0x02; page_idx < 0x04; ++page_idx) {
             page_B00 = &page_map_B00->pages[page_idx];
             page_B00->bank_read = ((memory_flags & CLEM_MEM_IO_MMAP_RAMRD) ? 0x01 : 00);

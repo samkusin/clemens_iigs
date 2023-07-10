@@ -82,16 +82,18 @@ void clem_read(ClemensMachine *clem, uint8_t *data, uint16_t adr, uint8_t bank, 
 }
 
 void clem_write(ClemensMachine *clem, uint8_t data, uint16_t adr, uint8_t bank, uint8_t mem_flags) {
-    struct ClemensMemoryPageMap *bank_page_map = clem->mem.bank_page_map[bank];
-    struct ClemensMemoryShadowMap *shadow_map = bank_page_map->shadow_map;
+    struct ClemensMemoryPageMap **bank_map = clem->mem.bank_page_map;
+    struct ClemensMemoryPageMap *bank_page_map = bank_map[bank];
+    struct ClemensMemoryShadowMap *shadow_map;
     struct ClemensMemoryPageInfo *page = &bank_page_map->pages[adr >> 8];
-    uint16_t offset = ((uint16_t)page->write << 8) | (adr & 0xff);
+    uint16_t offset;
     uint8_t flags = mem_flags == CLEM_MEM_FLAG_NULL ? CLEM_OP_IO_NO_OP : 0;
     bool mega2_access = false;
     bool io_access = false;
 
     if (page->flags & CLEM_MEM_IO_MEMORY_MASK) {
         unsigned slot_idx;
+        offset = ((uint16_t)page->write << 8) | (adr & 0xff);
         if (page->flags & CLEM_MEM_PAGE_IOADDR_FLAG) {
             if (page->flags & CLEM_MEM_PAGE_WRITEOK_FLAG) {
                 (*clem->mem.mmio_write)(&clem->mem, &clem->tspec, data, offset, flags,
@@ -119,7 +121,12 @@ void clem_write(ClemensMachine *clem, uint8_t data, uint16_t adr, uint8_t bank, 
         } else {
             bank_actual = page->bank_write;
         }
+        bank_page_map = bank_map[bank_actual];
+        shadow_map = bank_page_map->shadow_map;
+        page = &bank_page_map->pages[adr >> 8];
+
         bank_mem = _clem_get_memory_bank(clem, bank_actual, &mega2_access);
+        offset = ((uint16_t)page->write << 8) | (adr & 0xff);
         if (page->flags & CLEM_MEM_PAGE_WRITEOK_FLAG) {
             bank_mem[offset] = data;
         }
