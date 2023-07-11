@@ -146,8 +146,6 @@ static inline void _clem_mmio_newvideo_c029_set(ClemensMMIO *mmio, uint8_t value
     */
     if (setflags & CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY) {
         setflags ^= CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY;
-        CLEM_LOG("clem_mem: c029 linearize memory = %u",
-                 (value & CLEM_MMIO_NEWVIDEO_LINEARIZE_MEMORY) != 0);
     }
     CLEM_ASSERT(setflags == 0);
     mmio->new_video_c029 = value & ~0x1e; /* bits 1-4 are not used */
