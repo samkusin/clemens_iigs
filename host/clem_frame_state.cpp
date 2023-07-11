@@ -1,5 +1,6 @@
 #include "clem_frame_state.hpp"
 
+#include "clem_defs.h"
 #include "clem_mem.h"
 #include "core/clem_apple2gs_config.hpp"
 #include "emulator.h"
@@ -7,6 +8,7 @@
 
 #include "fmt/core.h"
 
+#include <algorithm>
 #include <cstring>
 
 void ClemensBackendState::reset() {
@@ -177,7 +179,7 @@ void FrameState::copyState(const ClemensBackendState &state, LastCommandState &c
         //  read every byte from the memory controller - which can be 'slow' enough
         //  to effect framerate on some systems.   so we only update memory state
         //  when the emulator isn't actively running instructions
-        for (unsigned addr = 0; addr < 0x10000; ++addr) {
+        for (unsigned addr = 0; addr < CLEM_IIGS_BANK_SIZE; ++addr) {
             clem_read(state.machine, &memoryView[addr], addr, state.debugMemoryPage,
                       CLEM_MEM_FLAG_NULL);
         }

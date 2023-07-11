@@ -39,6 +39,8 @@ extern const char *kLabelCancel[];
 extern const char *kLabelDeleteConfirm[];
 extern const char *kLabelDeleteFailed[];
 
+extern const char *kDebugNotAvailableWhileRunning[];
+
 constexpr unsigned kLanguageDefault = 0;
 
 } // namespace ClemensL10N

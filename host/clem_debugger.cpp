@@ -1,6 +1,7 @@
 #include "clem_debugger.hpp"
 #include "clem_command_queue.hpp"
 #include "clem_host_utils.hpp"
+#include "clem_l10n.hpp"
 #include "core/clem_disk_utils.hpp"
 
 #include "clem_types.h"
@@ -351,6 +352,7 @@ void ClemensDebugger::layoutConsoleLines(ImVec2 dimensions) {
 
 void ClemensDebugger::console(ImVec2 anchor, ImVec2 dimensions) {
     const float kLineSize = ImGui::GetTextLineHeight();
+    const float kTextLineSize = ImGui::GetTextLineHeightWithSpacing();
     const ImGuiStyle &style = ImGui::GetStyle();
 
     ImGui::SetNextWindowPos(anchor);
@@ -358,13 +360,37 @@ void ClemensDebugger::console(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::Begin("DebuggerConsole", nullptr,
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
 
+    //  pass 1 - min layout
     ImVec2 contentRegion = ImGui::GetContentRegionAvail();
-    const float kInputHeight = kLineSize + (style.FrameBorderSize + style.FramePadding.y) * 2;
-    const float kConsoleHeight =
-        contentRegion.y - kInputHeight - 3 * style.ItemSpacing.y - 2 * style.FramePadding.y;
+    const float kCollapsingHeaderHeight = 2 * style.FramePadding.y + kLineSize;
+    float topY = 0.0f;
+    float componentHeight = 2 * style.FramePadding.y + 8 * kTextLineSize;
+    float consoleY = topY + kCollapsingHeaderHeight + componentHeight + style.ItemSpacing.y +
+                     (2 * style.ItemSpacing.y); // separator
+    float consoleHeight = 2 * style.FramePadding.y + 4 * kTextLineSize;
+    float inputY = consoleY + consoleHeight + style.ItemSpacing.y;
+    float bottomY = inputY + 2 * style.FramePadding.y + kLineSize;
 
-    layoutConsoleLines(ImVec2(contentRegion.x, kConsoleHeight));
-    ImGui::SetCursorPosY(contentRegion.y - style.ItemSpacing.y - kInputHeight);
+    //  pass 2 - resize component up to component max height if space is available
+    //  then resize console to remainder size
+    topY = bottomY;
+    bottomY = contentRegion.y;
+    float adjustHeight = 6 * kTextLineSize;
+    float availHeight = bottomY - topY;
+    adjustHeight = std::min(adjustHeight, availHeight);
+    componentHeight += adjustHeight;
+    availHeight -= adjustHeight;
+    ImVec2 sectionSize(contentRegion.x, componentHeight);
+    if (ImGui::CollapsingHeader("DOC", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::BeginChild("##DOC", sectionSize);
+        doMachineDebugDOCDisplay();
+        ImGui::EndChild();
+    } else {
+        availHeight += componentHeight;
+    }
+    ImGui::Separator();
+    sectionSize.y = consoleHeight + availHeight;
+    layoutConsoleLines(sectionSize);
     ImGui::Separator();
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(">");
@@ -378,7 +404,6 @@ void ClemensDebugger::console(ImVec2 anchor, ImVec2 dimensions) {
         consoleInputLineBuf_[0] = '\0';
         ImGui::SetKeyboardFocusHere(-1);
     }
-
     ImGui::SetItemDefaultFocus();
     ImGui::PopItemWidth();
 
@@ -390,21 +415,23 @@ void ClemensDebugger::auxillary(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::SetNextWindowPos(anchor);
     ImGui::SetNextWindowSize(dimensions);
     ImGui::Begin("DebuggerAuxillary", nullptr,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
-
-    if (frameState_) {
-        // float localContentWidth = ImGui::GetWindowContentRegionWidth();
-        if (frameState_->memoryView) {
-
-            uint8_t bank = frameState_->memoryViewBank;
-            if (ImGui::InputScalar("Bank", ImGuiDataType_U8, &bank, NULL, NULL, "%02X",
-                                   ImGuiInputTextFlags_CharsHexadecimal)) {
-                commandQueue_.debugMemoryPage((uint8_t)(bank & 0xff));
-            }
-            debugMemoryEditor_.OptAddrDigitsCount = 4;
-            debugMemoryEditor_.Cols = 16;
-            debugMemoryEditor_.DrawContents(this, CLEM_IIGS_BANK_SIZE, (size_t)(bank) << 16);
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoBringToFrontOnFocus);
+    ImVec2 contentRegion = ImGui::GetContentRegionAvail();
+    if (frameState_ && frameState_->memoryView) {
+        uint8_t bank = frameState_->memoryViewBank;
+        if (ImGui::InputScalar("Bank", ImGuiDataType_U8, &bank, NULL, NULL, "%02X",
+                               ImGuiInputTextFlags_CharsHexadecimal)) {
+            commandQueue_.debugMemoryPage((uint8_t)(bank & 0xff));
         }
+        debugMemoryEditor_.OptAddrDigitsCount = 4;
+        debugMemoryEditor_.Cols = 16;
+        debugMemoryEditor_.DrawContents(this, CLEM_IIGS_BANK_SIZE, (size_t)(bank) << 16);
+    } else {
+        auto labelSize = ImGui::CalcTextSize(CLEM_L10N_LABEL(kDebugNotAvailableWhileRunning));
+        ImVec2 pos((contentRegion.x - labelSize.x) * 0.5f, (contentRegion.y - labelSize.y) * 0.5f);
+        ImGui::SetCursorPos(pos);
+        ImGui::TextUnformatted(CLEM_L10N_LABEL(kDebugNotAvailableWhileRunning));
     }
     ImGui::End();
 }
@@ -416,7 +443,8 @@ void ClemensDebugger::cpuStateTable(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::SetNextWindowPos(anchor);
     ImGui::SetNextWindowSize(dimensions);
     ImGui::Begin("CPUAndMachineState", nullptr,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoBringToFrontOnFocus);
     ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(kCharSize, 2.0f));
     if (frameState_) {
         auto &regs = frameState_->cpu.regs;
@@ -550,6 +578,82 @@ void ClemensDebugger::doMachineDebugIORegister(uint8_t * /*ioregsold */, uint8_t
         ImGui::EndTooltip();
     }
     */
+}
+
+void ClemensDebugger::doMachineDebugDOCDisplay() {
+    if (!frameState_)
+        return;
+
+    auto &doc = frameState_->doc;
+    ImGui::BeginTable("MMIO_Ensoniq_Global", 3);
+    {
+        ImGui::TableSetupColumn("OIR");
+        ImGui::TableSetupColumn("OSC");
+        ImGui::TableSetupColumn("ADC");
+        ImGui::TableHeadersRow();
+        ImGui::TableNextColumn();
+        ImGui::Text("%c:%u", doc.reg[CLEM_ENSONIQ_REG_OSC_OIR] & 0x80 ? '-' : 'I',
+                    (doc.reg[CLEM_ENSONIQ_REG_OSC_OIR] >> 1) & 0x1f);
+        ImGui::TableNextColumn();
+        ImGui::Text("%u + 1", (doc.reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1));
+        ImGui::TableNextColumn();
+        ImGui::Text("%02X", doc.reg[CLEM_ENSONIQ_REG_OSC_ADC]);
+    }
+    ImGui::EndTable();
+
+    //  OSC 0, 1, ... N
+    //  Per OSC: Control: Halt, Mode, Channel, IE, IRQ
+    //           Data, ACC, PTR
+    //
+    auto contentAvail = ImGui::GetContentRegionAvail();
+    auto fontCharSize = ImGui::GetFont()->GetCharAdvance('A');
+    unsigned oscCount = (doc.reg[CLEM_ENSONIQ_REG_OSC_ENABLE] >> 1) + 1;
+    ImGui::BeginTable("MMIO_Ensoniq_OSC", 10, ImGuiTableFlags_ScrollY, contentAvail);
+    {
+        ImGui::TableSetupColumn("OSC");
+        ImGui::TableSetupColumn("IE");
+        ImGui::TableSetupColumn("IR");
+        ImGui::TableSetupColumn("M1");
+        ImGui::TableSetupColumn("M0");
+        ImGui::TableSetupColumn("CH");
+        ImGui::TableSetupColumn("FC", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
+        ImGui::TableSetupColumn("ACC", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 6);
+        ImGui::TableSetupColumn("TBL", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
+        ImGui::TableSetupColumn("PTR", ImGuiTableColumnFlags_WidthFixed, fontCharSize * 4);
+        ImGui::TableHeadersRow();
+        ImColor oscActiveColor(255, 255, 255);
+        ImColor oscHalted(160, 160, 160);
+        for (unsigned oscIndex = 0; oscIndex < oscCount; ++oscIndex) {
+            auto ctl = doc.reg[CLEM_ENSONIQ_REG_OSC_CTRL + oscIndex];
+            uint16_t fc = ((uint16_t)doc.reg[CLEM_ENSONIQ_REG_OSC_FCHI + oscIndex] << 8) |
+                          doc.reg[CLEM_ENSONIQ_REG_OSC_FCLOW + oscIndex];
+            auto flags = doc.osc_flags[oscIndex];
+            const ImColor &col = (ctl & CLEM_ENSONIQ_OSC_CTL_HALT) ? oscHalted : oscActiveColor;
+            ImGui::TableNextColumn();
+            ImGui::TextColored(col, "%u", oscIndex);
+            ImGui::TableNextColumn();
+            ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_IE) ? '1' : '0');
+            ImGui::TableNextColumn();
+            ImGui::TextColored(col, "%c", (flags & CLEM_ENSONIQ_OSC_FLAG_CYCLE) ? 'C' : ' ');
+            ImGui::TableNextColumn();
+            ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_SYNC) ? '1' : '0');
+            ImGui::TableNextColumn();
+            ImGui::TextColored(col, "%c", (ctl & CLEM_ENSONIQ_OSC_CTL_M0) ? '1' : '0');
+            ImGui::TableNextColumn();
+            ImGui::TextColored(col, "%u", (ctl >> 4));
+            ImGui::TableNextColumn();
+            ImGui::TextColored(col, "%04X", fc);
+            ImGui::TableNextColumn();
+            ImGui::TextColored(col, "%06X", doc.acc[oscIndex] & 0x00ffffff);
+            ImGui::TableNextColumn();
+            ImGui::TextColored(col, "%04X",
+                               (uint16_t)doc.reg[CLEM_ENSONIQ_REG_OSC_PTR + oscIndex] << 8);
+            ImGui::TableNextColumn();
+            ImGui::TextColored(col, "%04X", doc.ptr[oscIndex]);
+            ImGui::TableNextRow();
+        }
+    }
+    ImGui::EndTable();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -953,13 +1057,13 @@ void ClemensDebugger::cmdBsave(std::string_view operand) {
     commandQueue_.bsave(std::string(params[0]), address, length);
 }
 
-void ClemensDebugger::cmdPwd(std::string_view ) {
+void ClemensDebugger::cmdPwd(std::string_view) {
     std::error_code ec{};
     auto curPath = std::filesystem::current_path(ec);
     if (ec) {
         CLEM_TERM_COUT.format(Error, "pwd error {}", ec.message());
     } else {
-        CLEM_TERM_COUT.print(Info, curPath.string());    
+        CLEM_TERM_COUT.print(Info, curPath.string());
     }
 }
 
@@ -996,11 +1100,10 @@ void ClemensDebugger::cmdHelp(std::string_view operand) {
     CLEM_TERM_COUT.print(
         Info, "load <pathname>             - loads a snapshot into the snapshots folder");
     CLEM_TERM_COUT.print(
-        Info, "bsave <pathname>,<address>,<length>  - saves binary to file from location in memory");
-    CLEM_TERM_COUT.print(
-        Info, "bload <pathname>,<address>             - loads binary to address");
-    CLEM_TERM_COUT.print(
-        Info, "pwd                         - current working directory");
+        Info,
+        "bsave <pathname>,<address>,<length>  - saves binary to file from location in memory");
+    CLEM_TERM_COUT.print(Info, "bload <pathname>,<address>             - loads binary to address");
+    CLEM_TERM_COUT.print(Info, "pwd                         - current working directory");
 
     CLEM_TERM_COUT.newline();
 }

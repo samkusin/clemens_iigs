@@ -68,6 +68,7 @@ class ClemensDebugger {
     static void imguiMemoryEditorWrite(ImU8 *mem_ptr, size_t off, ImU8 value);
 
     void doMachineDebugIORegister(uint8_t *ioregsold, uint8_t *ioregs, uint8_t reg);
+    void doMachineDebugDOCDisplay();
 
   private:
     ClemensCPUPins lastFrameCPUPins_;

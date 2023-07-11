@@ -16,5 +16,6 @@ const char *kLabelCancel[] = {"Cancel"};
 
 #include "strings/clem_help.inl"
 #include "strings/clem_settings.inl"
+#include "strings/clem_debug.inl"
 
 } // namespace ClemensL10N
