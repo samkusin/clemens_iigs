@@ -140,13 +140,30 @@ static inline void _clem_next_dbr(ClemensMachine *clem, uint8_t *next_dbr, uint8
 }
 
 static inline void _clem_write_16(ClemensMachine *clem, uint16_t data, uint16_t adr, uint8_t bank) {
+    uint16_t adr_1 = adr + 1;
+    uint16_t bank_1 = adr_1 ? bank : bank + 1;
+    clem_write(clem, (uint8_t)data, adr, bank, CLEM_MEM_FLAG_DATA);
+    clem_write(clem, (uint8_t)(data >> 8), adr_1, bank_1, CLEM_MEM_FLAG_DATA);
+}
+
+static inline void _clem_write_16_wrap(ClemensMachine *clem, uint16_t data, uint16_t adr, uint8_t bank) {
     clem_write(clem, (uint8_t)data, adr, bank, CLEM_MEM_FLAG_DATA);
     clem_write(clem, (uint8_t)(data >> 8), adr + 1, bank, CLEM_MEM_FLAG_DATA);
 }
 
 static inline void _clem_read_16(ClemensMachine *clem, uint16_t *data16, uint16_t adr, uint8_t bank,
                                  uint8_t flags) {
-    //  TODO: DATA read should wrap to next DBR
+    uint16_t adr_1 = adr + 1;
+    uint16_t bank_1 = adr_1 ? bank : bank + 1;
+    uint8_t tmp_data;
+    clem_read(clem, &tmp_data, adr, bank, flags);
+    *data16 = tmp_data;
+    clem_read(clem, &tmp_data, adr_1, bank_1, flags);
+    *data16 = ((uint16_t)tmp_data << 8) | (*data16);
+}
+
+static inline void _clem_read_16_wrap(ClemensMachine *clem, uint16_t *data16, uint16_t adr, uint8_t bank,
+                                 uint8_t flags) {
     uint8_t tmp_data;
     clem_read(clem, &tmp_data, adr, bank, flags);
     *data16 = tmp_data;
@@ -175,7 +192,7 @@ static inline void _clem_read_pba_816(ClemensMachine *clem, uint16_t *out, uint1
         *out = ((uint16_t)tmp_data << 8) | *out;
     }
 }
-
+                        
 static inline void _clem_read_data_816(ClemensMachine *clem, uint16_t *out, uint16_t addr,
                                        uint8_t dbr, bool is8) {
     uint8_t tmp_data;
@@ -314,7 +331,7 @@ static inline void _clem_read_pba_mode_dp(ClemensMachine *clem, uint16_t *eff_ad
 
     _clem_read_pba(clem, offset, pc);
     offset_index += *offset;
-    if (clem->cpu.pins.emulation) {
+    if (clem->cpu.pins.emulation && !(D & 0xff)) {  // page boundary wrap?
         *eff_addr = (D & 0xff00) + ((D & 0xff) + offset_index) % 256;
     } else {
         *eff_addr = D + offset_index;
