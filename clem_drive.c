@@ -329,10 +329,13 @@ void clem_disk_step(struct ClemensDrive *drive, unsigned *io_flags) {
             drive->read_buffer |= 0x1;
         }
     }
-    if (is_drive_525) {
-        /* 3.5" drives don't have the same hardware as the Disk II, so
-           I *think* fake bits don't apply
-        */
+    /* 3.5" drives don't have the same hardware as the Disk II, so
+        I *think* fake bits don't apply.
+        WRONG!!  Though the hardware isn't the same, randomness can still
+        occur.  No real documentation on how similiar this is to Disk II
+        random behavior.
+    */
+    //if (is_drive_525) {
         if ((drive->read_buffer & 0xf) && valid_disk_data) {
             if (drive->read_buffer & 0x2) {
                 *io_flags |= CLEM_IWM_FLAG_READ_DATA;
@@ -343,11 +346,11 @@ void clem_disk_step(struct ClemensDrive *drive, unsigned *io_flags) {
                 *io_flags |= CLEM_IWM_FLAG_READ_DATA;
             }
         }
-    } else {
-        if (drive->read_buffer & 0x1) {
-            *io_flags |= CLEM_IWM_FLAG_READ_DATA;
-        }
-    }
+    //} else {
+    //    if (drive->read_buffer & 0x1) {
+    //        *io_flags |= CLEM_IWM_FLAG_READ_DATA;
+    //    }
+    //}
 
     drive->current_byte = (drive->current_byte & 0xfe) | (drive->read_buffer & 0x01);
 
