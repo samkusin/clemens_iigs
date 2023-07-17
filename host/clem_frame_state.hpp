@@ -77,13 +77,18 @@ struct IWMStatus {
     unsigned track_byte_index;
     unsigned track_bit_shift;
     unsigned track_bit_length;
-    uint8_t buffer[4];
+    uint8_t buffer[256];
+    unsigned buffer_bit_start_index;
     uint8_t data;
+    uint8_t data_w;
     uint8_t latch;
     uint8_t status;
     uint8_t ph03;
+    uint8_t async_mode;
+    uint8_t cell_time;
+    uint8_t has_disk;
 
-    void copyFrom(ClemensMMIO &mmio, const ClemensDeviceIWM &iwm);
+    void copyFrom(ClemensMMIO &mmio, const ClemensDeviceIWM &iwm, bool detailed);
 };
 
 struct DOCStatus {

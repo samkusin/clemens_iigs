@@ -69,6 +69,7 @@ class ClemensDebugger {
 
     void doMachineDebugIORegister(uint8_t *ioregsold, uint8_t *ioregs, uint8_t reg);
     void doMachineDebugDOCDisplay();
+    void doMachineDebugIWMDisplay(bool detailed);
 
   private:
     ClemensCPUPins lastFrameCPUPins_;
@@ -79,6 +80,8 @@ class ClemensDebugger {
     uint8_t lastFrameIORegs_[256];
 
     std::vector<ClemensBackendBreakpoint> breakpoints_;
+
+    int iwmDiskBitSlip_;
 
     void cpuStatRow16(const char *label, const char *attrName, uint16_t value, float labelWidth,
                       const ImVec4 &color);

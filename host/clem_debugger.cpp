@@ -160,6 +160,14 @@ template <typename T> static ImColor getStatusFieldColor(T a, T b, T statusMask,
 #define CLEM_TERM_COUT                                                                             \
     FormatView2<decltype(ClemensDebugger::consoleLines_)>(consoleLines_, consoleChanged_)
 
+static void displayViewNotAvailable(const char *label) {
+    ImVec2 contentRegion = ImGui::GetContentRegionAvail();
+    auto labelSize = ImGui::CalcTextSize(label);
+    ImVec2 pos((contentRegion.x - labelSize.x) * 0.5f, (contentRegion.y - labelSize.y) * 0.5f);
+    ImGui::SetCursorPos(pos);
+    ImGui::TextUnformatted(label);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 ClemensDebugger::ClemensDebugger(ClemensCommandQueue &commandQueue,
@@ -168,6 +176,7 @@ ClemensDebugger::ClemensDebugger(ClemensCommandQueue &commandQueue,
       consoleChanged_(false) {
 
     consoleInputLineBuf_[0] = '\0';
+    iwmDiskBitSlip_ = 0;
 
     debugMemoryEditor_.ReadFn = &ClemensDebugger::imguiMemoryEditorRead;
     debugMemoryEditor_.WriteFn = &ClemensDebugger::imguiMemoryEditorWrite;
@@ -363,10 +372,11 @@ void ClemensDebugger::console(ImVec2 anchor, ImVec2 dimensions) {
     //  pass 1 - min layout
     ImVec2 contentRegion = ImGui::GetContentRegionAvail();
     const float kCollapsingHeaderHeight = 2 * style.FramePadding.y + kLineSize;
-    float topY = 0.0f;
+    float topY = style.FramePadding.y + kTextLineSize;
     float componentHeight = 2 * style.FramePadding.y + 8 * kTextLineSize;
     float consoleY = topY + kCollapsingHeaderHeight + componentHeight + style.ItemSpacing.y +
-                     (2 * style.ItemSpacing.y); // separator
+                     (style.FramePadding.y + style.ItemSpacing.y) + // tab border
+                     (2 * style.ItemSpacing.y);                     // separator
     float consoleHeight = 2 * style.FramePadding.y + 4 * kTextLineSize;
     float inputY = consoleY + consoleHeight + style.ItemSpacing.y;
     float bottomY = inputY + 2 * style.FramePadding.y + kLineSize;
@@ -381,10 +391,16 @@ void ClemensDebugger::console(ImVec2 anchor, ImVec2 dimensions) {
     componentHeight += adjustHeight;
     availHeight -= adjustHeight;
     ImVec2 sectionSize(contentRegion.x, componentHeight);
-    if (ImGui::CollapsingHeader("DOC", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::BeginChild("##DOC", sectionSize);
-        doMachineDebugDOCDisplay();
-        ImGui::EndChild();
+    if (ImGui::CollapsingHeader("Systems", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (ImGui::BeginTabBar("SystemsTabBar")) {
+            if (ImGui::BeginTabItem("DOC")) {
+                ImGui::BeginChild("##DOC", sectionSize);
+                doMachineDebugDOCDisplay();
+                ImGui::EndChild();
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+        }
     } else {
         availHeight += componentHeight;
     }
@@ -417,21 +433,30 @@ void ClemensDebugger::auxillary(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::Begin("DebuggerAuxillary", nullptr,
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
                      ImGuiWindowFlags_NoBringToFrontOnFocus);
-    ImVec2 contentRegion = ImGui::GetContentRegionAvail();
-    if (frameState_ && frameState_->memoryView) {
-        uint8_t bank = frameState_->memoryViewBank;
-        if (ImGui::InputScalar("Bank", ImGuiDataType_U8, &bank, NULL, NULL, "%02X",
-                               ImGuiInputTextFlags_CharsHexadecimal)) {
-            commandQueue_.debugMemoryPage((uint8_t)(bank & 0xff));
+    if (ImGui::BeginTabBar("AuxTabBar")) {
+        if (ImGui::BeginTabItem("Memory")) {
+            if (frameState_ && frameState_->memoryView) {
+                uint8_t bank = frameState_->memoryViewBank;
+                if (ImGui::InputScalar("Bank", ImGuiDataType_U8, &bank, NULL, NULL, "%02X",
+                                       ImGuiInputTextFlags_CharsHexadecimal)) {
+                    commandQueue_.debugMemoryPage((uint8_t)(bank & 0xff));
+                }
+                debugMemoryEditor_.OptAddrDigitsCount = 4;
+                debugMemoryEditor_.Cols = 16;
+                debugMemoryEditor_.DrawContents(this, CLEM_IIGS_BANK_SIZE, (size_t)(bank) << 16);
+            } else {
+                displayViewNotAvailable(CLEM_L10N_LABEL(kDebugNotAvailableWhileRunning));
+            }
+            ImGui::EndTabItem();
         }
-        debugMemoryEditor_.OptAddrDigitsCount = 4;
-        debugMemoryEditor_.Cols = 16;
-        debugMemoryEditor_.DrawContents(this, CLEM_IIGS_BANK_SIZE, (size_t)(bank) << 16);
-    } else {
-        auto labelSize = ImGui::CalcTextSize(CLEM_L10N_LABEL(kDebugNotAvailableWhileRunning));
-        ImVec2 pos((contentRegion.x - labelSize.x) * 0.5f, (contentRegion.y - labelSize.y) * 0.5f);
-        ImGui::SetCursorPos(pos);
-        ImGui::TextUnformatted(CLEM_L10N_LABEL(kDebugNotAvailableWhileRunning));
+        if (ImGui::BeginTabItem("IWM")) {
+            ImVec2 contentRegion = ImGui::GetContentRegionAvail();
+            ImGui::BeginChild("##IWM", contentRegion);
+            doMachineDebugIWMDisplay(frameState_ && !frameState_->isRunning);
+            ImGui::EndChild();
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
     }
     ImGui::End();
 }
@@ -654,6 +679,186 @@ void ClemensDebugger::doMachineDebugDOCDisplay() {
         }
     }
     ImGui::EndTable();
+}
+
+void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
+    if (!frameState_)
+        return;
+    auto &iwm = frameState_->iwm;
+    static const ImVec4 kOffColor(0.50f, 0.50f, 0.50f, 1.0f);
+    static const ImVec4 kLoColor(0.75f, 0.75f, 0.75f, 1.0f);
+    static const ImVec4 kHiColor(1.0f, 1.0f, 1.0f, 1.0f);
+    static const char *q6q7motor[] = {
+        "----", // q60,q70,off
+        "STAT", // q61,q70,off
+        "HAND", // q60,q71,off
+        "MODE", // q61,q71,off
+        "READ", // q60,q70,on
+        "STAT", // q61,q70,on
+        "HAND", // q60,q71,on
+        "WRIT"  // q61,q71,on
+    };
+
+    // First Section:   IWM State Machine
+    // PHI0-3, 3.5?, Dx, ENBL, Q6, Q7, SENSE, Latch
+
+    ImGui::BeginTable("IWM_State", 9);
+    {
+        bool driveOn = (iwm.status & ClemensFrame::kIWMStatusDriveOn) != 0; // TODO SmartPort
+        unsigned stateFlags = ((iwm.status & ClemensFrame::kIWMStatusIWMQ6) ? 0x1 : 0) |
+                              ((iwm.status & ClemensFrame::kIWMStatusIWMQ7) ? 0x2 : 0) |
+                              (driveOn ? 0x4 : 0);
+        ImGui::TableSetupColumn("Type");
+        ImGui::TableSetupColumn("Num");
+        ImGui::TableSetupColumn("Phase");
+        ImGui::TableSetupColumn("Sense");
+        ImGui::TableSetupColumn("Q6Q7");
+        ImGui::TableSetupColumn("Read");
+        ImGui::TableSetupColumn("Writ");
+        ImGui::TableSetupColumn("Ltch");
+        ImGui::TableSetupColumn("Cell");
+        ImGui::TableHeadersRow();
+        ImGui::PushStyleColor(ImGuiCol_Text, driveOn ? kHiColor : kLoColor);
+        ImGui::TableNextColumn(); // 0
+        if (driveOn) {
+            ImGui::TextUnformatted((iwm.status & ClemensFrame::kIWMStatusDrive35) != 0 ? "3.5 "
+                                                                                       : "5.25");
+        } else {
+            ImGui::TextUnformatted("----");
+        }
+        ImGui::TableNextColumn(); // 1
+        ImGui::TextUnformatted(iwm.status & ClemensFrame::kIWMStatusDriveAlt ? "D2" : "D1");
+        ImGui::TableNextColumn(); // 2
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+        ImGui::TextColored(iwm.ph03 & 1 ? kHiColor : kOffColor, "0");
+        ImGui::SameLine();
+        ImGui::TextColored(iwm.ph03 & 2 ? kHiColor : kOffColor, "1");
+        ImGui::SameLine();
+        ImGui::TextColored(iwm.ph03 & 4 ? kHiColor : kOffColor, "2");
+        ImGui::SameLine();
+        ImGui::TextColored(iwm.ph03 & 8 ? kHiColor : kOffColor, "3");
+        ImGui::PopStyleVar();
+        ImGui::TableNextColumn(); // 3
+        ImGui::TextUnformatted(iwm.status & ClemensFrame::kIWMStatusDriveWP ? "HI" : "LO");
+        ImGui::TableNextColumn(); // 4
+        ImGui::TextColored(stateFlags ? kHiColor : kOffColor, q6q7motor[stateFlags & 0x7]);
+        ImGui::TableNextColumn(); // 5
+        ImGui::Text("%02X", iwm.data);
+        ImGui::TableNextColumn(); // 6
+        ImGui::Text("%02X", iwm.data_w);
+        ImGui::TableNextColumn(); // 7
+        ImGui::Text("%02X", iwm.latch);
+        ImGui::TableNextColumn(); // 8
+        if (stateFlags) {
+            ImGui::Text("%uus", iwm.cell_time);
+        } else {
+            ImGui::TextUnformatted("   ");
+        }
+        ImGui::PopStyleColor();
+    }
+    ImGui::EndTable();
+
+    ImGui::Separator();
+
+    // Second Section:  Active Disk
+    // QtrTrack, "Real Track", Bitpos
+
+    auto contentAvail = ImGui::GetContentRegionAvail();
+    ImGui::TextColored(iwm.has_disk ? kHiColor : kLoColor, "Qtr Track: %03d", iwm.qtr_track_index);
+    ImGui::SameLine();
+
+    ImGui::TextColored(iwm.has_disk ? kHiColor : kLoColor,
+
+        char headPositionText[32];
+    snprintf(headPositionText, sizeof(headPositionText), "%07d/%07d",
+             iwm.track_byte_index * 8 + (7 - iwm.track_bit_shift), iwm.track_bit_length);
+    ImGui::SetCursorPosX(contentAvail.x - ImGui::CalcTextSize(headPositionText).x -
+                         ImGui::GetStyle().ItemSpacing.x);
+    ImGui::TextColored(iwm.has_disk ? kHiColor : kLoColor, headPositionText);
+    ImGui::SameLine();
+    ImGui::PushItemWidth(contentAvail.x * 0.5f);
+    ImGui::SliderInt("Shift", &iwmDiskBitSlip_, 0, 7, "%d", ImGuiSliderFlags_AlwaysClamp);
+
+    ImGui::NewLine();
+    if (frameState_->isRunning) {
+        displayViewNotAvailable(CLEM_L10N_LABEL(kDebugNotAvailableWhileRunning));
+    } else if (!iwm.has_disk || !iwm.track_bit_length) {
+        displayViewNotAvailable(CLEM_L10N_LABEL(kDebugDiskNoTrackData));
+    } else {
+        // 40 byte window disk head 8 bits * 8 bytes per row (8 rows)
+        // Draw in bit order where we mark starting bytes and the current head
+        // position.
+        // bit_count = 32 bytes * 8 = 256 bits
+        // head_position = bit_count / 2
+        // draw bits left to right,;
+        auto &style = ImGui::GetStyle();
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, style.ItemSpacing.y));
+
+        const float kCursorLeft = ImGui::GetCursorPosX();
+        ImVec2 cursorPos = ImGui::GetCursorPos();
+
+        constexpr unsigned kRowLimit = 5;
+        unsigned rowIndex = 0;
+
+        constexpr unsigned kBitsPerRow = (40 / kRowLimit) * 8;
+        constexpr unsigned kBitWindowCount = 40 * 8;
+
+        unsigned absBitHead = iwm.track_byte_index * 8 + 7 - iwm.track_bit_shift;
+        unsigned absBitLeft;
+        if (absBitHead - kBitWindowCount / 2 > absBitHead) {
+            absBitLeft = iwm.track_bit_length - kBitWindowCount + absBitHead;
+        } else {
+            absBitLeft = absBitHead - kBitWindowCount / 2;
+        }
+        unsigned bitOffset = absBitLeft - iwm.buffer_bit_start_index;
+        unsigned bitOffsetEnd = bitOffset + kBitWindowCount;
+        unsigned bitOffsetCur = bitOffset;
+        unsigned bitSlip = iwmDiskBitSlip_;
+
+        unsigned byteBitIndex = 0;
+        uint16_t shiftreg = (uint16_t)(iwm.buffer[bitOffsetCur / 8]) << 8;
+        shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
+
+        while (bitOffset < bitOffsetEnd) {
+            uint16_t data = (uint16_t)(iwm.buffer[bitOffsetCur / 8]) << 8;
+            data |= iwm.buffer[(bitOffsetCur / 8) + 1];
+            ImGui::SetCursorPos(cursorPos);
+            if ((rowIndex & 1)) {
+                //  byte row
+                if (((bitOffsetCur + bitSlip) % 8) == 0) {
+                    ImGui::Text("^%02X", (uint8_t)((data >> (8 - bitSlip) & 0xff)));
+                }
+            } else {
+                //  bit row
+                if (data & (1 << 7 - (bitOffsetCur % 8))) {
+                    ImGui::TextUnformatted("1");
+                } else {
+                    ImGui::TextColored(kOffColor, "0");
+                }
+            }
+            ++bitOffsetCur;
+            ++byteBitIndex;
+            if ((byteBitIndex % 8) == 0) {
+                shiftreg <<= 8;
+                shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
+            }
+            cursorPos.x += ImGui::GetFont()->GetCharAdvance('1') + style.ItemSpacing.x;
+            if (!((bitOffsetCur - bitOffset) % kBitsPerRow)) {
+                //  do the bit row or the byte value row
+                ++rowIndex;
+                if (rowIndex & 1) {
+                    bitOffsetCur = bitOffset;
+                    cursorPos.y += ImGui::GetTextLineHeightWithSpacing();
+                } else {
+                    bitOffset = bitOffsetCur;
+                    cursorPos.y += ImGui::GetTextLineHeightWithSpacing() + style.ItemSpacing.y;
+                }
+                cursorPos.x = kCursorLeft;
+            }
+        }
+
+        ImGui::PopStyleVar();
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

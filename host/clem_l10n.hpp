@@ -40,6 +40,7 @@ extern const char *kLabelDeleteConfirm[];
 extern const char *kLabelDeleteFailed[];
 
 extern const char *kDebugNotAvailableWhileRunning[];
+extern const char *kDebugDiskNoTrackData[];
 
 constexpr unsigned kLanguageDefault = 0;
 
