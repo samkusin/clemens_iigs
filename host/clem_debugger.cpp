@@ -766,19 +766,10 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
     auto contentAvail = ImGui::GetContentRegionAvail();
     ImGui::TextColored(iwm.has_disk ? kHiColor : kLoColor, "Qtr Track: %03d", iwm.qtr_track_index);
     ImGui::SameLine();
-
-    ImGui::TextColored(iwm.has_disk ? kHiColor : kLoColor,
-
-        char headPositionText[32];
-    snprintf(headPositionText, sizeof(headPositionText), "%07d/%07d",
-             iwm.track_byte_index * 8 + (7 - iwm.track_bit_shift), iwm.track_bit_length);
-    ImGui::SetCursorPosX(contentAvail.x - ImGui::CalcTextSize(headPositionText).x -
-                         ImGui::GetStyle().ItemSpacing.x);
-    ImGui::TextColored(iwm.has_disk ? kHiColor : kLoColor, headPositionText);
+    ImGui::TextColored(iwm.has_disk ? kHiColor : kLoColor, "%07d/%07d",
+                       iwm.track_byte_index * 8 + (7 - iwm.track_bit_shift), iwm.track_bit_length);
     ImGui::SameLine();
-    ImGui::PushItemWidth(contentAvail.x * 0.5f);
     ImGui::SliderInt("Shift", &iwmDiskBitSlip_, 0, 7, "%d", ImGuiSliderFlags_AlwaysClamp);
-
     ImGui::NewLine();
     if (frameState_->isRunning) {
         displayViewNotAvailable(CLEM_L10N_LABEL(kDebugNotAvailableWhileRunning));
