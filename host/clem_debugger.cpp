@@ -702,8 +702,7 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
     // First Section:   IWM State Machine
     // PHI0-3, 3.5?, Dx, ENBL, Q6, Q7, SENSE, Latch
 
-    ImGui::BeginTable("IWM_State", 9);
-    {
+    if (ImGui::BeginTable("IWM_State", 9)) {
         bool driveOn = (iwm.status & ClemensFrame::kIWMStatusDriveOn) != 0; // TODO SmartPort
         unsigned stateFlags = ((iwm.status & ClemensFrame::kIWMStatusIWMQ6) ? 0x1 : 0) |
                               ((iwm.status & ClemensFrame::kIWMStatusIWMQ7) ? 0x2 : 0) |
@@ -755,24 +754,27 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
             ImGui::TextUnformatted("   ");
         }
         ImGui::PopStyleColor();
+        ImGui::EndTable();
     }
-    ImGui::EndTable();
 
     ImGui::Separator();
 
     // Second Section:  Active Disk
     // QtrTrack, "Real Track", Bitpos
 
-    ImGui::BeginTable("IWM_Head", 3);
-    ImGui::TableNextRow();
-    ImGui::TableNextColumn();
-    ImGui::TextColored(iwm.has_disk ? kHiColor : kLoColor, "QtrTrk: %03d", iwm.qtr_track_index);
-    ImGui::TableNextColumn();
-    ImGui::TextColored(iwm.has_disk ? kHiColor : kLoColor, "Head: %07d/%07d",
-                       iwm.track_byte_index * 8 + (7 - iwm.track_bit_shift), iwm.track_bit_length);
-    ImGui::TableNextColumn();
-    ImGui::SliderInt("Shift", &iwmDiskBitSlip_, 0, 7, "%d", ImGuiSliderFlags_AlwaysClamp);
-    ImGui::EndTable();
+    if (ImGui::BeginTable("IWM_Head", 3)) {
+
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextColored(iwm.has_disk ? kHiColor : kLoColor, "QtrTrk: %03d", iwm.qtr_track_index);
+        ImGui::TableNextColumn();
+        ImGui::TextColored(iwm.has_disk ? kHiColor : kLoColor, "Head: %07d/%07d",
+                           iwm.track_byte_index * 8 + (7 - iwm.track_bit_shift),
+                           iwm.track_bit_length);
+        ImGui::TableNextColumn();
+        ImGui::SliderInt("Shift", &iwmDiskBitSlip_, 0, 7, "%d", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::EndTable();
+    }
 
     if (frameState_->isRunning) {
         displayViewNotAvailable(CLEM_L10N_LABEL(kDebugNotAvailableWhileRunning));
@@ -789,8 +791,9 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, style.ItemSpacing.y));
 
         const float kCursorLeft = ImGui::GetCursorPosX();
-        const ImVec2 kCharSize = ImGui::CalcTextSize("0");
         ImVec2 cursorPos = ImGui::GetCursorPos();
+        ImVec2 kCellSize(ImGui::GetFont()->GetCharAdvance('0') + style.ItemSpacing.x,
+                         ImGui::GetTextLineHeightWithSpacing());
 
         constexpr unsigned kRowLimit = 5;
         unsigned rowIndex = 0;
@@ -801,20 +804,19 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
         unsigned absBitHead = iwm.track_byte_index * 8 + 7 - iwm.track_bit_shift;
         unsigned absBitLeft;
         if (absBitHead - kBitWindowCount / 2 > absBitHead) {
-            absBitLeft = iwm.track_bit_length - kBitWindowCount + absBitHead;
+            absBitLeft = iwm.track_bit_length - kBitWindowCount / 2 + absBitHead;
         } else {
             absBitLeft = absBitHead - kBitWindowCount / 2;
         }
         unsigned bitOffset;
         if (absBitLeft - iwm.buffer_bit_start_index > iwm.buffer_bit_start_index) {
-            bitOffset = iwm.buffer_bit_start_index + /* TODO: finish */ absBitLeft;
+            bitOffset = iwm.track_bit_length - iwm.buffer_bit_start_index + absBitLeft;
         } else {
             bitOffset = absBitLeft - iwm.buffer_bit_start_index;
         }
         unsigned bitOffsetEnd = bitOffset + kBitWindowCount;
         unsigned bitOffsetCur = bitOffset;
         unsigned bitSlip = iwmDiskBitSlip_;
-
         unsigned byteBitIndex = 0;
         uint16_t shiftreg = (uint16_t)(iwm.buffer[bitOffsetCur / 8]) << 8;
         shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
@@ -831,22 +833,16 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
                 unsigned absBitIndex =
                     (iwm.buffer_bit_start_index + bitOffsetCur) % iwm.track_bit_length;
                 bool bitValue = (shiftreg >> 8) & (1 << 7 - (bitOffsetCur % 8));
-                ImU32 bitColor;
-                ImVec2 screenPos = ImGui::GetCursorScreenPos();
-                screenPos.x -= style.ItemSpacing.x;
-                screenPos.y -= style.ItemSpacing.y;
-                ImVec2 brscreenPos = ImVec2(screenPos.x + kCharSize.x + style.ItemSpacing.x,
-                                            screenPos.y + kCharSize.y + style.ItemSpacing.y);
+                ImVec4 bitColor;
+
                 if (absBitIndex == absBitHead) {
-                    ImGui::GetForegroundDrawList()->AddRectFilled(screenPos, brscreenPos,
-                                                                  IM_COL32_WHITE);
-                    bitColor = IM_COL32_BLACK;
+                    ImGui::Selectable(bitValue ? "1" : "0", true, 0,
+                                      kCellSize); // needs to be sized
                 } else if (bitValue) {
-                    bitColor = IM_COL32(255, 255, 255, 255);
+                    ImGui::TextColored(kHiColor, "1");
                 } else {
-                    bitColor = IM_COL32(128, 128, 128, 255);
+                    ImGui::TextColored(kLoColor, "0");
                 }
-                ImGui::GetForegroundDrawList()->AddText(screenPos, bitColor, bitValue ? "1" : "0");
             }
             ++bitOffsetCur;
             ++byteBitIndex;
@@ -854,16 +850,16 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
                 shiftreg <<= 8;
                 shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
             }
-            cursorPos.x += ImGui::GetFont()->GetCharAdvance('1') + style.ItemSpacing.x;
+            cursorPos.x += kCellSize.x;
             if (!((bitOffsetCur - bitOffset) % kBitsPerRow)) {
                 //  do the bit row or the byte value row
                 ++rowIndex;
+                cursorPos.y += kCellSize.y;
                 if (rowIndex & 1) {
                     bitOffsetCur = bitOffset;
-                    cursorPos.y += ImGui::GetTextLineHeight();
                 } else {
                     bitOffset = bitOffsetCur;
-                    cursorPos.y += ImGui::GetTextLineHeightWithSpacing() + style.ItemSpacing.y;
+                    cursorPos.y += style.CellPadding.y;
                 }
                 cursorPos.x = kCursorLeft;
             }
