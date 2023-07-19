@@ -827,8 +827,8 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
         unsigned bitOffsetEnd = bitOffset + kBitWindowCount;
         unsigned bitOffsetCur = bitOffset;
         unsigned bitSlip = iwmDiskBitSlip_;
-        uint16_t shiftreg = (uint16_t)(iwm.buffer[bitOffsetCur / 8]) << 8;
-        shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
+        uint16_t shiftreg = (uint16_t)(iwm.buffer[(bitOffsetCur / 8) + 1]) << 8;
+        shiftreg |= iwm.buffer[(bitOffsetCur / 8)];
 
         uint16_t slippedData = 0xffff;
 
@@ -846,6 +846,7 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
         /* kBitsPerRow + 2 to account for byte hex which may overflow the bits row*/
         const float kTableInnerWidth =
             std::max(kCellSize.x * 6 + (kBitsPerRow + 3) * kCellSize.x, contentRegionAvail.x);
+        ImDrawList *drawList = ImGui::GetWindowDrawList();
 
         if (ImGui::BeginTable("IWM_BufferTable", 2,
                               ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
@@ -861,6 +862,7 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
             ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(192, 192, 192, 255));
 
             ImVec2 startCursorPos;
+            unsigned byteColumnIndex = 0;
 
             while (bitOffset < bitOffsetEnd) {
                 unsigned absBitIndex =
@@ -880,9 +882,19 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
                 } else {
                     ImGui::SetCursorPos(cursorPos);
                 }
-                bool onByteBoundary = ((bitOffsetCur + bitSlip) % 8) == 0;
+                bool onByteBoundary = ((bitOffsetCur - bitSlip) % 8) == 0;
                 if (onByteBoundary) {
-                    slippedData = (uint8_t)((shiftreg >> (8 - bitSlip) & 0xff));
+                    slippedData = (uint8_t)((shiftreg >> bitSlip) & 0xff);
+
+                    if (!(byteColumnIndex % 2)) {
+                        ImVec2 ltanchor = ImGui::GetCursorScreenPos();
+                        ImVec2 rbanchor = ltanchor;
+                        rbanchor.x += 8 * kCellSize.x;
+                        rbanchor.y += 2 * kCellSize.y;
+
+                        drawList->AddRectFilled(ltanchor, rbanchor, IM_COL32_BLACK);
+                    }
+                    ++byteColumnIndex;
                 }
                 if ((rowIndex & 1)) {
                     //  byte row
@@ -892,7 +904,7 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
                     }
                 } else {
                     //  bit row
-                    bool bitValue = ((shiftreg >> 8) & (1 << (7 - (bitOffsetCur % 8)))) != 0;
+                    bool bitValue = (shiftreg & (1 << (7 - (bitOffsetCur % 8)))) != 0;
                     ImVec4 bitColor;
 
                     if (absBitIndex == absBitHead) {
@@ -918,8 +930,8 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
                 }
                 ++bitOffsetCur;
                 if ((bitOffsetCur % 8) == 0) {
-                    shiftreg <<= 8;
-                    shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
+                    shiftreg >>= 8;
+                    shiftreg |= ((uint16_t)(iwm.buffer[(bitOffsetCur / 8) + 1]) << 8);
                 }
                 cursorPos.x += kCellSize.x;
                 if (!((bitOffsetCur - bitOffset) % kBitsPerRow)) {
@@ -935,8 +947,8 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
                             ImVec2(cursorPos.x - startCursorPos.x, cursorPos.y - startCursorPos.y));
                         ImGui::TableNextRow();
                     }
-                    shiftreg = (uint16_t)(iwm.buffer[bitOffsetCur / 8]) << 8;
-                    shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
+                    shiftreg = (uint16_t)(iwm.buffer[(bitOffsetCur / 8) + 1]) << 8;
+                    shiftreg |= iwm.buffer[(bitOffsetCur / 8)];
                 }
             }
             ImGui::PopStyleColor(3);
