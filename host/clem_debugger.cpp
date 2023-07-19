@@ -832,109 +832,117 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
 
         uint16_t slippedData = 0xffff;
 
-        if (ImGui::BeginChild("IWM_Buffer", ImVec2(0, 0), false,
-                              ImGuiWindowFlags_HorizontalScrollbar)) {
+        auto &style = ImGui::GetStyle();
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, style.ItemSpacing.y));
 
-            auto &style = ImGui::GetStyle();
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, style.ItemSpacing.y));
+        //  not using a table... seems overkill?  but would like to control the
+        //  rendering of this buffer to minimize screen space
+        ImVec2 cursorPos = ImGui::GetCursorPos();
+        ImVec2 kCellSize(ImGui::GetFont()->GetCharAdvance('0') + style.ItemSpacing.x,
+                         ImGui::GetTextLineHeightWithSpacing());
 
-            //  not using a table... seems overkill?  but would like to control the
-            //  rendering of this buffer to minimize screen space
-            const float kCursorLeft = ImGui::GetCursorPosX();
-            ImVec2 cursorPos = ImGui::GetCursorPos();
-            ImVec2 windowPos = ImGui::GetWindowPos();
-            ImVec2 kCellSize(ImGui::GetFont()->GetCharAdvance('0') + style.ItemSpacing.x,
-                             ImGui::GetTextLineHeightWithSpacing());
-            ImDrawList *drawList = ImGui::GetWindowDrawList();
-            ImVec2 drawAnchor;
+        ImVec2 contentRegionAvail = ImGui::GetContentRegionAvail();
 
-            ImGui::TextUnformatted("Offset ");
-            ImGui::SameLine();
-            ImGui::TextUnformatted("Data");
+        /* kBitsPerRow + 2 to account for byte hex which may overflow the bits row*/
+        const float kTableInnerWidth =
+            std::max(kCellSize.x * 6 + (kBitsPerRow + 3) * kCellSize.x, contentRegionAvail.x);
 
-            drawAnchor.x = windowPos.x + cursorPos.x;
-            drawAnchor.y = windowPos.y + cursorPos.y;
+        if (ImGui::BeginTable("IWM_BufferTable", 2,
+                              ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
+                                  ImGuiTableFlags_RowBg,
+                              contentRegionAvail, kTableInnerWidth)) {
 
-            if (ImGui::BeginTable("IWM_BufferTable", 2)) {
+            ImGui::TableSetupColumn("Offset", ImGuiTableColumnFlags_WidthFixed, kCellSize.x * 6);
+            ImGui::TableSetupColumn("Data", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableHeadersRow();
 
-                ImGui::TableSetupColumn("Offset");
-                ImGui::TableSetupColumn("Data");
-                ImGui::TableHeadersRow();
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, IM_COL32_WHITE);
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32_WHITE);
+            ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(192, 192, 192, 255));
 
-                ImGui::PushStyleColor(ImGuiCol_HeaderActive, IM_COL32_WHITE);
-                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32_WHITE);
-                ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(192, 192, 192, 255));
+            ImVec2 startCursorPos;
 
-                while (bitOffset < bitOffsetEnd) {
-                    unsigned absBitIndex =
-                        (iwm.buffer_bit_start_index + bitOffsetCur) % iwm.track_bit_length;
-                    ImGui::SetCursorPos(cursorPos);
-                    if (bitOffset == bitOffsetCur) {
+            while (bitOffset < bitOffsetEnd) {
+                unsigned absBitIndex =
+                    (iwm.buffer_bit_start_index + bitOffsetCur) % iwm.track_bit_length;
+                if (bitOffset == bitOffsetCur) {
+                    if (!(rowIndex & 1)) {
+                        ImGui::TableNextColumn();
                         //  start of line
                         ImGui::TextColored(kLoColor, "%06u:", absBitIndex);
-                        ImGui::SameLine();
-                        cursorPos = ImGui::GetCursorPos();
-                    }
-                    bool onByteBoundary = ((bitOffsetCur + bitSlip) % 8) == 0;
-                    if (onByteBoundary) {
-                        slippedData = (uint8_t)((shiftreg >> (8 - bitSlip) & 0xff));
-                    }
-                    if ((rowIndex & 1)) {
-                        //  byte row
-                        if (onByteBoundary) {
-                            ImGui::Text("^%02X", (uint8_t)(slippedData));
-                        }
+                        ImGui::TableNextColumn();
+                        startCursorPos = ImGui::GetCursorPos();
+                        cursorPos = startCursorPos;
                     } else {
-                        //  bit row
-                        bool bitValue = ((shiftreg >> 8) & (1 << (7 - (bitOffsetCur % 8)))) != 0;
-                        ImVec4 bitColor;
+                        cursorPos.x = startCursorPos.x;
+                        cursorPos.y = startCursorPos.y + kCellSize.y;
+                    }
+                } else {
+                    ImGui::SetCursorPos(cursorPos);
+                }
+                bool onByteBoundary = ((bitOffsetCur + bitSlip) % 8) == 0;
+                if (onByteBoundary) {
+                    slippedData = (uint8_t)((shiftreg >> (8 - bitSlip) & 0xff));
+                }
+                if ((rowIndex & 1)) {
+                    //  byte row
+                    if (onByteBoundary) {
+                        ImGui::Text("^%02X", (uint8_t)(slippedData));
+                        ImGui::SameLine();
+                    }
+                } else {
+                    //  bit row
+                    bool bitValue = ((shiftreg >> 8) & (1 << (7 - (bitOffsetCur % 8)))) != 0;
+                    ImVec4 bitColor;
 
-                        if (absBitIndex == absBitHead) {
-                            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32_BLACK);
-                            ImGui::Selectable(bitValue ? "1" : "0", true, 0,
-                                              kCellSize); // needs to be sized
-                            ImGui::PopStyleColor();
-                        } else if (bitValue) {
-                            ImGui::TextColored(kHiColor, "1");
-                        } else {
-                            ImGui::TextColored(kLoColor, "0");
-                        }
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-                            if (slippedData != 0xffff) {
-                                ImGui::SetTooltip("%s @ %u, BYTE:%02X", bitValue ? "HI" : "LO",
-                                                  absBitIndex, (uint8_t)(slippedData));
-                            } else {
-                                ImGui::SetTooltip("%s @ %u, BYTE:--", bitValue ? "HI" : "LO",
-                                                  absBitIndex);
-                            }
-                        }
+                    if (absBitIndex == absBitHead) {
+                        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32_BLACK);
+                        ImGui::Selectable(bitValue ? "1" : "0", true, 0,
+                                          kCellSize); // needs to be sized
+                        ImGui::SameLine();
+                        ImGui::PopStyleColor();
+                    } else if (bitValue) {
+                        ImGui::TextColored(kHiColor, "1");
+                    } else {
+                        ImGui::TextColored(kLoColor, "0");
                     }
-                    ++bitOffsetCur;
-                    if ((bitOffsetCur % 8) == 0) {
-                        shiftreg <<= 8;
-                        shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
-                    }
-                    cursorPos.x += kCellSize.x;
-                    if (!((bitOffsetCur - bitOffset) % kBitsPerRow)) {
-                        //  do the bit row or the byte value row
-                        ++rowIndex;
-                        cursorPos.y += kCellSize.y;
-                        if (rowIndex & 1) {
-                            bitOffsetCur = bitOffset;
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+                        if (slippedData != 0xffff) {
+                            ImGui::SetTooltip("%s @ %u, BYTE:%02X", bitValue ? "HI" : "LO",
+                                              absBitIndex, (uint8_t)(slippedData));
                         } else {
-                            bitOffset = bitOffsetCur;
-                            cursorPos.y += style.CellPadding.y;
+                            ImGui::SetTooltip("%s @ %u, BYTE:--", bitValue ? "HI" : "LO",
+                                              absBitIndex);
                         }
-                        shiftreg = (uint16_t)(iwm.buffer[bitOffsetCur / 8]) << 8;
-                        shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
-                        cursorPos.x = kCursorLeft;
                     }
                 }
-                ImGui::PopStyleColor(3);
+                ++bitOffsetCur;
+                if ((bitOffsetCur % 8) == 0) {
+                    shiftreg <<= 8;
+                    shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
+                }
+                cursorPos.x += kCellSize.x;
+                if (!((bitOffsetCur - bitOffset) % kBitsPerRow)) {
+                    //  do the bit row or the byte value row
+                    ++rowIndex;
+                    if (rowIndex & 1) {
+                        bitOffsetCur = bitOffset;
+                    } else {
+                        bitOffset = bitOffsetCur;
+                        cursorPos.x += (kCellSize.x * 3); /* byte hex overflow */
+                        ImGui::SetCursorPos(startCursorPos);
+                        ImGui::Dummy(
+                            ImVec2(cursorPos.x - startCursorPos.x, cursorPos.y - startCursorPos.y));
+                        ImGui::TableNextRow();
+                    }
+                    shiftreg = (uint16_t)(iwm.buffer[bitOffsetCur / 8]) << 8;
+                    shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
+                }
             }
-            ImGui::PopStyleVar();
-            ImGui::EndChild();
+            ImGui::PopStyleColor(3);
+            ImGui::EndTable();
         }
+        ImGui::PopStyleVar();
     }
 }
 
