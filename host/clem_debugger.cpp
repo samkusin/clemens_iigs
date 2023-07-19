@@ -827,8 +827,9 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
         unsigned bitOffsetEnd = bitOffset + kBitWindowCount;
         unsigned bitOffsetCur = bitOffset;
         unsigned bitSlip = iwmDiskBitSlip_;
-        uint16_t shiftreg = (uint16_t)(iwm.buffer[(bitOffsetCur / 8) + 1]) << 8;
-        shiftreg |= iwm.buffer[(bitOffsetCur / 8)];
+        //  bits 15-0 = bitOffset to bitOffset + 15, since disk bytes are 'big' bit-endian
+        uint16_t shiftreg = (uint16_t)(iwm.buffer[bitOffsetCur / 8]) << 8;
+        shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
 
         uint16_t slippedData = 0xffff;
 
@@ -884,7 +885,7 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
                 }
                 bool onByteBoundary = ((bitOffsetCur - bitSlip) % 8) == 0;
                 if (onByteBoundary) {
-                    slippedData = (uint8_t)((shiftreg >> bitSlip) & 0xff);
+                    slippedData = (uint8_t)((shiftreg << bitSlip) >> 8);
 
                     if (!(byteColumnIndex % 2)) {
                         ImVec2 ltanchor = ImGui::GetCursorScreenPos();
@@ -904,7 +905,8 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
                     }
                 } else {
                     //  bit row
-                    bool bitValue = (shiftreg & (1 << (7 - (bitOffsetCur % 8)))) != 0;
+                    //  bit 15 = high bit of current byte, big bit-endian order
+                    uint16_t bitValue = (shiftreg >> (15 - (bitOffsetCur % 8))) & 1;
                     ImVec4 bitColor;
 
                     if (absBitIndex == absBitHead) {
@@ -930,8 +932,8 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
                 }
                 ++bitOffsetCur;
                 if ((bitOffsetCur % 8) == 0) {
-                    shiftreg >>= 8;
-                    shiftreg |= ((uint16_t)(iwm.buffer[(bitOffsetCur / 8) + 1]) << 8);
+                    shiftreg <<= 8;
+                    shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
                 }
                 cursorPos.x += kCellSize.x;
                 if (!((bitOffsetCur - bitOffset) % kBitsPerRow)) {
@@ -947,8 +949,8 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
                             ImVec2(cursorPos.x - startCursorPos.x, cursorPos.y - startCursorPos.y));
                         ImGui::TableNextRow();
                     }
-                    shiftreg = (uint16_t)(iwm.buffer[(bitOffsetCur / 8) + 1]) << 8;
-                    shiftreg |= iwm.buffer[(bitOffsetCur / 8)];
+                    shiftreg = (uint16_t)(iwm.buffer[bitOffsetCur / 8]) << 8;
+                    shiftreg |= iwm.buffer[(bitOffsetCur / 8) + 1];
                 }
             }
             ImGui::PopStyleColor(3);

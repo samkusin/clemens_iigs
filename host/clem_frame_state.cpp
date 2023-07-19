@@ -94,7 +94,8 @@ void IWMStatus::copyFrom(ClemensMMIO &mmio, const ClemensDeviceIWM &iwm, bool de
     //  do_copy_window(window)
     constexpr auto diskBufferSize = sizeof(buffer);
     constexpr auto diskBufferMid = diskBufferSize / 2;
-    const uint8_t *diskBits = iwmDrive->disk.bits_data;
+    const uint8_t *diskBits =
+        iwmDrive->disk.bits_data + iwmDrive->disk.track_byte_offset[diskTrackIndex];
     unsigned trackByteCount = (iwmDrive->disk.track_bits_count[diskTrackIndex] + 7) / 8;
     int startIndex = int(track_byte_index - diskBufferMid);
     int runLength;
