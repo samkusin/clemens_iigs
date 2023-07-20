@@ -403,9 +403,9 @@
  *  of IO registers.  Our host should have the opportunity to send input to the
  *  emulator at a decent frequency (30-60hz) for us not to lose events
  */
-#define CLEM_ADB_KEYB_BUFFER_LIMIT     8
+#define CLEM_ADB_KEYB_BUFFER_LIMIT      8
 #define CLEM_ADB_CLIPBOARD_BUFFER_LIMIT 8
-#define CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK 0x0000001
+#define CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK  0x0000001
 
 /** Gameport support - note that paddle axis values range from 0 to 1023, and
  *  there's support for up to 8 buttons.  Of course the Apple 2 only supports
@@ -605,9 +605,16 @@
 #define CLEM_ADB_KEY_MOD_STATE_RESET   CLEM_ADB_GLU_REG2_KEY_RESET
 #define CLEM_ADB_KEY_MOD_STATE_ESCAPE  0x00010000
 
-/** Emulated duration of every 'step' iwm_glu_sync runs. 1.023 / 2 ~ 0.511 */
-#define CLEM_IWM_SYNC_CLOCKS_FAST        (CLEM_CLOCKS_2MHZ_CYCLE * 4)
-#define CLEM_IWM_SYNC_CLOCKS_NORMAL      (CLEM_CLOCKS_2MHZ_CYCLE * 8)
+/** Emulated duration of every 'step' iwm_glu_sync runs. 1.023 / 2 ~ 0.511
+ * Note, the hard coded values are much closer to 2000 ns and 4000 ns instead of
+ * multiples of the master clock frequency as they better match with ideal disk
+ * bit cell timings.   Apparently these are better especially for certain
+ * copy protection schemes on 3.5" disks (re: Carmen Sandiego), but may
+ * benefit 5.25" copy protected disk read/writes as well.  Time will tell...
+ *
+ */
+#define CLEM_IWM_SYNC_CLOCKS_FAST        5714  // (CLEM_CLOCKS_2MHZ_CYCLE * 4)
+#define CLEM_IWM_SYNC_CLOCKS_NORMAL      11428 // (CLEM_CLOCKS_2MHZ_CYCLE * 8)
 #define CLEM_IWM_SYNC_DISK_FRAME_NS      500
 #define CLEM_IWM_SYNC_DISK_FRAME_NS_FAST 250
 #define CLEM_IWM_DRIVE_RANDOM_BYTES      16

@@ -103,7 +103,9 @@ static struct ClemensDrive *_clem_iwm_select_drive(struct ClemensDeviceIWM *iwm,
 }
 
 static clem_clocks_duration_t _clem_iwm_select_clocks_step(struct ClemensDeviceIWM *iwm) {
-    return iwm->fast_mode ? CLEM_IWM_SYNC_CLOCKS_FAST : CLEM_IWM_SYNC_CLOCKS_NORMAL;
+    // return iwm->fast_mode ? CLEM_IWM_SYNC_CLOCKS_FAST : CLEM_IWM_SYNC_CLOCKS_NORMAL;
+    // return iwm->fast_mode ? 5600 : 11200;
+    return iwm->fast_mode ? 5714 : 11428;
 }
 
 static uint8_t _clem_iwm_read_status(struct ClemensDeviceIWM *iwm);

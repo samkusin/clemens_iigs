@@ -386,7 +386,7 @@ struct ClemensDrive {
     unsigned track_byte_index;              /**< byte index into track */
     unsigned track_bit_shift;               /**< bit offset into current byte */
     unsigned track_bit_length;              /**< current track bit length */
-    clem_clocks_duration_t pulse_clocks_dt; /**< clocks per drive tick */
+    clem_clocks_duration_t pulse_clocks_dt; /**< TODO: remove, NOT USED ANYMORE */
     unsigned read_buffer;                   /**< Used for MC3470 emulation */
 
     /**
