@@ -746,7 +746,9 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
         ImGui::TableNextColumn(); // 3
         ImGui::TextUnformatted(iwm.status & ClemensFrame::kIWMStatusDriveWP ? "HI" : "LO");
         ImGui::TableNextColumn(); // 4
-        ImGui::TextColored(stateFlags ? kHiColor : kOffColor, q6q7motor[stateFlags & 0x7]);
+        ImGui::PushStyleColor(ImGuiCol_Text, stateFlags ? kHiColor : kOffColor);
+        ImGui::TextUnformatted(q6q7motor[stateFlags & 0x7]);
+        ImGui::PopStyleColor();
         ImGui::TableNextColumn(); // 5
         ImGui::Text("%02X", iwm.data);
         ImGui::TableNextColumn(); // 6
@@ -766,7 +768,7 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
 
     // Second Section:  Active Disk
     // QtrTrack, "Real Track", Bitpos
-    bool showBuffer = !frameState_->isRunning && iwm.has_disk && iwm.track_bit_length;
+    bool showBuffer = detailed && iwm.has_disk && iwm.track_bit_length;
 
     if (ImGui::BeginTable("IWM_Head", 3)) {
 
@@ -907,8 +909,7 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
                     //  bit row
                     //  bit 15 = high bit of current byte, big bit-endian order
                     uint16_t bitValue = (shiftreg >> (15 - (bitOffsetCur % 8))) & 1;
-                    ImVec4 bitColor;
-
+                  
                     if (absBitIndex == absBitHead) {
                         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32_BLACK);
                         ImGui::Selectable(bitValue ? "1" : "0", true, 0,

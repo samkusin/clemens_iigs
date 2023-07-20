@@ -105,7 +105,7 @@ void IWMStatus::copyFrom(ClemensMMIO &mmio, const ClemensDeviceIWM &iwm, bool de
         runLength = -startIndex;
         startIndex = trackByteCount - runLength;
         buffer_bit_start_index = startIndex * 8;
-        assert(runCount + runLength <= diskBufferSize);
+        assert(runCount + runLength <= (int)diskBufferSize);
         memcpy(buffer + runCount, diskBits + startIndex, runLength);
         runCount += runLength;
         runLength = diskBufferSize - runLength;
@@ -116,7 +116,7 @@ void IWMStatus::copyFrom(ClemensMMIO &mmio, const ClemensDeviceIWM &iwm, bool de
         runCount = 0;
         buffer_bit_start_index = startIndex * 8;
     }
-    assert(runCount + runLength <= diskBufferSize);
+    assert(runCount + runLength <= (int)diskBufferSize);
     memcpy(buffer + runCount, diskBits + startIndex, runLength);
 }
 
