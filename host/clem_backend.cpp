@@ -290,7 +290,10 @@ auto ClemensBackend::step(ClemensCommandQueue &commands) -> ClemensCommandQueue:
     return result;
 }
 
-ClemensAudio ClemensBackend::renderAudioFrame() { return GS_->renderAudio(); }
+ClemensAudio ClemensBackend::renderAudioFrame() { 
+    ClemensAudio audio = GS_->renderAudio();
+    return audio;
+}
 
 void ClemensBackend::post(ClemensBackendState &backendState) {
     auto &machine = GS_->getMachine();
