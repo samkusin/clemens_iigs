@@ -82,7 +82,7 @@ char *get_local_user_data_directory(char *outpath, size_t outpath_size, const ch
     return outpath;
 }
 
-void open_system_folder_view(const char *folder_path) {}
+void open_system_folder_view(const char *folder_path) { (void)folder_path; }
 
 //  evdev implementation
 //  using https://fossies.org/linux/stella/src/tools/evdev-joystick/evdev-joystick.c
@@ -346,7 +346,6 @@ void clem_joystick_open_devices(const char *provider) {
 }
 
 unsigned clem_joystick_poll(ClemensHostJoystick *joysticks) {
-    unsigned valid_device_count = 0;
     unsigned device_index;
 
     for (device_index = 0; device_index < CLEM_HOST_JOYSTICK_LIMIT; ++device_index) {
@@ -355,7 +354,6 @@ unsigned clem_joystick_poll(ClemensHostJoystick *joysticks) {
             joysticks[device_index].isConnected = false;
             continue;
         }
-        ++valid_device_count;
         if (joystick_info->connected) {
             joysticks[device_index].isConnected =
                 _clem_joystick_poll_one(&joysticks[device_index], joystick_info);

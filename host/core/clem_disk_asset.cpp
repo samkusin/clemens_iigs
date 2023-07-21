@@ -170,7 +170,7 @@ cinek::ConstRange<uint8_t> ClemensDiskAsset::createBlankDiskImage(ImageType imag
         disk.flags = CLEM_WOZ_IMAGE_CLEANED | CLEM_WOZ_IMAGE_SYNCHRONIZED;
         disk.version = CLEM_WOZ_SUPPORTED_VERSION;
         memset(disk.creator, 0x20, sizeof(disk.creator));
-        memcpy(disk.creator, creatorName, strnlen(creatorName, sizeof(disk.creator)));
+        memcpy(disk.creator, creatorName, strlen(creatorName));
 
         if (diskType == Disk35) {
             disk.disk_type = CLEM_DISK_TYPE_3_5;

@@ -736,6 +736,7 @@ namespace ImGui
                 {
                     break;
                 }
+                // fall through
 			case Emphasis::RIGHT:
 				if( em.sym == c )
                 {
