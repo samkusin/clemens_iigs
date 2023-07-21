@@ -530,6 +530,9 @@ void clem_sound_glu_sync(struct ClemensDeviceAudio *glu, struct ClemensClock *cl
             //  TODO: stereo
             unsigned ensoniq_voice_cnt = clem_ensoniq_voices(&glu->doc);
             clem_ensoniq_mono(&glu->doc, ensoniq_voice_cnt, &doc_out[0], &doc_out[1]);
+            if (glu->mix_frame_index + delta_frames > glu->mix_buffer.frame_count) {
+                delta_frames = glu->mix_buffer.frame_count - glu->mix_frame_index;
+            }
             for (unsigned i = 0; i < delta_frames; ++i) {
                 unsigned frame_index = (glu->mix_frame_index + i) % glu->mix_buffer.frame_count;
                 float *samples = (float *)(&mix_out[frame_index * glu->mix_buffer.stride]);
@@ -570,7 +573,7 @@ void clem_sound_glu_sync(struct ClemensDeviceAudio *glu, struct ClemensClock *cl
                     samples[1] = -1.0f;
             }
             glu->mix_frame_index =
-                (glu->mix_frame_index + delta_frames) % (glu->mix_buffer.frame_count);
+                (glu->mix_frame_index + delta_frames); // % (glu->mix_buffer.frame_count);
             glu->dt_mix_frame = glu->dt_mix_frame % glu->dt_mix_sample;
 #if CLEM_AUDIO_DIAGNOSTICS
             glu->diag_delta_frames += delta_frames;

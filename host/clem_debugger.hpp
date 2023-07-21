@@ -33,9 +33,11 @@ class ClemensDebugger {
     //  Draws the main debugger console
     void console(ImVec2 anchor, ImVec2 dimensions);
     //  Draws a column of CPU state entries
-    void cpuStateTable(ImVec2 anchor, ImVec2 dimensions);
+    void cpuStateTable(ImVec2 anchor, ImVec2 dimensions, const DebugDiagnostics& diagnostics);
     //  Draws the auxillary view
     void auxillary(ImVec2 anchor, ImVec2 dimensions);
+    //  Draws the debug diagnostic tables - (automatically drawn if cpuStateTable is called)
+    void diagnosticTables(const DebugDiagnostics& diagnostics);
 
     enum LogLineType { Debug, Info, Warn, Error, Command, Opcode };
 
@@ -68,6 +70,8 @@ class ClemensDebugger {
     static void imguiMemoryEditorWrite(ImU8 *mem_ptr, size_t off, ImU8 value);
 
     void doMachineDebugIORegister(uint8_t *ioregsold, uint8_t *ioregs, uint8_t reg);
+    void doMachineDebugDOCDisplay();
+    void doMachineDebugIWMDisplay(bool detailed);
 
   private:
     ClemensCPUPins lastFrameCPUPins_;
@@ -78,6 +82,8 @@ class ClemensDebugger {
     uint8_t lastFrameIORegs_[256];
 
     std::vector<ClemensBackendBreakpoint> breakpoints_;
+
+    int iwmDiskBitSlip_;
 
     void cpuStatRow16(const char *label, const char *attrName, uint16_t value, float labelWidth,
                       const ImVec4 &color);

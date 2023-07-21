@@ -144,8 +144,8 @@ static void _clem_disk_reset_drive(struct ClemensDrive *drive) {
          "Half-step single-coil mode"
     Mechanical Summary: 3.5"
 */
-static unsigned _clem_disk_get_track_bit_length(struct ClemensDrive *drive, int qtr_track_index,
-                                                bool is_drive_525) {
+static inline unsigned _clem_disk_get_track_bit_length(struct ClemensDrive *drive,
+                                                       int qtr_track_index, bool is_drive_525) {
     if (drive->disk.meta_track_map[qtr_track_index] != 0xff) {
         return drive->disk.track_bits_count[(drive->disk.meta_track_map[qtr_track_index])];
     }
@@ -153,7 +153,7 @@ static unsigned _clem_disk_get_track_bit_length(struct ClemensDrive *drive, int 
     return 51200;
 }
 
-static void _clem_disk_write_bit(struct ClemensDrive *drive, bool value) {
+static inline void _clem_disk_write_bit(struct ClemensDrive *drive, bool value) {
     uint8_t *data =
         drive->disk.bits_data + (drive->disk.track_byte_offset[drive->real_track_index]);
     if (value) {
@@ -180,7 +180,7 @@ static inline bool _clem_disk_read_fake_bit_525(struct ClemensDrive *drive) {
     return random_bit;
 }
 
-unsigned _clem_disk_get_track_position(struct ClemensDrive *drive) {
+static inline unsigned _clem_disk_get_track_position(struct ClemensDrive *drive) {
     unsigned track_cur_pos = (drive->track_byte_index * 8) + (7 - drive->track_bit_shift);
     return track_cur_pos;
 }
@@ -294,7 +294,10 @@ void clem_disk_control(struct ClemensDrive *drive, unsigned *io_flags, unsigned 
                 drive->track_bit_length = drive->disk.track_bits_count[0];
             }
             if (track_prev_len) {
-                track_cur_pos = track_cur_pos * drive->track_bit_length / track_prev_len;
+                //  TODO: this should be 64-bit math or reexamined - using double here for
+                //  expediency until Carmen Sandiego copy protection bug is fixed
+                track_cur_pos = (unsigned)(track_cur_pos *
+                                           ((double)(drive->track_bit_length) / track_prev_len));
             }
         }
     } else {
@@ -329,25 +332,28 @@ void clem_disk_step(struct ClemensDrive *drive, unsigned *io_flags) {
             drive->read_buffer |= 0x1;
         }
     }
-    if (is_drive_525) {
-        /* 3.5" drives don't have the same hardware as the Disk II, so
-           I *think* fake bits don't apply
-        */
-        if ((drive->read_buffer & 0xf) && valid_disk_data) {
-            if (drive->read_buffer & 0x2) {
-                *io_flags |= CLEM_IWM_FLAG_READ_DATA;
-            }
-        } else {
-            *io_flags |= CLEM_IWM_FLAG_READ_DATA_FAKE;
-            if (_clem_disk_read_fake_bit_525(drive)) {
-                *io_flags |= CLEM_IWM_FLAG_READ_DATA;
-            }
+    /* 3.5" drives don't have the same hardware as the Disk II, so
+        I *think* fake bits don't apply.
+        WRONG!!  Though the hardware isn't the same, randomness can still
+        occur.  No real documentation on how similiar this is to Disk II
+        random behavior.
+    */
+    // if (is_drive_525) {
+    if ((drive->read_buffer & 0xf) && valid_disk_data) {
+        if (drive->read_buffer & 0x2) {
+            *io_flags |= CLEM_IWM_FLAG_READ_DATA;
         }
     } else {
-        if (drive->read_buffer & 0x1) {
+        *io_flags |= CLEM_IWM_FLAG_READ_DATA_FAKE;
+        if (_clem_disk_read_fake_bit_525(drive)) {
             *io_flags |= CLEM_IWM_FLAG_READ_DATA;
         }
     }
+    //} else {
+    //    if (drive->read_buffer & 0x1) {
+    //        *io_flags |= CLEM_IWM_FLAG_READ_DATA;
+    //    }
+    //}
 
     drive->current_byte = (drive->current_byte & 0xfe) | (drive->read_buffer & 0x01);
 

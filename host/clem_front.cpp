@@ -599,7 +599,8 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
       frameLastSeqNo_(kFrameSeqNoInvalid),
       frameReadMemory_(kFrameMemorySize, malloc(kFrameMemorySize)), lastFrameCPUPins_{},
       lastFrameCPURegs_{}, lastFrameIWM_{}, lastFrameIRQs_(0), lastFrameNMIs_(0),
-      emulatorHasKeyboardFocus_(true), emulatorHasMouseFocus_(false), mouseInEmulatorScreen_(false),
+      emulatorShouldHaveKeyboardFocus_(false), emulatorHasKeyboardFocus_(false),
+      emulatorHasMouseFocus_(false), mouseInEmulatorScreen_(false),
       pasteClipboardToEmulator_(false), debugIOMode_(DebugIOMode::Core), vgcDebugMinScanline_(0),
       vgcDebugMaxScanline_(0), joystickSlotCount_(0), guiMode_(GUIMode::None),
       guiPrevMode_(GUIMode::None), appTime_(0.0), nextUIFlashCycleAppTime_(0.0),
@@ -623,7 +624,7 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
     spdlog::info("Clemens IIGS Emulator {}.{}", CLEM_HOST_VERSION_MAJOR, CLEM_HOST_VERSION_MINOR);
 
     if (config_.poweredOn) {
-        setGUIMode(GUIMode::RebootEmulator);
+        rebootInternal(true);
     } else {
         setGUIMode(GUIMode::Setup);
     }
@@ -645,6 +646,7 @@ void ClemensFrontend::input(ClemensInputEvent input) {
             input.type = kClemensInputType_None;
         }
     }
+
     if (emulatorHasKeyboardFocus_ && input.type != kClemensInputType_None) {
         constexpr float kMouseScalar = 1.25f;
         if (input.type == kClemensInputType_MouseMove) {
@@ -668,8 +670,15 @@ void ClemensFrontend::pasteText(const char *utf8, unsigned textSizeLimit) {
 }
 
 void ClemensFrontend::lostFocus() {
+
+}
+
+void ClemensFrontend::gainFocus() {
     emulatorHasMouseFocus_ = false;
     emulatorHasKeyboardFocus_ = false;
+    if (guiMode_ == GUIMode::Emulator) {
+        emulatorShouldHaveKeyboardFocus_ = true;
+    }
 }
 
 void ClemensFrontend::startBackend() {
@@ -920,10 +929,10 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         pasteClipboardToEmulator_ = true;
         break;
     case ClemensHostInterop::Power:
-        setGUIMode(GUIMode::RebootEmulator);
+        rebootInternal(true);
         break;
     case ClemensHostInterop::Reboot:
-        rebootInternal();
+        rebootInternal(true);
         break;
     case ClemensHostInterop::Shutdown:
         setGUIMode(GUIMode::ShutdownEmulator);
@@ -1205,16 +1214,6 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
         } else {
             doMachineViewLayout(kMonitorViewAnchor, kMonitorViewSize, viewToMonitor);
         }
-        bool mode80 = true;
-        ImGui::PushFont(mode80 ? ClemensHostImGui::Get80ColumnFont() : NULL);
-        const float kCharSize = ImGui::GetFont()->GetCharAdvance('W');
-        ImVec2 debugViewSize((kMainStyle.WindowPadding.x + kMainStyle.FramePadding.x) * 2 +
-                                 kCharSize * 20,
-                             kLineSpacing * 8);
-        doDebugView(ImVec2(kMonitorViewAnchor.x + kMonitorViewSize.x - debugViewSize.x,
-                           kMonitorViewAnchor.y),
-                    debugViewSize);
-        ImGui::PopFont();
     }
     doSidePanelLayout(kSideBarAnchor, kSideBarSize);
     doInfoStatusLayout(kInfoStatusAnchor, kInfoStatusSize, kMonitorViewAnchor.x);
@@ -1245,7 +1244,7 @@ void ClemensFrontend::doDebuggerLayout(ImVec2 anchor, ImVec2 dimensions,
     //  CPU tile always fixed for now
 
     childSize[kCPUTile].x =
-        (kCharSize * 12.5f) +
+        (kCharSize * 15.0f) +
         (style.WindowPadding.x + style.WindowBorderSize + style.FramePadding.x) * 2;
     childSize[kCPUTile].y = dimensions.y;
     childAnchor[kCPUTile].x = anchor.x + dimensions.x - childSize[kCPUTile].x;
@@ -1255,8 +1254,8 @@ void ClemensFrontend::doDebuggerLayout(ImVec2 anchor, ImVec2 dimensions,
     //  These tiles can be resized based off the anchor tile, which will be
     //  the view tile (emulator screen).
     childAnchor[kViewTile] = anchor;
-    childSize[kViewTile].x = dimensions.x * 0.5f;
-    childSize[kViewTile].y = dimensions.y * 0.5f;
+    childSize[kViewTile].x = dimensions.x * 0.55f;
+    childSize[kViewTile].y = dimensions.y * 0.55f;
 
     childAnchor[kConsoleTile].x = childAnchor[kViewTile].x + childSize[kViewTile].x;
     childAnchor[kConsoleTile].y = childAnchor[kViewTile].y;
@@ -1271,7 +1270,7 @@ void ClemensFrontend::doDebuggerLayout(ImVec2 anchor, ImVec2 dimensions,
     doMachineViewLayout(childAnchor[kViewTile], childSize[kViewTile], viewToMonitor);
     debugger_.auxillary(childAnchor[kAuxViewTile], childSize[kAuxViewTile]);
     debugger_.console(childAnchor[kConsoleTile], childSize[kConsoleTile]);
-    debugger_.cpuStateTable(childAnchor[kCPUTile], childSize[kCPUTile]);
+    debugger_.cpuStateTable(childAnchor[kCPUTile], childSize[kCPUTile], diagnostics_);
 
     ImGui::PopFont();
 }
@@ -1376,7 +1375,9 @@ void ClemensFrontend::doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions) {
 }
 
 void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
-    ImGui::BeginChild("PeripheralsAndCards");
+    if (!ImGui::BeginChild("PeripheralsAndCards"))
+        return;
+
     const ImGuiStyle &drawStyle = ImGui::GetStyle();
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     if (ImGui::CollapsingHeader("System", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -1484,6 +1485,14 @@ void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
             ImGui::Separator();
         }
     }
+
+    auto cursor = ImGui::GetCursorScreenPos();
+    bool mode80 = true;
+    ImGui::PushFont(mode80 ? ClemensHostImGui::Get80ColumnFont() : NULL);
+    ImVec2 debugViewSize(ImGui::GetContentRegionAvail().x,
+                         ImGui::GetTextLineHeightWithSpacing() * 10);
+    doDebugView(ImVec2(cursor), debugViewSize);
+    ImGui::PopFont();
     ImGui::EndChild();
 }
 
@@ -1596,7 +1605,7 @@ void ClemensFrontend::doDebuggerQuickbar(float /*width */) {
         if (ClemensHostImGui::IconButton(
                 "Reboot", ClemensHostStyle::getImTextureOfAsset(ClemensHostAssets::kPowerCycle),
                 kIconSize)) {
-            rebootInternal();
+            rebootInternal(true);
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
             ImGui::SetTooltip("Reboot");
@@ -2797,63 +2806,11 @@ void ClemensFrontend::doMachineDebugSoundDisplay() {
 */
 
 void ClemensFrontend::doDebugView(ImVec2 anchor, ImVec2 size) {
-    auto *state = frameReadState_.e1bank;
     ImGui::SetNextWindowPos(anchor, ImGuiCond_Once);
     ImGui::SetNextWindowSize(size, ImGuiCond_Once);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 128));
     if (ImGui::Begin("Debug View", NULL, 0)) {
-        if (ImGui::CollapsingHeader("Stats", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::BeginTable("##Stats", 2);
-            {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::TextUnformatted("EMU");
-                ImGui::TableNextColumn();
-                ImGui::Text("%5.2f fps", frameReadState_.fps);
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::TextUnformatted("GUI");
-                ImGui::TableNextColumn();
-                ImGui::Text("%5.2f fps", ImGui::GetIO().Framerate);
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::TextUnformatted("Time");
-                ImGui::TableNextColumn();
-                uint64_t emulatorTime = 0;
-                if (frameSeqNo_ != kFrameSeqNoInvalid) {
-                    emulatorTime =
-                        (uint64_t)(clem_calc_secs_from_clocks(&frameReadState_.emulatorClock) *
-                                   1000);
-                }
-                unsigned hours = emulatorTime / 3600000;
-                unsigned minutes = (emulatorTime % 3600000) / 60000;
-                unsigned seconds = ((emulatorTime % 3600000) % 60000) / 1000;
-                unsigned milliseconds = ((emulatorTime % 3600000) % 60000) % 1000;
-                ImGui::Text("%02u:%02u:%02u.%01u", hours, minutes, seconds, milliseconds);
-            }
-            ImGui::EndTable();
-            ImGui::Separator();
-        }
-        if (ImGui::CollapsingHeader("Mouse", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::BeginTable("##Mouse", 2);
-            {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::TextUnformatted("Host");
-                ImGui::TableNextColumn();
-                ImGui::Text("(%d,%d)", diagnostics_.mouseX, diagnostics_.mouseY);
-                if (state) {
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::TextUnformatted("E1ROM");
-                    ImGui::TableNextColumn();
-                    ImGui::Text("(%u,%u)", ((uint16_t)(state[0x192]) << 8) | state[0x190],
-                                ((uint16_t)(state[0x193]) << 8) | state[0x191]);
-                }
-            }
-            ImGui::EndTable();
-            ImGui::Separator();
-        }
+        debugger_.diagnosticTables(diagnostics_);
     }
 
     ImGui::End();
@@ -2867,114 +2824,120 @@ void ClemensFrontend::doSetupUI(ImVec2 anchor, ImVec2 dimensions) {
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
     ImGui::Spacing();
     if (settingsView_.frame()) {
-        setGUIMode(GUIMode::RebootEmulator);
+        rebootInternal(true);
     }
     ImGui::End();
 }
 
 void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
                                           const ViewToMonitorTranslation &viewToMonitor) {
-    if (emulatorHasKeyboardFocus_) {
-        // Focus for the next frame will be evaluated inside the window block
-        // Here we want the emulator to intercept all keyboard input
-        ImGui::SetNextWindowFocus();
-        emulatorHasKeyboardFocus_ = false;
-    }
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::SetNextWindowPos(rootAnchor);
     ImGui::SetNextWindowSize(rootSize);
-    ImGui::Begin("Display", nullptr,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                     ImGuiWindowFlags_NoMove);
-    ImGui::BeginChild("DisplayView");
-
-    ImTextureID texId{(void *)((uintptr_t)display_.getScreenTarget().id)};
-    ImVec2 p = ImGui::GetCursorScreenPos();
-    ImVec2 contentSize = ImGui::GetContentRegionAvail();
-    ImVec2 monitorSize(contentSize.y * kClemensAspectRatio, contentSize.y);
-    if (contentSize.x < monitorSize.x) {
-        monitorSize.x = contentSize.x;
-        monitorSize.y = contentSize.x / kClemensAspectRatio;
-    }
-    ImVec2 monitorAnchor(p.x + (contentSize.x - monitorSize.x) * 0.5f,
-                         p.y + (contentSize.y - monitorSize.y) * 0.5f);
-    float screenV0 = 0.0f, screenV1 = viewToMonitor.screenUVs.y;
-#if defined(CK3D_BACKEND_GL)
-    // Flip the texture coords so that the top V is 1.0f
-    screenV0 = 1.0f;
-    screenV1 = 1.0f - screenV1;
-#endif
-
-    ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // No tint
-    ImGui::GetWindowDrawList()->AddImage(
-        texId, ImVec2(monitorAnchor.x, monitorAnchor.y),
-        ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y),
-        ImVec2(0, screenV0), ImVec2(viewToMonitor.screenUVs.x, screenV1),
-        ImGui::GetColorU32(tint_col));
-
-    emulatorHasKeyboardFocus_ = emulatorHasMouseFocus_;
-    if (ImGui::IsWindowFocused()) {
-        emulatorHasKeyboardFocus_ = true;
-    }
-    emulatorHasKeyboardFocus_ = emulatorHasKeyboardFocus_ || ImGui::IsWindowHovered();
-
-    //  translate mouse position to emulated screen coordinates
-    auto mousePos = ImGui::GetMousePos();
-    float viewToMonitorScalarX = viewToMonitor.size.x / monitorSize.x;
-    float viewToMonitorScalarY = viewToMonitor.size.y / monitorSize.y;
-    float mouseX = (mousePos.x - monitorAnchor.x) * viewToMonitorScalarX;
-    float mouseY = (mousePos.y - monitorAnchor.y) * viewToMonitorScalarY;
-    float mouseToViewDX = (viewToMonitor.size.x - viewToMonitor.workSize.x) * 0.5f;
-    float mouseToViewDY = (viewToMonitor.size.y - viewToMonitor.workSize.y) * 0.5f;
-
-    bool mouseInDeviceScreen = true;
-    diagnostics_.mouseX = std::floor(mouseX - mouseToViewDX);
-    diagnostics_.mouseY = std::floor(mouseY - mouseToViewDY);
-
-    if (diagnostics_.mouseX < 0 || diagnostics_.mouseX >= viewToMonitor.workSize.x)
-        mouseInDeviceScreen = false;
-    else if (diagnostics_.mouseY < 0 || diagnostics_.mouseY >= viewToMonitor.workSize.y)
-        mouseInDeviceScreen = false;
-
-    //
-    //` super-hires tracking: x /= 2 if in 320 mode (any scanlines that are 640 pixel,
-    //```means 640 mode)
-    //  what to do about legacy graphics modes (use screen holes, but what do apps expect
-    //  in ranges from firmware?)
-    if (!emulatorHasMouseFocus_) {
-        mouseInEmulatorScreen_ = mouseInDeviceScreen;
-        if (mouseInEmulatorScreen_) {
-            ClemensInputEvent mouseEvt;
-
-            int16_t a2screenX, a2screenY;
-
-            //  TODO: maybe only run this for super-hires mode?
-            clemens_monitor_to_video_coordinates(
-                &frameReadState_.frame.monitor, &frameReadState_.frame.graphics, &a2screenX,
-                &a2screenY, diagnostics_.mouseX, diagnostics_.mouseY);
-
-            mouseEvt.type = kClemensInputType_MouseMoveAbsolute;
-            mouseEvt.value_a = int16_t(a2screenX);
-            mouseEvt.value_b = int16_t(a2screenY);
-            backendQueue_.inputEvent(mouseEvt);
-            if (ImGui::GetIO().MouseClicked[0] && ImGui::IsWindowHovered()) {
-                mouseEvt.type = kClemensInputType_MouseButtonDown;
-                mouseEvt.value_a = 0x01;
-                mouseEvt.value_b = 0x01;
-                backendQueue_.inputEvent(mouseEvt);
-            } else if (ImGui::GetIO().MouseReleased[0]) {
-                mouseEvt.type = kClemensInputType_MouseButtonUp;
-                mouseEvt.value_a = 0x01;
-                mouseEvt.value_b = 0x01;
-                backendQueue_.inputEvent(mouseEvt);
+    if (ImGui::Begin("Display", nullptr,
+                     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                         ImGuiWindowFlags_NoMove)) {
+        if (emulatorShouldHaveKeyboardFocus_) {
+            // Focus for the next frame will be evaluated inside the window block
+            // Here we want the emulator to intercept all keyboard input
+            ImGui::SetNextWindowFocus();
+            if (guiMode_ == GUIMode::Emulator) {
+                emulatorShouldHaveKeyboardFocus_ = false;
             }
         }
-    } else {
-        mouseInEmulatorScreen_ = false;
-    }
+        if (ImGui::BeginChild("DisplayView")) {
+            ImTextureID texId{(void *)((uintptr_t)display_.getScreenTarget().id)};
+            ImVec2 p = ImGui::GetCursorScreenPos();
+            ImVec2 contentSize = ImGui::GetContentRegionAvail();
+            ImVec2 monitorSize(contentSize.y * kClemensAspectRatio, contentSize.y);
+            if (contentSize.x < monitorSize.x) {
+                monitorSize.x = contentSize.x;
+                monitorSize.y = contentSize.x / kClemensAspectRatio;
+            }
+            ImVec2 monitorAnchor(p.x + (contentSize.x - monitorSize.x) * 0.5f,
+                                 p.y + (contentSize.y - monitorSize.y) * 0.5f);
+            float screenV0 = 0.0f, screenV1 = viewToMonitor.screenUVs.y;
+#if defined(CK3D_BACKEND_GL)
+            // Flip the texture coords so that the top V is 1.0f
+            screenV0 = 1.0f;
+            screenV1 = 1.0f - screenV1;
+#endif
 
-    ImGui::EndChild();
-    ImGui::End();
+            ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // No tint
+            ImGui::GetWindowDrawList()->AddImage(
+                texId, ImVec2(monitorAnchor.x, monitorAnchor.y),
+                ImVec2(monitorAnchor.x + monitorSize.x, monitorAnchor.y + monitorSize.y),
+                ImVec2(0, screenV0), ImVec2(viewToMonitor.screenUVs.x, screenV1),
+                ImGui::GetColorU32(tint_col));
+
+            bool hadEmulatorKeyFocus = emulatorHasKeyboardFocus_;
+            emulatorHasKeyboardFocus_ =
+                emulatorHasMouseFocus_ || ImGui::IsWindowFocused() || ImGui::IsWindowHovered();
+
+            if (hadEmulatorKeyFocus != emulatorHasKeyboardFocus_) {
+                spdlog::info("Key focus changed from {} to {}", hadEmulatorKeyFocus,
+                             emulatorHasKeyboardFocus_);
+            }
+
+            //  translate mouse position to emulated screen coordinates
+            auto mousePos = ImGui::GetMousePos();
+            float viewToMonitorScalarX = viewToMonitor.size.x / monitorSize.x;
+            float viewToMonitorScalarY = viewToMonitor.size.y / monitorSize.y;
+            float mouseX = (mousePos.x - monitorAnchor.x) * viewToMonitorScalarX;
+            float mouseY = (mousePos.y - monitorAnchor.y) * viewToMonitorScalarY;
+            float mouseToViewDX = (viewToMonitor.size.x - viewToMonitor.workSize.x) * 0.5f;
+            float mouseToViewDY = (viewToMonitor.size.y - viewToMonitor.workSize.y) * 0.5f;
+
+            bool mouseInDeviceScreen = true;
+            diagnostics_.mouseX = std::floor(mouseX - mouseToViewDX);
+            diagnostics_.mouseY = std::floor(mouseY - mouseToViewDY);
+
+            if (diagnostics_.mouseX < 0 || diagnostics_.mouseX >= viewToMonitor.workSize.x)
+                mouseInDeviceScreen = false;
+            else if (diagnostics_.mouseY < 0 || diagnostics_.mouseY >= viewToMonitor.workSize.y)
+                mouseInDeviceScreen = false;
+
+            //
+            //` super-hires tracking: x /= 2 if in 320 mode (any scanlines that are 640 pixel,
+            //```means 640 mode)
+            //  what to do about legacy graphics modes (use screen holes, but what do apps expect
+            //  in ranges from firmware?)
+            if (!emulatorHasMouseFocus_) {
+                mouseInEmulatorScreen_ = mouseInDeviceScreen;
+                if (mouseInEmulatorScreen_) {
+                    ClemensInputEvent mouseEvt;
+
+                    int16_t a2screenX, a2screenY;
+
+                    //  TODO: maybe only run this for super-hires mode?
+                    clemens_monitor_to_video_coordinates(
+                        &frameReadState_.frame.monitor, &frameReadState_.frame.graphics, &a2screenX,
+                        &a2screenY, diagnostics_.mouseX, diagnostics_.mouseY);
+
+                    mouseEvt.type = kClemensInputType_MouseMoveAbsolute;
+                    mouseEvt.value_a = int16_t(a2screenX);
+                    mouseEvt.value_b = int16_t(a2screenY);
+                    backendQueue_.inputEvent(mouseEvt);
+                    if (ImGui::GetIO().MouseClicked[0] && ImGui::IsWindowHovered()) {
+                        mouseEvt.type = kClemensInputType_MouseButtonDown;
+                        mouseEvt.value_a = 0x01;
+                        mouseEvt.value_b = 0x01;
+                        backendQueue_.inputEvent(mouseEvt);
+                    } else if (ImGui::GetIO().MouseReleased[0]) {
+                        mouseEvt.type = kClemensInputType_MouseButtonUp;
+                        mouseEvt.value_a = 0x01;
+                        mouseEvt.value_b = 0x01;
+                        backendQueue_.inputEvent(mouseEvt);
+                    }
+                }
+            } else {
+                mouseInEmulatorScreen_ = false;
+            }
+
+            ImGui::EndChild();
+        }
+        ImGui::End();
+    }
     ImGui::PopStyleVar();
 }
 
@@ -3049,7 +3012,7 @@ bool ClemensFrontend::isEmulatorStarting() const {
 
 bool ClemensFrontend::isEmulatorActive() const { return !isEmulatorStarting(); }
 
-void ClemensFrontend::rebootInternal() {
+void ClemensFrontend::rebootInternal(bool keyfocus) {
     setGUIMode(GUIMode::RebootEmulator);
     delayRebootTimer_ = 0.0f;
     if (isBackendRunning()) {
@@ -3057,6 +3020,10 @@ void ClemensFrontend::rebootInternal() {
         debugger_.print(ClemensDebugger::Info, "Rebooting machine...");
     } else {
         debugger_.print(ClemensDebugger::Info, "Powering machine...");
+    }
+    if (keyfocus) {
+        spdlog::info("Emulator view keyboard focus requested");
+        emulatorShouldHaveKeyboardFocus_ = true;
     }
 }
 
@@ -3099,7 +3066,7 @@ void ClemensFrontend::dispatchClipboardToEmulator() {
 }
 */
 
-void ClemensFrontend::onDebuggerCommandReboot() { rebootInternal(); }
+void ClemensFrontend::onDebuggerCommandReboot() { rebootInternal(false); }
 
 void ClemensFrontend::onDebuggerCommandShutdown() { setGUIMode(GUIMode::ShutdownEmulator); }
 

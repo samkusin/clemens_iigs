@@ -290,7 +290,16 @@ auto ClemensBackend::step(ClemensCommandQueue &commands) -> ClemensCommandQueue:
     return result;
 }
 
-ClemensAudio ClemensBackend::renderAudioFrame() { return GS_->renderAudio(); }
+ClemensAudio ClemensBackend::renderAudioFrame() { 
+    ClemensAudio audio = GS_->renderAudio();
+    /*
+    if (runSampler_.fastModeEnabled) {
+        audio.frame_count = 0;
+        audio.frame_total = 0;
+    }
+    */
+    return audio;
+}
 
 void ClemensBackend::post(ClemensBackendState &backendState) {
     auto &machine = GS_->getMachine();

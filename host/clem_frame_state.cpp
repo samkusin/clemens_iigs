@@ -1,5 +1,6 @@
 #include "clem_frame_state.hpp"
 
+#include "clem_defs.h"
 #include "clem_mem.h"
 #include "core/clem_apple2gs_config.hpp"
 #include "emulator.h"
@@ -7,6 +8,7 @@
 
 #include "fmt/core.h"
 
+#include <algorithm>
 #include <cstring>
 
 void ClemensBackendState::reset() {
@@ -17,7 +19,7 @@ void ClemensBackendState::reset() {
 
 namespace ClemensFrame {
 
-void IWMStatus::copyFrom(ClemensMMIO &mmio, const ClemensDeviceIWM &iwm) {
+void IWMStatus::copyFrom(ClemensMMIO &mmio, const ClemensDeviceIWM &iwm, bool detailed) {
     const ClemensDrive *iwmDrive = nullptr;
     status = 0;
     if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_ON) {
@@ -29,6 +31,9 @@ void IWMStatus::copyFrom(ClemensMMIO &mmio, const ClemensDeviceIWM &iwm) {
     } else {
         iwmDrive = clemens_drive_get(&mmio, kClemensDrive_5_25_D1);
     }
+    if (iwm.io_flags & CLEM_IWM_FLAG_HEAD_SEL) {
+        status |= kIWMStatusDriveSel;
+    }
     if (iwm.io_flags & CLEM_IWM_FLAG_DRIVE_2) {
         status |= kIWMStatusDriveAlt;
         ++iwmDrive; // HACKY!
@@ -39,55 +44,80 @@ void IWMStatus::copyFrom(ClemensMMIO &mmio, const ClemensDeviceIWM &iwm) {
     if (iwm.q7_switch) {
         status |= kIWMStatusIWMQ7;
     }
+    if (iwm.io_flags & CLEM_IWM_FLAG_WRPROTECT_SENSE) {
+        status |= kIWMStatusDriveWP;
+    }
+    data = iwm.data_r;
+    data_w = iwm.data_w;
+    latch = iwm.latch;
+    async_mode = iwm.async_mode ? 1 : 0;
+    cell_time = iwm.fast_mode ? 2 : 4;
+    has_disk = iwmDrive->has_disk ? 1 : 0;
+
+    ph03 = (uint8_t)(iwm.out_phase & 0xff);
+    if (!iwmDrive) {
+        qtr_track_index = -1; //  no disk
+        return;
+    }
     if (iwmDrive->is_spindle_on) {
         status |= kIWMStatusDriveSpin;
     }
-
     qtr_track_index = iwmDrive->qtr_track_index;
     track_byte_index = iwmDrive->track_byte_index;
     track_bit_shift = iwmDrive->track_bit_shift;
     track_bit_length = iwmDrive->track_bit_length;
-    data = iwm.data_r;
-    latch = iwm.latch;
-    ph03 = (uint8_t)(iwm.out_phase & 0xff);
 
-    constexpr auto diskBufferSize = sizeof(buffer);
-    memset(buffer, 0, diskBufferSize);
-
-    const uint8_t *diskBits = iwmDrive->disk.bits_data;
-    unsigned diskTrackIndex = qtr_track_index;
-
-    if (iwmDrive->disk.meta_track_map[diskTrackIndex] != 0xff) {
-        diskTrackIndex = iwmDrive->disk.meta_track_map[diskTrackIndex];
-
-        if (iwmDrive->disk.track_initialized[diskTrackIndex]) {
-            unsigned trackByteCount = iwmDrive->disk.track_byte_count[diskTrackIndex];
-            unsigned left, right;
-            if (iwmDrive->track_byte_index > 0) {
-                left = iwmDrive->track_byte_index - 1;
-            } else {
-                left = trackByteCount - 1;
-            }
-            right = left + diskBufferSize - 1;
-            if (right >= trackByteCount) {
-                right = right - trackByteCount;
-            }
-            diskBits += iwmDrive->disk.track_byte_offset[diskTrackIndex];
-            unsigned bufferIndex = 0;
-            if (left > right) {
-                for (; left < trackByteCount && bufferIndex < 4; ++left, ++bufferIndex) {
-                    buffer[bufferIndex] = diskBits[left];
-                }
-                left = 0;
-            }
-            //  TODO: Buggy - seems that using a blank disk and then inserting a non blank disk
-            //  causes a crash
-            for (; left <= right; ++left, ++bufferIndex) {
-                assert(bufferIndex < 4);
-                buffer[bufferIndex] = diskBits[left];
-            }
+    if (!iwmDrive->has_disk || !detailed ||
+        iwmDrive->disk.meta_track_map[qtr_track_index] == 0xff) {
+        if (detailed) {
+            memset(buffer, 0, sizeof(buffer));
         }
+        return;
     }
+    unsigned diskTrackIndex = iwmDrive->disk.meta_track_map[qtr_track_index];
+    if (!iwmDrive->disk.track_initialized[diskTrackIndex]) {
+        memset(buffer, 0, sizeof(buffer));
+        return;
+    }
+
+    //  copy window from disk to buffer
+    //  step 1 - bytes from disk buffer.
+    //  buffer_mid = sizeof(buffer) / 2;
+    //  window = [track_byte_index - buffer_mid : sizeof(buffer)]
+    //  if window.start < 0:
+    //      window = [track_byte_count + window.start, -window.start]
+    //      buffer_bit_start_index = window.start * 8;
+    //      do_copy_window(window)
+    //      window = [0, sizeof(buffer) - window.start]
+    //  else:
+    //      buffer_bit_start_index = window.start * 8
+    //  do_copy_window(window)
+    constexpr auto diskBufferSize = sizeof(buffer);
+    constexpr auto diskBufferMid = diskBufferSize / 2;
+    const uint8_t *diskBits =
+        iwmDrive->disk.bits_data + iwmDrive->disk.track_byte_offset[diskTrackIndex];
+    unsigned trackByteCount = (iwmDrive->disk.track_bits_count[diskTrackIndex] + 7) / 8;
+    int startIndex = int(track_byte_index - diskBufferMid);
+    int runLength;
+    int runCount = 0;
+    if (startIndex < 0) {
+        //  split window
+        runLength = -startIndex;
+        startIndex = trackByteCount - runLength;
+        buffer_bit_start_index = startIndex * 8;
+        assert(runCount + runLength <= (int)diskBufferSize);
+        memcpy(buffer + runCount, diskBits + startIndex, runLength);
+        runCount += runLength;
+        runLength = diskBufferSize - runLength;
+        startIndex = 0;
+    } else {
+        //  single window
+        runLength = int(diskBufferSize);
+        runCount = 0;
+        buffer_bit_start_index = startIndex * 8;
+    }
+    assert(runCount + runLength <= (int)diskBufferSize);
+    memcpy(buffer + runCount, diskBits + startIndex, runLength);
 }
 
 void DOCStatus::copyFrom(const ClemensDeviceEnsoniq &doc) {
@@ -164,7 +194,7 @@ void FrameState::copyState(const ClemensBackendState &state, LastCommandState &c
     }
 
     //  Mega 2 Component subsystems
-    iwm.copyFrom(*state.mmio, state.mmio->dev_iwm);
+    iwm.copyFrom(*state.mmio, state.mmio->dev_iwm, !state.isRunning);
     doc.copyFrom(state.mmio->dev_audio.doc);
     adb.copyFrom(*state.mmio);
 
@@ -177,7 +207,7 @@ void FrameState::copyState(const ClemensBackendState &state, LastCommandState &c
         //  read every byte from the memory controller - which can be 'slow' enough
         //  to effect framerate on some systems.   so we only update memory state
         //  when the emulator isn't actively running instructions
-        for (unsigned addr = 0; addr < 0x10000; ++addr) {
+        for (unsigned addr = 0; addr < CLEM_IIGS_BANK_SIZE; ++addr) {
             clem_read(state.machine, &memoryView[addr], addr, state.debugMemoryPage,
                       CLEM_MEM_FLAG_NULL);
         }

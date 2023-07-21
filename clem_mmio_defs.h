@@ -403,9 +403,9 @@
  *  of IO registers.  Our host should have the opportunity to send input to the
  *  emulator at a decent frequency (30-60hz) for us not to lose events
  */
-#define CLEM_ADB_KEYB_BUFFER_LIMIT     8
+#define CLEM_ADB_KEYB_BUFFER_LIMIT      8
 #define CLEM_ADB_CLIPBOARD_BUFFER_LIMIT 8
-#define CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK 0x0000001
+#define CLEM_ADB_KEYB_TOGGLE_CAPS_LOCK  0x0000001
 
 /** Gameport support - note that paddle axis values range from 0 to 1023, and
  *  there's support for up to 8 buttons.  Of course the Apple 2 only supports
@@ -605,13 +605,29 @@
 #define CLEM_ADB_KEY_MOD_STATE_RESET   CLEM_ADB_GLU_REG2_KEY_RESET
 #define CLEM_ADB_KEY_MOD_STATE_ESCAPE  0x00010000
 
-/** Emulated duration of every 'step' iwm_glu_sync runs. 1.023 / 2 ~ 0.511 */
-#define CLEM_IWM_SYNC_CLOCKS_FAST        (CLEM_CLOCKS_2MHZ_CYCLE * 4)
-#define CLEM_IWM_SYNC_CLOCKS_NORMAL      (CLEM_CLOCKS_2MHZ_CYCLE * 8)
-#define CLEM_IWM_SYNC_DISK_FRAME_NS      500
-#define CLEM_IWM_SYNC_DISK_FRAME_NS_FAST 250
-#define CLEM_IWM_DRIVE_RANDOM_BYTES      16
-#define CLEM_IWM_DEBUG_BUFFER_SIZE       256
+/**
+ * Instead of using clock multiples for 3.5" drives, use values that get us closer
+ * to 2000ns bit cell times.   Doing the same for 5.25" drives seems to result in
+ * write errors (the bane of our IWM implementation whenever we change timing
+ * values!)   This approach seems highly suspect but it does pass some copy
+ * protection schemes for 3.5" titles that rely on precise timing between sectors
+ * on tracks (https://github.com/samkusin/clemens_iigs/issues/108) - see 
+ * Where in the World is Carmen Sandiego
+ *
+ * Perhaps a longer term solution is to investigate how our IWM sync loop
+ * deals with IWM updates vs disk head updates - i.e. decouple them, which
+ * seems even more potentially buggy - as we used to do this but ran into
+ * other issues when fixing how PHI0 + stretch worked.
+ *
+ * When I have time to investigate that.........
+ */
+// #define CLEM_IWM_SYNC_CLOCKS_FAST        (CLEM_CLOCKS_2MHZ_CYCLE * 4)
+#define CLEM_IWM_SYNC_CLOCKS_FAST   5714 //(2000 * CLEM_CLOCKS_14MHZ_CYCLE / CLEM_14MHZ_CYCLE_NS)
+#define CLEM_IWM_SYNC_CLOCKS_NORMAL (CLEM_CLOCKS_2MHZ_CYCLE * 8)
+// #define CLEM_IWM_SYNC_CLOCKS_NORMAL      11461 //(4000 * CLEM_CLOCKS_14MHZ_CYCLE /
+// CLEM_14MHZ_CYCLE_NS)
+#define CLEM_IWM_DRIVE_RANDOM_BYTES 16
+#define CLEM_IWM_DEBUG_BUFFER_SIZE  256
 
 /*  Enable 3.5 drive seris */
 #define CLEM_IWM_FLAG_DRIVE_35 0x00000001

@@ -25,6 +25,8 @@ class ClemensHostView {
     virtual void pasteText(const char *text, unsigned textSizeLimit) = 0;
     //  application lost focus
     virtual void lostFocus() = 0;
+    //  application gained focus
+    virtual void gainFocus() = 0;
 };
 
 #endif

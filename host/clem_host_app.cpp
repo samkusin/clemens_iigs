@@ -6,8 +6,8 @@
 #include <combaseapi.h>
 #endif
 
-#include "clem_imgui.hpp"
 #include "clem_host.hpp"
+#include "clem_imgui.hpp"
 
 #include <array>
 #include <clocale>
@@ -51,7 +51,7 @@ static unsigned g_ADBKeyToggleMask = 0;
 static cinek::ByteBuffer g_systemFontLoBuffer;
 static cinek::ByteBuffer g_systemFontHiBuffer;
 static const unsigned kClipboardTextLimit = 8192;
-static ClemensHostInterop g_interop {};
+static ClemensHostInterop g_interop{};
 
 //  Keyboard customization
 //  Typically the OS specific "super" key is used to augment key combinations that
@@ -498,6 +498,10 @@ static void onEvent(const sapp_event *evt, void *) {
         if (g_Host)
             g_Host->lostFocus();
         break;
+    case SAPP_EVENTTYPE_FOCUSED:
+        if (g_Host)
+            g_Host->gainFocus();
+        break;
     case SAPP_EVENTTYPE_KEY_DOWN:
         keycode = onKeyDown(evt);
         if (keycode != SAPP_KEYCODE_INVALID) {
@@ -576,7 +580,7 @@ sapp_desc sokol_main(int argc, char *argv[]) {
         fprintf(stdout, "locale: %s\n", loc);
     }
     //  TODO: logging startup should go here
-    
+
     spdlog::set_level(spdlog::level::info);
     spdlog::flush_on(spdlog::level::err);
     spdlog::info("Setting up host frameworks");
