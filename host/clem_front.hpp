@@ -51,6 +51,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     bool emulatorHasFocus() const final;
     void pasteText(const char *text, unsigned textSizeLimit) final;
     void lostFocus() final;
+    void gainFocus() final;
 
   private:
     void onDebuggerCommandReboot() override;
@@ -113,7 +114,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
                                              ClemensDriveType driveType,
                                              std::vector<std::string> imagePaths);
 
-    void rebootInternal();
+    void rebootInternal(bool keyfocus);
 
   private:
     ClemensConfiguration config_;
@@ -165,6 +166,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     ClemensFrame::IWMStatus lastFrameIWM_;
     uint32_t lastFrameIRQs_, lastFrameNMIs_;
     uint8_t lastFrameIORegs_[256];
+    bool emulatorShouldHaveKeyboardFocus_;
     bool emulatorHasKeyboardFocus_;
     bool emulatorHasMouseFocus_;
     bool mouseInEmulatorScreen_;
@@ -240,10 +242,6 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     Animation smartPortWidgetAnimation_;
 
     //  Used for debugging client-side features (i.e. audio playback, framerate)
-    struct DebugDiagnostics {
-        int16_t mouseX = 0;
-        int16_t mouseY = 0;
-    };
     DebugDiagnostics diagnostics_;
 };
 

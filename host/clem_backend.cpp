@@ -292,6 +292,12 @@ auto ClemensBackend::step(ClemensCommandQueue &commands) -> ClemensCommandQueue:
 
 ClemensAudio ClemensBackend::renderAudioFrame() { 
     ClemensAudio audio = GS_->renderAudio();
+    /*
+    if (runSampler_.fastModeEnabled) {
+        audio.frame_count = 0;
+        audio.frame_total = 0;
+    }
+    */
     return audio;
 }
 

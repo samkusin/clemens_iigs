@@ -21,6 +21,7 @@ class ClemensStartupView : public ClemensHostView {
     bool emulatorHasFocus() const final { return false; }
     void pasteText(const char *text, unsigned textSizeLimit) final;
     void lostFocus() final;
+    void gainFocus() final;
 
   private:
     enum class Mode { Initial, ChangeDataDirectory, Preamble, SetupError, Aborted, Finished };

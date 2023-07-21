@@ -10,6 +10,11 @@
 #include <optional>
 #include <vector>
 
+struct DebugDiagnostics {
+    int16_t mouseX = 0;
+    int16_t mouseY = 0;
+};
+
 struct ClemensBackendState {
     ClemensMachine *machine = NULL;
     ClemensMMIO *mmio = NULL;

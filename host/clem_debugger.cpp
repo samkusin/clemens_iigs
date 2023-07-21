@@ -1,5 +1,6 @@
 #include "clem_debugger.hpp"
 #include "clem_command_queue.hpp"
+#include "clem_frame_state.hpp"
 #include "clem_host_utils.hpp"
 #include "clem_l10n.hpp"
 #include "core/clem_disk_utils.hpp"
@@ -461,7 +462,8 @@ void ClemensDebugger::auxillary(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::End();
 }
 
-void ClemensDebugger::cpuStateTable(ImVec2 anchor, ImVec2 dimensions) {
+void ClemensDebugger::cpuStateTable(ImVec2 anchor, ImVec2 dimensions,
+                                    const DebugDiagnostics &diagnostics) {
     const float kCharSize = ImGui::GetFont()->GetCharAdvance('A');
     const ImGuiStyle &style = ImGui::GetStyle();
 
@@ -559,11 +561,72 @@ void ClemensDebugger::cpuStateTable(ImVec2 anchor, ImVec2 dimensions) {
                                "NMI");
             ImGui::EndTable();
         }
-
         // TODO: IRQ Mask/Flags
+
+        ImGui::Separator();
+        diagnosticTables(diagnostics);
     }
+
     ImGui::PopStyleVar();
     ImGui::End();
+}
+
+void ClemensDebugger::diagnosticTables(const DebugDiagnostics& diagnostics) {
+    if (!frameState_) return;
+    const float kCharSize = ImGui::GetFont()->GetCharAdvance('A');
+    if (ImGui::CollapsingHeader("Stats", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (ImGui::BeginTable("##Stats", 2)) {
+            ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthFixed, kCharSize * 4);
+            ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted("EMU");
+            ImGui::TableNextColumn();
+            ImGui::Text("%5.2f fps", frameState_->fps);
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted("GUI");
+            ImGui::TableNextColumn();
+            ImGui::Text("%5.2f fps", ImGui::GetIO().Framerate);
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted("Time");
+            ImGui::TableNextColumn();
+            uint64_t emulatorTime = 0;
+            // if (frameSeqNo_ != kFrameSeqNoInvalid) {
+            emulatorTime =
+                (uint64_t)(clem_calc_secs_from_clocks(&frameState_->emulatorClock) * 1000);
+            //}
+            unsigned hours = emulatorTime / 3600000;
+            unsigned minutes = (emulatorTime % 3600000) / 60000;
+            unsigned seconds = ((emulatorTime % 3600000) % 60000) / 1000;
+            unsigned milliseconds = ((emulatorTime % 3600000) % 60000) % 1000;
+            ImGui::Text("%02u:%02u:%02u.%01u", hours, minutes, seconds, milliseconds / 100);
+            ImGui::EndTable();
+        }
+    }
+
+    if (ImGui::CollapsingHeader("Mouse", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto *state = frameState_->e1bank;
+        if (ImGui::BeginTable("##Mouse", 2)) {
+            ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthFixed, kCharSize * 4);
+            ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted("Host");
+            ImGui::TableNextColumn();
+            ImGui::Text("%d,%d", diagnostics.mouseX, diagnostics.mouseY);
+            if (state) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted("ROM");
+                ImGui::TableNextColumn();
+                ImGui::Text("%u,%u", ((uint16_t)(state[0x192]) << 8) | state[0x190],
+                            ((uint16_t)(state[0x193]) << 8) | state[0x191]);
+            }
+            ImGui::EndTable();
+        }
+    }
 }
 
 ImU8 ClemensDebugger::imguiMemoryEditorRead(const ImU8 *mem_ptr, size_t off) {
@@ -909,7 +972,7 @@ void ClemensDebugger::doMachineDebugIWMDisplay(bool detailed) {
                     //  bit row
                     //  bit 15 = high bit of current byte, big bit-endian order
                     uint16_t bitValue = (shiftreg >> (15 - (bitOffsetCur % 8))) & 1;
-                  
+
                     if (absBitIndex == absBitHead) {
                         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32_BLACK);
                         ImGui::Selectable(bitValue ? "1" : "0", true, 0,
