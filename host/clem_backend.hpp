@@ -47,6 +47,7 @@ struct ClemensRunSampler {
     unsigned sampledVblsSpent;
     unsigned emulatorVblsPerFrame;
     bool fastModeEnabled;
+    bool fastModeDisabledThisFrame;
 
     ClemensRunSampler();
 
@@ -89,7 +90,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     //  Executes a single emulator timeslice
     ClemensCommandQueue::DispatchResult step(ClemensCommandQueue& commands);
     //  Obtain current audio frame (following calls to step())
-    ClemensAudio renderAudioFrame();
+    std::pair<ClemensAudio, bool> renderAudioFrame();
     //  Populate a backend state
     void post(ClemensBackendState& backendState);
 

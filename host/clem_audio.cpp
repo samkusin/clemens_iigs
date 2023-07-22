@@ -61,9 +61,15 @@ void ClemensAudioDevice::stop() {
 unsigned ClemensAudioDevice::getAudioFrequency() const { return saudio_sample_rate(); }
 unsigned ClemensAudioDevice::getBufferStride() const { return queuedFrameStride_; }
 
-unsigned ClemensAudioDevice::queue(const ClemensAudio &audio) {
-    if (!audio.frame_count || !queuedFrameBuffer_)
+unsigned ClemensAudioDevice::queue(const ClemensAudio &audio, bool flush) {
+    if (!audio.frame_count || !queuedFrameBuffer_ || flush) {
+        if (flush) {
+            std::lock_guard<std::mutex> lk(queuedFrameMutex_);
+            queuedFrameTail_ = 0;
+            queuedFrameHead_ = 0;
+        }
         return 0;
+    }
 
     //  the audio data layout of our queue must be the same as the data coming
     //  in from the emulated device.  conversion between formats occurs during

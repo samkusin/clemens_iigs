@@ -746,7 +746,8 @@ void ClemensFrontend::runBackend(std::unique_ptr<ClemensBackend> backend) {
 #endif
 
         // sync audio
-        audio_.queue(backend->renderAudioFrame());
+        auto audioFrame = backend->renderAudioFrame();
+        audio_.queue(audioFrame.first, audioFrame.second);
     }
 
     std::lock_guard<std::mutex> lk(frameMutex_);

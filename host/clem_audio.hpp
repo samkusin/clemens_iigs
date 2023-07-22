@@ -16,7 +16,7 @@ class ClemensAudioDevice {
 
     void start();
     void stop();
-    unsigned queue(const ClemensAudio &audio);
+    unsigned queue(const ClemensAudio &audio, bool flush);
 
   private:
     static void mixAudio(float *buffer, int num_frames, int num_channels, void *user_data);
