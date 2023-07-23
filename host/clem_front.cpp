@@ -1366,24 +1366,26 @@ void ClemensFrontend::doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::SetNextWindowSize(sidebarSize);
     sidebarSize.x -= 2 * style.FramePadding.x;
 
-    ImGui::Begin("SidePanel", nullptr,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus);
-    doMachineDiskDisplay(sidebarSize.x);
-    doMachinePeripheralDisplay(sidebarSize.x);
-    ImGui::End();
+    if (ImGui::Begin("SidePanel", nullptr,
+                     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus)) {
+        doMachineDiskDisplay(sidebarSize.x);
+        if (ImGui::BeginChild("PeripheralsAndCards")) {
+            doMachinePeripheralDisplay(sidebarSize.x);
+        }
+        ImGui::EndChild();
+        ImGui::End();
+    }
     anchor.y += sidebarSize.y;
     ImGui::SetNextWindowPos(anchor);
     ImGui::SetNextWindowSize(quickBarSize);
-    ImGui::Begin("Quickbar", nullptr,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus);
-    doDebuggerQuickbar(quickBarSize.x);
-    ImGui::End();
+    if (ImGui::Begin("Quickbar", nullptr,
+                     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus)) {
+        doDebuggerQuickbar(quickBarSize.x);
+        ImGui::End();
+    }
 }
 
 void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
-    if (!ImGui::BeginChild("PeripheralsAndCards"))
-        return;
-
     const ImGuiStyle &drawStyle = ImGui::GetStyle();
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     if (ImGui::CollapsingHeader("System", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -1501,7 +1503,6 @@ void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
         doDebugView(ImVec2(cursor), debugViewSize);
     }
     ImGui::PopFont();
-    ImGui::EndChild();
 }
 
 void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float dividerXPos) {
@@ -2941,9 +2942,8 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
             } else {
                 mouseInEmulatorScreen_ = false;
             }
-
-            ImGui::EndChild();
         }
+        ImGui::EndChild();
         ImGui::End();
     }
     ImGui::PopStyleVar();

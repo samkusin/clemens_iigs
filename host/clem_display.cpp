@@ -370,8 +370,8 @@ ClemensDisplay::ClemensDisplay(ClemensDisplayProvider &provider) : provider_(pro
     imageDesc.height = 8;
     imageDesc.type = SG_IMAGETYPE_2D;
     imageDesc.pixel_format = SG_PIXELFORMAT_RGBA8;
-    imageDesc.min_filter = SG_FILTER_LINEAR;
-    imageDesc.mag_filter = SG_FILTER_LINEAR;
+    imageDesc.min_filter = SG_FILTER_NEAREST;
+    imageDesc.mag_filter = SG_FILTER_NEAREST;
     imageDesc.wrap_u = SG_WRAP_CLAMP_TO_EDGE;
     imageDesc.wrap_v = SG_WRAP_CLAMP_TO_EDGE;
     imageDesc.usage = SG_USAGE_IMMUTABLE;
@@ -395,8 +395,8 @@ ClemensDisplay::ClemensDisplay(ClemensDisplayProvider &provider) : provider_(pro
     imageDesc.height = 8;
     imageDesc.type = SG_IMAGETYPE_2D;
     imageDesc.pixel_format = SG_PIXELFORMAT_RGBA8;
-    imageDesc.min_filter = SG_FILTER_LINEAR;
-    imageDesc.mag_filter = SG_FILTER_LINEAR;
+    imageDesc.min_filter = SG_FILTER_NEAREST;
+    imageDesc.mag_filter = SG_FILTER_NEAREST;
     imageDesc.wrap_u = SG_WRAP_CLAMP_TO_EDGE;
     imageDesc.wrap_v = SG_WRAP_CLAMP_TO_EDGE;
     imageDesc.usage = SG_USAGE_IMMUTABLE;
@@ -412,8 +412,8 @@ ClemensDisplay::ClemensDisplay(ClemensDisplayProvider &provider) : provider_(pro
     imageDesc.height = kColorTextureHeight;
     imageDesc.type = SG_IMAGETYPE_2D;
     imageDesc.pixel_format = SG_PIXELFORMAT_RGBA8;
-    imageDesc.min_filter = SG_FILTER_LINEAR;
-    imageDesc.mag_filter = SG_FILTER_LINEAR;
+    imageDesc.min_filter = SG_FILTER_NEAREST;
+    imageDesc.mag_filter = SG_FILTER_NEAREST;
     imageDesc.wrap_u = SG_WRAP_CLAMP_TO_EDGE;
     imageDesc.wrap_v = SG_WRAP_CLAMP_TO_EDGE;
     imageDesc.usage = SG_USAGE_STREAM;
@@ -423,8 +423,8 @@ ClemensDisplay::ClemensDisplay(ClemensDisplayProvider &provider) : provider_(pro
     imageDesc.width = kGraphicsTextureWidth;
     imageDesc.height = kGraphicsTextureHeight;
     imageDesc.pixel_format = SG_PIXELFORMAT_R8;
-    imageDesc.min_filter = SG_FILTER_LINEAR;
-    imageDesc.mag_filter = SG_FILTER_LINEAR;
+    imageDesc.min_filter = SG_FILTER_NEAREST;
+    imageDesc.mag_filter = SG_FILTER_NEAREST;
     imageDesc.wrap_u = SG_WRAP_CLAMP_TO_EDGE;
     imageDesc.wrap_v = SG_WRAP_CLAMP_TO_EDGE;
     imageDesc.usage = SG_USAGE_STREAM;

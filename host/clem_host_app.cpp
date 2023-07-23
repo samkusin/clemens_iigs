@@ -597,7 +597,6 @@ sapp_desc sokol_main(int argc, char *argv[]) {
     sapp.win32_console_attach = true;
     sapp.logger.func = sokolLogger;
     sapp.clipboard_size = kClipboardTextLimit;
-    sapp.enable_clipboard = true;
 
     return sapp;
 }
