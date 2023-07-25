@@ -2910,7 +2910,6 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
                 ImVec2(0, screenV0), ImVec2(viewToMonitor.screenUVs.x, screenV1),
                 ImGui::GetColorU32(tint_col));
 
-            bool hadEmulatorKeyFocus = emulatorHasKeyboardFocus_;
             emulatorHasKeyboardFocus_ =
                 emulatorHasMouseFocus_ || ImGui::IsWindowFocused() || ImGui::IsWindowHovered();
 
