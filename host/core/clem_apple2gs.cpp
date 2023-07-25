@@ -79,6 +79,22 @@ void destroyCard(ClemensCard *card) {
 
 } // namespace
 
+std::array<const char*, kClemensCardLimitPerSlot> getCardNamesForSlot(unsigned slotIndex) {
+    std::array<const char*, kClemensCardLimitPerSlot> cards;
+    cards.fill(nullptr);
+
+    ++slotIndex;
+    switch (slotIndex) {
+        case 4:
+            cards[0] = kClemensCardMockingboardName;
+            break;
+        case 7:
+            cards[0] = kClemensCardHardDiskName;
+            break;
+    }
+    return cards;
+}
+
 ClemensAppleIIGS::ClemensAppleIIGS(const std::string &romPath, const Config &config,
                                    ClemensSystemListener &listener)
     : listener_(listener), status_(Status::Offline),
