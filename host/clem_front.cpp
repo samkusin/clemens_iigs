@@ -2914,11 +2914,6 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
             emulatorHasKeyboardFocus_ =
                 emulatorHasMouseFocus_ || ImGui::IsWindowFocused() || ImGui::IsWindowHovered();
 
-            if (hadEmulatorKeyFocus != emulatorHasKeyboardFocus_) {
-                spdlog::info("Key focus changed from {} to {}", hadEmulatorKeyFocus,
-                             emulatorHasKeyboardFocus_);
-            }
-
             //  translate mouse position to emulated screen coordinates
             auto mousePos = ImGui::GetMousePos();
             float viewToMonitorScalarX = viewToMonitor.size.x / monitorSize.x;
