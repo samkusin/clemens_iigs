@@ -18,6 +18,7 @@
 #include "clem_host_platform.h"
 
 #include "clem_assets.hpp"
+#include "clem_configuration.hpp"
 #include "clem_front.hpp"
 #include "clem_startup_view.hpp"
 
@@ -34,14 +35,11 @@
 #include "fonts/font_prnumber3.h"
 
 struct SharedAppData {
-    SharedAppData(int argc, char *argv[]) {
-        if (argc > 1) {
-            rootPathOverride = argv[1];
-        }
-    }
+    SharedAppData(int /*argc*/, char *[] /* *argv[] */) : config(findConfiguration()) {}
 
-    std::string rootPathOverride;
     ImVector<ImWchar> imguiUnicodeRanges;
+
+    ClemensConfiguration config;
 };
 
 static uint64_t g_lastTime = 0;
@@ -269,6 +267,10 @@ static cinek::ByteBuffer loadFont(const char *pathname) {
 static void onInit(void *userdata) {
     auto *appdata = reinterpret_cast<SharedAppData *>(userdata);
 
+    g_interop.debuggerOn = appdata->config.hybridInterfaceEnabled;
+    g_interop.view =
+        sapp_is_fullscreen() ? ClemensHostInterop::Fullscreen : ClemensHostInterop::Windowed;
+
     clemens_host_init(&g_interop);
     stm_setup();
 
@@ -398,10 +400,11 @@ static void onInit(void *userdata) {
                                 g_systemFontHiBuffer);
     ClemensHostAssets::initialize();
 
-    g_Host = new ClemensStartupView();
+    g_Host = new ClemensStartupView(appdata->config);
 }
 
-static void onFrame(void *) {
+static void onFrame(void *userdata) {
+    auto *appdata = reinterpret_cast<SharedAppData *>(userdata);
     const int frameWidth = sapp_width();
     const int frameHeight = sapp_height();
 
@@ -420,6 +423,7 @@ static void onFrame(void *) {
         g_interop.mouseLock = sapp_mouse_locked();
         g_interop.mouseShow = sapp_mouse_shown();
         g_interop.poweredOn = false;
+        g_interop.isFullscreen = sapp_is_fullscreen();
 
         auto nextViewType = g_Host->frame(frameWidth, frameHeight, deltaTime, g_interop);
         sapp_lock_mouse(g_interop.mouseLock);
@@ -434,20 +438,22 @@ static void onFrame(void *) {
         g_interop.action = ClemensHostInterop::None;
         exitApp = g_interop.exitApp;
 
+        bool isViewFullscreen = g_interop.view == ClemensHostInterop::Fullscreen;
+        if (sapp_is_fullscreen() != isViewFullscreen) {
+            sapp_toggle_fullscreen();
+            spdlog::info("Host fullscreen mode is {}", sapp_is_fullscreen());
+        } 
         clemens_host_update();
 
         if (nextViewType != g_Host->getViewType()) {
             auto *oldHost = g_Host;
             switch (nextViewType) {
             case ClemensHostView::ViewType::Startup:
-                g_Host = new ClemensStartupView();
+                g_Host = new ClemensStartupView(appdata->config);
                 break;
             case ClemensHostView::ViewType::Main: {
-                ClemensConfiguration config;
-                if (oldHost->getViewType() == ClemensHostView::ViewType::Startup) {
-                    config = static_cast<ClemensStartupView *>(oldHost)->getConfiguration();
-                }
-                g_Host = new ClemensFrontend(config, g_systemFontLoBuffer, g_systemFontHiBuffer);
+                g_Host = new ClemensFrontend(appdata->config, g_systemFontLoBuffer,
+                                             g_systemFontHiBuffer);
                 break;
             }
             default:
@@ -460,6 +466,12 @@ static void onFrame(void *) {
             if (oldHost) {
                 delete oldHost;
             }
+        }
+
+        if (g_interop.viewWidth && g_interop.viewHeight) {
+            //  TODO: set window size
+            g_interop.viewWidth = 0;
+            g_interop.viewHeight = 0;
         }
     }
     sg_begin_default_pass(&g_sgPassAction, frameWidth, frameHeight);
@@ -579,13 +591,19 @@ sapp_desc sokol_main(int argc, char *argv[]) {
     if (const char *loc = std::setlocale(LC_ALL, "en_US.UTF-8")) {
         fprintf(stdout, "locale: %s\n", loc);
     }
-    //  TODO: logging startup should go here
 
     spdlog::set_level(spdlog::level::info);
     spdlog::flush_on(spdlog::level::err);
     spdlog::info("Setting up host frameworks");
 
-    sapp.user_data = new SharedAppData(argc, argv);
+    SharedAppData *appdata = new SharedAppData(argc, argv);
+    if (appdata->config.viewMode == ClemensConfiguration::ViewMode::Fullscreen) {
+        sapp.fullscreen = true;
+    } else {
+        sapp.fullscreen = false;
+    }
+
+    sapp.user_data = appdata;
     sapp.height = 900;
     sapp.width = 1440;
     sapp.init_userdata_cb = &onInit;

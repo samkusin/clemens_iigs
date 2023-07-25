@@ -590,7 +590,7 @@ const uint64_t ClemensFrontend::kFrameSeqNoInvalid = std::numeric_limits<uint64_
 
 extern "C" void clem_temp_generate_ascii_to_adb_table();
 
-ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
+ClemensFrontend::ClemensFrontend(ClemensConfiguration& config,
                                  const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
     : config_(config), displayProvider_(systemFontLoBuffer, systemFontHiBuffer),
@@ -936,6 +936,15 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     case ClemensHostInterop::Shutdown:
         setGUIMode(GUIMode::ShutdownEmulator);
         break;
+    case ClemensHostInterop::Debugger:
+        config_.hybridInterfaceEnabled = true;
+        break;
+    case ClemensHostInterop::Standard:
+        config_.hybridInterfaceEnabled = false;
+        break;
+    case ClemensHostInterop::AspectView:
+        // TODO: set view width and height in interop
+        break;
     case ClemensHostInterop::None:
         break;
     }
@@ -1054,6 +1063,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     interop.mouseShow =
         !mouseInEmulatorScreen_ || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
     interop.poweredOn = isBackendRunning();
+    interop.debuggerOn = config_.hybridInterfaceEnabled;
 
     return getViewType();
 }
@@ -1307,6 +1317,27 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
             // ImGui::Separator();
             if (ImGui::MenuItem("Paste Text Input", NULL)) {
                 interop.action = ClemensHostInterop::PasteFromClipboard;
+            }
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("View")) {
+            if (interop.isFullscreen) {
+                if (ImGui::MenuItem("Exit Fullscreen", NULL)) {
+                    interop.view = ClemensHostInterop::Windowed;
+                }
+            } else {
+                if (ImGui::MenuItem("Enter Fullscreen", NULL)) {
+                    interop.view = ClemensHostInterop::Fullscreen;
+                }
+            }
+            if (config_.hybridInterfaceEnabled) {
+                if (ImGui::MenuItem("User Mode", NULL)) {
+                    config_.hybridInterfaceEnabled = false;
+                }
+            } else {
+                if (ImGui::MenuItem("Debugger Mode", NULL)) {
+                    config_.hybridInterfaceEnabled = true;
+                }
             }
             ImGui::EndMenu();
         }

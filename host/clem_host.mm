@@ -27,6 +27,8 @@
   NSMenuItem *powerMenuItem;
   NSMenuItem *rebootMenuItem;
   NSMenuItem *shutdownMenuItem;
+  NSMenuItem *fullscreenMenuItem;
+  NSMenuItem *debuggerMenuItem;
 }
 
 + (id)instance {
@@ -80,6 +82,22 @@
 
 - (void)menuDiskHelp:(id)sender {
   hostInterop->action = ClemensHostInterop::DiskHelp;
+}
+
+- (void)menuFullscreenToggle:(id)sender {
+  if (hostInterop->view == ClemensHostInterop::Windowed) {
+    hostInterop->view = ClemensHostInterop::Fullscreen;
+  } else {
+    hostInterop->view = ClemensHostInterop::Windowed;
+  }
+}
+
+- (void)menuDebugger:(id)sender {
+  if (hostInterop->debuggerOn) {
+    hostInterop->action = ClemensHostInterop::Standard;
+  } else {
+    hostInterop->action = ClemensHostInterop::Debugger;
+  }
 }
 
 //  TODO: localized strings!
@@ -137,6 +155,26 @@
                                          keyEquivalent:@""];
   [menubar setSubmenu:editmenu forItem:editMenuItem];
 
+  // View Menu
+  NSMenu *viewmenu = [[NSMenu alloc] initWithTitle:@"View"];
+  fullscreenMenuItem =
+      [[NSMenuItem alloc] initWithTitle:@"Enter Fullscreen"
+                                 action:@selector(menuFullscreenToggle:)
+                          keyEquivalent:@""];
+  [fullscreenMenuItem setTarget:self];
+  [viewmenu addItem:fullscreenMenuItem];
+
+  debuggerMenuItem = [[NSMenuItem alloc] initWithTitle:@"Debugger View"
+                                                action:@selector(menuDebugger:)
+                                         keyEquivalent:@""];
+  [debuggerMenuItem setTarget:self];
+  [viewmenu addItem:debuggerMenuItem];
+
+  NSMenuItem *viewMenuItem = [menubar addItemWithTitle:@""
+                                                action:nil
+                                         keyEquivalent:@""];
+  [menubar setSubmenu:viewmenu forItem:viewMenuItem];
+
   // Machine Menu
   NSMenu *machmenu = [[NSMenu alloc] initWithTitle:@"Machine"];
   powerMenuItem = [[NSMenuItem alloc] initWithTitle:@"Power"
@@ -165,14 +203,14 @@
   // Help Menu
   NSMenu *helpmenu = [[NSMenu alloc] initWithTitle:@"Help"];
   menuItem = [[NSMenuItem alloc] initWithTitle:@"Keyboard Shortcuts"
-                                             action:@selector(menuShortcutsHelp:)
-                                      keyEquivalent:@""];
+                                        action:@selector(menuShortcutsHelp:)
+                                 keyEquivalent:@""];
   [menuItem setTarget:self];
   [helpmenu addItem:menuItem];
 
   menuItem = [[NSMenuItem alloc] initWithTitle:@"Disk Selection"
-                                             action:@selector(menuDiskHelp:)
-                                      keyEquivalent:@""];
+                                        action:@selector(menuDiskHelp:)
+                                 keyEquivalent:@""];
   [menuItem setTarget:self];
   [helpmenu addItem:menuItem];
 
@@ -208,6 +246,16 @@
     [shutdownMenuItem setAction:nil];
     [powerMenuItem setEnabled:TRUE];
     [powerMenuItem setAction:@selector(menuPower:)];
+  }
+  if (hostInterop->view != ClemensHostInterop::Fullscreen) {
+    [fullscreenMenuItem setTitle:@"Enter Fullscreen"];
+  } else {
+    [fullscreenMenuItem setTitle:@"Exit Fullscreen"];
+  }
+  if (hostInterop->debuggerOn) {
+    [debuggerMenuItem setTitle:@"User Mode"];
+  } else {
+    [debuggerMenuItem setTitle:@"Debugger Mode"];
   }
 }
 

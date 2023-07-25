@@ -20,47 +20,6 @@
 
 namespace {
 
-//  For all platforms, the config file is guaranteed to be located in a
-//  predefined location.  The config file is effectively our 'registry' to
-//  use windows terminology.
-//
-ClemensConfiguration createConfiguration(const std::filesystem::path defaultDataDirectory) {
-    auto configPath = defaultDataDirectory / "config.ini";
-    spdlog::info("Configuration created at {}", defaultDataDirectory.string());
-    return ClemensConfiguration(configPath.string(), defaultDataDirectory.string());
-}
-
-ClemensConfiguration findConfiguration() {
-    //  find the config file on the system
-
-    //  local directory configuration check
-    char localpath[CLEMENS_PATH_MAX];
-    size_t localpathSize = sizeof(localpath);
-    if (get_process_executable_path(localpath, &localpathSize)) {
-        if (strnlen(localpath, CLEMENS_PATH_MAX - 1) >= sizeof(localpath) - 1) {
-            //  If this is a problem, later code will determine whether the path
-            //  was actually truncated
-            spdlog::warn("Discovered configuration pathname is likely truncated!");
-        }
-        auto dataDirectory = std::filesystem::path(localpath).parent_path();
-        auto configPath = dataDirectory / "config.ini";
-        spdlog::info("Checking for configuration in {}", configPath.string());
-        if (std::filesystem::exists(configPath)) {
-            return createConfiguration(dataDirectory);
-        }
-    } else {
-        //  TODO: handle systems that support dynamic path sizes (i.e. localpathSize !=
-        //  sizeof(localpath))
-        spdlog::warn("Unable to obtain our local executable path. Falling back to user data paths");
-    }
-    if (!get_local_user_data_directory(localpath, sizeof(localpath), CLEM_HOST_COMPANY_NAME,
-                                       CLEM_HOST_APPLICATION_NAME)) {
-        spdlog::error("Unable to obtain the OS specific user data directory.");
-        return ClemensConfiguration();
-    }
-    return createConfiguration(std::filesystem::path(localpath));
-}
-
 void setupLogger(const ClemensConfiguration &config) {
     static spdlog::level::level_enum levels[] = {spdlog::level::debug, spdlog::level::info,
                                                  spdlog::level::warn, spdlog::level::err,
@@ -116,7 +75,7 @@ void setupLogger(const ClemensConfiguration &config) {
  *  - MacOS
  *    - Supports only User installs and store in ~/Library/Application or equivalent
  */
-ClemensStartupView::ClemensStartupView() : mode_(Mode::Initial), config_(findConfiguration()) {}
+ClemensStartupView::ClemensStartupView(ClemensConfiguration& config) : mode_(Mode::Initial), config_(config) {}
 
 auto ClemensStartupView::frame(int width, int height, double /*deltaTime */,
                                ClemensHostInterop &interop) -> ViewType {

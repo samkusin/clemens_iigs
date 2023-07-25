@@ -13,6 +13,7 @@ with a rich user frontend.
 5. [Finding Software](#finding-roms)
 5. [Debugger](#debugger)
 6. [Troubleshooting](#troubleshooting)
+7. [Missing Features](#known-issues)
 
 ## Features <a name="section-support"></a>
 
@@ -220,4 +221,15 @@ contains WOZ disk images useful for copy protected software.
 
 ## Troubleshooting <a name="troubleshooting"></a>
 
+## Missing Features <a name="known-issues"></a>
+
+* ROM 1 support
+* Serial communication (over IP, then USB via emulation layer)
+* Printer support
+* International Keyboards
+* Monochrome Graphics Modes
+* Transwarp (8mhz+ native mode)
+* Shadow bank bit 0 (Ninjaforce demo emulation)
+* ROM 3 Mouse ADB Keypad emulation
+* SHK, BXY disk image support
 
