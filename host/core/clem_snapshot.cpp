@@ -21,6 +21,7 @@ struct ClemensSnapshotWriter {
     size_t bufferSize = 0;
     mz_uint8 *compBuffer = nullptr;
     uLong compBufferSize = 0;
+    bool compressionEnabled = false;
 
     ClemensSnapshotWriter(FILE *fp) : fpout(fp) {
         buffer = new char[65536];
@@ -31,6 +32,10 @@ struct ClemensSnapshotWriter {
         if (compBuffer) {
             delete[] compBuffer;
         }
+    }
+    void enableCompression(bool enable, mpack_writer_t* writer) {
+        mpack_writer_flush_message(writer);
+        compressionEnabled = enable;
     }
     static void flush(mpack_writer_t *writer, const char *outbuf, size_t count) {
         auto *context = reinterpret_cast<ClemensSnapshotWriter *>(mpack_writer_context(writer));
@@ -52,6 +57,10 @@ struct ClemensSnapshotReader {
     }
     ~ClemensSnapshotReader() {
         delete[] buffer;
+    }
+    void expectCompression(bool enable, mpack_reader_t* writer) {
+        mpack_writer_flush_message(writer);
+        compressionEnabled = enable;
     }
     static size_t fill(mpack_reader_t *reader, char *outbuf, size_t count) {
         auto *context = reinterpret_cast<ClemensSnapshotReader *>(mpack_reader_context(reader));
