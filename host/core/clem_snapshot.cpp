@@ -6,6 +6,7 @@
 #include "clem_smartport.h"
 #include "external/cross_endian.h"
 #include "external/mpack.h"
+#include "miniz.h"
 #include "spdlog/spdlog.h"
 
 #include <cstdio>
@@ -13,7 +14,56 @@
 
 namespace {
 static const char *kValidationStepNames[] = {"None", "Header", "Metadata", "Machine", "Custom"};
-}
+
+struct ClemensSnapshotWriter {
+    FILE *fpout;
+    char *buffer = nullptr;
+    size_t bufferSize = 0;
+    mz_uint8 *compBuffer = nullptr;
+    uLong compBufferSize = 0;
+
+    ClemensSnapshotWriter(FILE *fp) : fpout(fp) {
+        buffer = new char[65536];
+        bufferSize = 65536;
+    }
+    ~ClemensSnapshotWriter() {
+        delete[] buffer;
+        if (compBuffer) {
+            delete[] compBuffer;
+        }
+    }
+    static void flush(mpack_writer_t *writer, const char *outbuf, size_t count) {
+        auto *context = reinterpret_cast<ClemensSnapshotWriter *>(mpack_writer_context(writer));
+        size_t result = fwrite(outbuf, 1, count, context->fpout);
+        if (result < count) {
+            mpack_writer_flag_error(writer, mpack_error_io);
+        }
+    }
+};
+
+struct ClemensSnapshotReader {
+    FILE *fpin;
+    char *buffer = nullptr;
+    size_t bufferSize = 0;
+
+    ClemensSnapshotReader(FILE *fp) : fpin(fp) {
+        buffer = new char[65536];
+        bufferSize = 65536;
+    }
+    ~ClemensSnapshotReader() {
+        delete[] buffer;
+    }
+    static size_t fill(mpack_reader_t *reader, char *outbuf, size_t count) {
+        auto *context = reinterpret_cast<ClemensSnapshotReader *>(mpack_reader_context(reader));
+        if (feof(context->fpin)) {
+            mpack_reader_flag_error(reader, mpack_error_eof);
+            return 0;
+        }
+        return fread(outbuf, 1, count, context->fpin);
+    }
+};
+
+} // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
 //  Serialization blocks
@@ -85,8 +135,11 @@ bool ClemensSnapshot::serialize(
     }
 
     //  begin mpack
+    ClemensSnapshotWriter writerStream(fp);
     mpack_writer_t writer{};
-    mpack_writer_init_stdfile(&writer, fp, true);
+    mpack_writer_init(&writer, writerStream.buffer, writerStream.bufferSize);
+    mpack_writer_set_context(&writer, &writerStream);
+    mpack_writer_set_flush(&writer, ClemensSnapshotWriter::flush);
     if (mpack_writer_error(&writer) != mpack_ok) {
         spdlog::error("serialize() - Failed to initialize writer", path_);
         validationError("stream");
@@ -168,7 +221,10 @@ ClemensSnapshot::unserialize(ClemensSystemListener &systemListener,
     mpack_reader_t reader{};
     bool success = true;
 
-    mpack_reader_init_stdfile(&reader, fp, true);
+    ClemensSnapshotReader streamReader(fp);
+    mpack_reader_init(&reader, streamReader.buffer, streamReader.bufferSize, 0);
+    mpack_reader_set_context(&reader, &streamReader);
+    mpack_reader_set_fill(&reader, ClemensSnapshotReader::fill);
     if (mpack_reader_error(&reader) != mpack_ok) {
         spdlog::error("serialize() - Failed to initialize writer", path_);
         validationError("stream");
@@ -229,7 +285,10 @@ std::pair<ClemensSnapshotMetadata, bool> ClemensSnapshot::unserializeMetadata() 
         return result;
     }
     mpack_reader_t reader{};
-    mpack_reader_init_stdfile(&reader, fp, true);
+    ClemensSnapshotReader streamReader(fp);
+    mpack_reader_init(&reader, streamReader.buffer, streamReader.bufferSize, 0);
+    mpack_reader_set_context(&reader, &streamReader);
+    mpack_reader_set_fill(&reader, ClemensSnapshotReader::fill);
     if (mpack_reader_error(&reader) != mpack_ok) {
         spdlog::error("serialize() - Failed to initialize writer", path_);
         validationError("stream");
