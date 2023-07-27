@@ -165,7 +165,7 @@ uint8_t ClemensProDOSDisk::doFlush(void * /*userContext*/, unsigned /*driveIndex
 }
 
 bool ClemensProDOSDisk::serialize(mpack_writer_t *writer, ClemensSmartPortDevice &device) {
-    mpack_build_map(writer);
+    mpack_start_map(writer, 3);
 
     mpack_write_cstr(writer, "path");
     mpack_write_cstr(writer, assetPath_.c_str());
@@ -195,7 +195,7 @@ bool ClemensProDOSDisk::serialize(mpack_writer_t *writer, ClemensSmartPortDevice
         mpack_finish_array(writer);
     }
 
-    mpack_complete_map(writer);
+    mpack_finish_map(writer);
     return true;
 }
 

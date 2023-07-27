@@ -406,7 +406,7 @@ std::pair<std::string, bool> ClemensAppleIIGS::save(mpack_writer_t *writer) {
     unsigned slotIndex;
     bool result = false;
 
-    mpack_build_map(writer);
+    mpack_start_map(writer, 7);
 
     if (getStatus() != Status::Online && getStatus() != Status::Ready)
         goto save_done;
@@ -478,7 +478,8 @@ save_done:
         localLog(CLEM_DEBUG_LOG_WARN, "ClemensAppleIIGS::save(): Bad save in component '{}'",
                  componentName);
     }
-    mpack_complete_map(writer);
+    mpack_finish_map(writer);
+    
     return std::make_pair(componentName, result);
 }
 

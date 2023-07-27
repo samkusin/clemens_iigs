@@ -3,7 +3,6 @@
 
 #include "clem_disk.h"
 #include "clem_host_platform.h"
-#include "clem_smartport.h"
 #include "external/cross_endian.h"
 #include "external/mpack.h"
 #include "miniz.h"
@@ -14,65 +13,73 @@
 
 namespace {
 static const char *kValidationStepNames[] = {"None", "Header", "Metadata", "Machine", "Custom"};
-static constexpr size_t kUncompressedBlockSize = 65536;
+static constexpr size_t kUncompressedBlockSize = 64 * 1024;
+static constexpr size_t kUncompressedBlockMinSize = 4096;
 
 struct ClemensCompressedWriter {
     FILE *fpout = NULL;
-    char *buffer = nullptr;
-    size_t bufferSize = 0;
+    char buffer[kUncompressedBlockMinSize];
+    uint8_t* rawBuffer = nullptr;
+    size_t rawBufferSize = 0;
+    size_t rawBufferTail = 0;
     mz_uint8 *compBuffer = nullptr;
     uLong compBufferSize = 0;
     mpack_writer_t writer{};
     unsigned flushCount = 0;
 
     ClemensCompressedWriter(FILE *fp) : fpout(fp) {
-        buffer = new char[kUncompressedBlockSize];
-        bufferSize = kUncompressedBlockSize;
-
-        mpack_writer_init(&writer, buffer, bufferSize);
+        mpack_writer_init(&writer, buffer, sizeof(buffer));
         mpack_writer_set_context(&writer, this);
         mpack_writer_set_flush(&writer, flush);
+        mpack_writer_set_teardown(&writer, teardown);
+
+        reallocateRawBuffer(kUncompressedBlockSize);
     }
     ~ClemensCompressedWriter() { finish(); }
 
     void finish() {
-        if (!buffer)
-            return;
         mpack_writer_destroy(&writer);
-        delete[] buffer;
-        buffer = nullptr;
-        if (compBuffer) {
-            delete[] compBuffer;
-            compBuffer = nullptr;
-        }
     }
 
-    static void flush(mpack_writer_t *writer, const char *outbuf, size_t count) {
-        auto *context = reinterpret_cast<ClemensCompressedWriter *>(mpack_writer_context(writer));
-
-        //  compress
-        uLong compSize = compressBound(count);
-        if (compSize == 0) {
-            mpack_writer_flag_error(writer, mpack_error_io);
-            return;
-        }
-
-        if (context->compBufferSize < compSize) {
-            if (context->compBuffer) {
-                delete[] context->compBuffer;
+    void reallocateRawBuffer(size_t sz) {
+        uint8_t* nextBuffer = sz ? new uint8_t[sz] : nullptr;
+        if (rawBuffer) {
+            if (rawBufferTail > 0 && sz) {
+                memmove(nextBuffer, rawBuffer, rawBufferTail);
             }
-            context->compBuffer = new uint8_t[compSize];
-            context->compBufferSize = compSize;
+            delete[] rawBuffer;
         }
+        rawBuffer = nextBuffer;
+        rawBufferSize = sz;
+    }
 
-        int compResult = compress(context->compBuffer, &compSize, (const uint8_t *)outbuf, count);
-        if (compResult != Z_OK) {
-            spdlog::error("ClemensCompressedWriter: error compressing {} bytes, code = {}", count,
-                          compResult);
-            mpack_writer_flag_error(writer, mpack_error_io);
+    uLong checkAndAllocateCompressionBuffer() {
+        //  buffer must be able to compress the full rawBuffer contents
+        assert(rawBufferTail > 0);
+        uLong compLen = compressBound(rawBufferTail);
+        if (compBufferSize < compLen) {
+            delete[] compBuffer;
+            compBuffer = new mz_uint8[compLen];
+            compBufferSize = compLen;
+        }
+        return compLen;
+    }
+
+    void compressAndWriteToStream() {
+        //  compress
+        if (rawBufferTail == 0) return;
+        uLong compSize = checkAndAllocateCompressionBuffer();
+        if (compSize == 0) {
+            mpack_writer_flag_error(&writer, mpack_error_io);
             return;
         }
-
+        int compResult = mz_compress(compBuffer, &compSize, rawBuffer, rawBufferTail);
+        if (compResult != MZ_OK) {
+            spdlog::error("ClemensCompressedWriter: error compressing {} bytes, code = {}", rawBufferTail,
+                          compResult);
+            mpack_writer_flag_error(&writer, mpack_error_io);
+            return;
+        }
         //  write out the compressed data block with a header containing the compressed length
         uint8_t header[16]{};
         header[0] = 'C';
@@ -85,151 +92,187 @@ struct ClemensCompressedWriter {
         header[7] = 'P';
         uint32_t compSizeHeader = htole32(compSize);
         memcpy(header + 8, &compSizeHeader, sizeof(compSizeHeader));
-        compSizeHeader = htole32((unsigned)count);
+        compSizeHeader = htole32((unsigned)rawBufferTail);
         memcpy(header + 12, &compSizeHeader, sizeof(compSizeHeader));
 
-        size_t writeCount = fwrite(header, sizeof(header), 1, context->fpout);
+        size_t writeCount = fwrite(header, sizeof(header), 1, fpout);
         if (writeCount < 1) {
             spdlog::error("ClemensCompressedWriter: error writing compression header {}",
-                          context->flushCount);
-            mpack_writer_flag_error(writer, mpack_error_io);
+                          flushCount);
+            mpack_writer_flag_error(&writer, mpack_error_io);
             return;
         }
 
-        writeCount = fwrite(context->compBuffer, 1, compSize, context->fpout);
+        writeCount = fwrite(compBuffer, 1, compSize, fpout);
         if (writeCount < compSize) {
             spdlog::error("ClemensCompressedWriter: error writing {} buffer bytes", compSize);
-            mpack_writer_flag_error(writer, mpack_error_io);
+            mpack_writer_flag_error(&writer, mpack_error_io);
         }
         spdlog::info("ClemensCompressedWriter: Chunk {}: original: {}, compressed: {}",
-                     context->flushCount, count, compSize);
-        context->flushCount++;
+                     flushCount, rawBufferTail, compSize);
+
+        rawBufferTail = 0;
+        flushCount++;
+    }
+
+    static void teardown(mpack_writer_t* writer) {
+        auto *context = reinterpret_cast<ClemensCompressedWriter *>(mpack_writer_context(writer));
+        context->compressAndWriteToStream();
+        if (context->compBuffer) {
+            delete[] context->compBuffer;
+            context->compBuffer = nullptr;
+            context->compBufferSize = 0;
+        }
+        context->reallocateRawBuffer(0);
+        context->rawBufferTail = 0;
+    }
+
+    static void flush(mpack_writer_t *writer, const char *outbuf, size_t count) {
+        //  push to a buffer that will be compressed once large enough
+        //  our goal is to keep flushed buffers together - not split them
+        //  when writing out to file (as compressed data)
+        auto *ctx = reinterpret_cast<ClemensCompressedWriter *>(mpack_writer_context(writer));
+        while (ctx->rawBufferTail + count > ctx->rawBufferSize) {
+            if (ctx->rawBufferTail >= kUncompressedBlockMinSize) {
+                ctx->compressAndWriteToStream();
+            } else {
+                //  no matter what, not enough space so expand the buffer!
+                ctx->reallocateRawBuffer(ctx->rawBufferTail + count);
+                //  break now in case our reallocation method expands the buffer
+                //  more than the requested amount (i.e. future optimization,
+                //  so let's be safe and do it here explicitly.)
+                break;
+            }
+        }
+        if (count > 0) {
+            memcpy(ctx->rawBuffer + ctx->rawBufferTail, outbuf, count);
+            ctx->rawBufferTail += count;
+            if (ctx->rawBufferTail > kUncompressedBlockSize) {
+                ctx->compressAndWriteToStream();
+                ctx->rawBufferTail = 0;
+            }
+        }
     }
 };
 
 struct ClemensCompressedReader {
     FILE *fpin = NULL;
-    char buffer[8192];
-    char *readbuffer = nullptr;
-    size_t readbufferHead = 0;
-    size_t readbufferTail = 0;
-    size_t readbufferSize = 0;
+    mpack_reader_t reader{};
+    char buffer[kUncompressedBlockMinSize];
     mz_uint8 *compBuffer = nullptr;
     uLong compBufferSize = 0;
-    mpack_reader_t reader{};
+    mz_stream compStream{};
+    unsigned uncompressedLeft = 0;
     unsigned fillCount = 0;
 
     ClemensCompressedReader(FILE *fp) : fpin(fp) {
-        //  allocating extra space to contain data that hasn't yet been written
-        //  to our fill buffer, but still enough to contain a full uncompressed
-        //  data chunk from disk.
-        readbuffer = new char[kUncompressedBlockSize + sizeof(buffer)];
-        readbufferSize = kUncompressedBlockSize + sizeof(buffer);
-
         mpack_reader_init(&reader, buffer, sizeof(buffer), 0);
         mpack_reader_set_context(&reader, this);
         mpack_reader_set_fill(&reader, fill);
+        mpack_reader_set_teardown(&reader, teardown);
     }
     ~ClemensCompressedReader() { finish(); }
 
     void finish() {
-        if (!readbuffer)
-            return;
         mpack_reader_destroy(&reader);
-        delete[] readbuffer;
-        readbuffer = nullptr;
-        if (compBuffer) {
-            delete[] compBuffer;
-            compBuffer = nullptr;
+    }
+
+    static void teardown(mpack_reader_t* reader) {
+        auto *context = reinterpret_cast<ClemensCompressedReader *>(mpack_reader_context(reader));
+        if (context->compStream.avail_in > 0) {
+            mz_inflateEnd(&context->compStream);
+            context->compStream = mz_stream{};
+        }
+        if (context->compBuffer) {
+            delete[] context->compBuffer;
+            context->compBuffer = nullptr;
         }
     }
 
     static size_t fill(mpack_reader_t *reader, char *outbuf, size_t count) {
-        auto *context = reinterpret_cast<ClemensCompressedReader *>(mpack_reader_context(reader));
-        size_t fillAmount = 0;
-        //  fill data from the input *uncompressed* data buffer.   when this buffer
-        //  is emptied, we need to pull from disk and uncompressed that chunk
-        if (context->readbufferHead + sizeof(buffer) > context->readbufferTail) {
-            //  starved readbuffer - copy data from
-            if (context->readbufferHead < context->readbufferTail) {
-                memmove(context->readbuffer, context->readbuffer + context->readbufferHead,
-                        context->readbufferTail - context->readbufferHead);
+        //  On every fill, we pull the requested data from our uncompressed
+        //  intermediate buffer (readbuffer)
+        //  If this buffer is starved, pull a compressed chunk from the input
+        //  stream, (making space if needed)
+        auto *ctx = reinterpret_cast<ClemensCompressedReader *>(mpack_reader_context(reader));
+        int compStatus;
+
+        //  If there's no data available, grab some from the input stream and 
+        //  decompress into the read buffer first
+        if (!ctx->compStream.avail_in) {
+            uint8_t header[16];
+            size_t headerSize = fread(header, 16, 1, ctx->fpin);
+            if (headerSize == 0) {
+                if (!feof(ctx->fpin)) {
+                   spdlog::error("ClemensCompressedReader: no compression header at {}!",
+                                  ctx->fillCount);
+                    mpack_reader_flag_error(reader, mpack_error_io);
+                }
+                return 0;
             }
-            if (!feof(context->fpin)) {
-                //  FILL!
-                context->readbufferTail = context->readbufferTail - context->readbufferHead;
-                context->readbufferHead = 0;
-                uint8_t header[16];
-                size_t headerSize = fread(header, 16, 1, context->fpin);
-                if (headerSize != 1) {
-                    spdlog::error("ClemensCompressedReader: no compression header at {}!",
-                                  context->fillCount);
-                    mpack_reader_flag_error(reader, mpack_error_io);
-                    return 0;
-                }
-                if (memcmp(header, "CLEMSNAP", 8) != 0) {
-                    spdlog::error(
-                        "ClemensCompressedReader: invalid compression header at {} ({},{},{},{})",
-                        context->fillCount, header[0], header[1], header[2], header[3]);
-                    mpack_reader_flag_error(reader, mpack_error_io);
-                    return 0;
-                }
-                //  aligned to 32-bit should be OK on all platforms
-                const uint32_t *compSizePtr = (const uint32_t *)(header + 8);
-                uint32_t compSize = le32toh(*compSizePtr);
-                if (compSize > context->compBufferSize) {
-                    if (context->compBuffer) {
-                        delete[] context->compBuffer;
-                    }
-                    context->compBuffer = new mz_uint8[compSize];
-                    context->compBufferSize = compSize;
-                }
-                uint32_t uncompressedExpected = le32toh(*(compSizePtr + 1));
-                size_t sizeRead;
-                if ((sizeRead = fread(context->compBuffer, 1, compSize, context->fpin)) !=
-                    compSize) {
-                    spdlog::error(
-                        "ClemensCompressedReader: invalid compression chunk at {}, size {}, "
-                        "expected {}",
-                        context->fillCount, sizeRead, compSize);
-                    mpack_reader_flag_error(reader, mpack_error_io);
-                    return 0;
-                }
-                auto readbufferAvail = context->readbufferSize - context->readbufferTail;
-                if (readbufferAvail < uncompressedExpected) {
-                    spdlog::error("ClemensCompressedReader: no room in read buffer for chunk {}, "
-                                  "(available {}, required {})",
-                                  context->fillCount, readbufferAvail, kUncompressedBlockSize);
-                    mpack_reader_flag_error(reader, mpack_error_io);
-                    return 0;
-                }
-                uLong uncompressedSize = uncompressedExpected;
-                int compStatus = uncompress(
-                    (unsigned char *)context->readbuffer + context->readbufferTail,
-                    &uncompressedSize, (const unsigned char *)context->compBuffer, compSize);
-                if (uncompressedSize != uncompressedExpected) {
-                    spdlog::error(
-                        "ClemensCompressedReader: uncompressed sizes do not match for chunk "
-                        "{},  (actual: {}, expected: {})",
-                        context->fillCount, uncompressedSize, uncompressedExpected);
-                    mpack_reader_flag_error(reader, mpack_error_io);
-                    return 0;
-                }
-                context->readbufferTail += uncompressedSize;
-                spdlog::info("ClemensCompressedReader: Chunk {}: original: {}, compressed: {} => "
-                             "buffer({}, {})",
-                             context->fillCount, uncompressedSize, compSize,
-                             context->readbufferHead, context->readbufferTail);
-                context->fillCount++;
+            if (memcmp(header, "CLEMSNAP", 8) != 0) {
+                spdlog::error(
+                    "ClemensCompressedReader: invalid compression header at {} ({},{},{},{})",
+                    ctx->fillCount, header[0], header[1], header[2], header[3]);
+                mpack_reader_flag_error(reader, mpack_error_io);
+                return 0;
+            }
+            //  aligned to 32-bit should be OK on all platforms
+            const uint32_t *compSizePtr = (const uint32_t *)(header + 8);
+            uint32_t compSize = le32toh(*compSizePtr);
+            if (compSize > ctx->compBufferSize) {
+                delete[] ctx->compBuffer;
+                ctx->compBuffer = new mz_uint8[compSize];
+                ctx->compBufferSize = compSize;
+            }
+            ctx->uncompressedLeft = le32toh(*(compSizePtr + 1));
+            size_t sizeRead;
+            if ((sizeRead = fread(ctx->compBuffer, 1, compSize, ctx->fpin)) !=
+                compSize) {
+                spdlog::error(
+                    "ClemensCompressedReader: invalid compression chunk at {}, size {}, "
+                    "expected {}",
+                    ctx->fillCount, sizeRead, compSize);
+                mpack_reader_flag_error(reader, mpack_error_io);
+                return 0;
+            }
+            ctx->compStream = mz_stream{};
+            ctx->compStream.avail_in = compSize;
+            ctx->compStream.next_in = ctx->compBuffer;
+
+            compStatus = mz_inflateInit(&ctx->compStream);
+            if (compStatus != MZ_OK) {
+                spdlog::error("ClemensCompressedReader: failed to initialize stream for chunk {} (result: {})", ctx->fillCount, compStatus);
+                mpack_reader_flag_error(reader, mpack_error_io);
+                return 0;
             }
         }
+        //  compStream is valid
+        unsigned fillAmt = (unsigned)count;
+        ctx->compStream.next_out = (unsigned char*)outbuf;
+        ctx->compStream.avail_out = fillAmt;
+        compStatus = mz_inflate(&ctx->compStream, ctx->compStream.avail_out >= ctx->compStream.avail_in ? MZ_FINISH : MZ_NO_FLUSH);
+        if (compStatus != MZ_OK) {
+            spdlog::error("ClemensCompressedReader: stream uncompress failed for chunk {}: in:{},out:{} (result: {})", ctx->fillCount, ctx->compStream.avail_in, ctx->compStream.avail_out, compStatus);
+            mpack_reader_flag_error(reader, mpack_error_io);
+            return 0;
+        }
+        fillAmt -= ctx->compStream.avail_out;
+        ctx->uncompressedLeft -= fillAmt;
+        if (ctx->compStream.avail_in == 0) {
+            mz_inflateEnd(&ctx->compStream);
+            if (ctx->uncompressedLeft != 0) {
+                spdlog::error(
+                    "ClemensCompressedReader: uncompressed sizes do not match for chunk "
+                    "{},  (actual: {}, expected: 0)",
+                    ctx->fillCount, ctx->uncompressedLeft);
+                mpack_reader_flag_error(reader, mpack_error_io);
+                return 0;
+            }
+            ctx->fillCount++;
+        }
 
-        //  read from head of our read buffer
-        size_t amountToFill = std::min(count, context->readbufferTail - context->readbufferHead);
-        memcpy(outbuf, context->readbuffer + context->readbufferHead, amountToFill);
-        context->readbufferHead += amountToFill;
-
-        return amountToFill;
+        return fillAmt;
     }
 };
 
@@ -315,7 +358,7 @@ bool ClemensSnapshot::serialize(
     }
     bool success = true;
     //  metadata
-    mpack_build_map(&writer);
+    mpack_start_map(&writer, 4);
     mpack_write_kv(&writer, "timestamp", (int64_t)time(NULL));
     mpack_write_kv(&writer, "origin", CLEMENS_PLATFORM_ID);
     mpack_write_cstr(&writer, "disks");
@@ -331,7 +374,7 @@ bool ClemensSnapshot::serialize(
         mpack_write_cstr(&writer, gs.getStorage().getSmartPortStatus(i).assetPath.c_str());
     }
     mpack_finish_array(&writer);
-    mpack_complete_map(&writer);
+    mpack_finish_map(&writer);
 
     //  custom
     validation(ValidationStep::Custom);
@@ -342,6 +385,7 @@ bool ClemensSnapshot::serialize(
             success = false;
         }
     }
+    mpack_writer_flush_message(&writer);
     mpack_writer_destroy(&writer);
 
     //  machine

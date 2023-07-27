@@ -427,6 +427,15 @@ struct ClemensSerializerRecord kNibbleDisk[] = {
                                  track_initialized, CLEM_DISK_LIMIT_QTR_TRACKS, 0),
     CLEM_SERIALIZER_RECORD_EMPTY()};
 
+static unsigned _count_serialization_records(const struct ClemensSerializerRecord *head) {
+    unsigned cnt = 0;
+    while (head->type != kClemensSerializerTypeEmpty) {
+        ++cnt;
+        ++head;
+    }
+    return cnt;
+}
+
 static unsigned clemens_serialize_custom(mpack_writer_t *writer, void *ptr, unsigned sz,
                                          unsigned record_id);
 
@@ -551,12 +560,12 @@ static unsigned clemens_serialize_custom(mpack_writer_t *writer, void *ptr, unsi
     struct ClemensClock *clock;
     uint8_t **card_slot_memory;
 
-    unsigned blob_size, i;
+    unsigned blob_size, i, cnt;
 
-    mpack_build_map(writer);
     switch (record_id) {
     case CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER:
         audio_mix_buffer = (struct ClemensAudioMixBuffer *)(ptr);
+        mpack_start_map(writer, 4);
         mpack_write_cstr(writer, "frame_count");
         mpack_write_u32(writer, audio_mix_buffer->frame_count);
         mpack_write_cstr(writer, "frames_per_second");
@@ -566,10 +575,14 @@ static unsigned clemens_serialize_custom(mpack_writer_t *writer, void *ptr, unsi
         mpack_write_cstr(writer, "data");
         mpack_write_bin(writer, (char *)audio_mix_buffer->data,
                         audio_mix_buffer->frame_count * audio_mix_buffer->stride);
+        mpack_finish_map(writer);
         break;
 
     case CLEM_SERIALIZER_CUSTOM_RECORD_NIBBLE_DISK:
         nib_disk = (struct ClemensNibbleDisk *)ptr;
+        cnt = _count_serialization_records(&kNibbleDisk[0]);
+        cnt = nib_disk->bits_data != NULL ? cnt + 2 : cnt + 1;
+        mpack_start_map(writer, cnt);
         clemens_serialize_records(writer, (uintptr_t)nib_disk, &kNibbleDisk[0]);
         mpack_write_cstr(writer, "bits_data");
         if (nib_disk->bits_data != NULL) {
@@ -580,29 +593,32 @@ static unsigned clemens_serialize_custom(mpack_writer_t *writer, void *ptr, unsi
         } else {
             mpack_write_bool(writer, false);
         }
+        mpack_finish_map(writer);
         break;
 
     case CLEM_SERIALIZER_CUSTOM_RECORD_CARD_MEMORY:
         card_slot_memory = (uint8_t **)ptr;
+        mpack_start_map(writer, 1);
         mpack_write_cstr(writer, "card_rom");
         mpack_start_array(writer, CLEM_CARD_SLOT_COUNT);
         for (i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
             mpack_write_bin(writer, (char *)card_slot_memory[i], 2048);
         }
         mpack_finish_array(writer);
+        mpack_finish_map(writer);
         break;
     }
 
-    mpack_complete_map(writer);
     return sz;
 }
 
 unsigned clemens_serialize_object(mpack_writer_t *writer, uintptr_t data_adr,
                                   const struct ClemensSerializerRecord *record) {
     const struct ClemensSerializerRecord *child = record->records;
-    mpack_build_map(writer);
+
+    mpack_start_map(writer, _count_serialization_records(child));
     clemens_serialize_records(writer, data_adr, child);
-    mpack_complete_map(writer);
+    mpack_finish_map(writer);
     return record->size;
 }
 

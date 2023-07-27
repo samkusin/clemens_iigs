@@ -488,19 +488,19 @@ bool ClemensBackend::serialize(const std::string &path) const {
     ClemensSnapshot snapshot(path);
 
     return snapshot.serialize(*GS_, [this](mpack_writer_t *writer, ClemensAppleIIGS &) -> bool {
-        mpack_build_map(writer);
+        mpack_start_map(writer, 1);
         mpack_write_cstr(writer, "breakpoints");
         mpack_start_array(writer, (uint32_t)breakpoints_.size());
         for (auto &breakpoint : breakpoints_) {
-            mpack_build_map(writer);
+            mpack_start_map(writer, 2);
             mpack_write_cstr(writer, "type");
             mpack_write_i32(writer, static_cast<int>(breakpoint.type));
             mpack_write_cstr(writer, "address");
             mpack_write_u32(writer, breakpoint.address);
-            mpack_complete_map(writer);
+            mpack_finish_map(writer);
         }
         mpack_finish_array(writer);
-        mpack_complete_map(writer);
+        mpack_finish_map(writer);
         return mpack_writer_error(writer) == mpack_ok;
     });
 }

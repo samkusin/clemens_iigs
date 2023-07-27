@@ -34,6 +34,7 @@
 
 #define MPACK_AMALGAMATED 1
 #define MPACK_RELEASE_VERSION 1
+#define MPACK_BUILDER 0
 
 #if defined(MPACK_HAS_CONFIG) && MPACK_HAS_CONFIG
 #include "mpack-config.h"

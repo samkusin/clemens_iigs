@@ -505,7 +505,7 @@ static const char *kErrorTypeNames[] = {"None", "Invalid", "ImageNotSupported",
                                         "VersionNotSupported", NULL};
 
 bool ClemensDiskAsset::serialize(mpack_writer_t *writer) {
-    mpack_build_map(writer);
+    mpack_start_map(writer, 7);
 
     mpack_write_cstr(writer, "image_type");
     mpack_write_cstr(writer, kImageTypeNames[static_cast<int>(imageType_)]);
@@ -524,12 +524,13 @@ bool ClemensDiskAsset::serialize(mpack_writer_t *writer) {
         mpack_write_nil(writer);
     }
     mpack_write_cstr(writer, "metadata");
-    mpack_build_map(writer);
+   
     bool imageTypeHasContainer = true;
     if (diskType_ == DiskHDD || diskType_ == DiskNone) {
         imageTypeHasContainer = false;
     }
     if (imageType_ == ImageWOZ && imageTypeHasContainer) {
+        mpack_start_map(writer, 11);
         auto &woz = std::get<ClemensWOZDisk>(metadata_);
         mpack_write_cstr(writer, "type");
         mpack_write_cstr(writer, "woz");
@@ -553,8 +554,10 @@ bool ClemensDiskAsset::serialize(mpack_writer_t *writer) {
         mpack_write_u16(writer, woz.largest_flux_track);
         mpack_write_cstr(writer, "woz.creator");
         mpack_write_bin(writer, woz.creator, sizeof(woz.creator));
+        mpack_finish_map(writer);
     } else if (imageType_ != ImageNone && imageTypeHasContainer) {
         auto &disk = std::get<Clemens2IMGDisk>(metadata_);
+        mpack_start_map(writer, 9);
         mpack_write_cstr(writer, "type");
         mpack_write_cstr(writer, "2img");
         mpack_write_cstr(writer, "creator");
@@ -573,13 +576,15 @@ bool ClemensDiskAsset::serialize(mpack_writer_t *writer) {
         mpack_write_u64(writer, (uintptr_t)disk.comment_end);
         mpack_write_cstr(writer, "is_write_protected");
         mpack_write_bool(writer, disk.is_write_protected);
+        mpack_finish_map(writer);
     } else {
+        mpack_start_map(writer, 1);
         mpack_write_cstr(writer, "type");
         mpack_write_cstr(writer, "none");
+        mpack_finish_map(writer);
     }
-    mpack_complete_map(writer);
 
-    mpack_complete_map(writer);
+    mpack_finish_map(writer);
     return true;
 }
 
