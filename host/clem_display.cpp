@@ -12,6 +12,7 @@
 #include "stb_truetype.h"
 
 #include <cassert>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -21,6 +22,8 @@
 #elif defined(CK3D_BACKEND_GL)
 #include "shaders/glcore33.inl"
 #endif
+
+#include "sokol/sokol_gfx_ext.h"
 
 //  Renders ClemensVideo data onto a render target/texture representing the
 //  machine's screen
@@ -487,6 +490,27 @@ void ClemensDisplay::finish(float *uvs) {
     sg_end_pass();
     uvs[0] = emulatorMonitorDimensions_[0] / kRenderTargetWidth;
     uvs[1] = emulatorMonitorDimensions_[1] / kRenderTargetHeight;
+}
+
+std::vector<unsigned char> ClemensDisplay::capture(int* w, int* h) {
+    std::vector<unsigned char> buffer(kRenderTargetWidth *kRenderTargetHeight * 4);
+    //  copy whole texture!
+    sg_query_image_pixels(screenTarget_, buffer.data(), buffer.size());
+    //  compress to only needed pixels based on width and height of monitor
+    size_t fromOffset = kRenderTargetWidth * 4;
+    int width = int(std::round(emulatorMonitorDimensions_[0]));
+    int height = int(std::round(emulatorMonitorDimensions_[1]));
+    const size_t srcPitch = kRenderTargetWidth * 4;
+    size_t toOffset = width * 4;
+    for (size_t row = 1, offset = srcPitch; row < height; row++) {
+        std::copy(buffer.data() + offset, buffer.data() + offset + srcPitch, buffer.data() + toOffset);
+        offset += srcPitch;
+        toOffset += width * 4;
+    }
+    buffer.resize(toOffset);
+    *w = width;
+    *h = height;
+    return buffer;
 }
 
 void ClemensDisplay::renderTextGraphics(const ClemensVideo &text, const ClemensVideo &graphics,

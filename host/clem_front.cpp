@@ -888,6 +888,11 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
             display_.renderSuperHiresGraphics(frameReadState_.frame.graphics, e1mem);
         }
         display_.finish(screenUVs);
+        if (ImGui::IsKeyPressed(ImGuiKey_F8)) {
+            int screenWidth, screenHeight;
+            auto screenData = display_.capture(&screenWidth, &screenHeight);
+            spdlog::info("CAPTURE SIZE: {}, {}x{}", screenData.size(), screenWidth, screenHeight);
+        }
         viewToMonitor.screenUVs.x = screenUVs[0];
         viewToMonitor.screenUVs.y = screenUVs[1];
         viewToMonitor.size.x = kClemensScreenWidth;
