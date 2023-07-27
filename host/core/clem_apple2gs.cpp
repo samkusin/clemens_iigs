@@ -406,7 +406,7 @@ std::pair<std::string, bool> ClemensAppleIIGS::save(mpack_writer_t *writer) {
     unsigned slotIndex;
     bool result = false;
 
-    mpack_start_map(writer, 7);
+    mpack_start_map(writer, 8);
 
     if (getStatus() != Status::Online && getStatus() != Status::Ready)
         goto save_done;

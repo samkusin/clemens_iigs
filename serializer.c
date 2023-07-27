@@ -625,17 +625,23 @@ unsigned clemens_serialize_object(mpack_writer_t *writer, uintptr_t data_adr,
 mpack_writer_t *clemens_serialize_machine(mpack_writer_t *writer, ClemensMachine *machine) {
     struct ClemensSerializerRecord root;
     void *data_adr = (void *)machine;
-    unsigned idx;
+    unsigned idx, cnt;
 
+    mpack_start_map(writer, 3);
+
+    mpack_write_cstr(writer, "object");
     memset(&root, 0, sizeof(root));
     root.type = kClemensSerializerTypeRoot;
     root.records = &kMachine[0];
     clemens_serialize_object(writer, (uintptr_t)data_adr, &root);
 
-    /* serialize FPI banks - this lies outside the procedural laying out of
-       values to serialize via record arrays since the logic is here is very
-       special cased to avoid unnecessary serialization
-    */
+    mpack_write_cstr(writer, "banks");
+    for (idx = 0, cnt = 0; idx < 256; ++idx) {
+        cnt++;
+        if (machine->mem.fpi_bank_used[idx])
+            cnt += 2;
+    }
+    mpack_start_array(writer, cnt);
     for (idx = 0; idx < 256; ++idx) {
         mpack_write_bool(writer, machine->mem.fpi_bank_used[idx]);
         if (machine->mem.fpi_bank_used[idx]) {
@@ -643,8 +649,15 @@ mpack_writer_t *clemens_serialize_machine(mpack_writer_t *writer, ClemensMachine
             mpack_write_bin(writer, (char *)machine->mem.fpi_bank_map[idx], CLEM_IIGS_BANK_SIZE);
         }
     }
+    mpack_finish_array(writer);
+
+    mpack_write_cstr(writer, "mega2");
+    mpack_start_array(writer, 2);
     mpack_write_bin(writer, (char *)machine->mem.mega2_bank_map[0], CLEM_IIGS_BANK_SIZE);
     mpack_write_bin(writer, (char *)machine->mem.mega2_bank_map[1], CLEM_IIGS_BANK_SIZE);
+    mpack_finish_array(writer);
+
+    mpack_finish_map(writer);
 
     return writer;
 }
@@ -767,7 +780,7 @@ static void clemens_unserialize_records(mpack_reader_t *reader, uintptr_t data_a
                                         ClemensSerializerAllocateCb alloc_cb, void *context) {
     char key[64];
     while (record->type != kClemensSerializerTypeEmpty) {
-        mpack_expect_cstr(reader, key, sizeof(key));
+        mpack_expect_cstr_match(reader, record->name);
         clemens_unserialize_record(reader, data_adr, record, alloc_cb, context);
         ++record;
     }
@@ -787,13 +800,13 @@ static unsigned clemens_unserialize_custom(mpack_reader_t *reader, void *ptr, un
     case CLEM_SERIALIZER_CUSTOM_RECORD_AUDIO_MIX_BUFFER:
         audio_mix_buffer = (struct ClemensAudioMixBuffer *)(ptr);
         v0 = audio_mix_buffer->stride * audio_mix_buffer->frame_count;
-        mpack_expect_cstr(reader, key, sizeof(key));
+        mpack_expect_cstr_match(reader, "frame_count");
         audio_mix_buffer->frame_count = mpack_expect_u32(reader);
-        mpack_expect_cstr(reader, key, sizeof(key));
+        mpack_expect_cstr_match(reader, "frames_per_second");
         audio_mix_buffer->frames_per_second = mpack_expect_u32(reader);
-        mpack_expect_cstr(reader, key, sizeof(key));
+        mpack_expect_cstr_match(reader, "stride");
         audio_mix_buffer->stride = mpack_expect_u32(reader);
-        mpack_expect_cstr(reader, key, sizeof(key));
+        mpack_expect_cstr_match(reader, "data");
         v1 = mpack_expect_bin(reader);
         if (v0 != v1) {
             audio_mix_buffer->data =
@@ -806,9 +819,9 @@ static unsigned clemens_unserialize_custom(mpack_reader_t *reader, void *ptr, un
         nib_disk = (struct ClemensNibbleDisk *)ptr;
         clemens_unserialize_records(reader, (uintptr_t)nib_disk, &kNibbleDisk[0], alloc_cb,
                                     context);
-        mpack_expect_cstr(reader, key, sizeof(key));
+        mpack_expect_cstr_match(reader, "bits_data");
         if (mpack_expect_bool(reader)) {
-            mpack_expect_cstr(reader, key, sizeof(key));
+            mpack_expect_cstr_match(reader, "blob");
             v0 = mpack_expect_bin(reader);
             v1 = (nib_disk->bits_data_end - nib_disk->bits_data);
             if (v0 > v1) {
@@ -861,10 +874,13 @@ mpack_reader_t *clemens_unserialize_machine(mpack_reader_t *reader, ClemensMachi
     void *data_adr = (void *)machine;
     unsigned idx, sz;
 
+    mpack_expect_map(reader);
+
+    mpack_expect_cstr_match(reader, "object");
+
     memset(&root, 0, sizeof(root));
     root.type = kClemensSerializerTypeRoot;
     root.records = &kMachine[0];
-
     if (clemens_unserialize_object(reader, (uintptr_t)data_adr, &root, alloc_cb, context) ==
         CLEM_SERIALIZER_INVALID_RECORD) {
         return NULL;
@@ -874,6 +890,8 @@ mpack_reader_t *clemens_unserialize_machine(mpack_reader_t *reader, ClemensMachi
        values to serialize via record arrays since the logic is here is very
        special cased to avoid unnecessary serialization
     */
+    mpack_expect_cstr_match(reader, "banks");
+    mpack_expect_array(reader);
     for (idx = 0; idx < 256; ++idx) {
         machine->mem.fpi_bank_used[idx] = mpack_expect_bool(reader);
         if (machine->mem.fpi_bank_used[idx]) {
@@ -888,12 +906,19 @@ mpack_reader_t *clemens_unserialize_machine(mpack_reader_t *reader, ClemensMachi
                                  CLEM_IIGS_BANK_SIZE);
         }
     }
+    mpack_done_array(reader);
+
+    mpack_expect_cstr_match(reader, "mega2");
+    mpack_expect_array(reader);
     machine->mem.mega2_bank_map[0] =
         (*alloc_cb)(CLEM_EMULATOR_ALLOCATION_MEGA2_MEMORY_BANK, 1, context);
     machine->mem.mega2_bank_map[1] =
         (*alloc_cb)(CLEM_EMULATOR_ALLOCATION_MEGA2_MEMORY_BANK, 1, context);
     mpack_expect_bin_buf(reader, (char *)machine->mem.mega2_bank_map[0], CLEM_IIGS_BANK_SIZE);
     mpack_expect_bin_buf(reader, (char *)machine->mem.mega2_bank_map[1], CLEM_IIGS_BANK_SIZE);
+    mpack_done_array(reader);
+
+    mpack_done_map(reader);
 
     memset(&machine->mem.bank_page_map, 0, sizeof(machine->mem.bank_page_map));
 

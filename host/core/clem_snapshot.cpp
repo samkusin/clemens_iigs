@@ -19,7 +19,7 @@ static constexpr size_t kUncompressedBlockMinSize = 4096;
 struct ClemensCompressedWriter {
     FILE *fpout = NULL;
     char buffer[kUncompressedBlockMinSize];
-    uint8_t* rawBuffer = nullptr;
+    uint8_t *rawBuffer = nullptr;
     size_t rawBufferSize = 0;
     size_t rawBufferTail = 0;
     mz_uint8 *compBuffer = nullptr;
@@ -37,12 +37,10 @@ struct ClemensCompressedWriter {
     }
     ~ClemensCompressedWriter() { finish(); }
 
-    void finish() {
-        mpack_writer_destroy(&writer);
-    }
+    void finish() { mpack_writer_destroy(&writer); }
 
     void reallocateRawBuffer(size_t sz) {
-        uint8_t* nextBuffer = sz ? new uint8_t[sz] : nullptr;
+        uint8_t *nextBuffer = sz ? new uint8_t[sz] : nullptr;
         if (rawBuffer) {
             if (rawBufferTail > 0 && sz) {
                 memmove(nextBuffer, rawBuffer, rawBufferTail);
@@ -67,7 +65,8 @@ struct ClemensCompressedWriter {
 
     void compressAndWriteToStream() {
         //  compress
-        if (rawBufferTail == 0) return;
+        if (rawBufferTail == 0)
+            return;
         uLong compSize = checkAndAllocateCompressionBuffer();
         if (compSize == 0) {
             mpack_writer_flag_error(&writer, mpack_error_io);
@@ -75,8 +74,8 @@ struct ClemensCompressedWriter {
         }
         int compResult = mz_compress(compBuffer, &compSize, rawBuffer, rawBufferTail);
         if (compResult != MZ_OK) {
-            spdlog::error("ClemensCompressedWriter: error compressing {} bytes, code = {}", rawBufferTail,
-                          compResult);
+            spdlog::error("ClemensCompressedWriter: error compressing {} bytes, code = {}",
+                          rawBufferTail, compResult);
             mpack_writer_flag_error(&writer, mpack_error_io);
             return;
         }
@@ -108,14 +107,14 @@ struct ClemensCompressedWriter {
             spdlog::error("ClemensCompressedWriter: error writing {} buffer bytes", compSize);
             mpack_writer_flag_error(&writer, mpack_error_io);
         }
-        spdlog::info("ClemensCompressedWriter: Chunk {}: original: {}, compressed: {}",
-                     flushCount, rawBufferTail, compSize);
+        spdlog::debug("ClemensCompressedWriter: Chunk {}: original: {}, compressed: {}", flushCount,
+                      rawBufferTail, compSize);
 
         rawBufferTail = 0;
         flushCount++;
     }
 
-    static void teardown(mpack_writer_t* writer) {
+    static void teardown(mpack_writer_t *writer) {
         auto *context = reinterpret_cast<ClemensCompressedWriter *>(mpack_writer_context(writer));
         context->compressAndWriteToStream();
         if (context->compBuffer) {
@@ -162,22 +161,22 @@ struct ClemensCompressedReader {
     mz_uint8 *compBuffer = nullptr;
     uLong compBufferSize = 0;
     mz_stream compStream{};
-    unsigned uncompressedLeft = 0;
+    unsigned uncompressedExpected = 0;
     unsigned fillCount = 0;
+    bool streamValid = false;
 
     ClemensCompressedReader(FILE *fp) : fpin(fp) {
         mpack_reader_init(&reader, buffer, sizeof(buffer), 0);
         mpack_reader_set_context(&reader, this);
         mpack_reader_set_fill(&reader, fill);
         mpack_reader_set_teardown(&reader, teardown);
+        mpack_reader_set_error_handler(&reader, mpackError);
     }
     ~ClemensCompressedReader() { finish(); }
 
-    void finish() {
-        mpack_reader_destroy(&reader);
-    }
+    void finish() { mpack_reader_destroy(&reader); }
 
-    static void teardown(mpack_reader_t* reader) {
+    static void teardown(mpack_reader_t *reader) {
         auto *context = reinterpret_cast<ClemensCompressedReader *>(mpack_reader_context(reader));
         if (context->compStream.avail_in > 0) {
             mz_inflateEnd(&context->compStream);
@@ -189,6 +188,14 @@ struct ClemensCompressedReader {
         }
     }
 
+    static void mpackError(mpack_reader_t *reader, mpack_error_t error) {
+        auto *context = reinterpret_cast<ClemensCompressedReader *>(mpack_reader_context(reader));
+        if (error == mpack_ok)
+            return;
+        spdlog::error("ClemensCompressedReader: failed unserialization occurred at chunk {}: {}",
+                      context->fillCount, mpack_error_to_string(error));
+    }
+
     static size_t fill(mpack_reader_t *reader, char *outbuf, size_t count) {
         //  On every fill, we pull the requested data from our uncompressed
         //  intermediate buffer (readbuffer)
@@ -197,14 +204,14 @@ struct ClemensCompressedReader {
         auto *ctx = reinterpret_cast<ClemensCompressedReader *>(mpack_reader_context(reader));
         int compStatus;
 
-        //  If there's no data available, grab some from the input stream and 
+        //  If there's no data available, grab some from the input stream and
         //  decompress into the read buffer first
-        if (!ctx->compStream.avail_in) {
+        if (!ctx->streamValid) {
             uint8_t header[16];
             size_t headerSize = fread(header, 16, 1, ctx->fpin);
             if (headerSize == 0) {
                 if (!feof(ctx->fpin)) {
-                   spdlog::error("ClemensCompressedReader: no compression header at {}!",
+                    spdlog::error("ClemensCompressedReader: no compression header at {}!",
                                   ctx->fillCount);
                     mpack_reader_flag_error(reader, mpack_error_io);
                 }
@@ -225,47 +232,60 @@ struct ClemensCompressedReader {
                 ctx->compBuffer = new mz_uint8[compSize];
                 ctx->compBufferSize = compSize;
             }
-            ctx->uncompressedLeft = le32toh(*(compSizePtr + 1));
+            ctx->uncompressedExpected = le32toh(*(compSizePtr + 1));
             size_t sizeRead;
-            if ((sizeRead = fread(ctx->compBuffer, 1, compSize, ctx->fpin)) !=
-                compSize) {
-                spdlog::error(
-                    "ClemensCompressedReader: invalid compression chunk at {}, size {}, "
-                    "expected {}",
-                    ctx->fillCount, sizeRead, compSize);
+            if ((sizeRead = fread(ctx->compBuffer, 1, compSize, ctx->fpin)) != compSize) {
+                spdlog::error("ClemensCompressedReader: invalid compression chunk at {}, size {}, "
+                              "expected {}",
+                              ctx->fillCount, sizeRead, compSize);
                 mpack_reader_flag_error(reader, mpack_error_io);
                 return 0;
             }
+
+            spdlog::debug("ClemensCompressedReadaer: Chunk {}: original: {}, compressed: {}",
+                          ctx->fillCount, ctx->uncompressedExpected, compSize);
+
             ctx->compStream = mz_stream{};
             ctx->compStream.avail_in = compSize;
             ctx->compStream.next_in = ctx->compBuffer;
 
             compStatus = mz_inflateInit(&ctx->compStream);
             if (compStatus != MZ_OK) {
-                spdlog::error("ClemensCompressedReader: failed to initialize stream for chunk {} (result: {})", ctx->fillCount, compStatus);
+                spdlog::error("ClemensCompressedReader: failed to initialize stream for chunk {} "
+                              "(result: {})",
+                              ctx->fillCount, compStatus);
                 mpack_reader_flag_error(reader, mpack_error_io);
                 return 0;
             }
+            ctx->streamValid = true;
         }
         //  compStream is valid
         unsigned fillAmt = (unsigned)count;
-        ctx->compStream.next_out = (unsigned char*)outbuf;
+        ctx->compStream.next_out = (unsigned char *)outbuf;
         ctx->compStream.avail_out = fillAmt;
-        compStatus = mz_inflate(&ctx->compStream, ctx->compStream.avail_out >= ctx->compStream.avail_in ? MZ_FINISH : MZ_NO_FLUSH);
-        if (compStatus != MZ_OK) {
-            spdlog::error("ClemensCompressedReader: stream uncompress failed for chunk {}: in:{},out:{} (result: {})", ctx->fillCount, ctx->compStream.avail_in, ctx->compStream.avail_out, compStatus);
+        int flush =
+            ((ctx->uncompressedExpected - ctx->compStream.total_out) <= ctx->compStream.avail_out)
+                ? MZ_FINISH
+                : MZ_NO_FLUSH;
+        compStatus = mz_inflate(&ctx->compStream, flush);
+        if (compStatus == MZ_STREAM_END) {
+            ctx->streamValid = false;
+        } else if (compStatus != MZ_OK) {
+            spdlog::error("ClemensCompressedReader: stream uncompress failed for chunk {}: "
+                          "in:{},out:{} (result: {})",
+                          ctx->fillCount, ctx->compStream.avail_in, ctx->compStream.avail_out,
+                          compStatus);
             mpack_reader_flag_error(reader, mpack_error_io);
             return 0;
         }
         fillAmt -= ctx->compStream.avail_out;
-        ctx->uncompressedLeft -= fillAmt;
-        if (ctx->compStream.avail_in == 0) {
+        if (!ctx->streamValid) {
+            unsigned uncompressedActual = ctx->compStream.total_out;
             mz_inflateEnd(&ctx->compStream);
-            if (ctx->uncompressedLeft != 0) {
-                spdlog::error(
-                    "ClemensCompressedReader: uncompressed sizes do not match for chunk "
-                    "{},  (actual: {}, expected: 0)",
-                    ctx->fillCount, ctx->uncompressedLeft);
+            if (ctx->uncompressedExpected != uncompressedActual) {
+                spdlog::error("ClemensCompressedReader: uncompressed sizes do not match for chunk "
+                              "{},  (actual: {}, expected: {})",
+                              ctx->fillCount, uncompressedActual, ctx->uncompressedExpected);
                 mpack_reader_flag_error(reader, mpack_error_io);
                 return 0;
             }
