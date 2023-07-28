@@ -45,10 +45,6 @@ SOKOL_GFX_API_DECL void sg_update_texture_filter(sg_image img_id,
     "Please include sokol_gfx.h implementation before sokol_gp.h implementation"
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 static void _sg_all_convert_to_rgba(void *dest_pixels, int dest_w, int dest_h,
                                     void *src_pixels, int src_pitch, int src_r,
                                     int src_g, int src_b, int src_a) {
@@ -455,7 +451,7 @@ static void _sg_metal_update_texture_filter(_sg_image_t *img,
 
 #endif
 
-void sg_query_image_pixels(sg_image img_id, void *pixels, int size) {
+extern "C" void sg_query_image_pixels(sg_image img_id, void *pixels, int size) {
   SOKOL_ASSERT(pixels);
   SOKOL_ASSERT(img_id.id != SG_INVALID_ID);
   _sg_image_t *img = _sg_lookup_image(&_sg.pools, img_id.id);
@@ -471,8 +467,8 @@ void sg_query_image_pixels(sg_image img_id, void *pixels, int size) {
 #endif
 }
 
-void sg_query_pixels(int x, int y, int w, int h, bool origin_top_left,
-                     void *pixels, int size) {
+extern "C" void sg_query_pixels(int x, int y, int w, int h,
+                                bool origin_top_left, void *pixels, int size) {
   SOKOL_ASSERT(pixels);
   SOKOL_ASSERT(size >= w * h);
   _SOKOL_UNUSED(size);
@@ -485,8 +481,8 @@ void sg_query_pixels(int x, int y, int w, int h, bool origin_top_left,
 #endif
 }
 
-void sg_update_texture_filter(sg_image img_id, sg_filter min_filter,
-                              sg_filter mag_filter) {
+extern "C" void sg_update_texture_filter(sg_image img_id, sg_filter min_filter,
+                                         sg_filter mag_filter) {
   SOKOL_ASSERT(img_id.id != SG_INVALID_ID);
   _sg_image_t *img = _sg_lookup_image(&_sg.pools, img_id.id);
   SOKOL_ASSERT(img);
@@ -498,10 +494,6 @@ void sg_update_texture_filter(sg_image img_id, sg_filter min_filter,
   _sg_metal_update_texture_filter(img, min_filter, mag_filter);
 #endif
 }
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
 
 #endif // SOKOL_GFX_EXT_IMPL_INCLUDED
 #endif // SOKOL_GFX_EXT_IMPL

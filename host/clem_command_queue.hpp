@@ -5,6 +5,7 @@
 
 #include "cinek/circular_buffer.hpp"
 
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -36,6 +37,31 @@ class ClemensCommandQueueListener {
     virtual void onCommandSendText(std::string text) = 0;
     virtual bool onCommandBinaryLoad(std::string pathname, unsigned address) = 0;
     virtual bool onCommandBinarySave(std::string pathname, unsigned address, unsigned length) = 0;
+};
+
+class ClemensCommandData {
+  public:
+    enum class Type { MinizPNG };
+
+    virtual ~ClemensCommandData(){};
+    virtual Type getType() const = 0;
+};
+
+class ClemensCommandMinizPNG : public ClemensCommandData {
+  public:
+    ClemensCommandMinizPNG(void *data, size_t sz, int width, int height);
+    virtual ~ClemensCommandMinizPNG() override;
+
+    virtual ClemensCommandData::Type getType() const { return ClemensCommandData::Type::MinizPNG; }
+    std::pair<void *, size_t> getData() const { return std::make_pair(data_, dataSize_); }
+    int getWidth() const { return width_; }
+    int getHeight() const { return height_; }
+
+  private:
+    void *data_;
+    size_t dataSize_;
+    int width_;
+    int height_;
 };
 
 class ClemensCommandQueue {
@@ -90,7 +116,7 @@ class ClemensCommandQueue {
     //  Enable a program trace
     void debugProgramTrace(std::string op, std::string path);
     //  Save and load the machine
-    void saveMachine(std::string path);
+    void saveMachine(std::string path, std::unique_ptr<ClemensCommandMinizPNG> image);
     void loadMachine(std::string path);
     //  Runs a script command for debugging
     void runScript(std::string command);
@@ -120,14 +146,15 @@ class ClemensCommandQueue {
     bool delBreakpoint(ClemensCommandQueueListener &listener, const std::string_view &inputParam);
     bool programTrace(ClemensCommandQueueListener &listener, const std::string_view &inputParam);
     bool runScriptCommand(ClemensCommandQueueListener &listener, const std::string_view &command);
-    bool saveBinary(ClemensCommandQueueListener &listener, const std::string_view& command);
-    bool loadBinary(ClemensCommandQueueListener &listener, const std::string_view& command);
-    
-    using Command = ClemensBackendCommand;
-    cinek::CircularBuffer<Command, 16> queue_;
+    bool saveBinary(ClemensCommandQueueListener &listener, const std::string_view &command);
+    bool loadBinary(ClemensCommandQueueListener &listener, const std::string_view &command);
 
-    void queue(const Command &cmd);
-    void queueToFront(const Command &cmd);
+    using Command = ClemensBackendCommand;
+    using Data = std::unique_ptr<ClemensCommandData>;
+    cinek::CircularBuffer<Command, 16> queue_;
+    cinek::CircularBuffer<Data, 16> dataQueue_;
+
+    void queue(const Command &cmd, Data data = Data());
 };
 
 #endif

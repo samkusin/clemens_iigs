@@ -590,7 +590,7 @@ const uint64_t ClemensFrontend::kFrameSeqNoInvalid = std::numeric_limits<uint64_
 
 extern "C" void clem_temp_generate_ascii_to_adb_table();
 
-ClemensFrontend::ClemensFrontend(ClemensConfiguration& config,
+ClemensFrontend::ClemensFrontend(ClemensConfiguration &config,
                                  const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
     : config_(config), displayProvider_(systemFontLoBuffer, systemFontHiBuffer),
@@ -888,11 +888,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
             display_.renderSuperHiresGraphics(frameReadState_.frame.graphics, e1mem);
         }
         display_.finish(screenUVs);
-        if (ImGui::IsKeyPressed(ImGuiKey_F8)) {
-            int screenWidth, screenHeight;
-            auto screenData = display_.capture(&screenWidth, &screenHeight);
-            spdlog::info("CAPTURE SIZE: {}, {}x{}", screenData.size(), screenWidth, screenHeight);
-        }
         viewToMonitor.screenUVs.x = screenUVs[0];
         viewToMonitor.screenUVs.y = screenUVs[1];
         viewToMonitor.size.x = kClemensScreenWidth;
@@ -964,7 +959,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         if (!saveSnapshotMode_.isStarted()) {
             saveSnapshotMode_.start(backendQueue_, frameReadState_.isRunning);
         }
-        if (saveSnapshotMode_.frame(width, height, backendQueue_)) {
+        if (saveSnapshotMode_.frame(width, height, display_, backendQueue_)) {
             saveSnapshotMode_.stop(backendQueue_);
             setGUIMode(GUIMode::Emulator);
         }

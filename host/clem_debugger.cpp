@@ -571,8 +571,9 @@ void ClemensDebugger::cpuStateTable(ImVec2 anchor, ImVec2 dimensions,
     ImGui::End();
 }
 
-void ClemensDebugger::diagnosticTables(const DebugDiagnostics& diagnostics) {
-    if (!frameState_) return;
+void ClemensDebugger::diagnosticTables(const DebugDiagnostics &diagnostics) {
+    if (!frameState_)
+        return;
     const float kCharSize = ImGui::GetFont()->GetCharAdvance('A');
     if (ImGui::CollapsingHeader("Stats", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (ImGui::BeginTable("##Stats", 2)) {
@@ -1271,7 +1272,7 @@ void ClemensDebugger::cmdSave(std::string_view operand) {
         CLEM_TERM_COUT.print(Error, "Save requires a filename.");
         return;
     }
-    commandQueue_.saveMachine(std::string(params[0]));
+    commandQueue_.saveMachine(std::string(params[0]), nullptr);
 }
 
 void ClemensDebugger::cmdLoad(std::string_view operand) {

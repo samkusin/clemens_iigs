@@ -492,8 +492,8 @@ void ClemensDisplay::finish(float *uvs) {
     uvs[1] = emulatorMonitorDimensions_[1] / kRenderTargetHeight;
 }
 
-std::vector<unsigned char> ClemensDisplay::capture(int* w, int* h) {
-    std::vector<unsigned char> buffer(kRenderTargetWidth *kRenderTargetHeight * 4);
+std::vector<unsigned char> ClemensDisplay::capture(int *w, int *h) {
+    std::vector<unsigned char> buffer(kRenderTargetWidth * kRenderTargetHeight * 4);
     //  copy whole texture!
     sg_query_image_pixels(screenTarget_, buffer.data(), buffer.size());
     //  compress to only needed pixels based on width and height of monitor
@@ -503,11 +503,13 @@ std::vector<unsigned char> ClemensDisplay::capture(int* w, int* h) {
     const size_t srcPitch = kRenderTargetWidth * 4;
     size_t toOffset = width * 4;
     for (size_t row = 1, offset = srcPitch; row < height; row++) {
-        std::copy(buffer.data() + offset, buffer.data() + offset + srcPitch, buffer.data() + toOffset);
+        std::copy(buffer.data() + offset, buffer.data() + offset + srcPitch,
+                  buffer.data() + toOffset);
         offset += srcPitch;
         toOffset += width * 4;
     }
     buffer.resize(toOffset);
+    buffer.shrink_to_fit();
     *w = width;
     *h = height;
     return buffer;
