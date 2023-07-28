@@ -19,6 +19,25 @@ void ClemensLoadSnapshotUI::start(ClemensCommandQueue &backend, const std::strin
     snapshotName_[0] = '\0';
     backend.breakExecution();
     resumeExecutionOnExit_ = true;
+    refresh();
+}
+
+void ClemensLoadSnapshotUI::refresh() {
+    snapshotNames_.clear();
+    for (auto const &entry : std::filesystem::directory_iterator(snapshotDir_)) {
+        auto filename = entry.path().filename();
+        auto extension = filename.extension().string();
+        if (extension != ".clemens-sav") continue;
+        snapshotNames_.emplace_back(std::move(filename.stem().string()));
+
+        ClemensSnapshot snapshot(entry.path().string());
+        auto metadata = snapshot.unserializeMetadata();
+        if (metadata.second) {
+            snapshotMetadatas_.emplace_back(std::move(metadata.first));
+        } else {
+            snapshotMetadatas_.emplace_back();
+        }
+    }
 }
 
 bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue &backend) {
@@ -44,8 +63,7 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue
                                           ImGui::GetTextLineHeightWithSpacing());
             listSize.y = ImGui::GetWindowHeight() - listSize.y - cursorPos.y;
             if (ImGui::BeginListBox("##SnapshotList", listSize)) {
-                for (auto const &entry : std::filesystem::directory_iterator(snapshotDir_)) {
-                    auto filename = entry.path().filename().string();
+                for (auto const &filename : snapshotNames_) {
                     bool isSelected = ImGui::Selectable(filename.c_str(), filename == snapshotName_,
                                                         ImGuiSelectableFlags_AllowDoubleClick);
                     if (!isOk && isSelected) {
@@ -80,7 +98,7 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue
             ImGui::EndDisabled();
             if (isOk && snapshotName_[0] != '\0') {
                 ImGui::CloseCurrentPopup();
-                backend.loadMachine(snapshotName_);
+                backend.loadMachine(fmt::format("{}.clemens-sav", snapshotName_));
                 spdlog::info("ClemensLoadSnapshotUI - loading...");
                 mode_ = Mode::WaitForResponse;
             }
@@ -94,7 +112,8 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue
                 ImGui::Separator();
                 if (ImGui::Button(CLEM_L10N_LABEL(kLabelDelete))) {
                     std::error_code errc{};
-                    auto snapshotPath = std::filesystem::path(snapshotDir_) / snapshotName_;
+                    auto snapshotFilename = fmt::format("{}.clemens-sav", snapshotName_);
+                    auto snapshotPath = std::filesystem::path(snapshotDir_) / snapshotFilename;
                     if (!std::filesystem::remove(snapshotPath, errc)) {
                         spdlog::error("Unable to delete snapshot {} (error={})",
                                       snapshotPath.string(), errc.message());

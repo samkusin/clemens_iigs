@@ -19,6 +19,12 @@ struct ClemensSnapshotMetadata {
     time_t timestamp;
     std::array<std::string, kClemensDrive_Count> disks;
     std::array<std::string, kClemensSmartPortDiskLimit> smartDisks;
+    std::vector<uint8_t> imageData;   // png
+};
+
+struct ClemensSnapshotPNG {
+  const unsigned char* data;
+  size_t size;
 };
 
 class ClemensSnapshot {
@@ -27,7 +33,7 @@ class ClemensSnapshot {
 
     ClemensSnapshot(const std::string &path);
 
-    bool serialize(ClemensAppleIIGS &gs,
+    bool serialize(ClemensAppleIIGS &gs, const ClemensSnapshotPNG& image,
                    std::function<bool(mpack_writer_t *, ClemensAppleIIGS &)> customCb);
     std::unique_ptr<ClemensAppleIIGS>
     unserialize(ClemensSystemListener &listener,

@@ -342,7 +342,8 @@ void ClemensSnapshot::validationError(const std::string &tag) {
 }
 
 bool ClemensSnapshot::serialize(
-    ClemensAppleIIGS &gs, std::function<bool(mpack_writer_t *, ClemensAppleIIGS &)> customCb) {
+    ClemensAppleIIGS &gs, const ClemensSnapshotPNG &image,
+    std::function<bool(mpack_writer_t *, ClemensAppleIIGS &)> customCb) {
     validation(ValidationStep::None);
 
     FILE *fp = fopen(path_.c_str(), "wb");
@@ -378,7 +379,7 @@ bool ClemensSnapshot::serialize(
     }
     bool success = true;
     //  metadata
-    mpack_start_map(&writer, 4);
+    mpack_start_map(&writer, 5);
     mpack_write_kv(&writer, "timestamp", (int64_t)time(NULL));
     mpack_write_kv(&writer, "origin", CLEMENS_PLATFORM_ID);
     mpack_write_cstr(&writer, "disks");
@@ -394,8 +395,13 @@ bool ClemensSnapshot::serialize(
         mpack_write_cstr(&writer, gs.getStorage().getSmartPortStatus(i).assetPath.c_str());
     }
     mpack_finish_array(&writer);
+    mpack_write_cstr(&writer, "screen");
+    if (image.data != NULL) {
+        mpack_write_bin(&writer, (const char *)image.data, (unsigned)image.size);
+    } else {
+        mpack_write_nil(&writer);
+    }
     mpack_finish_map(&writer);
-
     //  custom
     validation(ValidationStep::Custom);
     if (success) {
@@ -572,6 +578,17 @@ ClemensSnapshot::unserializeMetadata(mpack_reader_t &reader) {
         result.first.smartDisks[i] = path;
     }
     mpack_done_array(&reader);
+
+    mpack_expect_cstr_match(&reader, "screen");
+    if (mpack_peek_tag(&reader).type != mpack_type_nil) {
+        uint32_t cnt = mpack_expect_bin(&reader);
+        result.first.imageData.resize(cnt);
+        mpack_read_bytes(&reader, (char *)result.first.imageData.data(), cnt);
+        mpack_done_bin(&reader);
+    } else {
+        mpack_expect_nil(&reader);
+    }
+
     mpack_done_map(&reader);
 
     if (mpack_reader_error(&reader) == mpack_ok) {

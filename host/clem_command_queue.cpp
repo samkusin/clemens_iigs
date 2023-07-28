@@ -115,9 +115,14 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
                 commandFailed = true;
             break;
         case Command::SaveMachine:
-            if (!listener.onCommandSaveMachine(cmd.operand))
-                commandFailed = true;
+            commandFailed = true;
+            if (!data || data->getType() == ClemensCommandData::Type::MinizPNG) {
+                auto *pngData = static_cast<ClemensCommandMinizPNG *>(data != nullptr ? data.release() : nullptr);
+                commandFailed = !listener.onCommandSaveMachine(
+                        cmd.operand, std::unique_ptr<ClemensCommandMinizPNG>(pngData));
+            }
             break;
+
         case Command::LoadMachine:
             if (!listener.onCommandLoadMachine(cmd.operand)) {
                 //  TODO: this should force a restart - hopefully the

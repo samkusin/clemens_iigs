@@ -292,7 +292,7 @@ auto ClemensBackend::step(ClemensCommandQueue &commands) -> ClemensCommandQueue:
     return result;
 }
 
-std::pair<ClemensAudio, bool> ClemensBackend::renderAudioFrame() { 
+std::pair<ClemensAudio, bool> ClemensBackend::renderAudioFrame() {
     std::pair<ClemensAudio, bool> out { GS_->renderAudio(), runSampler_.fastModeDisabledThisFrame};
     return out;
 }
@@ -484,10 +484,15 @@ void ClemensBackend::localLog(int log_level, const char *msg, Args... args) {
     logOutput_.emplace_back(logLine);
 }
 
-bool ClemensBackend::serialize(const std::string &path) const {
+bool ClemensBackend::serialize(const std::string &path, const ClemensCommandMinizPNG* pngData) const {
     ClemensSnapshot snapshot(path);
+    ClemensSnapshotPNG png {};
+    if (pngData) {
+        png.data = (const unsigned char *)pngData->getData().first;
+        png.size = pngData->getData().second;
+    }
 
-    return snapshot.serialize(*GS_, [this](mpack_writer_t *writer, ClemensAppleIIGS &) -> bool {
+    return snapshot.serialize(*GS_,  png, [this](mpack_writer_t *writer, ClemensAppleIIGS &) -> bool {
         mpack_start_map(writer, 1);
         mpack_write_cstr(writer, "breakpoints");
         mpack_start_array(writer, (uint32_t)breakpoints_.size());
@@ -735,10 +740,10 @@ bool ClemensBackend::onCommandDebugProgramTrace(std::string_view op, std::string
     return ok;
 }
 
-bool ClemensBackend::onCommandSaveMachine(std::string path) {
+bool ClemensBackend::onCommandSaveMachine(std::string path, std::unique_ptr<ClemensCommandMinizPNG> pngData) {
     auto outputPath = std::filesystem::path(config_.snapshotRootPath) / path;
 
-    return serialize(outputPath.string());
+    return serialize(outputPath.string(), pngData.get());
 }
 
 bool ClemensBackend::onCommandLoadMachine(std::string path) {

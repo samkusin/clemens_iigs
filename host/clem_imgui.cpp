@@ -6,10 +6,13 @@
 #include "imgui_markdown.h"
 
 #include "sokol/sokol_gfx.h"
+#include "stb_image.h"
 
 #include <cstdio>
 #include <filesystem>
 #include <string_view>
+
+
 
 namespace ClemensHostImGui {
 
@@ -291,5 +294,6 @@ void PushStyleButtonDisabled() {
 void PopStyleButton() { ImGui::PopStyleColor(3); }
 
 ImFont *Get80ColumnFont() { return g_fonts[kFontNarrow]; }
+
 
 } // namespace ClemensHostImGui

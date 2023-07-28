@@ -2,6 +2,9 @@
 #define CLEM_HOST_LOAD_SNAPSHOT_UI_HPP
 
 #include <string>
+#include <vector>
+
+#include "core/clem_snapshot.hpp"
 
 class ClemensCommandQueue;
 
@@ -21,6 +24,15 @@ class ClemensLoadSnapshotUI {
     std::string snapshotDir_;
     char snapshotName_[128];
     bool resumeExecutionOnExit_;
+
+    void refresh();
+
+    std::vector<std::string> snapshotNames_;
+    std::vector<ClemensSnapshotMetadata> snapshotMetadatas_;
+
+    uintptr_t snapshotImage_ = 0;
+    int snapshotImageWidth_ = 0;
+    int snapshotImageHeight_ = 0;
 };
 
 #endif
