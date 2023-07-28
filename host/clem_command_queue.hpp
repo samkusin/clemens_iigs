@@ -9,36 +9,6 @@
 #include <optional>
 #include <string>
 
-class ClemensCommandQueueListener {
-  public:
-    virtual ~ClemensCommandQueueListener() {}
-
-    virtual void onCommandReset() = 0;
-    virtual void onCommandRun() = 0;
-    virtual void onCommandBreakExecution() = 0;
-    virtual void onCommandStep(unsigned count) = 0;
-    virtual void onCommandAddBreakpoint(const ClemensBackendBreakpoint &breakpoint) = 0;
-    virtual bool onCommandRemoveBreakpoint(int index) = 0;
-    virtual void onCommandInputEvent(const ClemensInputEvent &inputEvent) = 0;
-    virtual bool onCommandInsertDisk(ClemensDriveType driveType, std::string diskPath) = 0;
-    virtual void onCommandEjectDisk(ClemensDriveType driveType) = 0;
-    virtual bool onCommandWriteProtectDisk(ClemensDriveType driveType, bool wp) = 0;
-    virtual bool onCommandInsertSmartPortDisk(unsigned driveIndex, std::string diskPath) = 0;
-    virtual void onCommandEjectSmartPortDisk(unsigned driveIndex) = 0;
-    virtual void onCommandDebugMemoryPage(uint8_t pageIndex) = 0;
-    virtual void onCommandDebugMemoryWrite(uint16_t addr, uint8_t value) = 0;
-    virtual void onCommandDebugLogLevel(int logLevel) = 0;
-    virtual bool onCommandDebugProgramTrace(std::string_view op, std::string_view path) = 0;
-    virtual bool onCommandSaveMachine(std::string path) = 0;
-    virtual bool onCommandLoadMachine(std::string path) = 0;
-    virtual bool onCommandRunScript(std::string command) = 0;
-    virtual void onCommandFastDiskEmulation(bool enabled) = 0;
-    virtual std::string onCommandDebugMessage(std::string msg) = 0;
-    virtual void onCommandSendText(std::string text) = 0;
-    virtual bool onCommandBinaryLoad(std::string pathname, unsigned address) = 0;
-    virtual bool onCommandBinarySave(std::string pathname, unsigned address, unsigned length) = 0;
-};
-
 class ClemensCommandData {
   public:
     enum class Type { MinizPNG };
@@ -62,6 +32,37 @@ class ClemensCommandMinizPNG : public ClemensCommandData {
     size_t dataSize_;
     int width_;
     int height_;
+};
+
+class ClemensCommandQueueListener {
+  public:
+    virtual ~ClemensCommandQueueListener() {}
+
+    virtual void onCommandReset() = 0;
+    virtual void onCommandRun() = 0;
+    virtual void onCommandBreakExecution() = 0;
+    virtual void onCommandStep(unsigned count) = 0;
+    virtual void onCommandAddBreakpoint(const ClemensBackendBreakpoint &breakpoint) = 0;
+    virtual bool onCommandRemoveBreakpoint(int index) = 0;
+    virtual void onCommandInputEvent(const ClemensInputEvent &inputEvent) = 0;
+    virtual bool onCommandInsertDisk(ClemensDriveType driveType, std::string diskPath) = 0;
+    virtual void onCommandEjectDisk(ClemensDriveType driveType) = 0;
+    virtual bool onCommandWriteProtectDisk(ClemensDriveType driveType, bool wp) = 0;
+    virtual bool onCommandInsertSmartPortDisk(unsigned driveIndex, std::string diskPath) = 0;
+    virtual void onCommandEjectSmartPortDisk(unsigned driveIndex) = 0;
+    virtual void onCommandDebugMemoryPage(uint8_t pageIndex) = 0;
+    virtual void onCommandDebugMemoryWrite(uint16_t addr, uint8_t value) = 0;
+    virtual void onCommandDebugLogLevel(int logLevel) = 0;
+    virtual bool onCommandDebugProgramTrace(std::string_view op, std::string_view path) = 0;
+    virtual bool onCommandSaveMachine(std::string path,
+                                      std::unique_ptr<ClemensCommandMinizPNG> pngData) = 0;
+    virtual bool onCommandLoadMachine(std::string path) = 0;
+    virtual bool onCommandRunScript(std::string command) = 0;
+    virtual void onCommandFastDiskEmulation(bool enabled) = 0;
+    virtual std::string onCommandDebugMessage(std::string msg) = 0;
+    virtual void onCommandSendText(std::string text) = 0;
+    virtual bool onCommandBinaryLoad(std::string pathname, unsigned address) = 0;
+    virtual bool onCommandBinarySave(std::string pathname, unsigned address, unsigned length) = 0;
 };
 
 class ClemensCommandQueue {
