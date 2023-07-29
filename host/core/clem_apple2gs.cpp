@@ -79,6 +79,22 @@ void destroyCard(ClemensCard *card) {
 
 } // namespace
 
+std::array<const char*, kClemensCardLimitPerSlot> getCardNamesForSlot(unsigned slotIndex) {
+    std::array<const char*, kClemensCardLimitPerSlot> cards;
+    cards.fill(nullptr);
+
+    ++slotIndex;
+    switch (slotIndex) {
+        case 4:
+            cards[0] = kClemensCardMockingboardName;
+            break;
+        case 7:
+            cards[0] = kClemensCardHardDiskName;
+            break;
+    }
+    return cards;
+}
+
 ClemensAppleIIGS::ClemensAppleIIGS(const std::string &romPath, const Config &config,
                                    ClemensSystemListener &listener)
     : listener_(listener), status_(Status::Offline),
@@ -249,7 +265,8 @@ ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener
                                                    unserializerAllocateHook, this);
                 mockingboard_ = mmio_.card_slot[index];
             } else if (cardNames_[index] == kClemensCardHardDiskName) {
-                clem_card_hdd_unserialize(reader, mmio_.card_slot[index], unserializerAllocateHook, this);
+                clem_card_hdd_unserialize(reader, mmio_.card_slot[index], unserializerAllocateHook,
+                                          this);
                 hddcard_ = mmio_.card_slot[index];
             } else {
                 localLog(CLEM_DEBUG_LOG_WARN, "ClemensAppleIIGS(): invalid card entry {}",
@@ -389,7 +406,7 @@ std::pair<std::string, bool> ClemensAppleIIGS::save(mpack_writer_t *writer) {
     unsigned slotIndex;
     bool result = false;
 
-    mpack_build_map(writer);
+    mpack_start_map(writer, 8);
 
     if (getStatus() != Status::Online && getStatus() != Status::Ready)
         goto save_done;
@@ -447,7 +464,7 @@ std::pair<std::string, bool> ClemensAppleIIGS::save(mpack_writer_t *writer) {
     if (mpack_writer_error(writer) != mpack_ok)
         goto save_done;
 
-        //  serialize storage unit
+    //  serialize storage unit
     componentName = "storage";
     mpack_write_cstr(writer, componentName.c_str());
     if (!storage_.serialize(mmio_, writer))
@@ -461,7 +478,8 @@ save_done:
         localLog(CLEM_DEBUG_LOG_WARN, "ClemensAppleIIGS::save(): Bad save in component '{}'",
                  componentName);
     }
-    mpack_complete_map(writer);
+    mpack_finish_map(writer);
+    
     return std::make_pair(componentName, result);
 }
 
@@ -586,7 +604,8 @@ bool ClemensAppleIIGS::writeDataToMemory(const uint8_t *data, unsigned address, 
     if (address > 0xffffff)
         return false;
     for (unsigned i = 0; i < length; ++i) {
-        clem_write(&machine_, data[i], (uint16_t)((address + i) & 0xffff), (uint8_t)(((address + i) >> 16) & 0xff), 0);
+        clem_write(&machine_, data[i], (uint16_t)((address + i) & 0xffff),
+                   (uint8_t)(((address + i) >> 16) & 0xff), 0);
     }
     return true;
 }
@@ -595,7 +614,8 @@ bool ClemensAppleIIGS::readDataFromMemory(uint8_t *data, unsigned address, unsig
     if (address > 0xffffff)
         return false;
     for (unsigned i = 0; i < length; ++i) {
-        clem_read(&machine_, &data[i], (uint16_t)((address + i) & 0xffff), (uint8_t)(((address + i) >> 16) & 0xff), 0);
+        clem_read(&machine_, &data[i], (uint16_t)((address + i) & 0xffff),
+                  (uint8_t)(((address + i) >> 16) & 0xff), 0);
     }
     return true;
 }

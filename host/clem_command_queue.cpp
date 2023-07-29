@@ -17,11 +17,26 @@
 //      - if this isRunning has changed to ON from OFF after the call to dispatchAll, reset the run
 //      sampler.
 
+ClemensCommandMinizPNG::ClemensCommandMinizPNG(void *data, size_t sz, int width, int height)
+    : data_(data), dataSize_(sz), width_(width), height_(height) {}
+
+ClemensCommandMinizPNG::~ClemensCommandMinizPNG() {
+    if (data_) {
+        free(data_);
+    }
+    data_ = nullptr;
+}
+
 void ClemensCommandQueue::queue(ClemensCommandQueue &other) {
     while (!queue_.isFull() && !other.queue_.isEmpty()) {
         Command cmd;
         other.queue_.pop(cmd);
         queue_.push(cmd);
+    }
+    while (!dataQueue_.isFull() && !other.dataQueue_.isEmpty()) {
+        Data data;
+        other.dataQueue_.pop(data);
+        dataQueue_.push(std::move(data));
     }
 }
 
@@ -33,6 +48,9 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
     while (!queue_.isEmpty() && !result.second) {
         Command cmd;
         queue_.pop(cmd);
+
+        Data data;
+        dataQueue_.pop(data);
 
         switch (cmd.type) {
         case Command::Terminate:
@@ -97,9 +115,14 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
                 commandFailed = true;
             break;
         case Command::SaveMachine:
-            if (!listener.onCommandSaveMachine(cmd.operand))
-                commandFailed = true;
+            commandFailed = true;
+            if (!data || data->getType() == ClemensCommandData::Type::MinizPNG) {
+                auto *pngData = static_cast<ClemensCommandMinizPNG *>(data != nullptr ? data.release() : nullptr);
+                commandFailed = !listener.onCommandSaveMachine(
+                        cmd.operand, std::unique_ptr<ClemensCommandMinizPNG>(pngData));
+            }
             break;
+
         case Command::LoadMachine:
             if (!listener.onCommandLoadMachine(cmd.operand)) {
                 //  TODO: this should force a restart - hopefully the
@@ -303,8 +326,9 @@ bool ClemensCommandQueue::programTrace(ClemensCommandQueueListener &listener,
     return listener.onCommandDebugProgramTrace(op, path);
 }
 
-void ClemensCommandQueue::saveMachine(std::string path) {
-    queue(Command{Command::SaveMachine, std::move(path)});
+void ClemensCommandQueue::saveMachine(std::string path,
+                                      std::unique_ptr<ClemensCommandMinizPNG> image) {
+    queue(Command{Command::SaveMachine, std::move(path)}, std::move(image));
 }
 
 void ClemensCommandQueue::loadMachine(std::string path) {
@@ -379,7 +403,7 @@ bool ClemensCommandQueue::delBreakpoint(ClemensCommandQueueListener &listener,
 #pragma GCC diagnostic ignored "-Wstringop-overflow"
 #endif
 #endif
-static const char *sInputKeys[] = {"",      "keyD", "keyU",   "mouseD", "mouseU",
+static const char *sInputKeys[] = {"",      "keyD",     "keyU", "mouseD", "mouseU",
                                    "mouse", "mouseABS", "padl", "nopadl", NULL};
 
 void ClemensCommandQueue::inputEvent(const ClemensInputEvent &input) {
@@ -478,13 +502,13 @@ bool ClemensCommandQueue::loadBinary(ClemensCommandQueueListener &listener,
 
     pathname = command.substr(tokenStart, tokenPos);
     tokenStart = tokenPos + 1;
-   
+
     std::string_view paramStr = command.substr(tokenStart);
     if (std::from_chars(paramStr.data(), paramStr.data() + paramStr.size(), address, 16).ec !=
         std::errc{}) {
         return false;
     }
-   
+
     return listener.onCommandBinaryLoad(pathname, address);
 }
 
@@ -509,4 +533,7 @@ void ClemensCommandQueue::bload(std::string pathname, unsigned address) {
     queue(Command{Command::LoadBinary, fmt::format("{},{:x}", pathname, address)});
 }
 
-void ClemensCommandQueue::queue(const Command &cmd) { queue_.push(cmd); }
+void ClemensCommandQueue::queue(const Command &cmd, Data data) {
+    queue_.push(cmd);
+    dataQueue_.push(std::move(data));
+}

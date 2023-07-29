@@ -19,6 +19,8 @@ class ClemensSettingsUI {
     enum class Mode { None, Main, ROMFileBrowse };
     Mode mode_;
     bool romFileExists_;
+
+    int cardCounts_[CLEM_CARD_SLOT_COUNT];
 };
 
 #endif

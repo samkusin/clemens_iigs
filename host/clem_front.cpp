@@ -74,7 +74,7 @@ static constexpr float kSideBarMinWidth = 160.0f;
 static ImU32 kDarkFrameColor = IM_COL32(0x4a, 0x4a, 0x33, 0xff);
 static ImU32 kDarkInsetColor = IM_COL32(0x3a, 0x3a, 0x22, 0xff);
 static ImU32 kWidgetToggleOnColor = IM_COL32(0xFF, 0xFF, 0xFF, 0xff);
-static ImU32 kWidgetActiveColor = IM_COL32(0xCA, 0xCA, 0xC8, 0xff);
+static ImU32 kWidgetActiveColor = IM_COL32(0xBA, 0xBA, 0xB8, 0xff);
 static ImU32 kWidgetHoverColor = IM_COL32(0xAA, 0xAA, 0xA8, 0xff);
 static ImU32 kWidgetColor = IM_COL32(0x96, 0x96, 0x95, 0xff);
 static ImU32 kWidgetToggleOffColor = IM_COL32(0x22, 0x22, 0x22, 0xff);
@@ -590,7 +590,7 @@ const uint64_t ClemensFrontend::kFrameSeqNoInvalid = std::numeric_limits<uint64_
 
 extern "C" void clem_temp_generate_ascii_to_adb_table();
 
-ClemensFrontend::ClemensFrontend(ClemensConfiguration config,
+ClemensFrontend::ClemensFrontend(ClemensConfiguration &config,
                                  const cinek::ByteBuffer &systemFontLoBuffer,
                                  const cinek::ByteBuffer &systemFontHiBuffer)
     : config_(config), displayProvider_(systemFontLoBuffer, systemFontHiBuffer),
@@ -669,9 +669,7 @@ void ClemensFrontend::pasteText(const char *utf8, unsigned textSizeLimit) {
     backendQueue_.sendText(std::move(clipboardText));
 }
 
-void ClemensFrontend::lostFocus() {
-
-}
+void ClemensFrontend::lostFocus() {}
 
 void ClemensFrontend::gainFocus() {
     emulatorHasMouseFocus_ = false;
@@ -746,7 +744,8 @@ void ClemensFrontend::runBackend(std::unique_ptr<ClemensBackend> backend) {
 #endif
 
         // sync audio
-        audio_.queue(backend->renderAudioFrame());
+        auto audioFrame = backend->renderAudioFrame();
+        audio_.queue(audioFrame.first, audioFrame.second);
     }
 
     std::lock_guard<std::mutex> lk(frameMutex_);
@@ -937,6 +936,15 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     case ClemensHostInterop::Shutdown:
         setGUIMode(GUIMode::ShutdownEmulator);
         break;
+    case ClemensHostInterop::Debugger:
+        config_.hybridInterfaceEnabled = true;
+        break;
+    case ClemensHostInterop::Standard:
+        config_.hybridInterfaceEnabled = false;
+        break;
+    case ClemensHostInterop::AspectView:
+        // TODO: set view width and height in interop
+        break;
     case ClemensHostInterop::None:
         break;
     }
@@ -951,7 +959,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         if (!saveSnapshotMode_.isStarted()) {
             saveSnapshotMode_.start(backendQueue_, frameReadState_.isRunning);
         }
-        if (saveSnapshotMode_.frame(width, height, backendQueue_)) {
+        if (saveSnapshotMode_.frame(width, height, display_, backendQueue_)) {
             saveSnapshotMode_.stop(backendQueue_);
             setGUIMode(GUIMode::Emulator);
         }
@@ -1055,6 +1063,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     interop.mouseShow =
         !mouseInEmulatorScreen_ || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
     interop.poweredOn = isBackendRunning();
+    interop.debuggerOn = config_.hybridInterfaceEnabled;
 
     return getViewType();
 }
@@ -1202,6 +1211,13 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
     ImVec2 kInfoStatusAnchor(anchor.x, anchor.y + kSideBarSize.y);
 
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ClemensHostStyle::getFrameColor(*this));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ClemensHostStyle::getWidgetActiveColor(*this));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ClemensHostStyle::getWidgetHoverColor(*this));
+    ImGui::PushStyleColor(ImGuiCol_Button, ClemensHostStyle::getWidgetColor(*this));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ClemensHostStyle::getWidgetActiveColor(*this));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ClemensHostStyle::getWidgetHoverColor(*this));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ClemensHostStyle::getWidgetToggleOffColor(*this));
+
     if (browseDriveType_.has_value()) {
         doMachineDiskBrowserInterface(kMonitorViewAnchor, kMonitorViewSize);
     } else if (browseSmartDriveIndex_.has_value()) {
@@ -1217,7 +1233,7 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
     }
     doSidePanelLayout(kSideBarAnchor, kSideBarSize);
     doInfoStatusLayout(kInfoStatusAnchor, kInfoStatusSize, kMonitorViewAnchor.x);
-    ImGui::PopStyleColor();
+    ImGui::PopStyleColor(7);
 }
 
 void ClemensFrontend::doDebuggerLayout(ImVec2 anchor, ImVec2 dimensions,
@@ -1304,6 +1320,27 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
             }
             ImGui::EndMenu();
         }
+        if (ImGui::BeginMenu("View")) {
+            if (interop.isFullscreen) {
+                if (ImGui::MenuItem("Exit Fullscreen", NULL)) {
+                    interop.view = ClemensHostInterop::Windowed;
+                }
+            } else {
+                if (ImGui::MenuItem("Enter Fullscreen", NULL)) {
+                    interop.view = ClemensHostInterop::Fullscreen;
+                }
+            }
+            if (config_.hybridInterfaceEnabled) {
+                if (ImGui::MenuItem("User Mode", NULL)) {
+                    config_.hybridInterfaceEnabled = false;
+                }
+            } else {
+                if (ImGui::MenuItem("Debugger Mode", NULL)) {
+                    config_.hybridInterfaceEnabled = true;
+                }
+            }
+            ImGui::EndMenu();
+        }
         if (ImGui::BeginMenu("Machine")) {
             if (guiMode_ == GUIMode::Setup) {
                 if (ImGui::MenuItem("Power", NULL)) {
@@ -1360,24 +1397,26 @@ void ClemensFrontend::doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::SetNextWindowSize(sidebarSize);
     sidebarSize.x -= 2 * style.FramePadding.x;
 
-    ImGui::Begin("SidePanel", nullptr,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus);
-    doMachineDiskDisplay(sidebarSize.x);
-    doMachinePeripheralDisplay(sidebarSize.x);
-    ImGui::End();
+    if (ImGui::Begin("SidePanel", nullptr,
+                     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus)) {
+        doMachineDiskDisplay(sidebarSize.x);
+        if (ImGui::BeginChild("PeripheralsAndCards")) {
+            doMachinePeripheralDisplay(sidebarSize.x);
+        }
+        ImGui::EndChild();
+        ImGui::End();
+    }
     anchor.y += sidebarSize.y;
     ImGui::SetNextWindowPos(anchor);
     ImGui::SetNextWindowSize(quickBarSize);
-    ImGui::Begin("Quickbar", nullptr,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus);
-    doDebuggerQuickbar(quickBarSize.x);
-    ImGui::End();
+    if (ImGui::Begin("Quickbar", nullptr,
+                     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus)) {
+        doDebuggerQuickbar(quickBarSize.x);
+        ImGui::End();
+    }
 }
 
 void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
-    if (!ImGui::BeginChild("PeripheralsAndCards"))
-        return;
-
     const ImGuiStyle &drawStyle = ImGui::GetStyle();
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     if (ImGui::CollapsingHeader("System", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -1491,9 +1530,10 @@ void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
     ImGui::PushFont(mode80 ? ClemensHostImGui::Get80ColumnFont() : NULL);
     ImVec2 debugViewSize(ImGui::GetContentRegionAvail().x,
                          ImGui::GetTextLineHeightWithSpacing() * 10);
-    doDebugView(ImVec2(cursor), debugViewSize);
+    if (!config_.hybridInterfaceEnabled) {
+        doDebugView(ImVec2(cursor), debugViewSize);
+    }
     ImGui::PopFont();
-    ImGui::EndChild();
 }
 
 void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float dividerXPos) {
@@ -2870,14 +2910,8 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
                 ImVec2(0, screenV0), ImVec2(viewToMonitor.screenUVs.x, screenV1),
                 ImGui::GetColorU32(tint_col));
 
-            bool hadEmulatorKeyFocus = emulatorHasKeyboardFocus_;
             emulatorHasKeyboardFocus_ =
                 emulatorHasMouseFocus_ || ImGui::IsWindowFocused() || ImGui::IsWindowHovered();
-
-            if (hadEmulatorKeyFocus != emulatorHasKeyboardFocus_) {
-                spdlog::info("Key focus changed from {} to {}", hadEmulatorKeyFocus,
-                             emulatorHasKeyboardFocus_);
-            }
 
             //  translate mouse position to emulated screen coordinates
             auto mousePos = ImGui::GetMousePos();
@@ -2933,9 +2967,8 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
             } else {
                 mouseInEmulatorScreen_ = false;
             }
-
-            ImGui::EndChild();
         }
+        ImGui::EndChild();
         ImGui::End();
     }
     ImGui::PopStyleVar();

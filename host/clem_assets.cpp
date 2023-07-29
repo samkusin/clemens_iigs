@@ -64,6 +64,18 @@ ImageInfo loadImageFromPNG(const uint8_t *data, size_t dataSize) {
     return image;
 }
 
+uintptr_t loadImageFromPNG(const uint8_t *data, size_t dataSize, int* width, int* height) {
+    auto image = loadImageFromPNG(data, dataSize);
+    *width = image.width;
+    *height = image.height;
+    return image.image.id;
+}
+
+//  only call for images that will be thrown out (i.e. from loadImageFromPNG)
+void freeLoadedImage(uintptr_t imageId) {
+    sg_destroy_image(sg_image{(uint32_t)imageId});
+}
+
 void initialize() {
     //  TODO: might make sense to make this a sprite sheet...
     g_allImages[kPowerButton] = loadImageFromPNG(power_png, power_png_len);

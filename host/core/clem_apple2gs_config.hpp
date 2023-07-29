@@ -9,9 +9,13 @@
 #include <string>
 
 constexpr unsigned kClemensSmartPortDiskLimit = CLEM_SMARTPORT_DRIVE_LIMIT + 1;
+// arbitrary - unlikely to ever need more
+constexpr unsigned kClemensCardLimitPerSlot = 8;        
 
 constexpr const char *kClemensCardMockingboardName = "mockingboard_c";
 constexpr const char *kClemensCardHardDiskName = "hddcard";
+
+std::array<const char*, kClemensCardLimitPerSlot> getCardNamesForSlot(unsigned slotIndex);
 
 struct ClemensAppleIIGSConfig {
     //  RAM in Kilobytes, not counting Mega 2 memory

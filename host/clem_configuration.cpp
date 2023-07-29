@@ -11,13 +11,59 @@
 #include <charconv>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
+
+static constexpr unsigned kViewModeNameCount = 2;
+static const char* kViewModeNames[kViewModeNameCount] = {"windowed", "fullscreen"};
+
+//  For all platforms, the config file is guaranteed to be located in a
+//  predefined location.  The config file is effectively our 'registry' to
+//  use windows terminology.
+//
+ClemensConfiguration createConfiguration(const std::filesystem::path defaultDataDirectory) {
+    auto configPath = defaultDataDirectory / "config.ini";
+    spdlog::info("Configuration created at {}", defaultDataDirectory.string());
+    return ClemensConfiguration(configPath.string(), defaultDataDirectory.string());
+}
+
+ClemensConfiguration findConfiguration() {
+    //  find the config file on the system
+
+    //  local directory configuration check
+    char localpath[CLEMENS_PATH_MAX];
+    size_t localpathSize = sizeof(localpath);
+    if (get_process_executable_path(localpath, &localpathSize)) {
+        if (strnlen(localpath, CLEMENS_PATH_MAX - 1) >= sizeof(localpath) - 1) {
+            //  If this is a problem, later code will determine whether the path
+            //  was actually truncated
+            spdlog::warn("Discovered configuration pathname is likely truncated!");
+        }
+        auto dataDirectory = std::filesystem::path(localpath).parent_path();
+        auto configPath = dataDirectory / "config.ini";
+        spdlog::info("Checking for configuration in {}", configPath.string());
+        if (std::filesystem::exists(configPath)) {
+            return createConfiguration(dataDirectory);
+        }
+    } else {
+        //  TODO: handle systems that support dynamic path sizes (i.e. localpathSize !=
+        //  sizeof(localpath))
+        spdlog::warn("Unable to obtain our local executable path. Falling back to user data paths");
+    }
+    if (!get_local_user_data_directory(localpath, sizeof(localpath), CLEM_HOST_COMPANY_NAME,
+                                       CLEM_HOST_APPLICATION_NAME)) {
+        spdlog::error("Unable to obtain the OS specific user data directory.");
+        return ClemensConfiguration();
+    }
+    return createConfiguration(std::filesystem::path(localpath));
+}
 
 ClemensConfiguration::ClemensConfiguration()
-    : majorVersion(0), minorVersion(0), logLevel(CLEM_DEBUG_LOG_INFO), poweredOn(false),
+    : majorVersion(0), minorVersion(0), logLevel(CLEM_DEBUG_LOG_INFO),
+      viewMode(ViewMode::Windowed),
+      poweredOn(false),
       hybridInterfaceEnabled(false), fastEmulationEnabled(true), isDirty(true) {
     gs.audioSamplesPerSecond = 0;
     gs.memory = CLEM_EMULATOR_RAM_DEFAULT;
-    gs.cardNames[3] = kClemensCardMockingboardName;
     gs.cardNames[6] = kClemensCardHardDiskName;
 }
 
@@ -36,6 +82,7 @@ void ClemensConfiguration::copyFrom(const ClemensConfiguration &other) {
     romFilename = other.romFilename;
     majorVersion = other.majorVersion;
     minorVersion = other.minorVersion;
+    viewMode = other.viewMode;
     logLevel = other.logLevel;
     poweredOn = other.poweredOn;
 
@@ -61,10 +108,12 @@ bool ClemensConfiguration::save() {
                "minor={}\n"
                "data={}\n"
                "hybrid={}\n"
+               "view={}\n"
                "logger={}\n"
                "power={}\n"
                "\n",
-               majorVersion, minorVersion, dataDirectory, hybridInterfaceEnabled ? 1 : 0, logLevel,
+               majorVersion, minorVersion, dataDirectory, hybridInterfaceEnabled ? 1 : 0, 
+               kViewModeNames[static_cast<unsigned>(viewMode) % kViewModeNameCount], logLevel,
                poweredOn ? 1 : 0);
     fmt::print(fp,
                "[emulator]\n"
@@ -122,6 +171,12 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
             config->logLevel = atoi(value);
         } else if (strncmp(name, "power", 16) == 0) {
             config->poweredOn = atoi(value) > 0;
+        } else if (strncmp(name, "view", 16) == 0) {
+            for (unsigned i = 0; i < kViewModeNameCount; ++i) {
+                if (strncmp(value, kViewModeNames[i], 16) == 0) {
+                    config->viewMode = static_cast<ViewMode>(i);
+                }
+            }
         }
     } else if (strncmp(section, "emulator", 16) == 0) {
         if (strncmp(name, "romfile", 16) == 0) {
@@ -175,8 +230,8 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
                 return 0;
             }
             config->gs.smartPortImagePaths[driveIndex] = value;
-        } else if (strncmp(name, "gs.card.", 9) == 0) {
-            const char *partial = name + 9;
+        } else if (strncmp(name, "gs.card.", 8) == 0) {
+            const char *partial = name + 8;
             unsigned cardIndex;
             if (std::from_chars(partial, partial + 1, cardIndex, 10).ec != std::errc{}) {
                 fmt::print(stderr, "Invalid Card configuration {}={}\n", name, value);

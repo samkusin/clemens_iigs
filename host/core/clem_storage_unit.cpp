@@ -380,7 +380,7 @@ bool ClemensStorageUnit::serialize(ClemensMMIO &mmio, mpack_writer_t *writer) {
     //  read from the emulator serialize module
     //  so we serialize disk asset objects
 
-    mpack_build_map(writer);
+    mpack_start_map(writer, 3);
     mpack_write_cstr(writer, "disk.assets");
     mpack_start_array(writer, diskAssets_.size());
     bool success = true;
@@ -425,7 +425,7 @@ bool ClemensStorageUnit::serialize(ClemensMMIO &mmio, mpack_writer_t *writer) {
     }
     mpack_finish_array(writer);
 
-    mpack_complete_map(writer);
+    mpack_finish_map(writer);
 
     return success;
 }

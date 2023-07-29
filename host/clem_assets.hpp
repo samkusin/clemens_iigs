@@ -39,6 +39,13 @@ float getImageAspect(ImageId imageId);
 ImageId getImageFromName(std::string_view name);
 void terminate();
 
+
+//  dynamically create images from PNG data
+uintptr_t loadImageFromPNG(const uint8_t *data, size_t dataSize, int* width, int* height);
+//  only call for images that will be thrown out (i.e. from loadImageFromPNG)
+void freeLoadedImage(uintptr_t imageId);
+
+
 }; // namespace ClemensHostAssets
 
 #endif

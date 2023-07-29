@@ -5,8 +5,34 @@
 
 #include "cinek/circular_buffer.hpp"
 
+#include <memory>
 #include <optional>
 #include <string>
+
+class ClemensCommandData {
+  public:
+    enum class Type { MinizPNG };
+
+    virtual ~ClemensCommandData(){};
+    virtual Type getType() const = 0;
+};
+
+class ClemensCommandMinizPNG : public ClemensCommandData {
+  public:
+    ClemensCommandMinizPNG(void *data, size_t sz, int width, int height);
+    virtual ~ClemensCommandMinizPNG() override;
+
+    virtual ClemensCommandData::Type getType() const override { return ClemensCommandData::Type::MinizPNG; }
+    std::pair<void *, size_t> getData() const { return std::make_pair(data_, dataSize_); }
+    int getWidth() const { return width_; }
+    int getHeight() const { return height_; }
+
+  private:
+    void *data_;
+    size_t dataSize_;
+    int width_;
+    int height_;
+};
 
 class ClemensCommandQueueListener {
   public:
@@ -28,7 +54,8 @@ class ClemensCommandQueueListener {
     virtual void onCommandDebugMemoryWrite(uint16_t addr, uint8_t value) = 0;
     virtual void onCommandDebugLogLevel(int logLevel) = 0;
     virtual bool onCommandDebugProgramTrace(std::string_view op, std::string_view path) = 0;
-    virtual bool onCommandSaveMachine(std::string path) = 0;
+    virtual bool onCommandSaveMachine(std::string path,
+                                      std::unique_ptr<ClemensCommandMinizPNG> pngData) = 0;
     virtual bool onCommandLoadMachine(std::string path) = 0;
     virtual bool onCommandRunScript(std::string command) = 0;
     virtual void onCommandFastDiskEmulation(bool enabled) = 0;
@@ -90,7 +117,7 @@ class ClemensCommandQueue {
     //  Enable a program trace
     void debugProgramTrace(std::string op, std::string path);
     //  Save and load the machine
-    void saveMachine(std::string path);
+    void saveMachine(std::string path, std::unique_ptr<ClemensCommandMinizPNG> image);
     void loadMachine(std::string path);
     //  Runs a script command for debugging
     void runScript(std::string command);
@@ -120,14 +147,15 @@ class ClemensCommandQueue {
     bool delBreakpoint(ClemensCommandQueueListener &listener, const std::string_view &inputParam);
     bool programTrace(ClemensCommandQueueListener &listener, const std::string_view &inputParam);
     bool runScriptCommand(ClemensCommandQueueListener &listener, const std::string_view &command);
-    bool saveBinary(ClemensCommandQueueListener &listener, const std::string_view& command);
-    bool loadBinary(ClemensCommandQueueListener &listener, const std::string_view& command);
-    
-    using Command = ClemensBackendCommand;
-    cinek::CircularBuffer<Command, 16> queue_;
+    bool saveBinary(ClemensCommandQueueListener &listener, const std::string_view &command);
+    bool loadBinary(ClemensCommandQueueListener &listener, const std::string_view &command);
 
-    void queue(const Command &cmd);
-    void queueToFront(const Command &cmd);
+    using Command = ClemensBackendCommand;
+    using Data = std::unique_ptr<ClemensCommandData>;
+    cinek::CircularBuffer<Command, 16> queue_;
+    cinek::CircularBuffer<Data, 16> dataQueue_;
+
+    void queue(const Command &cmd, Data data = Data());
 };
 
 #endif

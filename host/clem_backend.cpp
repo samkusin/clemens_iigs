@@ -75,6 +75,7 @@ void ClemensRunSampler::reset() {
     sampledVblsSpent = 0;
     emulatorVblsPerFrame = 1;
     fastModeEnabled = false;
+    fastModeDisabledThisFrame = false;
     frameTimeBuffer.clear();
     clocksBuffer.clear();
     cyclesBuffer.clear();
@@ -84,6 +85,7 @@ void ClemensRunSampler::reset() {
 void ClemensRunSampler::enableFastMode() { fastModeEnabled = true; }
 
 void ClemensRunSampler::disableFastMode() {
+    if (fastModeEnabled) fastModeDisabledThisFrame = true;
     fastModeEnabled = false;
     emulatorVblsPerFrame = 1;
 }
@@ -290,15 +292,9 @@ auto ClemensBackend::step(ClemensCommandQueue &commands) -> ClemensCommandQueue:
     return result;
 }
 
-ClemensAudio ClemensBackend::renderAudioFrame() { 
-    ClemensAudio audio = GS_->renderAudio();
-    /*
-    if (runSampler_.fastModeEnabled) {
-        audio.frame_count = 0;
-        audio.frame_total = 0;
-    }
-    */
-    return audio;
+std::pair<ClemensAudio, bool> ClemensBackend::renderAudioFrame() {
+    std::pair<ClemensAudio, bool> out { GS_->renderAudio(), runSampler_.fastModeDisabledThisFrame};
+    return out;
 }
 
 void ClemensBackend::post(ClemensBackendState &backendState) {
@@ -352,6 +348,7 @@ void ClemensBackend::post(ClemensBackendState &backendState) {
 
     GS_->finishFrame(backendState.frame);
     hitBreakpoint_ = std::nullopt;
+    runSampler_.fastModeDisabledThisFrame = false;
 }
 
 #if defined(__GNUC__)
@@ -487,23 +484,28 @@ void ClemensBackend::localLog(int log_level, const char *msg, Args... args) {
     logOutput_.emplace_back(logLine);
 }
 
-bool ClemensBackend::serialize(const std::string &path) const {
+bool ClemensBackend::serialize(const std::string &path, const ClemensCommandMinizPNG* pngData) const {
     ClemensSnapshot snapshot(path);
+    ClemensSnapshotPNG png {};
+    if (pngData) {
+        png.data = (const unsigned char *)pngData->getData().first;
+        png.size = pngData->getData().second;
+    }
 
-    return snapshot.serialize(*GS_, [this](mpack_writer_t *writer, ClemensAppleIIGS &) -> bool {
-        mpack_build_map(writer);
+    return snapshot.serialize(*GS_,  png, [this](mpack_writer_t *writer, ClemensAppleIIGS &) -> bool {
+        mpack_start_map(writer, 1);
         mpack_write_cstr(writer, "breakpoints");
         mpack_start_array(writer, (uint32_t)breakpoints_.size());
         for (auto &breakpoint : breakpoints_) {
-            mpack_build_map(writer);
+            mpack_start_map(writer, 2);
             mpack_write_cstr(writer, "type");
             mpack_write_i32(writer, static_cast<int>(breakpoint.type));
             mpack_write_cstr(writer, "address");
             mpack_write_u32(writer, breakpoint.address);
-            mpack_complete_map(writer);
+            mpack_finish_map(writer);
         }
         mpack_finish_array(writer);
-        mpack_complete_map(writer);
+        mpack_finish_map(writer);
         return mpack_writer_error(writer) == mpack_ok;
     });
 }
@@ -738,10 +740,10 @@ bool ClemensBackend::onCommandDebugProgramTrace(std::string_view op, std::string
     return ok;
 }
 
-bool ClemensBackend::onCommandSaveMachine(std::string path) {
+bool ClemensBackend::onCommandSaveMachine(std::string path, std::unique_ptr<ClemensCommandMinizPNG> pngData) {
     auto outputPath = std::filesystem::path(config_.snapshotRootPath) / path;
 
-    return serialize(outputPath.string());
+    return serialize(outputPath.string(), pngData.get());
 }
 
 bool ClemensBackend::onCommandLoadMachine(std::string path) {

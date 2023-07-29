@@ -2,9 +2,12 @@
 #include "clem_command_queue.hpp"
 
 #include "clem_backend.hpp"
+#include "clem_display.hpp"
 #include "clem_imgui.hpp"
 #include "fmt/format.h"
 #include "imgui.h"
+
+#include "miniz.h"
 
 #include <filesystem>
 
@@ -17,7 +20,8 @@ void ClemensSaveSnapshotUI::start(ClemensCommandQueue &backend, bool isEmulatorR
     backend.breakExecution();
 }
 
-bool ClemensSaveSnapshotUI::frame(float width, float /* height */, ClemensCommandQueue &backend) {
+bool ClemensSaveSnapshotUI::frame(float width, float /* height */, ClemensDisplay &display,
+                                  ClemensCommandQueue &backend) {
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     switch (mode_) {
     case Mode::None:
@@ -55,8 +59,17 @@ bool ClemensSaveSnapshotUI::frame(float width, float /* height */, ClemensComman
                 if (!selectedPath.has_extension()) {
                     selectedPath.replace_extension(".clemens-sav");
                 }
-                backend.saveMachine(selectedPath.string());
-                fmt::print("SaveSnapshotMode: saving...\n");
+                int screenWidth, screenHeight;
+                auto screenData = display.capture(&screenWidth, &screenHeight);
+                size_t imageDataLen = 0;
+
+                //  now compress to PNG
+                void *imageData = tdefl_write_image_to_png_file_in_memory_ex(
+                    screenData.data(), screenWidth, screenHeight, 4, &imageDataLen,
+                    MZ_DEFAULT_LEVEL, display.shouldFlipTarget());
+                auto pngData = std::make_unique<ClemensCommandMinizPNG>(imageData, imageDataLen,
+                                                                        screenWidth, screenHeight);
+                backend.saveMachine(selectedPath.string(), std::move(pngData));
                 mode_ = Mode::WaitForResponse;
             }
             ImGui::EndPopup();

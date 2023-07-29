@@ -4,6 +4,8 @@
 
 #include "clem_imgui.hpp"
 
+#include "clem_mmio_defs.h"
+#include "core/clem_apple2gs_config.hpp"
 #include "fmt/format.h"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -22,6 +24,17 @@ void ClemensSettingsUI::stop() { mode_ = Mode::None; }
 void ClemensSettingsUI::start() {
     mode_ = Mode::Main;
     romFileExists_ = !config_.romFilename.empty() && std::filesystem::exists(config_.romFilename);
+
+    for (unsigned slotIdx = 0; slotIdx < CLEM_CARD_SLOT_COUNT; ++slotIdx) {
+        cardCounts_[slotIdx] = 0;
+
+        auto names = getCardNamesForSlot(slotIdx);
+        for (unsigned cardIdx = 0; cardIdx < (unsigned)names.size(); ++cardIdx) {
+            if (names[0] == nullptr)
+                break;
+            cardCounts_[slotIdx]++;
+        }
+    }
 }
 
 bool ClemensSettingsUI::frame() {
@@ -90,10 +103,37 @@ bool ClemensSettingsUI::frame() {
             }
             config_.gs.memory = ramSizeKB;
         }
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::Text("Cards");
+        ImGui::TableNextColumn();
+        for (unsigned slotIdx = 0; slotIdx < CLEM_CARD_SLOT_COUNT; ++slotIdx) {
+            char slotLabel[32];
+            if (cardCounts_[slotIdx] > 0) {
+                auto cards = getCardNamesForSlot(slotIdx);
+                snprintf(slotLabel, sizeof(slotLabel), "Slot %u", slotIdx + 1);
+                if (ImGui::BeginCombo(slotLabel, !config_.gs.cardNames[slotIdx].empty()
+                                                     ? config_.gs.cardNames[slotIdx].c_str() 
+                                                     : "None")) {
+                    if (ImGui::Selectable("None", config_.gs.cardNames[slotIdx].empty())) {
+                        config_.gs.cardNames[slotIdx].clear();
+                    }
+                    for (auto cardNameIt = cards.begin(); cardNameIt != cards.end(); ++cardNameIt) {
+                        if (*cardNameIt == nullptr) break;
+                        if (ImGui::Selectable(*cardNameIt,
+                                              config_.gs.cardNames[slotIdx] == *cardNameIt)) {
+                            config_.gs.cardNames[slotIdx] = *cardNameIt;
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+            }
+        }
         ImGui::EndTable();
 
         ImGui::NewLine();
-        if (ImGui::Button("Power On", ImVec2(ImGui::GetFont()->GetCharAdvance('W') * 20, ImGui::GetTextLineHeight() * 2))) {
+        if (ImGui::Button("Power On", ImVec2(ImGui::GetFont()->GetCharAdvance('W') * 20,
+                                             ImGui::GetTextLineHeight() * 2))) {
             startMachine = true;
         }
         ImGui::NewLine();

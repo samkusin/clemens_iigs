@@ -5,6 +5,8 @@
 #include "clem_mmio_types.h"
 #include "sokol/sokol_gfx.h"
 
+#include <vector>
+
 struct ClemensDisplayVertex {
     float pos[2];
     float uvs[2];
@@ -59,6 +61,8 @@ class ClemensDisplay {
 
     void start(const ClemensMonitor &monitor, int screen_w, int screen_h);
     void finish(float *uvs);
+    //  must be done after finish()
+    std::vector<unsigned char> capture(int* w, int* h);
 
     //  all memory blocks passed to render functions are assumed to be 64K banks
     //  from the emulator.  The 'video' structures represent scanline data
@@ -74,6 +78,9 @@ class ClemensDisplay {
 
     // Returns the color texture for the display for rendering
     sg_image getScreenTarget() const { return screenTarget_; }
+
+    // Return whether the target should be flipped due to rendering backend type
+    bool shouldFlipTarget() const;
 
   private:
     using DrawVertex = ClemensDisplayVertex;

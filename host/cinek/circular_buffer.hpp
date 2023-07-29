@@ -124,7 +124,7 @@ template <typename Element, size_t Size> bool CircularBuffer<Element, Size>::pop
     if (current_head == _tail.load())
         return false; // empty queue
 
-    item = _array[current_head];
+    item = std::move(_array[current_head]);
     _head.store(increment(current_head));
     return true;
 }

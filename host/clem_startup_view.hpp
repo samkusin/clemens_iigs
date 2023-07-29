@@ -10,9 +10,7 @@ class ClemensPreamble;
 
 class ClemensStartupView : public ClemensHostView {
   public:
-    ClemensStartupView();
-
-    const ClemensConfiguration &getConfiguration() const { return config_; }
+    ClemensStartupView(ClemensConfiguration& config);
 
   public:
     ViewType getViewType() const final { return ViewType::Startup; }
@@ -28,7 +26,7 @@ class ClemensStartupView : public ClemensHostView {
     bool validateDirectories();
 
     Mode mode_;
-    ClemensConfiguration config_;
+    ClemensConfiguration& config_;
 
     std::string setupError_;
 

@@ -47,6 +47,7 @@ struct ClemensRunSampler {
     unsigned sampledVblsSpent;
     unsigned emulatorVblsPerFrame;
     bool fastModeEnabled;
+    bool fastModeDisabledThisFrame;
 
     ClemensRunSampler();
 
@@ -89,7 +90,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     //  Executes a single emulator timeslice
     ClemensCommandQueue::DispatchResult step(ClemensCommandQueue& commands);
     //  Obtain current audio frame (following calls to step())
-    ClemensAudio renderAudioFrame();
+    std::pair<ClemensAudio, bool> renderAudioFrame();
     //  Populate a backend state
     void post(ClemensBackendState& backendState);
 
@@ -130,7 +131,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     void onCommandDebugMemoryWrite(uint16_t addr, uint8_t value) final;
     void onCommandDebugLogLevel(int logLevel) final;
     bool onCommandDebugProgramTrace(std::string_view op, std::string_view path) final;
-    bool onCommandSaveMachine(std::string path) final;
+    bool onCommandSaveMachine(std::string path, std::unique_ptr<ClemensCommandMinizPNG> pngData) final;
     bool onCommandLoadMachine(std::string path) final;
     bool onCommandRunScript(std::string command) final;
     void onCommandFastDiskEmulation(bool enabled) final;
@@ -144,7 +145,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     std::optional<unsigned> checkHitBreakpoint();
     template <typename... Args> void localLog(int log_level, const char *msg, Args... args);
 
-    bool serialize(const std::string &path) const;
+    bool serialize(const std::string &path, const ClemensCommandMinizPNG* pngData) const;
     bool unserialize(const std::string &path);
     void updateRTC();
 

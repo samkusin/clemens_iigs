@@ -20,14 +20,21 @@
 #include <string>
 
 struct ClemensConfiguration {
+    enum class ViewMode {
+      Windowed,
+      Fullscreen
+    };
+
     std::string iniPathname;
     unsigned majorVersion;
     unsigned minorVersion;
     std::string dataDirectory;
     std::string romFilename;
     int logLevel;
+    ViewMode viewMode;
     bool poweredOn;
     bool hybridInterfaceEnabled;
+    
 
     ClemensAppleIIGSConfig gs;
 
@@ -53,5 +60,7 @@ struct ClemensConfiguration {
     static int handler(void *user, const char *section, const char *name, const char *value);
     bool isDirty;
 };
+
+ClemensConfiguration findConfiguration();
 
 #endif

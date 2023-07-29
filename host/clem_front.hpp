@@ -41,7 +41,7 @@ struct ClemensBackendState;
 
 class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
   public:
-    ClemensFrontend(ClemensConfiguration config, const cinek::ByteBuffer &systemFontLoBuffer,
+    ClemensFrontend(ClemensConfiguration& config, const cinek::ByteBuffer &systemFontLoBuffer,
                     const cinek::ByteBuffer &systemFontHiBuffer);
     ~ClemensFrontend();
 
@@ -117,7 +117,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     void rebootInternal(bool keyfocus);
 
   private:
-    ClemensConfiguration config_;
+    ClemensConfiguration& config_;
     ClemensDisplayProvider displayProvider_;
 
     ClemensDisplay display_;
