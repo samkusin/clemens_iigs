@@ -11,6 +11,8 @@
 #include <ctime>
 #include <filesystem>
 
+#include "cinek/ckdefs.h"
+
 // TODO: this is duplicated in clem_backend.cpp - consolidate!
 static void getLocalTimeFromEpoch(struct tm *localTime, time_t epoch) {
 #if CK_COMPILER_MSVC
