@@ -22,7 +22,7 @@ class ClemensCommandMinizPNG : public ClemensCommandData {
     ClemensCommandMinizPNG(void *data, size_t sz, int width, int height);
     virtual ~ClemensCommandMinizPNG() override;
 
-    virtual ClemensCommandData::Type getType() const { return ClemensCommandData::Type::MinizPNG; }
+    virtual ClemensCommandData::Type getType() const override { return ClemensCommandData::Type::MinizPNG; }
     std::pair<void *, size_t> getData() const { return std::make_pair(data_, dataSize_); }
     int getWidth() const { return width_; }
     int getHeight() const { return height_; }

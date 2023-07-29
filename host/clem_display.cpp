@@ -497,12 +497,11 @@ std::vector<unsigned char> ClemensDisplay::capture(int *w, int *h) {
     //  copy whole texture!
     sg_query_image_pixels(screenTarget_, buffer.data(), buffer.size());
     //  compress to only needed pixels based on width and height of monitor
-    size_t fromOffset = kRenderTargetWidth * 4;
     int width = int(std::round(emulatorMonitorDimensions_[0]));
     int height = int(std::round(emulatorMonitorDimensions_[1]));
     const size_t srcPitch = kRenderTargetWidth * 4;
     size_t toOffset = width * 4;
-    for (size_t row = 1, offset = srcPitch; row < height; row++) {
+    for (int row = 1, offset = srcPitch; row < height; row++) {
         std::copy(buffer.data() + offset, buffer.data() + offset + srcPitch,
                   buffer.data() + toOffset);
         offset += srcPitch;
@@ -513,6 +512,14 @@ std::vector<unsigned char> ClemensDisplay::capture(int *w, int *h) {
     *w = width;
     *h = height;
     return buffer;
+}
+
+bool ClemensDisplay::shouldFlipTarget() const {
+#if defined(CK3D_BACKEND_GL)
+    return true;
+#else
+    return false;
+#endif
 }
 
 void ClemensDisplay::renderTextGraphics(const ClemensVideo &text, const ClemensVideo &graphics,

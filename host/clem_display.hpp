@@ -79,6 +79,9 @@ class ClemensDisplay {
     // Returns the color texture for the display for rendering
     sg_image getScreenTarget() const { return screenTarget_; }
 
+    // Return whether the target should be flipped due to rendering backend type
+    bool shouldFlipTarget() const;
+
   private:
     using DrawVertex = ClemensDisplayVertex;
     using DisplayVertexParams = ClemensDisplayVertexParams;

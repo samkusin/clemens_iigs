@@ -1,6 +1,7 @@
 #ifndef CLEM_HOST_LOAD_SNAPSHOT_UI_HPP
 #define CLEM_HOST_LOAD_SNAPSHOT_UI_HPP
 
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -27,6 +28,7 @@ class ClemensLoadSnapshotUI {
 
     void refresh();
     void loadSnapshotImage(unsigned snapshotIndex);
+    void freeSnapshotImage();
 
     std::vector<std::string> snapshotNames_;
     std::vector<ClemensSnapshotMetadata> snapshotMetadatas_;
@@ -35,6 +37,7 @@ class ClemensLoadSnapshotUI {
     int snapshotImageWidth_ = 0;
     int snapshotImageHeight_ = 0;
     int snapshotIndex_ = -1;
+    struct tm snapshotTime_;
 };
 
 #endif

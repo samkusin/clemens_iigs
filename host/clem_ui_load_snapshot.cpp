@@ -2,15 +2,24 @@
 #include "clem_command_queue.hpp"
 
 #include "clem_assets.hpp"
-#include "clem_backend.hpp"
-#include "clem_imgui.hpp"
-#include "fmt/format.h"
 #include "imgui.h"
 #include "spdlog/spdlog.h"
 
 #include "clem_l10n.hpp"
+#include "core/clem_disk_utils.hpp"
 
+#include <ctime>
 #include <filesystem>
+#include <malloc/_malloc.h>
+
+// TODO: this is duplicated in clem_backend.cpp - consolidate!
+static void getLocalTimeFromEpoch(struct tm *localTime, time_t epoch) {
+#if CK_COMPILER_MSVC
+    localtime_s(localTime, &epoch);
+#else
+    localtime_r(&epoch, localTime);
+#endif
+}
 
 bool ClemensLoadSnapshotUI::isStarted() const { return mode_ != Mode::None; }
 
@@ -26,13 +35,14 @@ void ClemensLoadSnapshotUI::start(ClemensCommandQueue &backend, const std::strin
 void ClemensLoadSnapshotUI::refresh() {
     snapshotNames_.clear();
     snapshotMetadatas_.clear();
+    bool foundSnapshot = false;
     for (auto const &entry : std::filesystem::directory_iterator(snapshotDir_)) {
         auto filename = entry.path().filename();
         auto extension = filename.extension().string();
         if (extension != ".clemens-sav")
             continue;
-        snapshotNames_.emplace_back(std::move(filename.stem().string()));
-
+        snapshotNames_.emplace_back(filename.stem().string());
+        if (snapshotNames_.back() == snapshotName_) foundSnapshot = true;
         ClemensSnapshot snapshot(entry.path().string());
         auto metadata = snapshot.unserializeMetadata();
         if (metadata.second) {
@@ -41,17 +51,27 @@ void ClemensLoadSnapshotUI::refresh() {
             snapshotMetadatas_.emplace_back();
         }
     }
+    if (!foundSnapshot) {
+        snapshotName_[0] = '\0';
+        freeSnapshotImage();
+    }
 }
 
 void ClemensLoadSnapshotUI::loadSnapshotImage(unsigned snapshotIndex) {
-    if (snapshotImage_) {
-        ClemensHostAssets::freeLoadedImage(snapshotImage_);
-        snapshotImage_ = 0;
-    }
+    freeSnapshotImage();
     auto &metadata = snapshotMetadatas_[snapshotIndex];
     snapshotImage_ =
         ClemensHostAssets::loadImageFromPNG(metadata.imageData.data(), metadata.imageData.size(),
                                             &snapshotImageWidth_, &snapshotImageHeight_);
+
+    getLocalTimeFromEpoch(&snapshotTime_, metadata.timestamp);
+}
+
+void ClemensLoadSnapshotUI::freeSnapshotImage() {
+    if (snapshotImage_) {
+        ClemensHostAssets::freeLoadedImage(snapshotImage_);
+        snapshotImage_ = 0;
+    }
 }
 
 bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue &backend) {
@@ -83,7 +103,7 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue
                     }
                     bool isSelected = ImGui::Selectable(filename.c_str(), filename == snapshotName_,
                                                         ImGuiSelectableFlags_AllowDoubleClick);
-                    if (!isOk && isSelected) {
+                    if (!isOk && (isSelected || snapshotName_[0] == '\0')) {
                         auto cnt = filename.copy(snapshotName_, sizeof(snapshotName_) - 1);
                         loadSnapshotImage(nameIndex);
                         snapshotName_[cnt] = '\0';
@@ -106,7 +126,38 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue
                 float imageWidth = contentRegion.x;
                 ImGui::Image((ImTextureID)snapshotImage_,
                              ImVec2(imageWidth, imageWidth * imageAspect));
-                ImGui::LabelText("Memory", "%u", snapshotMetadatas_[snap])
+                ImGui::Spacing();
+                ImGui::Separator();
+                if (ImGui::BeginTable("##Metadata", 3)) {
+                    char timestr[64];
+                    ImGui::TableSetupColumn("N", ImGuiTableColumnFlags_WidthFixed);
+                    ImGui::TableSetupColumn("M", ImGuiTableColumnFlags_WidthFixed);
+                    ImGui::TableSetupColumn("V", ImGuiTableColumnFlags_WidthStretch);
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted("Time");
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted(":");
+                    ImGui::TableNextColumn();
+                    strftime(timestr, sizeof(timestr), "%D %R", &snapshotTime_);
+                    ImGui::TextUnformatted(timestr);
+                    for (auto it = metadata.disks.begin(); it != metadata.disks.end(); ++it) {
+                        if (it->empty())
+                            continue;
+                        auto driveName = ClemensDiskUtilities::getDriveName(
+                            static_cast<ClemensDriveType>(it - metadata.disks.begin()));
+                        ImGui::TableNextRow();
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted(driveName.data(),
+                                               driveName.data() + driveName.size());
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted(":");
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted(
+                            std::filesystem::path(*it).filename().string().c_str());
+                    }
+                    ImGui::EndTable();
+                }
             }
             ImGui::EndChild();
             ImGui::Separator();
@@ -230,10 +281,7 @@ void ClemensLoadSnapshotUI::stop(ClemensCommandQueue &backend) {
         backend.run();
     }
     mode_ = Mode::None;
-    if (snapshotImage_ != 0) {
-        ClemensHostAssets::freeLoadedImage(snapshotImage_);
-        snapshotImage_ = 0;
-    }
+    freeSnapshotImage();
     snapshotNames_.clear();
     snapshotMetadatas_.clear();
 }

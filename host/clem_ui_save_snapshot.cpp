@@ -64,8 +64,9 @@ bool ClemensSaveSnapshotUI::frame(float width, float /* height */, ClemensDispla
                 size_t imageDataLen = 0;
 
                 //  now compress to PNG
-                void *imageData = tdefl_write_image_to_png_file_in_memory(
-                    screenData.data(), screenWidth, screenHeight, 4, &imageDataLen);
+                void *imageData = tdefl_write_image_to_png_file_in_memory_ex(
+                    screenData.data(), screenWidth, screenHeight, 4, &imageDataLen,
+                    MZ_DEFAULT_LEVEL, display.shouldFlipTarget());
                 auto pngData = std::make_unique<ClemensCommandMinizPNG>(imageData, imageDataLen,
                                                                         screenWidth, screenHeight);
                 backend.saveMachine(selectedPath.string(), std::move(pngData));
