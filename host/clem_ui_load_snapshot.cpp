@@ -10,7 +10,6 @@
 
 #include <ctime>
 #include <filesystem>
-#include <malloc/_malloc.h>
 
 // TODO: this is duplicated in clem_backend.cpp - consolidate!
 static void getLocalTimeFromEpoch(struct tm *localTime, time_t epoch) {
