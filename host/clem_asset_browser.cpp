@@ -92,7 +92,7 @@ bool ClemensAssetBrowser::onCreateRecord(const std::filesystem::directory_entry 
         }
     } else if (extension == ".woz") {
         auto cnt = readDiskImageHeaderBytes(direntry.path(), headerData, sizeof(headerData));
-        const uint8_t *wozCurrent = clem_woz_check_header(headerData, cnt);
+        const uint8_t *wozCurrent = clem_woz_check_header(headerData, cnt, NULL);
         if (wozCurrent) {
             const uint8_t *wozEnd = headerData + cnt;
             ClemensWOZChunkHeader wozChunk;

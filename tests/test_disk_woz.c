@@ -33,7 +33,7 @@ void test_clem_woz_parse_info(void) {
     memset(&header, 0, sizeof(header));
 
     image_data_end = image_data + image_sz;
-    woz_data = clem_woz_check_header(image_data, image_sz);
+    woz_data = clem_woz_check_header(image_data, image_sz, NULL);
     TEST_ASSERT_NOT_NULL(woz_data);
     woz_data = clem_woz_parse_chunk_header(&header, woz_data, image_data_end - woz_data);
     TEST_ASSERT_NOT_NULL(woz_data);
