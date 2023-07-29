@@ -2938,20 +2938,24 @@ void ClemensFrontend::doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
             //  in ranges from firmware?)
             if (!emulatorHasMouseFocus_) {
                 mouseInEmulatorScreen_ = mouseInDeviceScreen;
+                int16_t clampedMouseX =
+                    std::clamp(diagnostics_.mouseX, (int16_t)0, (int16_t)viewToMonitor.workSize.x);
+                int16_t clampedMouseY =
+                    std::clamp(diagnostics_.mouseY, (int16_t)0, (int16_t)viewToMonitor.workSize.y);
+                ClemensInputEvent mouseEvt;
+
+                int16_t a2screenX, a2screenY;
+
+                //  TODO: maybe only run this for super-hires mode?
+                clemens_monitor_to_video_coordinates(
+                    &frameReadState_.frame.monitor, &frameReadState_.frame.graphics, &a2screenX,
+                    &a2screenY, clampedMouseX, clampedMouseY);
+
+                mouseEvt.type = kClemensInputType_MouseMoveAbsolute;
+                mouseEvt.value_a = int16_t(a2screenX);
+                mouseEvt.value_b = int16_t(a2screenY);
+                backendQueue_.inputEvent(mouseEvt);
                 if (mouseInEmulatorScreen_) {
-                    ClemensInputEvent mouseEvt;
-
-                    int16_t a2screenX, a2screenY;
-
-                    //  TODO: maybe only run this for super-hires mode?
-                    clemens_monitor_to_video_coordinates(
-                        &frameReadState_.frame.monitor, &frameReadState_.frame.graphics, &a2screenX,
-                        &a2screenY, diagnostics_.mouseX, diagnostics_.mouseY);
-
-                    mouseEvt.type = kClemensInputType_MouseMoveAbsolute;
-                    mouseEvt.value_a = int16_t(a2screenX);
-                    mouseEvt.value_b = int16_t(a2screenY);
-                    backendQueue_.inputEvent(mouseEvt);
                     if (ImGui::GetIO().MouseClicked[0] && ImGui::IsWindowHovered()) {
                         mouseEvt.type = kClemensInputType_MouseButtonDown;
                         mouseEvt.value_a = 0x01;

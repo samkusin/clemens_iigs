@@ -420,20 +420,14 @@ std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
         if (std::holds_alternative<ClemensWOZDisk>(metadata_)) {
             auto disk = std::get<ClemensWOZDisk>(metadata_);
             disk.nib = const_cast<ClemensNibbleDisk *>(&nib);
+            if (!data_.empty()) {
+                disk.extra_data_start = data_.data();
+                disk.extra_data_end = data_.data() + data_.size();
+            } else {
+                disk.extra_data_start = disk.extra_data_end = NULL;
+            }
             size_t outSize = outEnd - outTail;
             outTail = clem_woz_serialize(&disk, outTail, &outSize);
-            //  append other WOZ chunks that weren't used (WRIT, META)
-            //  TODO: this may be problematic if the WOZ bits data was altered
-            //        will WRIT change?
-            if (data_.size() > 0) {
-                if ((size_t)(outEnd - outTail) >= data_.size()) {
-                    outTail = std::copy(data_.begin(), data_.end(), outTail);
-                } else {
-                    //  at this point, some data will be lost - but not essential data
-                    //  and so allow this image to be serialized - but should we warn?
-                    assert(false);
-                }
-            }
         }
         break;
     case Image2IMG:

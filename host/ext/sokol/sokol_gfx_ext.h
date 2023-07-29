@@ -45,6 +45,7 @@ SOKOL_GFX_API_DECL void sg_update_texture_filter(sg_image img_id,
     "Please include sokol_gfx.h implementation before sokol_gp.h implementation"
 #endif
 
+#if !defined(_SOKOL_ANY_GL)
 static void _sg_all_convert_to_rgba(void *dest_pixels, int dest_w, int dest_h,
                                     void *src_pixels, int src_pitch, int src_r,
                                     int src_g, int src_b, int src_a) {
@@ -64,6 +65,7 @@ static void _sg_all_convert_to_rgba(void *dest_pixels, int dest_w, int dest_h,
     }
   }
 }
+#endif
 
 #if defined(_SOKOL_ANY_GL)
 

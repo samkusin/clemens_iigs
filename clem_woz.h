@@ -94,6 +94,9 @@ struct ClemensWOZDisk {
        this byte vector with nibbles
     */
     struct ClemensNibbleDisk *nib;
+    /* Buffer containing other data like META, WRIT, etc - can be NULL */
+    uint8_t* extra_data_start;
+    uint8_t* extra_data_end;
 };
 
 /*
@@ -121,7 +124,7 @@ struct ClemensWOZDisk {
     the clemens emulator, or an incomplete/invalid image.
  */
 
-const uint8_t *clem_woz_check_header(const uint8_t *data, size_t data_sz);
+const uint8_t *clem_woz_check_header(const uint8_t *data, size_t data_sz, uint32_t *crc);
 
 const uint8_t *clem_woz_parse_chunk_header(struct ClemensWOZChunkHeader *header,
                                            const uint8_t *data, size_t data_sz);
