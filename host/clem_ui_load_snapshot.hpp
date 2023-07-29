@@ -26,6 +26,7 @@ class ClemensLoadSnapshotUI {
     bool resumeExecutionOnExit_;
 
     void refresh();
+    void loadSnapshotImage(unsigned snapshotIndex);
 
     std::vector<std::string> snapshotNames_;
     std::vector<ClemensSnapshotMetadata> snapshotMetadatas_;
@@ -33,6 +34,7 @@ class ClemensLoadSnapshotUI {
     uintptr_t snapshotImage_ = 0;
     int snapshotImageWidth_ = 0;
     int snapshotImageHeight_ = 0;
+    int snapshotIndex_ = -1;
 };
 
 #endif
