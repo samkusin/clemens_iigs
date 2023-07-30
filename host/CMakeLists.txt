@@ -4,6 +4,8 @@ project(clements_iigs VERSION 0.6.0 LANGUAGES C CXX)
 
 ################################################################################
 
+get_filename_component(CLEMENS_ROOT_DIR ../ ABSOLUTE)
+
 set(CINEK_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/cinek/ckdebug.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/cinek/buffer.cpp"
@@ -280,15 +282,31 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     # Icon and app shortcut for Linux systems
     # Note: .desktop file must have same name as executable
-    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/exampleApp.desktop
+    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cinekine.Clemens.desktop
         DESTINATION share/applications/
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
         )
-    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/exampleApp.png
+    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cineline.Clemens_16.png
+        DESTINATION share/icons/hicolor/16x16/apps/
+        PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+        )
+    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cineline.Clemens_32.png
+        DESTINATION share/icons/hicolor/32x32/apps/
+        PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+        )
+    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cineline.Clemens_64.png
+        DESTINATION share/icons/hicolor/64x64/apps/
+        PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+        )
+    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cineline.Clemens_128.png
         DESTINATION share/icons/hicolor/256x256/apps/
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
         )
-    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/exampleApp.png
+    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cineline.Clemens_256.png
+        DESTINATION share/icons/hicolor/256x256/apps/
+        PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+        )
+    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cineline.Clemens_256.png
         DESTINATION share/icons/gnome/256x256/apps/
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
         )
