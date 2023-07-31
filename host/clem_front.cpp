@@ -2054,7 +2054,8 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, const char 
     const float charHeight = ImGui::GetTextLineHeight();
 
     char driveName[32];
-    strncpy(driveName, label, sizeof(driveName));
+    strncpy(driveName, label, sizeof(driveName)-1);
+    driveName[31] = '\0';
 
     ImVec2 iconSize(32.0f, 32.0f);
     const auto clemensDiskIcon = ClemensHostAssets::kDiskHDD;

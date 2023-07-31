@@ -57,7 +57,6 @@ static ClemensHostInterop g_interop{};
 #include "images/app_icons_png.h"
 
 void loadAppIcon(sapp_image_desc* desc, const uint8_t *src, const unsigned srcLen) {
-    int width, height;
     desc->pixels.ptr = ClemensHostAssets::loadBitmapFromPNG(
         src, srcLen, &desc->width, &desc->height);
     if (!desc->pixels.ptr) {
