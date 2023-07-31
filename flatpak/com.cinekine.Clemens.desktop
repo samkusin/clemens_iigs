@@ -7,5 +7,5 @@ Comment=An Apple IIgs Emulator and Debugger
 
 Icon=com.cinekine.Clemens.png
 Exec=clemens_iigs
-Terminal=false
+Terminal=true
 
