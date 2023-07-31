@@ -18,14 +18,32 @@
 #include <memory>
 #include <system_error>
 
+#if defined(_MSC_VER) && defined(WIN32)
+    #define NOMINMAX
+    #include <Windows.h>
+    #include "spdlog/sinks/msvc_sink.h"
+#endif
+
 namespace {
 
 void setupLogger(const ClemensConfiguration &config) {
     static spdlog::level::level_enum levels[] = {spdlog::level::debug, spdlog::level::info,
                                                  spdlog::level::warn, spdlog::level::err,
                                                  spdlog::level::err};
+
+
+
     auto logLevel = levels[std::clamp(config.logLevel, 0, CLEM_DEBUG_LOG_FATAL)];
-    auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    std::shared_ptr<spdlog::sinks::sink> console_sink;
+#if defined(_MSC_VER)
+    if (IsDebuggerPresent()) {
+        console_sink = std::make_shared<spdlog::sinks::msvc_sink_mt>();
+    } else {
+        console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    }
+#else
+    console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+#endif
     console_sink->set_level(logLevel);
 
     auto logPath = std::filesystem::path(config.dataDirectory) / "clem_host.log";
