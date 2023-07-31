@@ -1,11 +1,11 @@
 [Desktop Entry]
+Encoding=UTF-8
 Version=1.0
 Type=Application
-
 Name=Clemens IIgs
 Comment=An Apple IIgs Emulator and Debugger
-Categories=Development;
 
 Icon=com.cinekine.Clemens.png
 Exec=clemens_iigs
-Terminal=true
+Terminal=false
+
