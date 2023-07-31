@@ -41,6 +41,17 @@ static const char *g_namedImages[kLastNamedImage - kFirstNamedImage] = {
     NULL,
 };
 
+//  this can be freed with freeLoadedBitmap();
+uint8_t* loadBitmapFromPNG(const uint8_t *data, size_t dataSize, int* width, int* height) {
+    int ncomp;
+    uint8_t *pixels = stbi_load_from_memory(data, dataSize, width, height, &ncomp, 4);
+    return pixels;
+}
+//  only call this with bitmapas loaded with loadBitmapFromPNG
+void freeLoadedBitmap(uint8_t* data) {
+    stbi_image_free(data);
+}
+
 ImageInfo loadImageFromPNG(const uint8_t *data, size_t dataSize) {
     ImageInfo image{};
 

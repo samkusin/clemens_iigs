@@ -51,6 +51,22 @@ static cinek::ByteBuffer g_systemFontHiBuffer;
 static const unsigned kClipboardTextLimit = 8192;
 static ClemensHostInterop g_interop{};
 
+#define CLEMENS_APP_ICONS_ARE_RESIDENT
+
+#if defined(CLEMENS_APP_ICONS_ARE_RESIDENT)
+#include "images/app_icons_png.h"
+
+void loadAppIcon(sapp_image_desc* desc, const uint8_t *src, const unsigned srcLen) {
+    int width, height;
+    desc->pixels.ptr = ClemensHostAssets::loadBitmapFromPNG(
+        src, srcLen, &desc->width, &desc->height);
+    if (!desc->pixels.ptr) {
+        return;
+    }
+    desc->pixels.size = desc->width * desc->height * 4;
+}
+#endif
+
 //  Keyboard customization
 //  Typically the OS specific "super" key is used to augment key combinations that
 //  may otherwise be intercepted by the OS.  This usage really depends on the target
@@ -442,7 +458,7 @@ static void onFrame(void *userdata) {
         if (sapp_is_fullscreen() != isViewFullscreen) {
             sapp_toggle_fullscreen();
             spdlog::info("Host fullscreen mode is {}", sapp_is_fullscreen());
-        } 
+        }
         clemens_host_update();
 
         if (nextViewType != g_Host->getViewType()) {
@@ -596,6 +612,9 @@ sapp_desc sokol_main(int argc, char *argv[]) {
     spdlog::flush_on(spdlog::level::err);
     spdlog::info("Setting up host frameworks");
 
+#if defined(CLEMENS_APP_ICONS_ARE_RESIDENT)
+
+#endif
     SharedAppData *appdata = new SharedAppData(argc, argv);
     if (appdata->config.viewMode == ClemensConfiguration::ViewMode::Fullscreen) {
         sapp.fullscreen = true;
@@ -615,6 +634,11 @@ sapp_desc sokol_main(int argc, char *argv[]) {
     sapp.win32_console_attach = true;
     sapp.logger.func = sokolLogger;
     sapp.clipboard_size = kClipboardTextLimit;
+
+    loadAppIcon(&sapp.icon.images[0], app_icon_cinekine_Clemens_16_png, app_icon_cinekine_Clemens_16_png_len);
+    loadAppIcon(&sapp.icon.images[1], app_icon_cinekine_Clemens_32_png, app_icon_cinekine_Clemens_32_png_len);
+    loadAppIcon(&sapp.icon.images[2], app_icon_cinekine_Clemens_64_png, app_icon_cinekine_Clemens_64_png_len);
+    loadAppIcon(&sapp.icon.images[3], app_icon_cinekine_Clemens_128_png, app_icon_cinekine_Clemens_128_png_len);
 
     return sapp;
 }
