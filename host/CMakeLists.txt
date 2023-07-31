@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(clements_iigs VERSION 0.6.0 LANGUAGES C CXX)
+project(clemens_iigs VERSION 0.6.0 LANGUAGES C CXX)
 
 ################################################################################
 
@@ -274,41 +274,49 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 
     # TODO do this better
+
     set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
     set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION TRUE)
     set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CLEMENS_HOMEPAGE}")
     # set(CPACK_DEBIAN_COMPRESSION_TYPE "xz")
-    # set(CPACK_DEBIAN_PACKAGE_DEPENDS "libgtkmm-3.0")
-
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS YES)
+    #set(CPACK_DEBIAN_PACKAGE_DEPENDS "libx11-dev,libxcursor-dev,libxi-dev,mesa-common-dev,libasound-dev,uuid-dev")
+      
     # Icon and app shortcut for Linux systems
     # Note: .desktop file must have same name as executable
     install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cinekine.Clemens.desktop
         DESTINATION share/applications/
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
         )
-    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cineline.Clemens_16.png
+    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cinekine.Clemens_16.png
         DESTINATION share/icons/hicolor/16x16/apps/
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+        RENAME com.cinekine.Clemens.png
         )
-    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cineline.Clemens_32.png
+    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cinekine.Clemens_32.png
         DESTINATION share/icons/hicolor/32x32/apps/
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+        RENAME com.cinekine.Clemens.png
         )
-    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cineline.Clemens_64.png
+    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cinekine.Clemens_64.png
         DESTINATION share/icons/hicolor/64x64/apps/
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+        RENAME com.cinekine.Clemens.png
         )
-    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cineline.Clemens_128.png
+    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cinekine.Clemens_128.png
         DESTINATION share/icons/hicolor/256x256/apps/
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+        RENAME com.cinekine.Clemens.png
         )
-    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cineline.Clemens_256.png
+    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cinekine.Clemens_256.png
         DESTINATION share/icons/hicolor/256x256/apps/
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+        RENAME com.cinekine.Clemens.png
         )
-    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cineline.Clemens_256.png
+    install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cinekine.Clemens_256.png
         DESTINATION share/icons/gnome/256x256/apps/
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+        RENAME com.cinekine.Clemens.png
         )
 endif()
 
