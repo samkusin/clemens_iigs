@@ -5,6 +5,7 @@
 
 #include "clem_host_shared.hpp"
 #include "fmt/core.h"
+#include "spdlog/spdlog.h"
 
 #include <cassert>
 #include <charconv>
@@ -433,7 +434,11 @@ void ClemensCommandQueue::inputMachine(ClemensCommandQueueListener &listener,
             //  to number
             auto commaPos = value.find(',');
             auto inputValueA = value.substr(0, commaPos);
-            inputEvent.value_a = (int16_t)std::stol(std::string(inputValueA));
+            if (std::from_chars(inputValueA.data(), inputValueA.data() + inputValueA.size(), inputEvent.value_a, 10).ec !=
+                std::errc{}) {
+                spdlog::error("ClemensCommandQueue::inputMachine: invalid input for A {}", inputParam);
+                return;
+            }
             if (commaPos != std::string_view::npos) {
                 std::string_view inputModifiers;
                 auto inputValueB = value.substr(commaPos + 1);
@@ -442,7 +447,11 @@ void ClemensCommandQueue::inputMachine(ClemensCommandQueueListener &listener,
                     inputModifiers = inputValueB.substr(commaPos + 1);
                     inputValueB = inputValueB.substr(0, commaPos);
                 }
-                inputEvent.value_b = (int16_t)std::stol(std::string(inputValueB));
+                if (std::from_chars(inputValueB.data(), inputValueB.data() + inputValueB.size(), inputEvent.value_b, 10).ec !=
+                    std::errc{}) {
+                    spdlog::error("ClemensCommandQueue::inputMachine: invalid input for B {}", inputParam);
+                    return;
+                }
                 if (inputEvent.type == kClemensInputType_Paddle ||
                     inputEvent.type == kClemensInputType_PaddleDisconnected) {
                     inputEvent.gameport_button_mask = std::stoul(std::string(inputModifiers));
