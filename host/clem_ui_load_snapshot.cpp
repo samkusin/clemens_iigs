@@ -30,7 +30,7 @@ void ClemensLoadSnapshotUI::start(ClemensCommandQueue &backend, const std::strin
     snapshotName_[0] = '\0';
     backend.breakExecution();
     resumeExecutionOnExit_ = true;
-    refresh();
+    doRefresh_ = true;
 }
 
 void ClemensLoadSnapshotUI::refresh() {
@@ -56,6 +56,7 @@ void ClemensLoadSnapshotUI::refresh() {
         snapshotName_[0] = '\0';
         freeSnapshotImage();
     }
+    doRefresh_ = false;
 }
 
 void ClemensLoadSnapshotUI::loadSnapshotImage(unsigned snapshotIndex) {
@@ -89,6 +90,9 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue
         if (ImGui::BeginPopupModal("Load Snapshot", NULL,
                                    ImGuiWindowFlags_Modal | ImGuiWindowFlags_AlwaysAutoResize)) {
             //  A custom listbox
+            if (doRefresh_) {
+                refresh();
+            }
             bool isOk = false;
             ImGui::Spacing();
             // account for bottom separator plus one row of buttons
@@ -201,9 +205,11 @@ bool ClemensLoadSnapshotUI::frame(float width, float height, ClemensCommandQueue
                         spdlog::error("Unable to delete snapshot {} (error={})",
                                       snapshotPath.string(), errc.message());
                         deleteError = true;
+                    } else {
+                        spdlog::info("Deleting snapshot {}", snapshotPath.string());
                     }
                     snapshotName_[0] = '\0';
-                    refresh();
+                    doRefresh_ = true;
                     ImGui::CloseCurrentPopup();
                 }
                 ImGui::SameLine();

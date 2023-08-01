@@ -1,11 +1,11 @@
 [Desktop Entry]
+Encoding=UTF-8
 Version=1.0
 Type=Application
-
-Name=Clemens
-Comment=An Apple IIgs Emulator and Debugger written in C/C++ for Windows and Linux.
-Categories=Development;
+Name=Clemens IIgs
+Comment=An Apple IIgs Emulator and Debugger
 
 Icon=com.cinekine.Clemens.png
 Exec=clemens_iigs
 Terminal=true
+

@@ -38,6 +38,7 @@ class ClemensLoadSnapshotUI {
     int snapshotImageHeight_ = 0;
     int snapshotIndex_ = -1;
     struct tm snapshotTime_;
+    bool doRefresh_ = false;
 };
 
 #endif

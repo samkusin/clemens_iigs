@@ -14,9 +14,12 @@ modules:
       - cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -G Ninja -S . -B .
       - ninja
       - install -D host/clemens_iigs /app/bin/clemens_iigs
-      - install -D clemens_mpack_format /app/bin/clemens_mpack_format
       - install -Dm755 flatpak/com.cinekine.Clemens.desktop -t /app/share/applications
-      - install -Dm644 flatpak/com.cinekine.Clemens.png /app/share/icons/hicolor/128x128/apps/com.cinekine.Clemens.png
+      - install -Dm644 flatpak/com.cinekine.Clemens_16.png /app/share/icons/hicolor/16x16/apps/com.cinekine.Clemens.png
+      - install -Dm644 flatpak/com.cinekine.Clemens_32.png /app/share/icons/hicolor/32x32/apps/com.cinekine.Clemens.png
+      - install -Dm644 flatpak/com.cinekine.Clemens_64.png /app/share/icons/hicolor/64x64/apps/com.cinekine.Clemens.png
+      - install -Dm644 flatpak/com.cinekine.Clemens_128.png /app/share/icons/hicolor/128x128/apps/com.cinekine.Clemens.png
+      - install -Dm644 flatpak/com.cinekine.Clemens_256.png /app/share/icons/hicolor/256x256/apps/com.cinekine.Clemens.png
       - install -Dm644 flatpak/com.cinekine.Clemens.appdata.xml -t /app/share/metainfo
 
     sources:
