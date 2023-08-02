@@ -784,9 +784,6 @@ void ClemensFrontend::pollJoystickDevices() {
     constexpr int32_t kHostAxisMagnitude = CLEM_HOST_JOYSTICK_AXIS_DELTA * 2;
     unsigned index;
 
-    if (!isBackendRunning()) {
-        return;
-    }
 
     for (index = 0; index < (unsigned)joysticks.size(); ++index) {
         if (index >= deviceCount || joystickCount >= 2)
@@ -831,6 +828,10 @@ void ClemensFrontend::pollJoystickDevices() {
         }
     }
     joystickSlotCount_ = std::max(joystickSlotCount_, joystickCount);
+
+    if (!isBackendRunning()) {
+        return;
+    }
     if (joystickCount < 1)
         return;
     backendQueue_.inputEvent(inputs[0]);
@@ -945,6 +946,9 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     case ClemensHostInterop::AspectView:
         // TODO: set view width and height in interop
         break;
+    case ClemensHostInterop::JoystickConfig:
+        setGUIMode(GUIMode::JoystickConfig);
+        break;
     case ClemensHostInterop::None:
         break;
     }
@@ -984,6 +988,9 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     case GUIMode::HelpShortcuts:
     case GUIMode::HelpDisk:
         doHelpScreen(width, height);
+        break;
+    case GUIMode::JoystickConfig:
+        doJoystickConfig(width, height);
         break;
     case GUIMode::RebootEmulator:
         if (!isBackendRunning()) {
@@ -1079,6 +1086,7 @@ void ClemensFrontend::setGUIMode(GUIMode guiMode) {
                                           "Help",
                                           "HelpShortcuts",
                                           "HelpDisk",
+                                          "JoystickConfig",
                                           "RebootEmulator",
                                           "StartingEmulator",
                                           "ShutdownEmulator"};
@@ -1321,15 +1329,6 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("View")) {
-            if (interop.isFullscreen) {
-                if (ImGui::MenuItem("Exit Fullscreen", NULL)) {
-                    interop.view = ClemensHostInterop::Windowed;
-                }
-            } else {
-                if (ImGui::MenuItem("Enter Fullscreen", NULL)) {
-                    interop.view = ClemensHostInterop::Fullscreen;
-                }
-            }
             if (config_.hybridInterfaceEnabled) {
                 if (ImGui::MenuItem("User Mode", NULL)) {
                     config_.hybridInterfaceEnabled = false;
@@ -1354,6 +1353,10 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
                 if (ImGui::MenuItem("Shutdown", NULL)) {
                     interop.action = ClemensHostInterop::Shutdown;
                 }
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Configure Joystick")) {
+                interop.action = ClemensHostInterop::JoystickConfig;
             }
             ImGui::EndMenu();
         }
@@ -1425,6 +1428,8 @@ void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
         ImGui::Unindent();
         ImGui::Separator();
     }
+    debugger_.diagnosticTables(diagnostics_, false);
+    ImGui::Separator();
 
     if (ImGui::CollapsingHeader("Devices", ImGuiTreeNodeFlags_DefaultOpen)) {
         for (unsigned slot = 0; slot < joystickSlotCount_; ++slot) {
@@ -1524,16 +1529,6 @@ void ClemensFrontend::doMachinePeripheralDisplay(float /*width */) {
             ImGui::Separator();
         }
     }
-
-    auto cursor = ImGui::GetCursorScreenPos();
-    bool mode80 = true;
-    ImGui::PushFont(mode80 ? ClemensHostImGui::Get80ColumnFont() : NULL);
-    ImVec2 debugViewSize(ImGui::GetContentRegionAvail().x,
-                         ImGui::GetTextLineHeightWithSpacing() * 10);
-    if (!config_.hybridInterfaceEnabled) {
-        doDebugView(ImVec2(cursor), debugViewSize);
-    }
-    ImGui::PopFont();
 }
 
 void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float dividerXPos) {
@@ -2846,18 +2841,6 @@ void ClemensFrontend::doMachineDebugSoundDisplay() {
 }
 */
 
-void ClemensFrontend::doDebugView(ImVec2 anchor, ImVec2 size) {
-    ImGui::SetNextWindowPos(anchor, ImGuiCond_Once);
-    ImGui::SetNextWindowSize(size, ImGuiCond_Once);
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 128));
-    if (ImGui::Begin("Debug View", NULL, 0)) {
-        debugger_.diagnosticTables(diagnostics_);
-    }
-
-    ImGui::End();
-    ImGui::PopStyleColor();
-}
-
 void ClemensFrontend::doSetupUI(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::SetNextWindowPos(anchor);
     ImGui::SetNextWindowSize(dimensions);
@@ -3042,6 +3025,11 @@ void ClemensFrontend::doHelpScreen(int width, int height) {
     if (!isOpen) {
         setGUIMode(GUIMode::Emulator);
     }
+}
+
+void ClemensFrontend::doJoystickConfig(int width, int height) {
+    //  the joystick position where 0,0 is the center
+    //  
 }
 
 bool ClemensFrontend::isEmulatorStarting() const {

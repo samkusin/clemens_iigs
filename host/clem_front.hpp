@@ -2,7 +2,6 @@
 #define CLEM_HOST_FRONT_HPP
 
 #include "cinek/keyframe.hpp"
-#include "clem_assets.hpp"
 #include "clem_command_queue.hpp"
 #include "clem_disk.h"
 #include "clem_host_platform.h"
@@ -18,7 +17,6 @@
 #include "clem_ui_settings.hpp"
 
 #include "cinek/buffer.hpp"
-#include "cinek/circular_buffer.hpp"
 #include "cinek/equation.hpp"
 #include "cinek/fixedstack.hpp"
 #include "clem_audio.hpp"
@@ -97,7 +95,6 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
 
     void doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size, bool isSpinning);
 
-    void doDebugView(ImVec2 anchor, ImVec2 size);
     void doSetupUI(ImVec2 anchor, ImVec2 dimensions);
     void doMachineViewLayout(ImVec2 rootAnchor, ImVec2 rootSize,
                              const ViewToMonitorTranslation &viewToMonitor);
@@ -187,6 +184,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
 
   private:
     void doHelpScreen(int width, int height);
+    void doJoystickConfig(int width, int height);
 
     bool isEmulatorStarting() const;
     bool isEmulatorActive() const;
@@ -202,6 +200,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
         Help,
         HelpShortcuts,
         HelpDisk,
+        JoystickConfig,
         RebootEmulator,
         StartingEmulator,
         ShutdownEmulator
