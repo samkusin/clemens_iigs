@@ -272,6 +272,7 @@ struct ClemensNibbleDisk *clem_iwm_insert_disk(struct ClemensDeviceIWM *iwm,
         return NULL;
     }
     drive->has_disk = true;
+    drive->disk.is_dirty = false;
 
     return &drive->disk;
 }

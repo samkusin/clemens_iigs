@@ -161,6 +161,7 @@ static inline void _clem_disk_write_bit(struct ClemensDrive *drive, bool value) 
     } else {
         data[drive->track_byte_index] &= ~(1 << drive->track_bit_shift);
     }
+    drive->disk.is_dirty = true;
 }
 
 static inline uint8_t _clem_disk_get_byte(struct ClemensDrive *drive) {

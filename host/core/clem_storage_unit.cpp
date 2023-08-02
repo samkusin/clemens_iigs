@@ -17,6 +17,7 @@
 #include "fmt/format.h"
 #include "spdlog/spdlog.h"
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -271,6 +272,12 @@ void ClemensStorageUnit::update(ClemensMMIO &mmio) {
             continue;
         }
 
+        if (drive->disk.is_dirty && !drive->is_spindle_on) {
+            // TODO: save disk when possible
+            // saveDisk(driveType, drive->disk);
+            drive->disk.is_dirty = false;
+        }
+
         status.isWriteProtected = drive->disk.is_write_protected;
         if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
             auto ejectStatus = clemens_eject_disk_in_progress(&mmio, driveType);
@@ -347,6 +354,7 @@ void ClemensStorageUnit::saveDisk(ClemensDriveType driveType, ClemensNibbleDisk 
         if (!out.fail()) {
             out.write((char *)writeOut.first, decodedDisk.first);
             if (!out.fail() && !out.bad()) {
+                disk.is_dirty = false;
                 diskStatuses_[driveType].saved();
                 spdlog::info("ClemensStorageUnit - {}: {} saved",
                              ClemensDiskUtilities::getDriveName(driveType),
