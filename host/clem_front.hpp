@@ -184,7 +184,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
 
   private:
     void doHelpScreen(int width, int height);
-    void doJoystickConfig(int width, int height);
+    void doJoystickConfig(ImVec2 anchor, ImVec2 dimensions);
 
     bool isEmulatorStarting() const;
     bool isEmulatorActive() const;

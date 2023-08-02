@@ -42,6 +42,12 @@ extern const char *kLabelDeleteFailed[];
 extern const char *kDebugNotAvailableWhileRunning[];
 extern const char *kDebugDiskNoTrackData[];
 
+extern const char* kTitleJoystickConfiguration[];
+extern const char* kLabelJoystickNone[];
+extern const char* kLabelJoystickId[];
+extern const char* kButtonJoystickButton1[];
+extern const char* kButtonJoystickButton2[];
+
 constexpr unsigned kLanguageDefault = 0;
 
 } // namespace ClemensL10N

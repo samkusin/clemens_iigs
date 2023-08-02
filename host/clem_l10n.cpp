@@ -13,6 +13,11 @@ const char *kLabelDeleteFailed[] = {"Unable to delete the selected file."};
 const char *kLabelDelete[] = {"Delete"};
 const char *kLabelOk[] = {"Ok"};
 const char *kLabelCancel[] = {"Cancel"};
+const char *kTitleJoystickConfiguration[] = {"Joystick Configuration"};
+const char *kLabelJoystickNone[] = {"No joysticks are available."};
+const char *kLabelJoystickId[] = {"Joystick #%u"};
+const char* kButtonJoystickButton1[] = {"Btn 0"};
+const char* kButtonJoystickButton2[] = {"Btn 1"};
 
 #include "strings/clem_help.inl"
 #include "strings/clem_settings.inl"

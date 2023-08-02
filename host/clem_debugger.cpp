@@ -577,21 +577,21 @@ void ClemensDebugger::diagnosticTables(const DebugDiagnostics &diagnostics, bool
     const float kCharSize = ImGui::GetFont()->GetCharAdvance('A');
     if (ImGui::CollapsingHeader("Stats", inDebugger ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
         if (ImGui::BeginTable("##Stats", 2)) {
-            ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthFixed, kCharSize * 3);
+            ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthFixed, kCharSize * 2);
             ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted("EMU");
+            ImGui::TextUnformatted("EM");
             ImGui::TableNextColumn();
             ImGui::Text("%5.2f fps", frameState_->fps);
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted("GUI");
+            ImGui::TextUnformatted("UI");
             ImGui::TableNextColumn();
             ImGui::Text("%5.2f fps", ImGui::GetIO().Framerate);
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted("CLK");
+            ImGui::TextUnformatted("CK");
             ImGui::TableNextColumn();
             uint64_t emulatorTime = 0;
             // if (frameSeqNo_ != kFrameSeqNoInvalid) {
@@ -629,6 +629,22 @@ void ClemensDebugger::diagnosticTables(const DebugDiagnostics &diagnostics, bool
                     ImGui::TableNextColumn();
                     ImGui::Text("%u,%u", ((uint16_t)(state[0x192]) << 8) | state[0x190],
                                 ((uint16_t)(state[0x193]) << 8) | state[0x191]);
+                }
+                ImGui::EndTable();
+            }
+        }
+    }
+    if (inDebugger && diagnostics.joyCount > 0) {
+        if (ImGui::CollapsingHeader("Joystick", ImGuiTreeNodeFlags_DefaultOpen)) {
+            if (ImGui::BeginTable("##Joysticks", 2)) {
+                ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthFixed, kCharSize * 2);
+                ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthStretch);
+                for (unsigned index = 0; index < diagnostics.joyCount; index++) {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::Text("J%u", index);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%d,%d", diagnostics.joyX[index], diagnostics.joyY[index]);
                 }
                 ImGui::EndTable();
             }
