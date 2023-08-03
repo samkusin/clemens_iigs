@@ -15,6 +15,7 @@ const char *kLabelOk[] = {"Ok"};
 const char *kLabelCancel[] = {"Cancel"};
 const char *kTitleJoystickConfiguration[] = {"Joystick Configuration"};
 const char *kLabelJoystickNone[] = {"No joysticks are available."};
+const char *kLabelJoystickButtonBinding[] = {"Press any joystick/gamepad button to bind Apple BTN %u"};
 const char *kLabelJoystickId[] = {"Joystick #%u"};
 const char *kLabelJoystickConfirm[] = {"Configure"};
 const char* kButtonJoystickButton1[] = {"Btn 0"};

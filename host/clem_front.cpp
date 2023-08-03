@@ -4,6 +4,7 @@
 #include "clem_host.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #define _USE_MATH_DEFINES
 
 #include "clem_front.hpp"
@@ -806,18 +807,14 @@ void ClemensFrontend::pollJoystickDevices() {
                 (int16_t)((int32_t)(joysticks[index].y[0] + CLEM_HOST_JOYSTICK_AXIS_DELTA) *
                           kGameportAxisMagnitude / kHostAxisMagnitude);
             input.gameport_button_mask = 0;
-            //  TODO: again, select button 1 or 2 based on user configuration
-            if (joysticks[index].buttons & CLEM_HOST_JOYSTICK_BUTTON_A) {
-                input.gameport_button_mask |= (1 << joystickBindings_[index].button[0]);
+            if (joystickBindings_[index].button[0] != UINT32_MAX &&
+                joysticks[index].buttons & (1 << joystickBindings_[index].button[0])) {
+                input.gameport_button_mask |= 1;
             }
-            if (joysticks[index].buttons & CLEM_HOST_JOYSTICK_BUTTON_B) {
-                input.gameport_button_mask |= (1 << joystickBindings_[index].button[1]);
+            if (joystickBindings_[index].button[1] != UINT32_MAX &&
+                joysticks[index].buttons & (1 << joystickBindings_[index].button[1])) {
+                input.gameport_button_mask |= 2;
             }
-            /*
-            printf("SKS: [%u] - A:(%d,%d)  B:(%d,%d)  BTN:%08X\n", index, joysticks[index].x[0],
-                    joysticks[index].y[0], joysticks[index].x[1], joysticks[index].y[1],
-                    joysticks[index].buttons);
-            */
             joysticks_[index] = joysticks[index];
             joystickCount++;
         } else if (joysticks_[index].isConnected) {
@@ -909,6 +906,10 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     }
 
     ImVec2 interfaceAnchor(0.0f, 0.0f);
+    interop.allowConfigureJoystick =
+        (guiMode_ == GUIMode::Emulator ||
+        guiMode_ == GUIMode::Setup) &&
+            !browseDriveType_.has_value() && !browseSmartDriveIndex_.has_value();
     if (!interop.nativeMenu) {
         doMainMenu(interfaceAnchor, interop);
     }
@@ -967,6 +968,13 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     doEmulatorInterface(interfaceAnchor, ImVec2(width, height), viewToMonitor, deltaTime);
 
     switch (guiMode_) {
+    case GUIMode::None:
+       if (isBackendRunning()) {
+            setGUIMode(GUIMode::Emulator);
+        } else {
+            setGUIMode(GUIMode::Setup);
+        }
+        break;
     case GUIMode::Setup:
         //  this is handled above
         break;
@@ -1238,8 +1246,10 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ClemensHostStyle::getWidgetToggleOffColor(*this));
 
     if (browseDriveType_.has_value()) {
+        if (guiMode_ == GUIMode::JoystickConfig) guiMode_ = GUIMode::None;
         doMachineDiskBrowserInterface(kMonitorViewAnchor, kMonitorViewSize);
     } else if (browseSmartDriveIndex_.has_value()) {
+        if (guiMode_ == GUIMode::JoystickConfig) guiMode_ = GUIMode::None;
         doMachineSmartDiskBrowserInterface(kMonitorViewAnchor, kMonitorViewSize);
     } else if (guiMode_ == GUIMode::Setup) {
         doSetupUI(kMonitorViewAnchor, kMonitorViewSize);
@@ -1368,7 +1378,8 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
                 }
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Configure Joystick")) {
+            if (ImGui::MenuItem("Configure Joystick", NULL, false,
+                                interop.allowConfigureJoystick)) {
                 interop.action = ClemensHostInterop::JoystickConfig;
             }
             ImGui::EndMenu();
@@ -3049,7 +3060,11 @@ void ClemensFrontend::doJoystickConfig(ImVec2 anchor, ImVec2 dimensions) {
     ImGui::Spacing();
 
     ImVec2 contentAvail = ImGui::GetContentRegionAvail();
+    ImVec2 modalAnchor;
+    ImVec2 modalDimensions;
+    std::optional<unsigned> joystickModalIndex;
     ImVec2 kFooterSize(contentAvail.x, ImGui::GetFrameHeightWithSpacing());
+    ImVec2 childPos = ImGui::GetCursorPos();
     if (ImGui::BeginChild("##Joysticks", ImVec2(contentAvail.x, contentAvail.y - kFooterSize.y))) {
         contentAvail = ImGui::GetContentRegionAvail();
         if (joystickSlotCount_ == 0) {
@@ -3077,7 +3092,7 @@ void ClemensFrontend::doJoystickConfig(ImVec2 anchor, ImVec2 dimensions) {
                 auto &bindings = joystickBindings_[joystickIndex];
                 auto &joystick = joysticks_[joystickIndex];
                 constexpr unsigned axisIndex = 0; // TODO: this will be configurable
-
+                modalAnchor = ImGui::GetCursorPos();
                 ImGui::BeginGroup();
                 if (ImGui::BeginTable(joyId, 3)) {
                     ImGui::BeginDisabled(!joystick.isConnected);
@@ -3107,36 +3122,50 @@ void ClemensFrontend::doJoystickConfig(ImVec2 anchor, ImVec2 dimensions) {
                     ImGui::TableNextColumn();
                     char btnLabel[8];
                     auto &style = ImGui::GetStyle();
-                    ImGui::PushStyleColor(ImGuiCol_Button,
-                                          (joystick.buttons & (1 << bindings.button[0]))
-                                              ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f)
-                                              : style.Colors[ImGuiCol_Button]);
-                    snprintf(btnLabel, sizeof(btnLabel) - 1, "B%u", bindings.button[0]);
-                    if (ImGui::Button(btnLabel, ImVec2(dimensions.x * 0.25f, 0.0f))) {
-                        // Add overlay modal for help across the whole row
-                        //  "Press the desired button on your device to bind Apple Button 0"
-                        //  When pressed, remove overlay modal
+                    auto buttonColor = (joystick.buttons & (1 << bindings.button[0]))
+                                           ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f)
+                                           : style.Colors[ImGuiCol_Button];
+                    ImGui::PushStyleColor(ImGuiCol_Button, buttonColor);
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, buttonColor);
+                    if (bindings.button[0] != UINT32_MAX) {
+                        snprintf(btnLabel, sizeof(btnLabel) - 1, "B%u", bindings.button[0]);
+                    } else {
+                        strncpy(btnLabel, "B?", sizeof(btnLabel) - 1);
                     }
-                    ImGui::PopStyleColor();
+                    if (ImGui::Button(btnLabel, ImVec2(dimensions.x * 0.25f, 0.0f))) {
+                        joystickModalIndex = joystickIndex;
+                        joystickButtonConfigIndex_ = 0;
+                    }
+                    ImGui::PopStyleColor(2);
                     ImGui::SameLine();
                     ImGui::TextUnformatted(CLEM_L10N_LABEL(kButtonJoystickButton1));
-                    ImGui::PushStyleColor(ImGuiCol_Button,
-                                          (joystick.buttons & (1 << bindings.button[1]))
-                                              ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f)
-                                              : style.Colors[ImGuiCol_Button]);
-                    snprintf(btnLabel, sizeof(btnLabel) - 1, "B%u", bindings.button[1]);
-                    if (ImGui::Button(btnLabel, ImVec2(dimensions.x * 0.25f, 0.0f))) {
-                        // Add overlay modal for help across the whole row
-                        //  "Press the desired button on your device to bind Apple Button 1"
-                        //  When pressed, remove overlay modal.
+                    buttonColor = (joystick.buttons & (1 << bindings.button[1]))
+                                      ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f)
+                                      : style.Colors[ImGuiCol_Button];
+                    ImGui::PushStyleColor(ImGuiCol_Button, buttonColor);
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, buttonColor);
+                    if (bindings.button[1] != UINT32_MAX) {
+                        snprintf(btnLabel, sizeof(btnLabel) - 1, "B%u", bindings.button[1]);
+                    } else {
+                        strncpy(btnLabel, "B?", sizeof(btnLabel) - 1);
                     }
-                    ImGui::PopStyleColor();
+                    if (ImGui::Button(btnLabel, ImVec2(dimensions.x * 0.25f, 0.0f))) {
+                        joystickModalIndex = joystickIndex;
+                        joystickButtonConfigIndex_ = 1;
+                    }
+                    ImGui::PopStyleColor(2);
                     ImGui::SameLine();
                     ImGui::TextUnformatted(CLEM_L10N_LABEL(kButtonJoystickButton2));
                     ImGui::EndDisabled();
                     ImGui::EndTable();
                 }
                 ImGui::EndGroup();
+                if (joystickModalIndex_.has_value()) {
+                    if (joystickIndex == joystickModalIndex_) {
+                        modalDimensions =
+                            ImVec2(contentAvail.x, ImGui::GetCursorPosY() - modalAnchor.y);
+                    }
+                }
                 ImGui::Separator();
             }
         }
@@ -3150,6 +3179,70 @@ void ClemensFrontend::doJoystickConfig(ImVec2 anchor, ImVec2 dimensions) {
         }
     }
     ImGui::End();
+
+    if (joystickModalIndex.has_value()) {
+        ImGui::OpenPopup("##ButtonInputModal");
+        joystickModalIndex_ = joystickModalIndex;
+    }
+    if (ImGui::IsPopupOpen("##ButtonInputModal")) {
+        assert(joystickModalIndex_.has_value());
+        unsigned joystickIndex = *joystickModalIndex_;
+        unsigned joystickButtonIndex = *joystickButtonConfigIndex_;
+        modalAnchor.x += (anchor.x + childPos.x);
+        modalAnchor.y += (anchor.y + childPos.y);
+        ImGui::SetNextWindowPos(modalAnchor);
+        ImGui::SetNextWindowSize(modalDimensions);
+        if (ImGui::BeginPopupModal("##ButtonInputModal", NULL,
+                                   ImGuiWindowFlags_Modal | ImGuiWindowFlags_NoScrollbar |
+                                       ImGuiWindowFlags_NoTitleBar)) {
+            ImGui::Text(CLEM_L10N_LABEL(kLabelJoystickButtonBinding), joystickIndex);
+
+            if (joysticks_[joystickIndex].buttons & CLEM_HOST_JOYSTICK_BUTTON_A) {
+                for (unsigned buttonBindingIndex = 0; buttonBindingIndex < 2;
+                     ++buttonBindingIndex) {
+                    if (joystickBindings_[joystickIndex].button[buttonBindingIndex] == 0) {
+                        joystickBindings_[joystickIndex].button[buttonBindingIndex] = UINT32_MAX;
+                    }
+                }
+                joystickBindings_[joystickIndex].button[joystickButtonIndex] = 0;
+                ImGui::CloseCurrentPopup();
+            } else if (joysticks_[joystickIndex].buttons & CLEM_HOST_JOYSTICK_BUTTON_B) {
+                for (unsigned buttonBindingIndex = 0; buttonBindingIndex < 2;
+                     ++buttonBindingIndex) {
+                    if (joystickBindings_[joystickIndex].button[buttonBindingIndex] == 1) {
+                        joystickBindings_[joystickIndex].button[buttonBindingIndex] = UINT32_MAX;
+                    }
+                }
+                joystickBindings_[joystickIndex].button[joystickButtonIndex] = 1;
+                ImGui::CloseCurrentPopup();
+            } else if (joysticks_[joystickIndex].buttons & CLEM_HOST_JOYSTICK_BUTTON_X) {
+                for (unsigned buttonBindingIndex = 0; buttonBindingIndex < 2;
+                     ++buttonBindingIndex) {
+                    if (joystickBindings_[joystickIndex].button[buttonBindingIndex] == 2) {
+                        joystickBindings_[joystickIndex].button[buttonBindingIndex] = UINT32_MAX;
+                    }
+                }
+                joystickBindings_[joystickIndex].button[joystickButtonIndex] = 2;
+                ImGui::CloseCurrentPopup();
+            } else if (joysticks_[joystickIndex].buttons & CLEM_HOST_JOYSTICK_BUTTON_Y) {
+                for (unsigned buttonBindingIndex = 0; buttonBindingIndex < 2;
+                     ++buttonBindingIndex) {
+                    if (joystickBindings_[joystickIndex].button[buttonBindingIndex] == 3) {
+                        joystickBindings_[joystickIndex].button[buttonBindingIndex] = UINT32_MAX;
+                    }
+                }
+                joystickBindings_[joystickIndex].button[joystickButtonIndex] = 3;
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        if (!ImGui::IsPopupOpen("##ButtonInputModal")) {
+            joystickModalIndex_ = std::nullopt;
+        }
+    }
 }
 
 bool ClemensFrontend::isEmulatorStarting() const {

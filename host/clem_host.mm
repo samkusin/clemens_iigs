@@ -251,6 +251,13 @@
   } else {
     [debuggerMenuItem setTitle:@"Debugger Mode"];
   }
+  if (hostInterop->allowConfigureJoystick) {
+    [joysickMenuItem setEnabled:TRUE];
+    [joysickMenuItem setAction:@selector(menuConfigureJoystick:)];
+  } else {
+    [joysickMenuItem setEnabled:FALSE];
+    [joysickMenuItem setAction:nil];
+  }
 }
 
 @end

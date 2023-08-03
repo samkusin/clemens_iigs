@@ -28,6 +28,7 @@ struct ClemensHostInterop {
     //  events from the main app
     bool poweredOn;
     bool debuggerOn;
+    bool allowConfigureJoystick;
     unsigned viewWidth;         //   0 = no change
     unsigned viewHeight;        //   0 = no change
 };

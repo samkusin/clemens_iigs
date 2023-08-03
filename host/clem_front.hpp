@@ -180,6 +180,8 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     DebugIOMode debugIOMode_;
 
     int vgcDebugMinScanline_, vgcDebugMaxScanline_;
+    std::optional<unsigned> joystickModalIndex_;
+    std::optional<unsigned> joystickButtonConfigIndex_;
 
     std::array<ClemensHostJoystick, CLEM_HOST_JOYSTICK_LIMIT> joysticks_;
     std::array<ClemensJoystickBindings, CLEM_HOST_JOYSTICK_LIMIT> joystickBindings_;
