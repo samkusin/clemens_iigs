@@ -37,6 +37,10 @@ struct ImFont;
 class ClemensBackend;
 struct ClemensBackendState;
 
+struct ClemensJoystickBindings {
+    unsigned button[2];
+};
+
 class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
   public:
     ClemensFrontend(ClemensConfiguration& config, const cinek::ByteBuffer &systemFontLoBuffer,
@@ -178,6 +182,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     int vgcDebugMinScanline_, vgcDebugMaxScanline_;
 
     std::array<ClemensHostJoystick, CLEM_HOST_JOYSTICK_LIMIT> joysticks_;
+    std::array<ClemensJoystickBindings, CLEM_HOST_JOYSTICK_LIMIT> joystickBindings_;
     unsigned joystickSlotCount_;
 
     void pollJoystickDevices();

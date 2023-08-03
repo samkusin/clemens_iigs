@@ -16,6 +16,7 @@ const char *kLabelCancel[] = {"Cancel"};
 const char *kTitleJoystickConfiguration[] = {"Joystick Configuration"};
 const char *kLabelJoystickNone[] = {"No joysticks are available."};
 const char *kLabelJoystickId[] = {"Joystick #%u"};
+const char *kLabelJoystickConfirm[] = {"Configure"};
 const char* kButtonJoystickButton1[] = {"Btn 0"};
 const char* kButtonJoystickButton2[] = {"Btn 1"};
 

@@ -628,6 +628,13 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration &config,
     } else {
         setGUIMode(GUIMode::Setup);
     }
+    //  TODO: this is essentially a joystick mapping that should be persisted
+    //        in the config - if there's a way to to obtain a key identifying the
+    //        controller device that persists between sessions
+    for (auto &joystickBinding : joystickBindings_) {
+        joystickBinding.button[0] = 0;
+        joystickBinding.button[1] = 1;
+    }
 }
 
 ClemensFrontend::~ClemensFrontend() {
@@ -801,10 +808,10 @@ void ClemensFrontend::pollJoystickDevices() {
             input.gameport_button_mask = 0;
             //  TODO: again, select button 1 or 2 based on user configuration
             if (joysticks[index].buttons & CLEM_HOST_JOYSTICK_BUTTON_A) {
-                input.gameport_button_mask |= 0x1;
+                input.gameport_button_mask |= (1 << joystickBindings_[index].button[0]);
             }
             if (joysticks[index].buttons & CLEM_HOST_JOYSTICK_BUTTON_B) {
-                input.gameport_button_mask |= 0x2;
+                input.gameport_button_mask |= (1 << joystickBindings_[index].button[1]);
             }
             /*
             printf("SKS: [%u] - A:(%d,%d)  B:(%d,%d)  BTN:%08X\n", index, joysticks[index].x[0],
@@ -833,7 +840,7 @@ void ClemensFrontend::pollJoystickDevices() {
         diagnostics_.joyY[index] = joysticks_[index].y[0];
     }
 
-    if (!isBackendRunning()) {
+    if (!isBackendRunning() || guiMode_ == GUIMode::JoystickConfig) {
         return;
     }
     if (joystickCount < 1)
@@ -3041,42 +3048,105 @@ void ClemensFrontend::doJoystickConfig(ImVec2 anchor, ImVec2 dimensions) {
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
     ImGui::Spacing();
 
-    if (joystickSlotCount_ == 0) {
-        ImVec2 contentAvail = ImGui::GetContentRegionAvail();
-        ImVec2 textSize = ImGui::CalcTextSize(CLEM_L10N_LABEL(kLabelJoystickNone));
-        ImGui::SetCursorPosX((contentAvail.x - textSize.x) * 0.5f);
-        ImGui::SetCursorPosY((contentAvail.y - textSize.y) * 0.5f);
-        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 0, 255));
-        ImGui::TextUnformatted(CLEM_L10N_LABEL(kLabelJoystickNone));
-        ImGui::PopStyleColor();
-    } else {
+    ImVec2 contentAvail = ImGui::GetContentRegionAvail();
+    ImVec2 kFooterSize(contentAvail.x, ImGui::GetFrameHeightWithSpacing());
+    if (ImGui::BeginChild("##Joysticks", ImVec2(contentAvail.x, contentAvail.y - kFooterSize.y))) {
+        contentAvail = ImGui::GetContentRegionAvail();
+        if (joystickSlotCount_ == 0) {
+            ImVec2 textSize = ImGui::CalcTextSize(CLEM_L10N_LABEL(kLabelJoystickNone));
+            ImGui::SetCursorPosX((contentAvail.x - textSize.x) * 0.5f);
+            ImGui::SetCursorPosY((contentAvail.y - textSize.y) * 0.5f);
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 0, 255));
+            ImGui::TextUnformatted(CLEM_L10N_LABEL(kLabelJoystickNone));
+            ImGui::PopStyleColor();
+        } else {
+            const float kRowSize = ImGui::GetTextLineHeightWithSpacing() * 12;
+            const float kGridSize = ImGui::GetTextLineHeightWithSpacing() * 10;
+            const float kBallSize = ImGui::GetFont()->FontSize;
+            const float kContentHeight =
+                (kRowSize + ImGui::GetTextLineHeight()) * joystickSlotCount_;
+            ImGui::SetCursorPosY((contentAvail.y - kContentHeight) * 0.5f);
+            //  the joystick position where 0,0 is the center
+            //
+            //  identifying label for the joystick
+            //  two rows, one per joystick
+            //  buttons 1 and 2 require mapping controls
+            for (unsigned joystickIndex = 0; joystickIndex < joystickSlotCount_; joystickIndex++) {
+                char joyId[8];
+                snprintf(joyId, sizeof(joyId) - 1, "joy%u", joystickIndex);
+                auto &bindings = joystickBindings_[joystickIndex];
+                auto &joystick = joysticks_[joystickIndex];
+                constexpr unsigned axisIndex = 0; // TODO: this will be configurable
 
-        //  the joystick position where 0,0 is the center
-        //
-        //  identifying label for the joystick
-        //  two rows, one per joystick
-        //  buttons 1 and 2 require mapping controls
-        for (unsigned joystickIndex = 0; joystickIndex < joystickSlotCount_; joystickIndex++) {
-            char joyId[8];
-            snprintf(joyId, sizeof(joyId) - 1, "joy%u", joystickIndex);
-            ImGui::BeginGroup();
-            if (ImGui::BeginTable(joyId, 3)) {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::Text(CLEM_L10N_LABEL(kLabelJoystickId), joystickIndex);
-                ImGui::TableNextColumn();
+                ImGui::BeginGroup();
+                if (ImGui::BeginTable(joyId, 3)) {
+                    ImGui::BeginDisabled(!joystick.isConnected);
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::Text(CLEM_L10N_LABEL(kLabelJoystickId), joystickIndex);
+                    ImGui::TableNextColumn();
+                    ImGui::Dummy(ImVec2(kGridSize, kGridSize));
+                    {
+                        ImDrawList *drawList = ImGui::GetWindowDrawList();
+                        auto leftTop = ImGui::GetItemRectMin();
+                        auto rightBottom = ImGui::GetItemRectMax();
+                        drawList->AddRectFilled(leftTop, rightBottom,
+                                                ClemensHostStyle::getInsetColor(*this));
+                        auto ballPos =
+                            ImVec2(((joystick.x[axisIndex] + CLEM_HOST_JOYSTICK_AXIS_DELTA) *
+                                    kGridSize / CLEM_HOST_JOYSTICK_AXIS_DELTA),
+                                   ((joystick.y[axisIndex] + CLEM_HOST_JOYSTICK_AXIS_DELTA) *
+                                    kGridSize / CLEM_HOST_JOYSTICK_AXIS_DELTA));
+                        ballPos.x = (ballPos.x * 0.5f) + leftTop.x;
+                        ballPos.y = (ballPos.y * 0.5f) + leftTop.y;
 
-                ImGui::TableNextColumn();
-                if (ImGui::Button(CLEM_L10N_LABEL(kButtonJoystickButton1),
-                                  ImVec2(dimensions.x * 0.25f, 0.0f))) {
+                        drawList->AddCircleFilled(ballPos, kBallSize,
+                                                  ClemensHostStyle::getWidgetColor(*this));
+                    }
+
+                    ImGui::TableNextColumn();
+                    char btnLabel[8];
+                    auto &style = ImGui::GetStyle();
+                    ImGui::PushStyleColor(ImGuiCol_Button,
+                                          (joystick.buttons & (1 << bindings.button[0]))
+                                              ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f)
+                                              : style.Colors[ImGuiCol_Button]);
+                    snprintf(btnLabel, sizeof(btnLabel) - 1, "B%u", bindings.button[0]);
+                    if (ImGui::Button(btnLabel, ImVec2(dimensions.x * 0.25f, 0.0f))) {
+                        // Add overlay modal for help across the whole row
+                        //  "Press the desired button on your device to bind Apple Button 0"
+                        //  When pressed, remove overlay modal
+                    }
+                    ImGui::PopStyleColor();
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(CLEM_L10N_LABEL(kButtonJoystickButton1));
+                    ImGui::PushStyleColor(ImGuiCol_Button,
+                                          (joystick.buttons & (1 << bindings.button[1]))
+                                              ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f)
+                                              : style.Colors[ImGuiCol_Button]);
+                    snprintf(btnLabel, sizeof(btnLabel) - 1, "B%u", bindings.button[1]);
+                    if (ImGui::Button(btnLabel, ImVec2(dimensions.x * 0.25f, 0.0f))) {
+                        // Add overlay modal for help across the whole row
+                        //  "Press the desired button on your device to bind Apple Button 1"
+                        //  When pressed, remove overlay modal.
+                    }
+                    ImGui::PopStyleColor();
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(CLEM_L10N_LABEL(kButtonJoystickButton2));
+                    ImGui::EndDisabled();
+                    ImGui::EndTable();
                 }
-                if (ImGui::Button(CLEM_L10N_LABEL(kButtonJoystickButton2),
-                                  ImVec2(dimensions.x * 0.25f, 0.0f))) {
-                }
-                ImGui::EndTable();
+                ImGui::EndGroup();
+                ImGui::Separator();
             }
-            ImGui::EndGroup();
-            ImGui::Separator();
+        }
+    }
+    ImGui::EndChild();
+    if (ImGui::Button(CLEM_L10N_LABEL(kLabelJoystickConfirm))) {
+        if (isBackendRunning()) {
+            setGUIMode(GUIMode::Emulator);
+        } else {
+            setGUIMode(GUIMode::Setup);
         }
     }
     ImGui::End();

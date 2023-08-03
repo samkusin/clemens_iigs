@@ -43,6 +43,7 @@ extern const char *kDebugNotAvailableWhileRunning[];
 extern const char *kDebugDiskNoTrackData[];
 
 extern const char* kTitleJoystickConfiguration[];
+extern const char* kLabelJoystickConfirm[];
 extern const char* kLabelJoystickNone[];
 extern const char* kLabelJoystickId[];
 extern const char* kButtonJoystickButton1[];
