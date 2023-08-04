@@ -130,6 +130,8 @@ static DIJOYCONFIG s_DInputJoyConfig;
 static bool s_hasPreferredJoyCfg = false;
 static HHOOK s_win32Hook = NULL;
 static BOOL s_flushDevices = FALSE;
+static int s_minWindowHeight = 0;
+static int s_minWindowWidth = 0;
 
 static BOOL CALLBACK _clem_joystick_dinput_enum_cb(LPCDIDEVICEINSTANCE instance, LPVOID userData) {
     IDirectInputDevice8 *device = NULL;
@@ -204,6 +206,11 @@ static LRESULT _clem_win32_hook(int code, WPARAM wParam, LPARAM lParam) {
                 s_flushDevices = TRUE;
                 break;
             }
+        }
+        if (msg->message == WM_GETMINMAXINFO) {
+            MINMAXINFO* minmaxinfo = (MINMAXINFO *)lParam;
+            minmaxinfo->ptMinTrackSize.x = s_minWindowWidth;
+            minmaxinfo->ptMinTrackSize.y = s_minWindowHeight;
         }
     }
     return CallNextHookEx(NULL, code, wParam, lParam);
@@ -367,6 +374,11 @@ static unsigned _clem_joystick_xinput(ClemensHostJoystick *joysticks) {
         joysticks[i].y[1] = state.Gamepad.sThumbRY;
     }
     return count;
+}
+
+void clem_host_set_min_window_size(int width, int height) {
+    s_minWindowWidth = width;
+    s_minWindowHeight = height;
 }
 
 void clem_joystick_open_devices(const char *provider) {

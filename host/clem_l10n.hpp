@@ -47,6 +47,8 @@ extern const char* kLabelJoystickConfirm[];
 extern const char* kLabelJoystickButtonBinding[];
 extern const char* kLabelJoystickNone[];
 extern const char* kLabelJoystickId[];
+extern const char* kLabelJoystickHelp[];
+extern const char* kLabelJoystick2Help[];
 extern const char* kButtonJoystickButton1[];
 extern const char* kButtonJoystickButton2[];
 

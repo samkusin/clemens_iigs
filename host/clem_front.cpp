@@ -1,4 +1,5 @@
 //  Boo...
+#include "clem_configuration.hpp"
 #include "clem_host.hpp"
 
 #include <algorithm>
@@ -62,8 +63,6 @@ void tweenProperty<ImVec2>(ImVec2 &out, const keyframe<ImVec2> &left, const keyf
 //  Style
 namespace ClemensHostStyle {
 
-static constexpr float kSideBarMinWidth = 160.0f;
-
 // monochromatic "platinum" classic CACAC8
 //                          middle  969695
 // monochromatic "platinum" dark    4A4A33
@@ -126,8 +125,8 @@ ImVec2 getScaledImageSize(ClemensHostAssets::ImageId id, float size) {
 namespace {
 
 //  NTSC visual "resolution"
-constexpr int kClemensScreenWidth = 720;
-constexpr int kClemensScreenHeight = 480;
+constexpr int kClemensScreenWidth = ClemensHostStyle::kScreenWidth;
+constexpr int kClemensScreenHeight = ClemensHostStyle::kScreenHeight;
 constexpr float kClemensAspectRatio = float(kClemensScreenWidth) / kClemensScreenHeight;
 constexpr double kMachineFrameDuration = 1.0 / 60.00;
 
@@ -855,6 +854,9 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     if (interop.exitApp)
         return getViewType();
 
+    interop.minWindowWidth = 0;
+    interop.minWidowHeight = 0;
+
     pollJoystickDevices();
 
     bool isNewFrame = false;
@@ -910,6 +912,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         !browseDriveType_.has_value() && !browseSmartDriveIndex_.has_value();
     if (!interop.nativeMenu) {
         doMainMenu(interfaceAnchor, interop);
+        interop.minWidowHeight += ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().WindowBorderSize;
     }
     switch (interop.action) {
     case ClemensHostInterop::About:
@@ -963,7 +966,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         break;
     }
 
-    doEmulatorInterface(interfaceAnchor, ImVec2(width, height), viewToMonitor, deltaTime);
+    doEmulatorInterface(interfaceAnchor, ImVec2(width, height), interop, viewToMonitor, deltaTime);
 
     switch (guiMode_) {
     case GUIMode::None:
@@ -1211,6 +1214,7 @@ void ClemensFrontend::processBackendResult(const ClemensBackendResult &result) {
 }
 
 void ClemensFrontend::doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
+                                          ClemensHostInterop& interop,
                                           const ViewToMonitorTranslation &viewToMonitor,
                                           double /*deltaTime*/) {
     const ImGuiStyle &kMainStyle = ImGui::GetStyle();
@@ -1222,6 +1226,11 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
     //  Bottom Info Bar
     ImVec2 kMonitorViewSize(dimensions.x, dimensions.y);
     ImVec2 kInfoStatusSize(dimensions.x, kLineSpacing + kWindowBoundary.y * 2);
+
+    interop.minWindowWidth += ClemensHostStyle::kSideBarMinWidth;
+    interop.minWindowWidth += viewToMonitor.size.x;
+    interop.minWidowHeight += ClemensHostStyle::kScreenHeight;
+    interop.minWidowHeight += kInfoStatusSize.y;
 
     kMonitorViewSize.y -= (kInfoStatusSize.y + anchor.y);
     kMonitorViewSize.x =
@@ -1265,6 +1274,8 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
     doSidePanelLayout(kSideBarAnchor, kSideBarSize);
     doInfoStatusLayout(kInfoStatusAnchor, kInfoStatusSize, kMonitorViewAnchor.x);
     ImGui::PopStyleColor(7);
+
+
 }
 
 void ClemensFrontend::doDebuggerLayout(ImVec2 anchor, ImVec2 dimensions,
@@ -1426,7 +1437,10 @@ void ClemensFrontend::doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions) {
 
     if (ImGui::Begin("SidePanel", nullptr,
                      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus)) {
-        doMachineDiskDisplay(sidebarSize.x);
+        if (ImGui::BeginChild("DiskTray", ImVec2(0.0f, ClemensHostStyle::kDiskTrayHeight))) {               
+            doMachineDiskDisplay(sidebarSize.x);
+        }
+        ImGui::EndChild();
         if (ImGui::BeginChild("PeripheralsAndCards")) {
             doMachinePeripheralDisplay(sidebarSize.x);
         }
@@ -3105,6 +3119,14 @@ void ClemensFrontend::doJoystickConfig(ImVec2 anchor, ImVec2 dimensions) {
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
                     ImGui::Text(CLEM_L10N_LABEL(kLabelJoystickId), joystickIndex);
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::Spacing();
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 0, 255));
+                    ImGui::PushTextWrapPos();
+                    ImGui::TextUnformatted(CLEM_L10N_LABEL(kLabelJoystickHelp));
+                    ImGui::PopTextWrapPos();
+                    ImGui::PopStyleColor();
                     ImGui::TableNextColumn();
                     ImGui::SetNextItemWidth(kGridSize);
                     ImGui::SliderInt("Adjust", &bindings.axisAdj[0], -9, 9);
@@ -3168,6 +3190,14 @@ void ClemensFrontend::doJoystickConfig(ImVec2 anchor, ImVec2 dimensions) {
                     ImGui::PopStyleColor(2);
                     ImGui::SameLine();
                     ImGui::TextUnformatted(CLEM_L10N_LABEL(kButtonJoystickButton2));
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::Spacing();
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 0, 255));
+                    ImGui::PushTextWrapPos();
+                    ImGui::TextUnformatted(CLEM_L10N_LABEL(kLabelJoystick2Help));
+                    ImGui::PopTextWrapPos();
+                    ImGui::PopStyleColor();
                     ImGui::EndDisabled();
                     ImGui::EndTable();
                 }

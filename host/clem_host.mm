@@ -258,6 +258,11 @@
     [joysickMenuItem setEnabled:FALSE];
     [joysickMenuItem setAction:nil];
   }
+  NSSize minSize;
+  minSize.width = hostInterop->minWindowWidth;
+  minSize.height = hostInterop->minWidowHeight;
+  NSWindow* mainWindow = [NSApp mainWindow];
+  mainWindow.contentMinSize = minSize;
 }
 
 @end

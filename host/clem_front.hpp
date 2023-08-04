@@ -4,6 +4,7 @@
 #include "cinek/keyframe.hpp"
 #include "clem_command_queue.hpp"
 #include "clem_disk.h"
+#include "clem_host.hpp"
 #include "clem_host_platform.h"
 #include "clem_host_view.hpp"
 
@@ -75,7 +76,7 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     //  when a frame has been published
     void processBackendResult(const ClemensBackendResult &result);
 
-    void doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
+    void doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions, ClemensHostInterop& interop,
                              const ViewToMonitorTranslation &viewToMonitor, double deltaTime);
 
     void doDebuggerLayout(ImVec2 anchor, ImVec2 dimensions,

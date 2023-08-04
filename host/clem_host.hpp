@@ -31,6 +31,8 @@ struct ClemensHostInterop {
     bool allowConfigureJoystick;
     unsigned viewWidth;         //   0 = no change
     unsigned viewHeight;        //   0 = no change
+    unsigned minWindowWidth;
+    unsigned minWidowHeight;
 };
 
 void clemens_host_init(ClemensHostInterop *interop);

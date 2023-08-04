@@ -84,6 +84,13 @@ char *get_local_user_data_directory(char *outpath, size_t outpath_size, const ch
 
 void open_system_folder_view(const char *folder_path) { (void)folder_path; }
 
+
+void clem_host_set_min_window_size(int width, int height) {
+    (void)width;
+    (void)height;
+}
+
+
 //  evdev implementation
 //  using https://fossies.org/linux/stella/src/tools/evdev-joystick/evdev-joystick.c
 //  as an education of evdev and joystick input.

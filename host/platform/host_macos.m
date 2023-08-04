@@ -60,6 +60,14 @@ void open_system_folder_view(const char *folder_path) {
   [[NSWorkspace sharedWorkspace] openURL:folder_url];
 }
 
+
+void clem_host_set_min_window_size(int width, int height) {
+  (void)width;
+  (void)height;
+  // this is handled via NSWindow.minContentWidth inside clem_host.mm
+}
+
+
 ///////////////////////////////////////////////////////////////////////////////
 
 @interface ClemensGameControllerDispatch : NSObject {
@@ -136,8 +144,9 @@ void open_system_folder_view(const char *folder_path) {
   //  fallback to microGamepad) gamepad profile.
   GCExtendedGamepad *gamepad = [controller extendedGamepad];
   GCMicroGamepad *micro = [controller microGamepad];
-  if (gamepad == nil && micro == nil)
-    return NO;
+  if (gamepad == nil && micro == nil) {
+      return NO;
+  }
 
   inputs->isConnected = true;
   inputs->buttons = 0;
@@ -150,7 +159,6 @@ void open_system_folder_view(const char *folder_path) {
         -gamepad.leftThumbstick.yAxis.value * CLEM_HOST_JOYSTICK_AXIS_DELTA;
     inputs->y[1] =
         -gamepad.rightThumbstick.yAxis.value * CLEM_HOST_JOYSTICK_AXIS_DELTA;
-    ;
     if (gamepad.buttonA.pressed) {
       inputs->buttons |= 0x1;
     }

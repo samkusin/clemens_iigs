@@ -141,9 +141,10 @@ bool ClemensConfiguration::save() {
         fmt::print(fp, "gs.card.{}={}\n", i, gs.cardNames[i]);
     }
     for (unsigned i = 0; i < (unsigned)joystickBindings.size(); i++) {
-        fmt::print(fp, "joystick.{}={},{},{},{}\n", i, joystickBindings[i].axisAdj[0],
-                   joystickBindings[i].axisAdj[1], joystickBindings[i].button[0],
-                   joystickBindings[i].button[1]);
+        fmt::print(fp, "joystick.{}.adjX={}\n", i, joystickBindings[i].axisAdj[0]);
+        fmt::print(fp, "joystick.{}.adjY={}\n", i, joystickBindings[i].axisAdj[1]);
+        fmt::print(fp, "joystick.{}.btn0={}\n", i, joystickBindings[i].button[0]);
+        fmt::print(fp, "joystick.{}.btn1={}\n", i, joystickBindings[i].button[1]);
     }
     assert(gs.bram.size() == 256);
     for (unsigned i = 0; i < 256; i += 16) {
@@ -252,15 +253,19 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
             config->gs.cardNames[cardIndex] = value;
         } else if (strncmp(name, "joystick.", 9) == 0) {
             const char *partial = name + 9;
-            unsigned joyIndex;
-            if (std::from_chars(partial, partial + 1, joyIndex, 10).ec != std::errc{}) {
-                fmt::print(stderr, "Invalid Joystick configuration {}={}\n", name, value);
-                return 0;
-            } else if (joyIndex >= 2) {
-                fmt::print(stderr, "Invalid Joystick index {}\n", joyIndex);
+            if (partial[1] != '.') {
+                fmt::print(stderr, "Invalid Joystick binding Id {}={}\n", name, value);
                 return 0;
             }
-            const char *valueSep = strchr(value, ',');
+            unsigned joyIndex;
+            if (std::from_chars(partial, partial + 1, joyIndex, 10).ec != std::errc{}) {
+                fmt::print(stderr, "Invalid Joystick binding index not found {}={}\n", name, value);
+                return 0;
+            } else if (joyIndex >= 2) {
+                fmt::print(stderr, "Invalid Joystick binding index {}\n", joyIndex);
+                return 0;
+            }
+            const char *valueSep = value + strnlen(value, 256);
             unsigned btnId;
             if (std::from_chars(value, valueSep, btnId, 10).ec != std::errc{}) {
                 fmt::print(stderr, "Invalid Joystick Button Id {}={}\n", name, btnId);

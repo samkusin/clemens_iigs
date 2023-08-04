@@ -450,6 +450,7 @@ static void onFrame(void *userdata) {
         g_interop.action = ClemensHostInterop::None;
         exitApp = g_interop.exitApp;
 
+        clem_host_set_min_window_size(g_interop.minWindowWidth, g_interop.minWidowHeight);
         clemens_host_update();
 
         if (nextViewType != g_Host->getViewType()) {
