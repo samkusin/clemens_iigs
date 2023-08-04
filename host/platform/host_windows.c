@@ -208,9 +208,10 @@ static LRESULT _clem_win32_hook(int code, WPARAM wParam, LPARAM lParam) {
             }
         }
         if (msg->message == WM_GETMINMAXINFO) {
-            MINMAXINFO* minmaxinfo = (MINMAXINFO *)lParam;
+            MINMAXINFO* minmaxinfo = (MINMAXINFO *)msg->lParam;
             minmaxinfo->ptMinTrackSize.x = s_minWindowWidth;
             minmaxinfo->ptMinTrackSize.y = s_minWindowHeight;
+            return 0;
         }
     }
     return CallNextHookEx(NULL, code, wParam, lParam);

@@ -7079,7 +7079,7 @@ _SOKOL_PRIVATE void _sapp_win32_timing_measure(void) {
 
 _SOKOL_PRIVATE LRESULT CALLBACK _sapp_win32_wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     if (!_sapp.win32.in_create_window) {
-        switch (uMsg) {
+        switch (uMsg) {          
             case WM_CLOSE:
                 /* only give user a chance to intervene when sapp_quit() wasn't already called */
                 if (!_sapp.quit_ordered) {
