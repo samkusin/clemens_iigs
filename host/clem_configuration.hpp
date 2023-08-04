@@ -4,6 +4,8 @@
 #include "clem_host_platform.h"
 #include "core/clem_apple2gs_config.hpp"
 
+#include <array>
+
 #if defined(CLEMENS_PLATFORM_WINDOWS)
 #define CLEM_HOST_COMPANY_NAME     "Cinekine"
 #define CLEM_HOST_APPLICATION_NAME "Clemens"
@@ -18,6 +20,11 @@
 
 #include <array>
 #include <string>
+
+struct ClemensJoystickBindings {
+    int axisAdj[2];
+    unsigned button[2];
+};
 
 struct ClemensConfiguration {
     enum class ViewMode {
@@ -34,7 +41,8 @@ struct ClemensConfiguration {
     ViewMode viewMode;
     bool poweredOn;
     bool hybridInterfaceEnabled;
-    
+
+    std::array<ClemensJoystickBindings, CLEM_HOST_JOYSTICK_LIMIT> joystickBindings;
 
     ClemensAppleIIGSConfig gs;
 
