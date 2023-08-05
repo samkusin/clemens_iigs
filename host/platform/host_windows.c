@@ -20,7 +20,6 @@
 #pragma comment(lib, "xinput")
 #endif
 
-
 unsigned clem_host_get_processor_number() { return (unsigned)GetCurrentProcessorNumber(); }
 
 void clem_host_uuid_gen(ClemensHostUUID *uuid) {
@@ -130,6 +129,8 @@ static DIJOYCONFIG s_DInputJoyConfig;
 static bool s_hasPreferredJoyCfg = false;
 static HHOOK s_win32Hook = NULL;
 static BOOL s_flushDevices = FALSE;
+static int s_minWindowHeight = 0;
+static int s_minWindowWidth = 0;
 
 static BOOL CALLBACK _clem_joystick_dinput_enum_cb(LPCDIDEVICEINSTANCE instance, LPVOID userData) {
     IDirectInputDevice8 *device = NULL;
@@ -205,6 +206,7 @@ static LRESULT _clem_win32_hook(int code, WPARAM wParam, LPARAM lParam) {
                 break;
             }
         }
+        //  modifying the min/max window info via WM_GETMINMAXINFO doesn't work here
     }
     return CallNextHookEx(NULL, code, wParam, lParam);
 }
@@ -360,6 +362,12 @@ static unsigned _clem_joystick_xinput(ClemensHostJoystick *joysticks) {
         }
         if (state.Gamepad.wButtons & XINPUT_GAMEPAD_Y) {
             joysticks[i].buttons |= CLEM_HOST_JOYSTICK_BUTTON_Y;
+        }
+        if (state.Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER) {
+            joysticks[i].buttons |= CLEM_HOST_JOYSTICK_BUTTON_L;
+        }
+        if (state.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER) {
+            joysticks[i].buttons |= CLEM_HOST_JOYSTICK_BUTTON_R;
         }
         joysticks[i].x[0] = state.Gamepad.sThumbLX;
         joysticks[i].y[0] = state.Gamepad.sThumbLY;

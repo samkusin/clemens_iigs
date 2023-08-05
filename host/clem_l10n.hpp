@@ -12,7 +12,6 @@ extern const char *kExitMessage[];
 
 extern const char *kWelcomeText[];
 extern const char *kGSKeyboardCommands[];
-extern const char *kViewInput[];
 extern const char *kMouseUnlock[];
 extern const char *kSettingsTabMachine[];
 extern const char *kSettingsNotAvailable[];
@@ -41,6 +40,16 @@ extern const char *kLabelDeleteFailed[];
 
 extern const char *kDebugNotAvailableWhileRunning[];
 extern const char *kDebugDiskNoTrackData[];
+
+extern const char* kTitleJoystickConfiguration[];
+extern const char* kLabelJoystickConfirm[];
+extern const char* kLabelJoystickButtonBinding[];
+extern const char* kLabelJoystickNone[];
+extern const char* kLabelJoystickId[];
+extern const char* kLabelJoystickHelp[];
+extern const char* kLabelJoystick2Help[];
+extern const char* kButtonJoystickButton1[];
+extern const char* kButtonJoystickButton2[];
 
 constexpr unsigned kLanguageDefault = 0;
 

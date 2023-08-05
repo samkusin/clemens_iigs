@@ -4,7 +4,6 @@
 struct ClemensHostInterop {
     bool exitApp;
     bool mouseShow;
-    bool isFullscreen;
 
     //  system/menu notifications to the main app
     bool mouseLock;
@@ -22,19 +21,18 @@ struct ClemensHostInterop {
         Debugger,
         Standard,
         AspectView,
+        JoystickConfig,
         About
     } action;
 
-    enum {
-        Windowed,
-        Fullscreen
-    } view;
-    
     //  events from the main app
     bool poweredOn;
     bool debuggerOn;
+    bool allowConfigureJoystick;
     unsigned viewWidth;         //   0 = no change
     unsigned viewHeight;        //   0 = no change
+    unsigned minWindowWidth;
+    unsigned minWindowHeight;
 };
 
 void clemens_host_init(ClemensHostInterop *interop);

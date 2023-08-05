@@ -402,19 +402,12 @@ struct ClemensSerializerRecord kMachine[] = {
 
 // see clem_disk.h
 struct ClemensSerializerRecord kNibbleDisk[] = {
-    // CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, disk_type),
-    // CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, boot_type),
-    // CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, flags),
-    // CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, required_ram_kb),
-    // CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk,
-    // max_track_size_bytes),
-    // CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensNibbleDisk,
-    // kClemensSerializerTypeUInt8, creator, 32, 0),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, disk_type),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, bit_timing_ns),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensNibbleDisk, track_count),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensNibbleDisk, is_write_protected),
     CLEM_SERIALIZER_RECORD_BOOL(struct ClemensNibbleDisk, is_double_sided),
+    CLEM_SERIALIZER_RECORD_BOOL(struct ClemensNibbleDisk, is_dirty),
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensNibbleDisk, kClemensSerializerTypeUInt8,
                                  meta_track_map, CLEM_DISK_LIMIT_QTR_TRACKS, 0),
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensNibbleDisk, kClemensSerializerTypeUInt32,

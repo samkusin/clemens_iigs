@@ -1,6 +1,7 @@
 #ifndef CLEM_HOST_FRAME_STATE_HPP
 #define CLEM_HOST_FRAME_STATE_HPP
 
+#include "clem_host_platform.h"
 #include "clem_host_shared.hpp"
 #include "core/clem_apple2gs_config.hpp"
 
@@ -13,6 +14,9 @@
 struct DebugDiagnostics {
     int16_t mouseX = 0;
     int16_t mouseY = 0;
+    int16_t joyX[CLEM_HOST_JOYSTICK_LIMIT];
+    int16_t joyY[CLEM_HOST_JOYSTICK_LIMIT];
+    unsigned joyCount = 0;
 };
 
 struct ClemensBackendState {

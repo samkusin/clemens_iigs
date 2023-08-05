@@ -1,8 +1,9 @@
 #ifndef CLEM_HOST_CONFIGURATION_HPP
 #define CLEM_HOST_CONFIGURATION_HPP
 
-#include "clem_host_platform.h"
 #include "core/clem_apple2gs_config.hpp"
+
+#include <array>
 
 #if defined(CLEMENS_PLATFORM_WINDOWS)
 #define CLEM_HOST_COMPANY_NAME     "Cinekine"
@@ -19,6 +20,18 @@
 #include <array>
 #include <string>
 
+namespace ClemensHostStyle {
+    constexpr float kSideBarMinWidth = 160.0f;
+    constexpr int kScreenWidth = 720;
+    constexpr int kScreenHeight = 480;
+    constexpr int kDiskTrayHeight = 320;
+}
+
+struct ClemensJoystickBindings {
+    int axisAdj[2];
+    unsigned button[2];
+};
+
 struct ClemensConfiguration {
     enum class ViewMode {
       Windowed,
@@ -34,7 +47,8 @@ struct ClemensConfiguration {
     ViewMode viewMode;
     bool poweredOn;
     bool hybridInterfaceEnabled;
-    
+
+    std::array<ClemensJoystickBindings, 2> joystickBindings;
 
     ClemensAppleIIGSConfig gs;
 

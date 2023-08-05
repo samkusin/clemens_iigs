@@ -1,4 +1,5 @@
 #include "clem_configuration.hpp"
+#include "clem_host_platform.h"
 #include "clem_shared.h"
 #include "core/clem_apple2gs_config.hpp"
 #include "core/clem_disk_utils.hpp"
@@ -14,7 +15,7 @@
 #include <filesystem>
 
 static constexpr unsigned kViewModeNameCount = 2;
-static const char* kViewModeNames[kViewModeNameCount] = {"windowed", "fullscreen"};
+static const char *kViewModeNames[kViewModeNameCount] = {"windowed", "fullscreen"};
 
 //  For all platforms, the config file is guaranteed to be located in a
 //  predefined location.  The config file is effectively our 'registry' to
@@ -58,13 +59,18 @@ ClemensConfiguration findConfiguration() {
 }
 
 ClemensConfiguration::ClemensConfiguration()
-    : majorVersion(0), minorVersion(0), logLevel(CLEM_DEBUG_LOG_INFO),
-      viewMode(ViewMode::Windowed),
-      poweredOn(false),
-      hybridInterfaceEnabled(false), fastEmulationEnabled(true), isDirty(true) {
+    : majorVersion(0), minorVersion(0), logLevel(CLEM_DEBUG_LOG_INFO), viewMode(ViewMode::Windowed),
+      poweredOn(false), hybridInterfaceEnabled(false), fastEmulationEnabled(true), isDirty(true) {
     gs.audioSamplesPerSecond = 0;
     gs.memory = CLEM_EMULATOR_RAM_DEFAULT;
     gs.cardNames[6] = kClemensCardHardDiskName;
+
+    for (auto &joystickBinding : joystickBindings) {
+        joystickBinding.axisAdj[0] = 0;
+        joystickBinding.axisAdj[1] = 0;
+        joystickBinding.button[0] = 0;
+        joystickBinding.button[1] = 1;
+    }
 }
 
 ClemensConfiguration::ClemensConfiguration(std::string pathname, std::string datadir)
@@ -85,6 +91,7 @@ void ClemensConfiguration::copyFrom(const ClemensConfiguration &other) {
     viewMode = other.viewMode;
     logLevel = other.logLevel;
     poweredOn = other.poweredOn;
+    joystickBindings = other.joystickBindings;
 
     gs = other.gs;
 
@@ -112,7 +119,7 @@ bool ClemensConfiguration::save() {
                "logger={}\n"
                "power={}\n"
                "\n",
-               majorVersion, minorVersion, dataDirectory, hybridInterfaceEnabled ? 1 : 0, 
+               majorVersion, minorVersion, dataDirectory, hybridInterfaceEnabled ? 1 : 0,
                kViewModeNames[static_cast<unsigned>(viewMode) % kViewModeNameCount], logLevel,
                poweredOn ? 1 : 0);
     fmt::print(fp,
@@ -132,6 +139,12 @@ bool ClemensConfiguration::save() {
     }
     for (unsigned i = 0; i < (unsigned)gs.cardNames.size(); i++) {
         fmt::print(fp, "gs.card.{}={}\n", i, gs.cardNames[i]);
+    }
+    for (unsigned i = 0; i < (unsigned)joystickBindings.size(); i++) {
+        fmt::print(fp, "joystick.{}.adjX={}\n", i, joystickBindings[i].axisAdj[0]);
+        fmt::print(fp, "joystick.{}.adjY={}\n", i, joystickBindings[i].axisAdj[1]);
+        fmt::print(fp, "joystick.{}.btn0={}\n", i, joystickBindings[i].button[0]);
+        fmt::print(fp, "joystick.{}.btn1={}\n", i, joystickBindings[i].button[1]);
     }
     assert(gs.bram.size() == 256);
     for (unsigned i = 0; i < 256; i += 16) {
@@ -238,6 +251,34 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
                 return 0;
             }
             config->gs.cardNames[cardIndex] = value;
+        } else if (strncmp(name, "joystick.", 9) == 0) {
+            const char *partial = name + 9;
+            if (partial[1] != '.') {
+                fmt::print(stderr, "Invalid Joystick binding Id {}={}\n", name, value);
+                return 0;
+            }
+            unsigned joyIndex;
+            if (std::from_chars(partial, partial + 1, joyIndex, 10).ec != std::errc{}) {
+                fmt::print(stderr, "Invalid Joystick binding index not found {}={}\n", name, value);
+                return 0;
+            } else if (joyIndex >= 2) {
+                fmt::print(stderr, "Invalid Joystick binding index {}\n", joyIndex);
+                return 0;
+            }
+            const char *valueSep = value + strnlen(value, 256);
+            unsigned btnId;
+            if (std::from_chars(value, valueSep, btnId, 10).ec != std::errc{}) {
+                fmt::print(stderr, "Invalid Joystick Button Id {}={}\n", name, btnId);
+                return 0;
+            }
+            config->joystickBindings[joyIndex].button[0] = btnId;
+            valueSep++;
+            const char *valueEnd = valueSep + strlen(valueSep);
+            if (std::from_chars(valueSep, valueEnd, btnId, 10).ec != std::errc{}) {
+                fmt::print(stderr, "Invalid Joystick Button Id {}={}\n", name, btnId);
+                return 0;
+            }
+            config->joystickBindings[joyIndex].button[1] = btnId;
         }
     }
 

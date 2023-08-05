@@ -283,8 +283,6 @@ static void onInit(void *userdata) {
     auto *appdata = reinterpret_cast<SharedAppData *>(userdata);
 
     g_interop.debuggerOn = appdata->config.hybridInterfaceEnabled;
-    g_interop.view =
-        sapp_is_fullscreen() ? ClemensHostInterop::Fullscreen : ClemensHostInterop::Windowed;
 
     clemens_host_init(&g_interop);
     stm_setup();
@@ -438,7 +436,6 @@ static void onFrame(void *userdata) {
         g_interop.mouseLock = sapp_mouse_locked();
         g_interop.mouseShow = sapp_mouse_shown();
         g_interop.poweredOn = false;
-        g_interop.isFullscreen = sapp_is_fullscreen();
 
         auto nextViewType = g_Host->frame(frameWidth, frameHeight, deltaTime, g_interop);
         sapp_lock_mouse(g_interop.mouseLock);
@@ -453,11 +450,6 @@ static void onFrame(void *userdata) {
         g_interop.action = ClemensHostInterop::None;
         exitApp = g_interop.exitApp;
 
-        bool isViewFullscreen = g_interop.view == ClemensHostInterop::Fullscreen;
-        if (sapp_is_fullscreen() != isViewFullscreen) {
-            sapp_toggle_fullscreen();
-            spdlog::info("Host fullscreen mode is {}", sapp_is_fullscreen());
-        }
         clemens_host_update();
 
         if (nextViewType != g_Host->getViewType()) {

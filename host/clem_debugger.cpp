@@ -564,34 +564,34 @@ void ClemensDebugger::cpuStateTable(ImVec2 anchor, ImVec2 dimensions,
         // TODO: IRQ Mask/Flags
 
         ImGui::Separator();
-        diagnosticTables(diagnostics);
+        diagnosticTables(diagnostics, true);
     }
 
     ImGui::PopStyleVar();
     ImGui::End();
 }
 
-void ClemensDebugger::diagnosticTables(const DebugDiagnostics &diagnostics) {
+void ClemensDebugger::diagnosticTables(const DebugDiagnostics &diagnostics, bool inDebugger) {
     if (!frameState_)
         return;
     const float kCharSize = ImGui::GetFont()->GetCharAdvance('A');
-    if (ImGui::CollapsingHeader("Stats", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader("Stats", inDebugger ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
         if (ImGui::BeginTable("##Stats", 2)) {
-            ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthFixed, kCharSize * 4);
+            ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthFixed, kCharSize * 2);
             ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted("EMU");
+            ImGui::TextUnformatted("EM");
             ImGui::TableNextColumn();
             ImGui::Text("%5.2f fps", frameState_->fps);
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted("GUI");
+            ImGui::TextUnformatted("UI");
             ImGui::TableNextColumn();
             ImGui::Text("%5.2f fps", ImGui::GetIO().Framerate);
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted("Time");
+            ImGui::TextUnformatted("CK");
             ImGui::TableNextColumn();
             uint64_t emulatorTime = 0;
             // if (frameSeqNo_ != kFrameSeqNoInvalid) {
@@ -602,30 +602,52 @@ void ClemensDebugger::diagnosticTables(const DebugDiagnostics &diagnostics) {
             unsigned minutes = (emulatorTime % 3600000) / 60000;
             unsigned seconds = ((emulatorTime % 3600000) % 60000) / 1000;
             unsigned milliseconds = ((emulatorTime % 3600000) % 60000) % 1000;
-            ImGui::Text("%02u:%02u:%02u.%01u", hours, minutes, seconds, milliseconds / 100);
+            if (inDebugger) {
+                ImGui::Text("%02u:%02u:%02u.%01u", hours, minutes, seconds, milliseconds / 100);
+            } else {
+                ImGui::Text("%02u:%02u:%02u", hours, minutes, seconds);
+            }
             ImGui::EndTable();
         }
     }
 
-    if (ImGui::CollapsingHeader("Mouse", ImGuiTreeNodeFlags_DefaultOpen)) {
-        auto *state = frameState_->e1bank;
-        if (ImGui::BeginTable("##Mouse", 2)) {
-            ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthFixed, kCharSize * 4);
-            ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthStretch);
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted("Host");
-            ImGui::TableNextColumn();
-            ImGui::Text("%d,%d", diagnostics.mouseX, diagnostics.mouseY);
-            if (state) {
+    if (inDebugger) {
+        if (ImGui::CollapsingHeader("Mouse", ImGuiTreeNodeFlags_DefaultOpen)) {
+            auto *state = frameState_->e1bank;
+            if (ImGui::BeginTable("##Mouse", 2)) {
+                ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthFixed, kCharSize * 4);
+                ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthStretch);
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::TextUnformatted("ROM");
+                ImGui::TextUnformatted("Host");
                 ImGui::TableNextColumn();
-                ImGui::Text("%u,%u", ((uint16_t)(state[0x192]) << 8) | state[0x190],
-                            ((uint16_t)(state[0x193]) << 8) | state[0x191]);
+                ImGui::Text("%d,%d", diagnostics.mouseX, diagnostics.mouseY);
+                if (state) {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted("ROM");
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%u,%u", ((uint16_t)(state[0x192]) << 8) | state[0x190],
+                                ((uint16_t)(state[0x193]) << 8) | state[0x191]);
+                }
+                ImGui::EndTable();
             }
-            ImGui::EndTable();
+        }
+    }
+    if (inDebugger && diagnostics.joyCount > 0) {
+        if (ImGui::CollapsingHeader("Joystick", ImGuiTreeNodeFlags_DefaultOpen)) {
+            if (ImGui::BeginTable("##Joysticks", 2)) {
+                ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthFixed, kCharSize * 2);
+                ImGui::TableSetupColumn("##Label", ImGuiTableColumnFlags_WidthStretch);
+                for (unsigned index = 0; index < diagnostics.joyCount; index++) {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::Text("J%u", index);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%d,%d", diagnostics.joyX[index], diagnostics.joyY[index]);
+                }
+                ImGui::EndTable();
+            }
         }
     }
 }

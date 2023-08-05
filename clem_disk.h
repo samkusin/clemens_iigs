@@ -161,6 +161,7 @@ struct ClemensNibbleDisk {
 
     bool is_write_protected; /**< Write protected data */
     bool is_double_sided;    /**< track 1, 3, 5 represents side 2 */
+    bool is_dirty;           /**< disk contents have changed */
 
     /* maps quarter tracks (for 5.25) and 80 tracks per side (for 3.25).  the
        drive head mechanism should track current head position by the meta

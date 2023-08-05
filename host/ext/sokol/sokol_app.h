@@ -1803,6 +1803,8 @@ SOKOL_APP_API_DECL const void* sapp_d3d11_get_render_target_view(void);
 SOKOL_APP_API_DECL const void* sapp_d3d11_get_depth_stencil_view(void);
 /* Win32: get the HWND window handle */
 SOKOL_APP_API_DECL const void* sapp_win32_get_hwnd(void);
+/* Win32: sets the minimum window size for the main application window*/
+SOKOL_APP_API_DECL void sapp_win32_set_min_window_size(int w, int h);
 
 /* WebGPU: get WGPUDevice handle */
 SOKOL_APP_API_DECL const void* sapp_wgpu_get_device(void);
@@ -2426,6 +2428,8 @@ typedef struct {
     LONG raw_input_mousepos_x;
     LONG raw_input_mousepos_y;
     uint8_t raw_input_data[256];
+    int min_window_width;
+    int min_window_height;
 } _sapp_win32_t;
 
 #if defined(SOKOL_GLCORE33)
@@ -7127,6 +7131,15 @@ _SOKOL_PRIVATE LRESULT CALLBACK _sapp_win32_wndproc(HWND hWnd, UINT uMsg, WPARAM
                     }
                 }
                 break;
+            case WM_GETMINMAXINFO:
+                if (_sapp.win32.min_window_width != 0 && _sapp.win32.min_window_height != 0)
+                {
+                    MINMAXINFO* minmaxinfo = (MINMAXINFO *)lParam;
+                    minmaxinfo->ptMinTrackSize.x = _sapp.win32.min_window_width;
+                    minmaxinfo->ptMinTrackSize.y = _sapp.win32.min_window_height;
+                    return 0;
+                }
+                break;
             case WM_SETFOCUS:
                 _sapp_win32_app_event(SAPP_EVENTTYPE_FOCUSED);
                 break;
@@ -11421,6 +11434,18 @@ SOKOL_API_IMPL const void* sapp_win32_get_hwnd(void) {
         return 0;
     #endif
 }
+
+SOKOL_APP_API_DECL void sapp_win32_set_min_window_size(int w, int h) {
+    SOKOL_ASSERT(_sapp.valid);
+    #if defined(_SAPP_WIN32)
+        _sapp.win32.min_window_width = w * _sapp.win32.dpi.content_scale;
+        _sapp.win32.min_window_height = h * _sapp.win32.dpi.content_scale;
+    #else
+        (void)w;
+        (void)h;
+    #endif
+}
+
 
 SOKOL_API_IMPL const void* sapp_wgpu_get_device(void) {
     SOKOL_ASSERT(_sapp.valid);

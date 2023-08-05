@@ -37,7 +37,7 @@ class ClemensDebugger {
     //  Draws the auxillary view
     void auxillary(ImVec2 anchor, ImVec2 dimensions);
     //  Draws the debug diagnostic tables - (automatically drawn if cpuStateTable is called)
-    void diagnosticTables(const DebugDiagnostics& diagnostics);
+    void diagnosticTables(const DebugDiagnostics& diagnostics, bool inDebugger);
 
     enum LogLineType { Debug, Info, Warn, Error, Command, Opcode };
 

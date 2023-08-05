@@ -1,3 +1,6 @@
+
+#include "clem_host.hpp"
+
 #if defined(CK3D_BACKEND_METAL)
 #define SOKOL_METAL
 #elif defined(CK3D_BACKEND_GL)
@@ -15,8 +18,6 @@
 #include "sokol/sokol_imgui.h"
 #include "sokol/sokol_time.h"
 
-#include "clem_host.hpp"
-
 #import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
 
@@ -28,8 +29,8 @@
   NSMenuItem *powerMenuItem;
   NSMenuItem *rebootMenuItem;
   NSMenuItem *shutdownMenuItem;
-  NSMenuItem *fullscreenMenuItem;
   NSMenuItem *debuggerMenuItem;
+  NSMenuItem *joysickMenuItem;
 }
 
 + (id)instance {
@@ -77,20 +78,16 @@
   hostInterop->action = ClemensHostInterop::Shutdown;
 }
 
+- (void)menuConfigureJoystick:(id)sender {
+  hostInterop->action = ClemensHostInterop::JoystickConfig;
+}
+
 - (void)menuShortcutsHelp:(id)sender {
   hostInterop->action = ClemensHostInterop::Help;
 }
 
 - (void)menuDiskHelp:(id)sender {
   hostInterop->action = ClemensHostInterop::DiskHelp;
-}
-
-- (void)menuFullscreenToggle:(id)sender {
-  if (hostInterop->view == ClemensHostInterop::Windowed) {
-    hostInterop->view = ClemensHostInterop::Fullscreen;
-  } else {
-    hostInterop->view = ClemensHostInterop::Windowed;
-  }
 }
 
 - (void)menuDebugger:(id)sender {
@@ -158,12 +155,6 @@
 
   // View Menu
   NSMenu *viewmenu = [[NSMenu alloc] initWithTitle:@"View"];
-  fullscreenMenuItem =
-      [[NSMenuItem alloc] initWithTitle:@"Enter Fullscreen"
-                                 action:@selector(menuFullscreenToggle:)
-                          keyEquivalent:@""];
-  [fullscreenMenuItem setTarget:self];
-  [viewmenu addItem:fullscreenMenuItem];
 
   debuggerMenuItem = [[NSMenuItem alloc] initWithTitle:@"Debugger View"
                                                 action:@selector(menuDebugger:)
@@ -195,6 +186,14 @@
                                          keyEquivalent:@""];
   [shutdownMenuItem setTarget:self];
   [machmenu addItem:shutdownMenuItem];
+
+  [machmenu addItem:[NSMenuItem separatorItem]];
+
+  joysickMenuItem = [[NSMenuItem alloc] initWithTitle:@"Configure Joystick"
+                                                action:@selector(menuConfigureJoystick:)
+                                         keyEquivalent:@""];
+  [joysickMenuItem setTarget: self];
+  [machmenu addItem: joysickMenuItem];
 
   NSMenuItem *machMenuItem = [menubar addItemWithTitle:@""
                                                 action:nil
@@ -248,16 +247,23 @@
     [powerMenuItem setEnabled:TRUE];
     [powerMenuItem setAction:@selector(menuPower:)];
   }
-  if (hostInterop->view != ClemensHostInterop::Fullscreen) {
-    [fullscreenMenuItem setTitle:@"Enter Fullscreen"];
-  } else {
-    [fullscreenMenuItem setTitle:@"Exit Fullscreen"];
-  }
   if (hostInterop->debuggerOn) {
     [debuggerMenuItem setTitle:@"User Mode"];
   } else {
     [debuggerMenuItem setTitle:@"Debugger Mode"];
   }
+  if (hostInterop->allowConfigureJoystick) {
+    [joysickMenuItem setEnabled:TRUE];
+    [joysickMenuItem setAction:@selector(menuConfigureJoystick:)];
+  } else {
+    [joysickMenuItem setEnabled:FALSE];
+    [joysickMenuItem setAction:nil];
+  }
+  NSSize minSize;
+  minSize.width = hostInterop->minWindowWidth;
+  minSize.height = hostInterop->minWindowHeight;
+  NSWindow* mainWindow = [NSApp mainWindow];
+  mainWindow.contentMinSize = minSize;
 }
 
 @end
