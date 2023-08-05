@@ -24,7 +24,7 @@ struct ClemensHostInterop {
         JoystickConfig,
         About
     } action;
-    
+
     //  events from the main app
     bool poweredOn;
     bool debuggerOn;
@@ -32,7 +32,7 @@ struct ClemensHostInterop {
     unsigned viewWidth;         //   0 = no change
     unsigned viewHeight;        //   0 = no change
     unsigned minWindowWidth;
-    unsigned minWidowHeight;
+    unsigned minWindowHeight;
 };
 
 void clemens_host_init(ClemensHostInterop *interop);

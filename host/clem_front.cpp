@@ -855,7 +855,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         return getViewType();
 
     interop.minWindowWidth = 0;
-    interop.minWidowHeight = 0;
+    interop.minWindowHeight = 0;
 
     pollJoystickDevices();
 
@@ -912,7 +912,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         !browseDriveType_.has_value() && !browseSmartDriveIndex_.has_value();
     if (!interop.nativeMenu) {
         doMainMenu(interfaceAnchor, interop);
-        interop.minWidowHeight += ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().WindowBorderSize;
+        interop.minWindowHeight += ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().WindowBorderSize;
     }
     switch (interop.action) {
     case ClemensHostInterop::About:
@@ -1228,9 +1228,9 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
     ImVec2 kInfoStatusSize(dimensions.x, kLineSpacing + kWindowBoundary.y * 2);
 
     interop.minWindowWidth += ClemensHostStyle::kSideBarMinWidth;
-    interop.minWindowWidth += viewToMonitor.size.x;
-    interop.minWidowHeight += ClemensHostStyle::kScreenHeight;
-    interop.minWidowHeight += kInfoStatusSize.y;
+    interop.minWindowWidth += ClemensHostStyle::kScreenWidth;
+    interop.minWindowHeight += ClemensHostStyle::kScreenHeight;
+    interop.minWindowHeight += kInfoStatusSize.y;
 
     kMonitorViewSize.y -= (kInfoStatusSize.y + anchor.y);
     kMonitorViewSize.x =
@@ -1437,7 +1437,7 @@ void ClemensFrontend::doSidePanelLayout(ImVec2 anchor, ImVec2 dimensions) {
 
     if (ImGui::Begin("SidePanel", nullptr,
                      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBringToFrontOnFocus)) {
-        if (ImGui::BeginChild("DiskTray", ImVec2(0.0f, ClemensHostStyle::kDiskTrayHeight))) {               
+        if (ImGui::BeginChild("DiskTray", ImVec2(0.0f, ClemensHostStyle::kDiskTrayHeight))) {
             doMachineDiskDisplay(sidebarSize.x);
         }
         ImGui::EndChild();
@@ -1646,9 +1646,10 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
 
     ImGui::SameLine(anchor.x + dimensions.x - resetStatusWidth - fpsStatusWidth -
                     style.ItemSpacing.x);
+
     ClemensHostImGui::StatusBarField(isResetDown ? ClemensHostImGui::StatusBarFlags_Active
                                                  : ClemensHostImGui::StatusBarFlags_Inactive,
-                                     "%5.2f mhz", frameReadState_.machineSpeedMhz);
+                                     "%5.2f mhz", isBackendRunning() ? frameReadState_.machineSpeedMhz : 0.0f);
 
     ImGui::SameLine(anchor.x + dimensions.x - resetStatusWidth);
     ClemensHostImGui::StatusBarField(isResetDown ? ClemensHostImGui::StatusBarFlags_Active
@@ -3005,8 +3006,6 @@ void ClemensFrontend::doViewInputInstructions(ImVec2 dimensions) {
     const char *infoText = nullptr;
     if (emulatorHasMouseFocus_) {
         infoText = ClemensL10N::kMouseUnlock[ClemensL10N::kLanguageDefault];
-    } else if (!emulatorHasKeyboardFocus_) {
-        infoText = ClemensL10N::kViewInput[ClemensL10N::kLanguageDefault];
     } else {
         infoText = "";
     }

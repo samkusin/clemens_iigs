@@ -61,13 +61,6 @@ void open_system_folder_view(const char *folder_path) {
 }
 
 
-void clem_host_set_min_window_size(int width, int height) {
-  (void)width;
-  (void)height;
-  // this is handled via NSWindow.minContentWidth inside clem_host.mm
-}
-
-
 ///////////////////////////////////////////////////////////////////////////////
 
 @interface ClemensGameControllerDispatch : NSObject {

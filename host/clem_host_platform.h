@@ -94,14 +94,6 @@ unsigned clem_host_get_processor_number(void);
 void clem_host_uuid_gen(ClemensHostUUID *uuid);
 
 /**
- * @brief 
- * 
- * @param width 
- * @param height 
- */
-void clem_host_set_min_window_size(int width, int height); 
-
-/**
  * @brief Get the process executable full path name
  *
  * @param outpath C string buffer

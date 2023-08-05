@@ -283,7 +283,7 @@ static void onInit(void *userdata) {
     auto *appdata = reinterpret_cast<SharedAppData *>(userdata);
 
     g_interop.debuggerOn = appdata->config.hybridInterfaceEnabled;
-   
+
     clemens_host_init(&g_interop);
     stm_setup();
 
@@ -450,7 +450,6 @@ static void onFrame(void *userdata) {
         g_interop.action = ClemensHostInterop::None;
         exitApp = g_interop.exitApp;
 
-        clem_host_set_min_window_size(g_interop.minWindowWidth, g_interop.minWidowHeight);
         clemens_host_update();
 
         if (nextViewType != g_Host->getViewType()) {

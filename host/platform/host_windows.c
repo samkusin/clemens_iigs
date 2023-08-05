@@ -20,7 +20,6 @@
 #pragma comment(lib, "xinput")
 #endif
 
-
 unsigned clem_host_get_processor_number() { return (unsigned)GetCurrentProcessorNumber(); }
 
 void clem_host_uuid_gen(ClemensHostUUID *uuid) {
@@ -207,12 +206,7 @@ static LRESULT _clem_win32_hook(int code, WPARAM wParam, LPARAM lParam) {
                 break;
             }
         }
-        if (msg->message == WM_GETMINMAXINFO) {
-            MINMAXINFO* minmaxinfo = (MINMAXINFO *)msg->lParam;
-            minmaxinfo->ptMinTrackSize.x = s_minWindowWidth;
-            minmaxinfo->ptMinTrackSize.y = s_minWindowHeight;
-            return 0;
-        }
+        //  modifying the min/max window info via WM_GETMINMAXINFO doesn't work here
     }
     return CallNextHookEx(NULL, code, wParam, lParam);
 }
@@ -375,11 +369,6 @@ static unsigned _clem_joystick_xinput(ClemensHostJoystick *joysticks) {
         joysticks[i].y[1] = state.Gamepad.sThumbRY;
     }
     return count;
-}
-
-void clem_host_set_min_window_size(int width, int height) {
-    s_minWindowWidth = width;
-    s_minWindowHeight = height;
 }
 
 void clem_joystick_open_devices(const char *provider) {

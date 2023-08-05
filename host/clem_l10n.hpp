@@ -12,7 +12,6 @@ extern const char *kExitMessage[];
 
 extern const char *kWelcomeText[];
 extern const char *kGSKeyboardCommands[];
-extern const char *kViewInput[];
 extern const char *kMouseUnlock[];
 extern const char *kSettingsTabMachine[];
 extern const char *kSettingsNotAvailable[];

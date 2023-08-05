@@ -193,7 +193,7 @@
                                          keyEquivalent:@""];
   [joysickMenuItem setTarget: self];
   [machmenu addItem: joysickMenuItem];
-  
+
   NSMenuItem *machMenuItem = [menubar addItemWithTitle:@""
                                                 action:nil
                                          keyEquivalent:@""];
@@ -260,7 +260,7 @@
   }
   NSSize minSize;
   minSize.width = hostInterop->minWindowWidth;
-  minSize.height = hostInterop->minWidowHeight;
+  minSize.height = hostInterop->minWindowHeight;
   NSWindow* mainWindow = [NSApp mainWindow];
   mainWindow.contentMinSize = minSize;
 }
