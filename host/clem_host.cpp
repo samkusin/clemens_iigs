@@ -1,3 +1,5 @@
+#include "clem_host.hpp"
+
 #if defined(CK3D_BACKEND_D3D11)
 #define SOKOL_D3D11
 #elif defined(CK3D_BACKEND_GL)
@@ -15,7 +17,6 @@
 #include "sokol/sokol_imgui.h"
 #include "sokol/sokol_time.h"
 
-#include "clem_host.hpp"
 
 static ClemensHostInterop *s_interop = nullptr;
 

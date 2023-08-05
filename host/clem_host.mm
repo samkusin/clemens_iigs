@@ -1,3 +1,6 @@
+
+#include "clem_host.hpp"
+
 #if defined(CK3D_BACKEND_METAL)
 #define SOKOL_METAL
 #elif defined(CK3D_BACKEND_GL)
@@ -14,8 +17,6 @@
 #include "sokol/sokol_glue.h"
 #include "sokol/sokol_imgui.h"
 #include "sokol/sokol_time.h"
-
-#include "clem_host.hpp"
 
 #import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
