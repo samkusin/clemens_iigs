@@ -3275,6 +3275,24 @@ void ClemensFrontend::doJoystickConfig(ImVec2 anchor, ImVec2 dimensions) {
                 }
                 bindings.button[joystickButtonIndex] = 3;
                 ImGui::CloseCurrentPopup();
+            } else if (joysticks_[joystickIndex].buttons & CLEM_HOST_JOYSTICK_BUTTON_L) {
+                for (unsigned buttonBindingIndex = 0; buttonBindingIndex < 2;
+                     ++buttonBindingIndex) {
+                    if (bindings.button[buttonBindingIndex] == 4) {
+                        bindings.button[buttonBindingIndex] = UINT32_MAX;
+                    }
+                }
+                bindings.button[joystickButtonIndex] = 4;
+                ImGui::CloseCurrentPopup();
+            } else if (joysticks_[joystickIndex].buttons & CLEM_HOST_JOYSTICK_BUTTON_R) {
+                for (unsigned buttonBindingIndex = 0; buttonBindingIndex < 2;
+                     ++buttonBindingIndex) {
+                    if (bindings.button[buttonBindingIndex] == 5) {
+                        bindings.button[buttonBindingIndex] = UINT32_MAX;
+                    }
+                }
+                bindings.button[joystickButtonIndex] = 5;
+                ImGui::CloseCurrentPopup();
             }
             if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
                 ImGui::CloseCurrentPopup();

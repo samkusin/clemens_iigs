@@ -153,16 +153,22 @@ void open_system_folder_view(const char *folder_path) {
     inputs->y[1] =
         -gamepad.rightThumbstick.yAxis.value * CLEM_HOST_JOYSTICK_AXIS_DELTA;
     if (gamepad.buttonA.pressed) {
-      inputs->buttons |= 0x1;
+      inputs->buttons |= CLEM_HOST_JOYSTICK_BUTTON_A;
     }
     if (gamepad.buttonX.pressed) {
-      inputs->buttons |= 0x2;
+      inputs->buttons |= CLEM_HOST_JOYSTICK_BUTTON_B;
     }
     if (gamepad.buttonB.pressed) {
-      inputs->buttons |= 0x4;
+      inputs->buttons |= CLEM_HOST_JOYSTICK_BUTTON_X;
     }
     if (gamepad.buttonY.pressed) {
-      inputs->buttons |= 0x8;
+      inputs->buttons |= CLEM_HOST_JOYSTICK_BUTTON_Y;
+    }
+    if (gamepad.leftShoulder.pressed) {
+      inputs->buttons |= CLEM_HOST_JOYSTICK_BUTTON_L;
+    }
+    if (gamepad.rightShoulder.pressed) {
+      inputs->buttons |= CLEM_HOST_JOYSTICK_BUTTON_R;
     }
   } else if (micro) {
     inputs->x[0] = micro.dpad.xAxis.value * CLEM_HOST_JOYSTICK_AXIS_DELTA;

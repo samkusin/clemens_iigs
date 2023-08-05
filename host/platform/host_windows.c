@@ -363,6 +363,12 @@ static unsigned _clem_joystick_xinput(ClemensHostJoystick *joysticks) {
         if (state.Gamepad.wButtons & XINPUT_GAMEPAD_Y) {
             joysticks[i].buttons |= CLEM_HOST_JOYSTICK_BUTTON_Y;
         }
+        if (state.Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER) {
+            joysticks[i].buttons |= CLEM_HOST_JOYSTICK_BUTTON_L;
+        }
+        if (state.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER) {
+            joysticks[i].buttons |= CLEM_HOST_JOYSTICK_BUTTON_R;
+        }
         joysticks[i].x[0] = state.Gamepad.sThumbLX;
         joysticks[i].y[0] = state.Gamepad.sThumbLY;
         joysticks[i].x[1] = state.Gamepad.sThumbRX;
