@@ -11440,6 +11440,9 @@ SOKOL_APP_API_DECL void sapp_win32_set_min_window_size(int w, int h) {
     #if defined(_SAPP_WIN32)
         _sapp.win32.min_window_width = w * _sapp.win32.dpi.content_scale;
         _sapp.win32.min_window_height = h * _sapp.win32.dpi.content_scale;
+    #else
+        (void)w;
+        (void)h;
     #endif
 }
 
