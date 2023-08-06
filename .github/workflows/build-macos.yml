@@ -81,7 +81,7 @@ jobs:
       # if: ${{ github.ref_type == 'tag'}}
       run: |
         cd ${{github.workspace}}/build
-        PACKAGE_FILE=$(ind ./out/*.dmg -print -quit)
+        PACKAGE_FILE=$(find ./out/*.dmg -print -quit)
         echo "Notorizing $PACKAGE_FILE ..."
         xcrun notarytool submit --apple-id ${{secrets.APPLE_DEVELOPER_ID}} --password "${{secrets.APPLE_CLEMENS_APP_PASSWORD}}" --team-id ${{secrets.APPLE_DEVELOPER_TEAM_ID}} --wait $PACKAGE_FILE
         xcrun stapler staple -v $PACKAGE_FILE
