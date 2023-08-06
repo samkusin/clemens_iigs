@@ -28,7 +28,7 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Setup Certification Keychain
-      # Codesign and submit the binary for notorization before packaging for release
+      # Codesign and submit the binary for notarization before packaging for release
       # Reference: https://docs.github.com/en/actions/deployment/deploying-xcode-applications/installing-an-apple-certificate-on-macos-runners-for-xcode-development
       env:
         BUILD_CERTIFICATE_BASE64: ${{secrets.APPLE_BUILD_CERTIFICATE_BASE64}}
@@ -77,12 +77,12 @@ jobs:
         cd ${{github.workspace}}/build
         cpack --config CPackConfig.cmake
 
-    - name: Notorize Package
+    - name: Notarize Package
       if: ${{ github.ref_type == 'tag'}}
       run: |
         cd ${{github.workspace}}/build
         PACKAGE_FILE=$(find ./out/*.dmg -print -quit)
-        echo "Notorizing $PACKAGE_FILE ..."
+        echo "Notarizing $PACKAGE_FILE ..."
         xcrun notarytool submit --apple-id ${{secrets.APPLE_DEVELOPER_ID}} --password "${{secrets.APPLE_CLEMENS_APP_PASSWORD}}" --team-id ${{secrets.APPLE_DEVELOPER_TEAM_ID}} --wait $PACKAGE_FILE
         xcrun stapler staple $PACKAGE_FILE
 
