@@ -24,6 +24,7 @@ jobs:
     runs-on: macos-11
 
     steps:
+    - name: Checkout Repository
     - uses: actions/checkout@v3
 
     - name: Setup Certification Keychain
@@ -34,7 +35,7 @@ jobs:
         BUILD_CERTIFICATE_BASE64: ${{secrets.APPLE_BUILD_CERTIFICATE_BASE64}}
         CERT_PASSWORD: ${{secrets.APPLE_BUILD_CERT_P12_PASSWORD}}
         KEYCHAIN_PASSWORD: ${{secrets.APPLE_LOCAL_KEYCHAIN_PASSWORD}}
-      run:
+      run: |
         CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
         KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
         # import certificate and provisioning profile from secrets
