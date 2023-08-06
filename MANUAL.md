@@ -142,7 +142,18 @@ apply to most Apple II titles from the 1980s.
 
 ## Operation (Hotkeys, etc.) <a name="hotkeys"></a>
 
+![Play Screen](docs/play-screen.png)
+
 This writeup isn't meant to be a complete tutorial on operating the Apple IIgs.
+Typical usage involves finding the disk images to run, loading them into the
+emulator and powering on the machine.
+
+Once you're able to power on a working machine, users will often run into
+situations where it's necessary to understand how the hardware works on a surface 
+level will.
+
+### Keyboard
+
 But you'll need to understand how to use the emulated Apple Desktop Bus Keyboard
 (ADB) and how keys like `Open-Apple` and `Option` map to keys on your device.
 
@@ -204,6 +215,33 @@ Clemens also supports a method to mock function keys by pressing *both* `Tux` an
 a number key to generate a function key.  For example, a user can press `Control + Right Alt + Tux + 1`
 which sends a `Control`, `Command` and `F1` key combination to the emulator. 
 
+### Joystick
+
+Apple II joysticks in Clemens are emulated as a two axis joystick with two buttons.
+
+It's usually as simple as inserting a Gamepad or modern joystick into your USB or
+connect via Bluetooth.  For notes on platform per host OS, see the below list.
+
+Clemens supports gamepad devices on the following platforms:
+
+* Windows with XInput
+  * Xbox and other gamepad devices
+  * Other devices with modern driver updates
+  * Older devices may not work (DirectInput is experimental and requires a rebuilding the app currently)
+* macOS with GameController
+  * Most modern gamepad devices
+* Linux with evdev
+  * Typically most modern gamepad devices are supported
+  * Older devices may be supported and require user configuration
+
+#### Joystick Configuraiton
+
+Select the **Machine** menu and choose **Configure Joystick**.  Options are provided to
+modify the center point of the emulated joystick, and the ability to map gamepad buttons
+to Button 0 and 1.
+
+![Joystick Config](docs/joystick-config.png)
+
 ## Finding ROM and Software Files <a name="finding-roms"></a>
 
 Clemens doesn't distribute any IIgs ROMs or software since they are still copyrighted
@@ -218,6 +256,29 @@ The [Internet Archive](https://archive.org/details/wozaday?tab=collection) also
 contains WOZ disk images useful for copy protected software.
 
 ## Debugger <a name="debugger"></a>
+
+To enter the debugger screen, select the **View** menu and choose **Debugger Mode**.
+Alternately one can press the **Bug** button in the lower left hand side of the
+main view.
+
+![Debug View](docs/debug-screen.png)
+
+The Debug View is a work in progress but does currently have some useful features,
+some of which include:
+
+* Inspect and modify register and processor status.
+* Inspect and modify Memory
+* View debugging logs
+* Component views such as IWM and Ensoniq/DOC microcontrollers
+* Set read/write/execute breakpoints and step over instructions
+* Dump memory contents to file
+* Write instruction traces to file
+* Load and save binary data to memory
+
+In the lower right side of the screen is a console.  By clicking inside the
+edit box, one can enter commands.
+
+Type 'h' to display a list of commands in the console. 
 
 ## Troubleshooting <a name="troubleshooting"></a>
 

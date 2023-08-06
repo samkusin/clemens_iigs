@@ -24,13 +24,35 @@ jobs:
     runs-on: macos-11
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Setup Certification Keychain
+      # Codesign and submit the binary for notarization before packaging for release
+      # Reference: https://docs.github.com/en/actions/deployment/deploying-xcode-applications/installing-an-apple-certificate-on-macos-runners-for-xcode-development
+      env:
+        BUILD_CERTIFICATE_BASE64: ${{secrets.APPLE_BUILD_CERTIFICATE_BASE64}}
+        CERT_PASSWORD: ${{secrets.APPLE_BUILD_CERT_P12_PASSWORD}}
+        KEYCHAIN_PASSWORD: ${{secrets.APPLE_LOCAL_KEYCHAIN_PASSWORD}}
+      run: |
+        CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+        KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+        # import certificate and provisioning profile from secrets
+        echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+        # create temporary keychain
+        security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+        security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+        # import certificate to keychain
+        security import $CERTIFICATE_PATH -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+        security list-keychain -d user -s $KEYCHAIN_PATH
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15 -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
-    
+          
     - name: Build
       # Build your program with the given configuration
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
@@ -39,11 +61,30 @@ jobs:
     #  working-directory: ${{github.workspace}}/build
     #  run: ctest -C ${{env.BUILD_TYPE}}
 
-    - name: Package
+    - name: Codesign Application
+      env:
+        IDENTITY_ID: ${{secrets.APPLE_KEYCHAIN_IDENTITY_ID}}
+      run: |
+        cd ${{github.workspace}}/build
+        xattr -c ./host/Clemens\ IIGS.app
+        codesign --force --verify --verbose --timestamp --sign "$IDENTITY_ID" --options runtime ./host/Clemens\ IIGS.app
+        codesign -dv -r- ./host/Clemens\ IIGS.app
+        codesign -vv ./host/Clemens\ IIGS.app
+
+    - name: Create Package
       if: ${{ github.ref_type == 'tag'}}
       run: |
         cd ${{github.workspace}}/build
         cpack --config CPackConfig.cmake
+
+    - name: Notarize Package
+      if: ${{ github.ref_type == 'tag'}}
+      run: |
+        cd ${{github.workspace}}/build
+        PACKAGE_FILE=$(find ./out/*.dmg -print -quit)
+        echo "Notarizing $PACKAGE_FILE ..."
+        xcrun notarytool submit --apple-id ${{secrets.APPLE_DEVELOPER_ID}} --password "${{secrets.APPLE_CLEMENS_APP_PASSWORD}}" --team-id ${{secrets.APPLE_DEVELOPER_TEAM_ID}} --wait $PACKAGE_FILE
+        xcrun stapler staple $PACKAGE_FILE
 
     - name: Archive production artifacts
       if: ${{ github.ref_type == 'tag'}}

@@ -3237,8 +3237,12 @@ void ClemensFrontend::doJoystickConfig(ImVec2 anchor, ImVec2 dimensions) {
                                    ImGuiWindowFlags_Modal | ImGuiWindowFlags_NoScrollbar |
                                        ImGuiWindowFlags_NoTitleBar)) {
             auto &bindings = config_.joystickBindings[joystickIndex];
-            ImGui::Text(CLEM_L10N_LABEL(kLabelJoystickButtonBinding), joystickIndex);
-
+            auto contentAvail = ImGui::GetContentRegionAvail();
+            auto textSize = ImGui::CalcTextSize(CLEM_L10N_LABEL(kLabelJoystickButtonBinding));
+            ImGui::SetCursorPos(ImVec2((contentAvail.x - textSize.x) * 0.5f, (contentAvail.y - textSize.y) * 0.5f));
+            ImGui::PushTextWrapPos();
+            ImGui::Text(CLEM_L10N_LABEL(kLabelJoystickButtonBinding), joystickButtonIndex);
+            ImGui::PopTextWrapPos();
             if (joysticks_[joystickIndex].buttons & CLEM_HOST_JOYSTICK_BUTTON_A) {
                 for (unsigned buttonBindingIndex = 0; buttonBindingIndex < 2;
                      ++buttonBindingIndex) {

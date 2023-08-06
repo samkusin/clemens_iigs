@@ -126,7 +126,6 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.cpp")
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(clemens_ICON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.icns")
-    set_source_files_properties(${clemens_ICON_FILE} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
     set(PLATFORM_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_macos.m"
         "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.mm")
@@ -191,11 +190,13 @@ elseif(APPLE)
         OUTPUT_NAME "Clemens IIGS"
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "Clemens IIGS"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.cinekine.clemens"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${CLEM_HOST_VERSION_MAJOR}.${CLEM_HOST_VERSION_MINOR}.${CLEM_HOST_VERSION_PATCH}"
         MACOSX_BUNDLE_COPYRIGHT "Copyright ${CLEM_HOST_COPYRIGHT_YEAR} Samir Sinha DBA Cinekine"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/macos_bundle_info_plist.in"
         MACOSX_BUNDLE_ICON_FILE icon.icns
+        RESOURCE "${clemens_ICON_FILE}"
         XCODE_ATTRIBUTE_EXECUTABLE_NAME "Clemens IIGS")
 
 endif()

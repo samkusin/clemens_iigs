@@ -17,15 +17,14 @@ First time users will be prompted to set a location where the emulator will stor
 * Joystick
 * Save/Load snapshots
 * Most disk image formats (.2mg, .woz, .po, .do, .dsk)
-* Smartport Hard Drives (32MB only on Slot 2, Drive 1)
 
 ## Missing Features
 
 * ROM 1 support
 * Host desktop mouse integration
 * Serial (SCC) communications
-* PAL display
 * Monochrome display
+* Uthernet
 )md"};
 
 const char *kDiskSelectionHelp[] = {R"md(
