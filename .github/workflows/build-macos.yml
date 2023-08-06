@@ -48,7 +48,6 @@ jobs:
         security import $CERTIFICATE_PATH -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
         security list-keychain -d user -s $KEYCHAIN_PATH
-        security find-identity -v
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
@@ -62,8 +61,8 @@ jobs:
     - name: Codesign and Notorize Application
       run: |
         pushd ${{github.workspace}}/build
-        xattr -c “./host/Clemens IIGS.app”
-        codesign --force --verify --verbose --timestamp --sign "$IDENTITY_ID" --options runtime "./host/Clemens IIGS.app"
+        xattr -c ./host/Clemens\ IIGS.app
+        codesign --force --verify --verbose --timestamp --sign "$IDENTITY_ID" --options runtime ./host/Clemens\ IIGS.app
         popd
 
     # - name: Test
