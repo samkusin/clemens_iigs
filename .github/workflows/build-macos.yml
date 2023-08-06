@@ -72,22 +72,22 @@ jobs:
         codesign -vv ./host/Clemens\ IIGS.app
 
     - name: Create Package
-      # if: ${{ github.ref_type == 'tag'}}
+      if: ${{ github.ref_type == 'tag'}}
       run: |
         cd ${{github.workspace}}/build
         cpack --config CPackConfig.cmake
 
     - name: Notorize Package
-      # if: ${{ github.ref_type == 'tag'}}
+      if: ${{ github.ref_type == 'tag'}}
       run: |
         cd ${{github.workspace}}/build
         PACKAGE_FILE=$(find ./out/*.dmg -print -quit)
         echo "Notorizing $PACKAGE_FILE ..."
         xcrun notarytool submit --apple-id ${{secrets.APPLE_DEVELOPER_ID}} --password "${{secrets.APPLE_CLEMENS_APP_PASSWORD}}" --team-id ${{secrets.APPLE_DEVELOPER_TEAM_ID}} --wait $PACKAGE_FILE
-        xcrun stapler staple -v $PACKAGE_FILE
+        xcrun stapler staple $PACKAGE_FILE
 
     - name: Archive production artifacts
-      #if: ${{ github.ref_type == 'tag'}}
+      if: ${{ github.ref_type == 'tag'}}
       uses: actions/upload-artifact@v3
       with:
         name: clemens_iigs-${{github.ref_name}}-${{runner.os}}
