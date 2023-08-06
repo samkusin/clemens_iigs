@@ -34,7 +34,6 @@ jobs:
         BUILD_CERTIFICATE_BASE64: ${{secrets.APPLE_BUILD_CERTIFICATE_BASE64}}
         CERT_PASSWORD: ${{secrets.APPLE_BUILD_CERT_P12_PASSWORD}}
         KEYCHAIN_PASSWORD: ${{secrets.APPLE_LOCAL_KEYCHAIN_PASSWORD}}
-        IDENTITY_ID: ${{secrets.APPLE_KEYCHAIN_IDENTITY_ID}}
       run: |
         CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
         KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
@@ -59,6 +58,8 @@ jobs:
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
     - name: Codesign and Notorize Application
+      env:
+        IDENTITY_ID: ${{secrets.APPLE_KEYCHAIN_IDENTITY_ID}}
       run: |
         pushd ${{github.workspace}}/build
         xattr -c ./host/Clemens\ IIGS.app
