@@ -265,20 +265,23 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
                 fmt::print(stderr, "Invalid Joystick binding index {}\n", joyIndex);
                 return 0;
             }
-            const char *valueSep = value + strnlen(value, 256);
-            unsigned btnId;
-            if (std::from_chars(value, valueSep, btnId, 10).ec != std::errc{}) {
-                fmt::print(stderr, "Invalid Joystick Button Id {}={}\n", name, btnId);
+             
+            int valueInt;
+            if (std::from_chars(value, value + strnlen(value, 4), valueInt, 10).ec != std::errc{}) {
+                fmt::print(stderr, "Invalid Joystick binding index not found {}={}\n", name, value);
                 return 0;
+            } 
+        
+            partial += 2;
+            if (strncmp(partial, "adjX", 4) == 0) {
+                config->joystickBindings[joyIndex].axisAdj[0] = valueInt;         
+            } else if (strncmp(partial, "adjY", 4) == 0) {
+                config->joystickBindings[joyIndex].axisAdj[1] = valueInt;         
+            } else if (strncmp(partial, "btn0", 4) == 0) {
+                config->joystickBindings[joyIndex].button[0] = valueInt;         
+            } else if (strncmp(partial, "btn1", 4) == 0) {
+                config->joystickBindings[joyIndex].button[1] = valueInt;         
             }
-            config->joystickBindings[joyIndex].button[0] = btnId;
-            valueSep++;
-            const char *valueEnd = valueSep + strlen(valueSep);
-            if (std::from_chars(valueSep, valueEnd, btnId, 10).ec != std::errc{}) {
-                fmt::print(stderr, "Invalid Joystick Button Id {}={}\n", name, btnId);
-                return 0;
-            }
-            config->joystickBindings[joyIndex].button[1] = btnId;
         }
     }
 
