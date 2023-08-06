@@ -34,6 +34,7 @@ jobs:
         BUILD_CERTIFICATE_BASE64: ${{secrets.APPLE_BUILD_CERTIFICATE_BASE64}}
         CERT_PASSWORD: ${{secrets.APPLE_BUILD_CERT_P12_PASSWORD}}
         KEYCHAIN_PASSWORD: ${{secrets.APPLE_LOCAL_KEYCHAIN_PASSWORD}}
+        IDENTITY_ID: ${{secrets.APPLE_KEYCHAIN_IDENTITY_ID}}
       run: |
         CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
         KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
@@ -45,6 +46,7 @@ jobs:
         security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
         # import certificate to keychain
         security import $CERTIFICATE_PATH -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
         security list-keychain -d user -s $KEYCHAIN_PATH
         security find-identity -v
 
@@ -57,12 +59,12 @@ jobs:
       # Build your program with the given configuration
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
-    # - name: Codesign and Notorize Application
-    #  run: |
-    #      pushd ${{github.workspace}}/build
-    #      xattr -c “./host/Clemens IIGS.app”
-    #      codesign --force --verify --verbose --timestamp --sign 
-    #      popd
+    - name: Codesign and Notorize Application
+      run: |
+        pushd ${{github.workspace}}/build
+        xattr -c “./host/Clemens IIGS.app”
+        codesign --force --verify --verbose --timestamp --sign "$IDENTITY_ID" --options runtime "./host/Clemens IIGS.app"
+        popd
 
     # - name: Test
     #  working-directory: ${{github.workspace}}/build
