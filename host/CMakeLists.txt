@@ -126,7 +126,6 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.cpp")
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(clemens_ICON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.icns")
-    set_source_files_properties(${clemens_ICON_FILE} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
     set(PLATFORM_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/platform/host_macos.m"
         "${CMAKE_CURRENT_SOURCE_DIR}/clem_host.mm")
@@ -196,7 +195,9 @@ elseif(APPLE)
         MACOSX_BUNDLE_COPYRIGHT "Copyright ${CLEM_HOST_COPYRIGHT_YEAR} Samir Sinha DBA Cinekine"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/macos_bundle_info_plist.in"
         MACOSX_BUNDLE_ICON_FILE icon.icns
-        XCODE_ATTRIBUTE_EXECUTABLE_NAME "Clemens IIGS")
+        RESOURCE "${clemens_ICON_FILE}"
+        XCODE_ATTRIBUTE_EXECUTABLE_NAME "Clemens IIGS"
+        XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME YES)
 
 endif()
 
