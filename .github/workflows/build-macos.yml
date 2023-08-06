@@ -57,27 +57,37 @@ jobs:
       # Build your program with the given configuration
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
-    - name: Codesign and Notorize Application
-      env:
-        IDENTITY_ID: ${{secrets.APPLE_KEYCHAIN_IDENTITY_ID}}
-      run: |
-        pushd ${{github.workspace}}/build
-        xattr -c ./host/Clemens\ IIGS.app
-        codesign --force --verify --verbose --timestamp --sign "$IDENTITY_ID" --options runtime ./host/Clemens\ IIGS.app
-        popd
-
     # - name: Test
     #  working-directory: ${{github.workspace}}/build
     #  run: ctest -C ${{env.BUILD_TYPE}}
 
-    - name: Package
-      if: ${{ github.ref_type == 'tag'}}
+    - name: Codesign Application
+      env:
+        IDENTITY_ID: ${{secrets.APPLE_KEYCHAIN_IDENTITY_ID}}
+      run: |
+        cd ${{github.workspace}}/build
+        xattr -c ./host/Clemens\ IIGS.app
+        codesign --force --verify --verbose --timestamp --sign "$IDENTITY_ID" --options runtime ./host/Clemens\ IIGS.app
+        codesign -dv -r- ./host/Clemens\ IIGS.app
+        codesign -vv ./host/Clemens\ IIGS.app
+
+    - name: Create Package
+      # if: ${{ github.ref_type == 'tag'}}
       run: |
         cd ${{github.workspace}}/build
         cpack --config CPackConfig.cmake
 
+    - name: Notorize Package
+      # if: ${{ github.ref_type == 'tag'}}
+      run: |
+        cd ${{github.workspace}}/build
+        PACKAGE_FILE=$(ind ./out/*.dmg -print -quit)
+        echo "Notorizing $PACKAGE_FILE ..."
+        xcrun notarytool submit --apple-id ${{secrets.APPLE_DEVELOPER_ID}} --password "${{secrets.APPLE_CLEMENS_APP_PASSWORD}}" --team-id ${{secrets.APPLE_DEVELOPER_TEAM_ID}} --wait $PACKAGE_FILE
+        xcrun stapler staple -v $PACKAGE_FILE
+
     - name: Archive production artifacts
-      if: ${{ github.ref_type == 'tag'}}
+      #if: ${{ github.ref_type == 'tag'}}
       uses: actions/upload-artifact@v3
       with:
         name: clemens_iigs-${{github.ref_name}}-${{runner.os}}
