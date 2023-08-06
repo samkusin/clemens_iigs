@@ -28,7 +28,6 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Setup Certification Keychain
-      if: github.ref == 'refs/heads/ss/0.6-release-doc'
       # Codesign and submit the binary for notorization before packaging for release
       # Reference: https://docs.github.com/en/actions/deployment/deploying-xcode-applications/installing-an-apple-certificate-on-macos-runners-for-xcode-development
       env:
