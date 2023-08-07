@@ -209,10 +209,14 @@ if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
         "Install path prefix, prepended onto install directories." FORCE )
 endif()
 
-install(TARGETS clemens_iigs
-    BUNDLE DESTINATION "."
-    RUNTIME DESTINATION bin)
-
+if (WIN32)
+    install(TARGETS clemens_iigs
+        RUNTIME DESTINATION ".")
+else()
+    install(TARGETS clemens_iigs
+        BUNDLE DESTINATION "."
+        RUNTIME DESTINATION "bin")
+endif()
 set(CPACK_PACKAGE_VENDOR "samkusin")
 set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
 set(CPACK_PACKAGE_CONTACT "Samir Sinha <samir@cinekine.com>")
@@ -226,8 +230,9 @@ set(CPACK_PACKAGE_DIRECTORY "${CMAKE_BINARY_DIR}/out")
 set(CPACK_PACKAGE_CHECKSUM SHA256)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    set(CPACK_GENERATOR "STGZ;ZIP")
+    set(CPACK_GENERATOR "ZIP")
     set(CPACK_PACKAGE_FILE_NAME "Clemens_IIGS-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}-windows-x64")
+    set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 elseif(APPLE)
     #--------------------------------------------------------------------------
     # Apple specific
@@ -282,7 +287,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # set(CPACK_DEBIAN_COMPRESSION_TYPE "xz")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS YES)
     #set(CPACK_DEBIAN_PACKAGE_DEPENDS "libx11-dev,libxcursor-dev,libxi-dev,mesa-common-dev,libasound-dev,uuid-dev")
-      
+
     # Icon and app shortcut for Linux systems
     # Note: .desktop file must have same name as executable
     install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cinekine.Clemens.desktop
