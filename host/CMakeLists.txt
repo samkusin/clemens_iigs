@@ -90,7 +90,7 @@ add_subdirectory(harness)
 ################################################################################
 
 string(TIMESTAMP CLEM_HOST_COPYRIGHT_YEAR "%Y")
-set(CLEMENS_HOMEPAGE "https://samirsinha.com/tags/clemens/")
+set(CLEMENS_HOMEPAGE "https://github.com/samkusin/clemens_iigs/blob/main/README.md")
 
 configure_file(version.h.in version.h)
 
@@ -220,6 +220,7 @@ endif()
 set(CPACK_PACKAGE_VENDOR "samkusin")
 set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
 set(CPACK_PACKAGE_CONTACT "Samir Sinha <samir@cinekine.com>")
+set(CPACK_PACKAGE_ICON "${CLEMENS_ROOT_DIR}/flatpak/com.cinekine.Clemens_256.png")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
     "A cross-platform Apple IIGS emulator.")
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
