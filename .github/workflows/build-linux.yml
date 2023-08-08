@@ -1,9 +1,11 @@
 name: Linux All Build
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" ]
-    tags: ['v*']
+    tags: 
+      - 'v*'
     paths: 
       - "**"
       - "!.github/**" 
