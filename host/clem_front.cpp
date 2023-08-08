@@ -3153,7 +3153,7 @@ void ClemensFrontend::doJoystickConfig(ImVec2 anchor, ImVec2 dimensions) {
                     ImGui::VSliderInt("##YAdj", ImVec2(kBallSize * 2, kGridSize),
                                       &bindings.axisAdj[1], 9, -9);
                     ImGui::TableNextColumn();
-                    char btnLabel[8];
+                    char btnLabel[16];
                     auto &style = ImGui::GetStyle();
                     auto buttonColor = (joystick.buttons & (1 << bindings.button[0]))
                                            ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f)

@@ -45,11 +45,22 @@ See the [Releases](https://github.com/samkusin/clemens_iigs/releases) page for t
 Download and mount the DMG to copy Clemens IIGS into your Applications folder.
 
 ### Linux
-There is a 64-bit .deb for Debian/Ubuntu systems.
+There is a 64-bit .deb for Debian or Ubuntu 20.04 systems.
 ```
-# Download the .deb file, copy it to a directory and run (for example, version 0.6.0):
-sudo dpkg -i Clemens_IIGS-0.6.0-linux-x64.deb
+# On Ubuntu 20.04 or later, download the .deb file, copy it to a directory and run (for example, version 0.6.0):
+sudo apt install ./Clemens_IIGS-0.6.0-linux-x64.deb
 ```
+
+### Linux-Flatpak
+
+There's an build script for the flatpak binary.   Detailed instruction on what is Flatpak or 
+how to use it are beyond the scope of this doc.  If new to [Flatpak](https://flatpak.org/) refer to the linked page.
+
+### Linux-Build from Source
+
+[Building from source](#linux-1) may be the best option on Linux if running on older Ubuntu distribution, or
+another disto like Manjaro/Arch, etc.
+
 
 ### Windows
 A single Windows 64-bit executable is available.  You will receive a SmartScreen warning
@@ -58,7 +69,7 @@ by a single developer, and not a corporation, during his spare time.)
 
 Simply select 'More Info' and 'Run Anyway' if your security policy (and personal comfort level) allows for running untrusted applications.
 
-## Buliding from Source
+## Building from Source
 This is always an option instead of installation if you have the prerequisites on your machine.
 
 All platforms require [CMake 3.15 or later](https://cmake.org/download/).

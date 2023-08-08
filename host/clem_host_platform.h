@@ -118,6 +118,18 @@ char *get_local_user_data_directory(char *outpath, size_t outpath_size, const ch
                                     const char *app_name);
 
 /**
+ * @brief Get the local user config directory (mainly Linux)
+ * 
+ * @param outpath 
+ * @param outpath_size 
+ * @param company_name 
+ * @param app_name 
+ * @return char* 
+ */
+char *get_local_user_config_directory(char *outpath, size_t outpath_size, const char *company_name,
+                                      const char *app_name);
+
+/**
  * @brief Attempts to open a folder view on the host machine
  *
  * @param folder_path

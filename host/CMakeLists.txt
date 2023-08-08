@@ -90,7 +90,7 @@ add_subdirectory(harness)
 ################################################################################
 
 string(TIMESTAMP CLEM_HOST_COPYRIGHT_YEAR "%Y")
-set(CLEMENS_HOMEPAGE "https://samirsinha.com/tags/clemens/")
+set(CLEMENS_HOMEPAGE "https://github.com/samkusin/clemens_iigs/blob/main/README.md")
 
 configure_file(version.h.in version.h)
 
@@ -220,6 +220,7 @@ endif()
 set(CPACK_PACKAGE_VENDOR "samkusin")
 set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
 set(CPACK_PACKAGE_CONTACT "Samir Sinha <samir@cinekine.com>")
+set(CPACK_PACKAGE_ICON "${CLEMENS_ROOT_DIR}/flatpak/com.cinekine.Clemens_256.png")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
     "A cross-platform Apple IIGS emulator.")
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
@@ -286,7 +287,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CLEMENS_HOMEPAGE}")
     # set(CPACK_DEBIAN_COMPRESSION_TYPE "xz")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS YES)
-    #set(CPACK_DEBIAN_PACKAGE_DEPENDS "libx11-dev,libxcursor-dev,libxi-dev,mesa-common-dev,libasound-dev,uuid-dev")
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libx11-dev,libxcursor-dev,libxi-dev,mesa-common-dev,libasound-dev,uuid-dev")
 
     # Icon and app shortcut for Linux systems
     # Note: .desktop file must have same name as executable
@@ -310,7 +311,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         RENAME com.cinekine.Clemens.png
         )
     install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cinekine.Clemens_128.png
-        DESTINATION share/icons/hicolor/256x256/apps/
+        DESTINATION share/icons/hicolor/128x128/apps/
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
         RENAME com.cinekine.Clemens.png
         )

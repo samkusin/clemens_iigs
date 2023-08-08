@@ -21,9 +21,10 @@ static const char *kViewModeNames[kViewModeNameCount] = {"windowed", "fullscreen
 //  predefined location.  The config file is effectively our 'registry' to
 //  use windows terminology.
 //
-ClemensConfiguration createConfiguration(const std::filesystem::path defaultDataDirectory) {
-    auto configPath = defaultDataDirectory / "config.ini";
-    spdlog::info("Configuration created at {}", defaultDataDirectory.string());
+ClemensConfiguration createConfiguration(const std::filesystem::path configDataDirectory,
+                                         const std::filesystem::path defaultDataDirectory) {
+    auto configPath = configDataDirectory / "config.ini";
+    spdlog::info("Configuration created at {}", configPath.string());
     return ClemensConfiguration(configPath.string(), defaultDataDirectory.string());
 }
 
@@ -32,6 +33,7 @@ ClemensConfiguration findConfiguration() {
 
     //  local directory configuration check
     char localpath[CLEMENS_PATH_MAX];
+    char datapath[CLEMENS_PATH_MAX];
     size_t localpathSize = sizeof(localpath);
     if (get_process_executable_path(localpath, &localpathSize)) {
         if (strnlen(localpath, CLEMENS_PATH_MAX - 1) >= sizeof(localpath) - 1) {
@@ -43,19 +45,24 @@ ClemensConfiguration findConfiguration() {
         auto configPath = dataDirectory / "config.ini";
         spdlog::info("Checking for configuration in {}", configPath.string());
         if (std::filesystem::exists(configPath)) {
-            return createConfiguration(dataDirectory);
+            return createConfiguration(dataDirectory, dataDirectory);
         }
     } else {
         //  TODO: handle systems that support dynamic path sizes (i.e. localpathSize !=
         //  sizeof(localpath))
         spdlog::warn("Unable to obtain our local executable path. Falling back to user data paths");
     }
-    if (!get_local_user_data_directory(localpath, sizeof(localpath), CLEM_HOST_COMPANY_NAME,
+    if (!get_local_user_config_directory(localpath, sizeof(localpath), CLEM_HOST_COMPANY_NAME,
+                                       CLEM_HOST_APPLICATION_NAME)) {
+        spdlog::error("Unable to obtain the OS specific user config directory.");
+        return ClemensConfiguration();
+    }
+    if (!get_local_user_data_directory(datapath, sizeof(datapath), CLEM_HOST_COMPANY_NAME,
                                        CLEM_HOST_APPLICATION_NAME)) {
         spdlog::error("Unable to obtain the OS specific user data directory.");
         return ClemensConfiguration();
     }
-    return createConfiguration(std::filesystem::path(localpath));
+    return createConfiguration(std::filesystem::path(localpath), std::filesystem::path(datapath));
 }
 
 ClemensConfiguration::ClemensConfiguration()
@@ -265,22 +272,22 @@ int ClemensConfiguration::handler(void *user, const char *section, const char *n
                 fmt::print(stderr, "Invalid Joystick binding index {}\n", joyIndex);
                 return 0;
             }
-             
+
             int valueInt;
             if (std::from_chars(value, value + strnlen(value, 4), valueInt, 10).ec != std::errc{}) {
                 fmt::print(stderr, "Invalid Joystick binding index not found {}={}\n", name, value);
                 return 0;
-            } 
-        
+            }
+
             partial += 2;
             if (strncmp(partial, "adjX", 4) == 0) {
-                config->joystickBindings[joyIndex].axisAdj[0] = valueInt;         
+                config->joystickBindings[joyIndex].axisAdj[0] = valueInt;
             } else if (strncmp(partial, "adjY", 4) == 0) {
-                config->joystickBindings[joyIndex].axisAdj[1] = valueInt;         
+                config->joystickBindings[joyIndex].axisAdj[1] = valueInt;
             } else if (strncmp(partial, "btn0", 4) == 0) {
-                config->joystickBindings[joyIndex].button[0] = valueInt;         
+                config->joystickBindings[joyIndex].button[0] = valueInt;
             } else if (strncmp(partial, "btn1", 4) == 0) {
-                config->joystickBindings[joyIndex].button[1] = valueInt;         
+                config->joystickBindings[joyIndex].button[1] = valueInt;
             }
         }
     }

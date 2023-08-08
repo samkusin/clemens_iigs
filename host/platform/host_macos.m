@@ -52,6 +52,12 @@ char *get_local_user_data_directory(char *outpath, size_t outpath_size,
   return outpath;
 }
 
+char *get_local_user_config_directory(char *outpath, size_t outpath_size, const char *company_name,
+                                      const char *app_name) {
+    return get_local_user_data_directory(outpath, outpath_size, company_name, app_name);
+}
+
+
 void open_system_folder_view(const char *folder_path) {
   NSString *folder_path_string =
       [[NSString alloc] initWithCString:folder_path
