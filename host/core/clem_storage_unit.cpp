@@ -78,7 +78,8 @@ bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIn
                                              const std::string &imagePath) {
     auto asset = ClemensDiskAsset(imagePath);
     if (asset.imageType() != ClemensDiskAsset::Image2IMG &&
-        asset.imageType() != ClemensDiskAsset::ImageProDOS) {
+        asset.imageType() != ClemensDiskAsset::ImageProDOS && 
+        asset.imageType() != ClemensDiskAsset::ImageHDV) {
         smartDiskStatuses_[driveIndex].mountFailed();
         return false;
     }

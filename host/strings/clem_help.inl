@@ -16,7 +16,7 @@ First time users will be prompted to set a location where the emulator will stor
 * Ensoniq and Mockingboard (Slot 4) audio
 * Joystick
 * Save/Load snapshots
-* Most disk image formats (.2mg, .woz, .po, .do, .dsk)
+* Most disk image formats (.2mg, .woz, .po, .do, .dsk, .hdv)
 
 ## Missing Features
 

@@ -53,6 +53,7 @@ bool ClemensProDOSDisk::bind(ClemensSmartPortDevice &device, const ClemensDiskAs
         blocks_ = input;
         break;
     }
+    case ClemensDiskAsset::ImageHDV:
     case ClemensDiskAsset::ImageProDOS: {
         std::ifstream fsin(asset.path(), std::ios_base::binary);
         if (!fsin.is_open())
@@ -107,6 +108,7 @@ bool ClemensProDOSDisk::save() {
         dataStart = storage_.getHead();
         dataEnd = storage_.getTail();
         break;
+    case ClemensDiskAsset::ImageHDV:
     case ClemensDiskAsset::ImageProDOS:
         dataStart = disk_.data;
         dataEnd = disk_.data_end;
@@ -239,7 +241,7 @@ bool ClemensProDOSDisk::unserialize(mpack_reader_t *reader, ClemensSmartPortDevi
                                     storage_.getHead() + storage_.getSize()))
             return false;
 
-    } else if (imageType == ClemensDiskAsset::ImageProDOS) {
+    } else if (imageType == ClemensDiskAsset::ImageProDOS || imageType == ClemensDiskAsset::ImageHDV) {
         if (!clem_2img_generate_header(&disk_, CLEM_DISK_FORMAT_PRODOS, storage_.getHead(),
                                        storage_.getTail(), CLEM_2IMG_HEADER_BYTE_SIZE, 0))
             return false;

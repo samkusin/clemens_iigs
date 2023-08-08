@@ -65,7 +65,7 @@ unsigned createProDOSHardDisk(const std::string &path, unsigned blockCount) {
         disk.data_end = disk.data + blockCount * 512;
         if (!clem_2img_build_image(&disk, header, header + CLEM_2IMG_HEADER_BYTE_SIZE))
             return 0;
-    } else if (imageType != ClemensDiskAsset::ImageProDOS) {
+    } else if (imageType != ClemensDiskAsset::ImageProDOS && imageType != ClemensDiskAsset::ImageHDV) {
         return 0;
     }
 
