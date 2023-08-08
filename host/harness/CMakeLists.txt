@@ -24,8 +24,7 @@ target_link_libraries(clemens_test_harness
     PRIVATE clemens_host_core )
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    target_compile_definitions(clemens_iigs PRIVATE CK3D_BACKEND_GL)
-    target_link_libraries(clemens_iigs PRIVATE pthread)
+    target_link_libraries(clemens_test_harness PRIVATE pthread)
 endif()
 
 target_compile_definitions(clemens_test_harness PRIVATE JSON_NOEXCEPTION)
