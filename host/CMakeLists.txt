@@ -287,7 +287,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CLEMENS_HOMEPAGE}")
     # set(CPACK_DEBIAN_COMPRESSION_TYPE "xz")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS YES)
-    #set(CPACK_DEBIAN_PACKAGE_DEPENDS "libx11-dev,libxcursor-dev,libxi-dev,mesa-common-dev,libasound-dev,uuid-dev")
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libx11-dev,libxcursor-dev,libxi-dev,mesa-common-dev,libasound-dev,uuid-dev")
 
     # Icon and app shortcut for Linux systems
     # Note: .desktop file must have same name as executable
@@ -311,7 +311,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         RENAME com.cinekine.Clemens.png
         )
     install(FILES ${CLEMENS_ROOT_DIR}/flatpak/com.cinekine.Clemens_128.png
-        DESTINATION share/icons/hicolor/256x256/apps/
+        DESTINATION share/icons/hicolor/128x128/apps/
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
         RENAME com.cinekine.Clemens.png
         )
