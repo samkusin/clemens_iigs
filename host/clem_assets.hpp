@@ -51,6 +51,6 @@ void freeLoadedImage(uintptr_t imageId);
 
 
 
-}; // namespace ClemensHostAssets
+} // namespace ClemensHostAssets
 
 #endif

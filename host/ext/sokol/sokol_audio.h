@@ -1527,7 +1527,7 @@ error:
         _saudio.backend.device = 0;
     }
     return false;
-};
+}
 
 _SOKOL_PRIVATE void _saudio_alsa_backend_shutdown(void) {
     SOKOL_ASSERT(_saudio.backend.device);
