@@ -1,5 +1,75 @@
 # Changelog
 
+See [planned features](https://github.com/samkusin/clemens_iigs/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement) for a list of TODOs.   Feel free to add to the list.
+
+## Version 0.6
+
+### Features
+
+* User view mode where IIgs display is maximized
+* Debugger mode GUI cleaned up (may be missing some features from prior versions)
+* Snapshots and other user data now saved to a specific location set by the user
+* Removed disk import feature and redesigned disk selection GUI
+* Slot 7 (ProDOS only) hard drive emulation
+* macOS Catalina and above support
+* Gamepad support on all supported platforms
+* Fast disk emulation where the machine is sped up during read and write operations
+* Partial SCC emluation to pass diagnostic tests
+* IIgs GSOS/Finder/Toolbox mouse to host desktop tracking
+* Paste text as keyboard input (does not work correctly on GSOS)
+* Debugger bload and bsave functionality
+* Linux Flatpak
+
+### Fixes
+
+* Fixed snapshot save issues
+* Fixed Apple II hires and double hires RGB emulation issues
+* Better 640 resolution mode support (no dithering still...)
+* Better support for per scanline color
+* VGC scanline and vertical sync/IRQ handling issues fixed
+* Fixed softswitches RDMIX and STATEREG.PAGE2
+* CPU and bus clock counters all based on an ideal master frequency of 28.636 Mhz, including 1Mhz stretch cycles
+* Apple II style floating bus
+* IWM refactored to reflect changes in clock frequency handling
+* Debugger: faster instruction tracing
+* DOC/Ensoniq fixes to pass diagnostic tests
+* Audio sync and lower playback latency
+* ADB SRQ/TALK keyboard functionality and system reset
+* 16-bit DBR based read and writes on bank boundaries operate on the next bank
+* Fixed page wrap logic to only occur if DL=0 on emulation mode
+* Clear key strobe on write to c010-1f
+* Ensure shadow map on writes is valid based on the final write page (bank 0,1 relevant)
+* 3.5" read/write bit cell timing fix for copy protection on certain titles
+* WOZ CRC generation
+* RTC uses local timezone vs GMT clock
+* WAI fix
+
+### Tested Devices
+
+All 60 fps emulation when not in Fast disk mode
+
+* i5 2 core 1.4 Ghz (Ubuntu, 2011 Macbook Air 4GB)
+* i3 2 core 2.3 Ghz (macOS Catalina Hackintosh, 2016 Intel NUC6i3SYH 8GB)
+* i7 4 core (Windows 10 and Manjaro Dual Boot, 2016 i7 Desktop, 32GB)
+* i7-10750H 6 core 2.6 Ghz (Windows 11, 2021 Dell XPS 15 9500, 16GB)
+* M2 Macbook Air (macOS Ventura, 16GB)
+
+### Known Issues
+
+* GSOS boot on freshly installed hard drive images may crash to the monitor on
+  first couple startups
+  * The problem "goes away" after this  
+  * Under investigation
+* Textfunk results in MAME-like results vs KEGS and Crossrunner
+* Mockingboard emulation may slow down the system due to an inefficient VIA implementation
+
+### Planned for 0.7
+
+* French keyboards
+* Debugger improvements
+* General GUI cleanup
+
+
 ## Version 0.5
 
 * SmartPort 32MB Hard Drive on the disk port, virtual slot 2, drive 1
