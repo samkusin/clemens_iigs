@@ -3,9 +3,11 @@ name: macOS All Build
 # macOS runners are time consuming - limit when we run workflows on them to 
 # pushes or version tags
 on:
+  workflow_dispatch:
   push:
     branches: [ 'main' ]
-    tags: ['v*']
+    tags: 
+      - 'v*'
     paths: 
       - "**"
       - "!.github/**" 
