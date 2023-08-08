@@ -61,4 +61,5 @@ jobs:
         name: clemens_iigs-${{github.ref_name}}-${{runner.os}}
         path: |
           ${{github.workspace}}/build/out/*.deb
+          ${{github.workspace}}/build/out/*.rpm
           ${{github.workspace}}/build/out/*.sha256

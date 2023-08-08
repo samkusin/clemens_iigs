@@ -69,15 +69,34 @@ char *get_process_executable_path(char *outpath, size_t *outpath_size) {
     return outpath;
 }
 
-char *get_local_user_data_directory(char *outpath, size_t outpath_size, const char *company_name,
+char *get_local_user_config_directory(char *outpath, size_t outpath_size, const char *company_name,
                                     const char *app_name) {
-    //  generate ~/.var/com.<company_name>.<app_name>/data
-    const char *user_home_dir = getenv("HOME");
+    //  retrieve $XDG_CONFIG_HOME or if not found ~/.config/<company_name>
+    const char *user_home_dir = getenv("XDG_CONFIG_HOME");
     if (user_home_dir == NULL) {
         user_home_dir = getpwuid(getuid())->pw_dir;
-    }
-    snprintf(outpath, outpath_size - 1, "%s/.var/com.%s.%s/data", user_home_dir, company_name,
+        snprintf(outpath, outpath_size - 1, "%s/.config/com.%s.%s", user_home_dir, company_name,
              app_name);
+    } else {
+        snprintf(outpath, outpath_size - 1, "%s/com.%s.%s", user_home_dir, company_name,
+             app_name);
+    }
+    outpath[outpath_size - 1] = '\0';
+    return outpath;
+}
+
+char *get_local_user_data_directory(char *outpath, size_t outpath_size, const char *company_name,
+                                      const char *app_name) {
+    //  retrieve $XDG_DATA_HOME or if not found ~/.local/share/<company_name>
+    const char *user_home_dir = getenv("XDG_DATA_HOME");
+    if (user_home_dir == NULL) {
+        user_home_dir = getpwuid(getuid())->pw_dir;
+        snprintf(outpath, outpath_size - 1, "%s/.local/share/com.%s.%s", user_home_dir, company_name,
+             app_name);
+    } else {
+        snprintf(outpath, outpath_size - 1, "%s/com.%s.%s", user_home_dir, company_name,
+             app_name);
+    }
     outpath[outpath_size - 1] = '\0';
     return outpath;
 }
