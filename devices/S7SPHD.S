@@ -92,7 +92,7 @@ DriverEntry     clc
                 lda   #$80          ; fire the command
                 sta   IO_CONTROL,x
 ]retry          lda   IO_CONTROL,x  ; wait until ready
-                bmi   ]retry                
+                bmi   ]retry        
                 ror                 ; carry contains error if any
                 lda   IO_COMMAND,x  ; error code
                 pha                 ; store code onto stack
@@ -104,9 +104,12 @@ DriverEntry     clc
                 tax                 ; store aux result into X
                 lda   IO_RESULT1,y
                 tay                 ; store aux result into Y
-                pla                 ; obtain prodos result again
-                plb
+                lda   SCRNHOLE7+7
+                and   #4            ; interrupt flag ON upon entry, then skip CLI
+                bne   :exit1
                 cli
+:exit1          pla                 ; obtain prodos result again
+                plb
                 rts
 *
 * Boot validation

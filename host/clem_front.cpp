@@ -2222,6 +2222,14 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, const char 
     }
     ImGui::EndGroup();
     ImGui::PopID();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        if (driveStatus.isMounted()) {
+            ImGui::SetTooltip("%s (%s)", label,
+                              driveStatus.assetPath.c_str());
+        } else {
+            ImGui::SetTooltip("%s", label);
+        }
+    }
 }
 
 void ClemensFrontend::doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size,
