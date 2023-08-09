@@ -499,7 +499,7 @@ std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
     return result;
 }
 
-static const char *kImageTypeNames[] = {"None", "DSK", "ProDOS", "DOS", "2IMG", "WOZ", NULL};
+static const char *kImageTypeNames[] = {"None", "DSK", "ProDOS", "DOS", "2IMG", "WOZ", "HDV", NULL};
 static const char *kDiskTypeNames[] = {"None", "525", "35", "HDD", NULL};
 static const char *kErrorTypeNames[] = {"None", "Invalid", "ImageNotSupported",
                                         "VersionNotSupported", NULL};
