@@ -57,12 +57,12 @@ CMD: Read the error code until CTL is set back $00
 #define CLEM_CARD_HDD_COMMAND_FORMAT 0x03
 
 struct ClemensHddCardContext {
-    struct ClemensProdosHDD32 *hdd;
+    struct ClemensProdosHDD32 *hdd[2];
     unsigned state;
     uint8_t cmd_num;
     uint8_t unit_num;
-    uint8_t write_prot;
-    uint8_t drive_index;
+    uint8_t write_prot[2];
+    uint8_t drive_index[2];
     uint16_t dma_addr;
     uint16_t dma_offset;
     uint32_t block_num;
@@ -90,12 +90,13 @@ static void inline _clem_card_hdd_ok(struct ClemensHddCardContext *context) {
 
 static void _clem_card_hdd_command(struct ClemensHddCardContext *context) {
     uint16_t prodos_block_max;
-    if (!context->hdd) {
+    uint8_t drive_index = context->unit_num >> 7;
+    if (!context->hdd[drive_index]) {
         _clem_card_hdd_fail_idle(context, CLEM_CARD_HDD_PRODOS_ERR_NODEV);
         return;
     }
-    prodos_block_max = context->hdd->block_limit;
-    if (context->hdd->block_limit >= 0x10000) {
+    prodos_block_max = context->hdd[drive_index]->block_limit;
+    if (context->hdd[drive_index]->block_limit >= 0x10000) {
         prodos_block_max = 0xffff;
     }
     switch (context->cmd_num) {
@@ -107,8 +108,8 @@ static void _clem_card_hdd_command(struct ClemensHddCardContext *context) {
     case CLEM_CARD_HDD_COMMAND_READ:
         context->dma_offset = 0;
         context->state = CLEM_CARD_HDD_STATE_DMA_W; // write to memory from reading disk
-        context->results[CLEM_CARD_HDD_RES_0] = (*context->hdd->read_block)(
-            context->hdd->user_context, 0, context->block_num, context->block_data);
+        context->results[CLEM_CARD_HDD_RES_0] = (*context->hdd[drive_index]->read_block)(
+            context->hdd[drive_index]->user_context, 0, context->block_num, context->block_data);
         if (context->results[CLEM_CARD_HDD_RES_0] != CLEM_SMARTPORT_STATUS_CODE_OK) {
             _clem_card_hdd_fail_idle(context, CLEM_CARD_HDD_PRODOS_ERR_IO);
         }
@@ -152,16 +153,18 @@ static void io_reset(struct ClemensClock *clock, void *ctxptr) {
 static uint32_t io_sync(struct ClemensClock *clock, void *ctxptr) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(ctxptr);
     unsigned i;
+    uint8_t drive_index = context->unit_num >> 7;
     if (context->state != CLEM_CARD_HDD_STATE_FORMAT) {
         return (context->state & CLEM_CARD_HDD_STATE_DMA) ? CLEM_CARD_DMA : 0;
     }
-    if (!context->hdd) {
+    if (!context->hdd[drive_index]) {
         _clem_card_hdd_fail_idle(context, CLEM_CARD_HDD_PRODOS_ERR_NODEV);
-    } else if (context->block_num < context->hdd->block_limit) {
+    } else if (context->block_num < context->hdd[drive_index]->block_limit) {
         if (++context->dma_offset >= 64) {
             context->dma_offset = 0;
-            context->results[CLEM_CARD_HDD_RES_0] = (*context->hdd->write_block)(
-                context->hdd->user_context, 0, context->block_num, context->block_data);
+            context->results[CLEM_CARD_HDD_RES_0] = (*context->hdd[drive_index]->write_block)(
+                context->hdd[drive_index]->user_context, 0, context->block_num,
+                context->block_data);
             if (context->results[CLEM_CARD_HDD_RES_0] != CLEM_SMARTPORT_STATUS_CODE_OK) {
                 _clem_card_hdd_fail_idle(context, CLEM_CARD_HDD_PRODOS_ERR_IO);
             }
@@ -181,6 +184,7 @@ static uint32_t io_dma(uint8_t *data_bank, uint16_t *adr, uint8_t is_adr_bus, vo
     // return 1 for DMA write
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(ctxptr);
     uint32_t out;
+    uint8_t drive_index;
     if (context->dma_offset >= (uint16_t)sizeof(context->block_data)) {
         return 0; // default to read, as reading is a non-destructive event
     }
@@ -195,14 +199,16 @@ static uint32_t io_dma(uint8_t *data_bank, uint16_t *adr, uint8_t is_adr_bus, vo
             context->block_data[context->dma_offset++] = *data_bank;
         }
     }
+    drive_index = context->unit_num >> 7;
     if (context->dma_offset == (uint16_t)sizeof(context->block_data)) {
         if (context->cmd_num == CLEM_CARD_HDD_COMMAND_WRITE) {
             // commit block
-            if (context->write_prot) {
+            if (context->write_prot[drive_index]) {
                 _clem_card_hdd_fail_idle(context, CLEM_CARD_HDD_PRODOS_ERR_WPROT);
             } else {
-                context->results[CLEM_CARD_HDD_RES_0] = (*context->hdd->write_block)(
-                    context->hdd->user_context, 0, context->block_num, context->block_data);
+                context->results[CLEM_CARD_HDD_RES_0] = (*context->hdd[drive_index]->write_block)(
+                    context->hdd[drive_index]->user_context, 0, context->block_num,
+                    context->block_data);
                 if (context->results[CLEM_CARD_HDD_RES_0] != CLEM_SMARTPORT_STATUS_CODE_OK) {
                     _clem_card_hdd_fail_idle(context, CLEM_CARD_HDD_PRODOS_ERR_IO);
                 } else {
@@ -318,7 +324,8 @@ static void io_write(struct ClemensClock *clock, uint8_t data, uint8_t addr, uin
 void clem_card_hdd_initialize(ClemensCard *card) {
     struct ClemensHddCardContext *context =
         (struct ClemensHddCardContext *)calloc(1, sizeof(struct ClemensHddCardContext));
-    context->drive_index = CLEM_CARD_HDD_INDEX_NONE;
+    context->drive_index[0] = CLEM_CARD_HDD_INDEX_NONE;
+    context->drive_index[1] = CLEM_CARD_HDD_INDEX_NONE;
 
     card->context = context;
     card->io_reset = &io_reset;
@@ -342,42 +349,45 @@ void clem_card_hdd_uninitialize(ClemensCard *card) {
 
 void clem_card_hdd_mount(ClemensCard *card, ClemensProdosHDD32 *hdd, uint8_t drive_index) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
-    context->hdd = hdd;
-    context->drive_index = drive_index;
+    context->hdd[drive_index - 1] = hdd;
+    context->drive_index[drive_index - 1] = drive_index;
 }
 
-ClemensProdosHDD32* clem_card_get_mount(ClemensCard* card) {
+ClemensProdosHDD32 *clem_card_get_mount(ClemensCard *card, uint8_t drive_index) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
-    return context->hdd; 
+    return context->hdd[drive_index - 1];
 }
 
-ClemensProdosHDD32 *clem_card_hdd_unmount(ClemensCard *card) {
+ClemensProdosHDD32 *clem_card_hdd_unmount(ClemensCard *card, uint8_t drive_index) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
-    struct ClemensProdosHDD32 *hdd = context->hdd;
-    context->hdd = NULL;
-    context->drive_index = CLEM_CARD_HDD_INDEX_NONE;
+    struct ClemensProdosHDD32 *hdd = context->hdd[drive_index - 1];
+    context->hdd[drive_index - 1] = NULL;
+    context->drive_index[drive_index - 1] = CLEM_CARD_HDD_INDEX_NONE;
     return hdd;
 }
 
-unsigned clem_card_hdd_get_status(ClemensCard *card) {
+unsigned clem_card_hdd_get_status(ClemensCard *card, uint8_t drive_index) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
     unsigned status = 0;
     if (context->cmd_num == CLEM_CARD_HDD_COMMAND_READ ||
         context->cmd_num == CLEM_CARD_HDD_COMMAND_WRITE) {
-        status |= CLEM_CARD_HDD_STATUS_DRIVE_ON;
+        uint8_t cmd_drive_index = context->unit_num >> 7;
+        if (cmd_drive_index == drive_index - 1) {
+            status |= CLEM_CARD_HDD_STATUS_DRIVE_ON;
+        }
     }
     return status;
 }
 
-void clem_card_hdd_lock(ClemensCard *card, uint8_t lock) {
+void clem_card_hdd_lock(ClemensCard *card, uint8_t lock, uint8_t drive_index) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
     //  note, this will take effect on the next block write
-    context->write_prot = lock ? 1 : 0;
+    context->write_prot[drive_index - 1] = lock ? 1 : 0;
 }
 
-uint8_t clem_card_hdd_get_drive_index(ClemensCard *card) {
+uint8_t clem_card_hdd_drive_index_has_image(ClemensCard *card, uint8_t drive_index) {
     struct ClemensHddCardContext *context = (struct ClemensHddCardContext *)(card->context);
-    return context->drive_index;
+    return context->drive_index[drive_index - 1];
 }
 
 static struct ClemensSerializerRecord kCard[] = {
@@ -385,13 +395,15 @@ static struct ClemensSerializerRecord kCard[] = {
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensHddCardContext, state),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensHddCardContext, cmd_num),
     CLEM_SERIALIZER_RECORD_UINT8(struct ClemensHddCardContext, unit_num),
-    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensHddCardContext, write_prot),
-    CLEM_SERIALIZER_RECORD_UINT8(struct ClemensHddCardContext, drive_index),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensHddCardContext, kClemensSerializerTypeUInt8,
+                                 write_prot, 2, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensHddCardContext, kClemensSerializerTypeUInt8,
+                                 drive_index, 2, 0),
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensHddCardContext, dma_addr),
     CLEM_SERIALIZER_RECORD_UINT16(struct ClemensHddCardContext, dma_offset),
     CLEM_SERIALIZER_RECORD_UINT32(struct ClemensHddCardContext, block_num),
-    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensHddCardContext, kClemensSerializerTypeUInt8,
-                                 results, 4, 0),
+    CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensHddCardContext, kClemensSerializerTypeUInt8, results,
+                                 4, 0),
     CLEM_SERIALIZER_RECORD_ARRAY(struct ClemensHddCardContext, kClemensSerializerTypeUInt8,
                                  block_data, 512, 0),
     CLEM_SERIALIZER_RECORD_EMPTY()};
@@ -406,7 +418,7 @@ void clem_card_hdd_serialize(mpack_writer_t *writer, ClemensCard *card) {
 
 void clem_card_hdd_unserialize(mpack_reader_t *reader, ClemensCard *card,
                                ClemensSerializerAllocateCb alloc_cb, void *context) {
-                                    struct ClemensSerializerRecord root;
+    struct ClemensSerializerRecord root;
     memset(&root, 0, sizeof(root));
     root.type = kClemensSerializerTypeRoot;
     root.records = &kCard[0];

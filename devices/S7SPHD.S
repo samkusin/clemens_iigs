@@ -139,5 +139,5 @@ BootCommand     hex   01,70,00,08,00,00 ; READ BLK 0 S7,D1 TO $800
 SlotHiAddr      db    $C7
 IOOffset        db    $70
                 ds    $C7FE-*
-                db    $87               ; STATUS,READ,WRITE,REMOVEABLE
+                db    $97               ; 2 volumes, STATUS,READ,WRITE,REMOVEABLE
                 db    DriverEntry-SlotEntry

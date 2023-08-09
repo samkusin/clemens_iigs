@@ -8,7 +8,8 @@
 #include <array>
 #include <string>
 
-constexpr unsigned kClemensSmartPortDiskLimit = CLEM_SMARTPORT_DRIVE_LIMIT + 1;
+constexpr unsigned kClemensHardDiskLimit = 2;
+constexpr unsigned kClemensSmartPortDiskLimit = CLEM_SMARTPORT_DRIVE_LIMIT + kClemensHardDiskLimit;
 // arbitrary - unlikely to ever need more
 constexpr unsigned kClemensCardLimitPerSlot = 8;        
 
