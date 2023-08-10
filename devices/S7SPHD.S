@@ -1,7 +1,8 @@
                 org   $C700
 
-ACTIVE_PERIP_SLOT equ   $07f8
+SCRNHOLE6       equ  $0778
 SCRNHOLE7       equ  $07f8
+ACTIVE_PERIP_SLOT equ   $07f8
 BASIC           equ  $E000
 SLOOP           equ  $FABA          ; Disk controller slot search loop entry
 
@@ -33,8 +34,8 @@ SlotEntry       equ   *
                 lda   #$20
                 lda   #$00
                 lda   #$03
-                cmp   #$03          ; #$00 would be a smartport device
-                bcs   :bootEntry
+                cmp   #$00          ; #$00 would be a smartport device
+                bcs   BootEntry
 *
 * ProDOS entry point will set carry to 0 indicating a ProDOS 
 * call based on contents of $42, etc.
@@ -43,18 +44,26 @@ SlotEntry       equ   *
 * ProDOS call to read sector 0 into $800
 *
 DriverEntry     clc
-:bootEntry      phb                 ; restore data bank on exit
+                bcc   CommonEntry
+SPortEntry      sec 
+CommonEntry     php
+                pla                 ; A0 = 0 for ProDOS, 1 = SmartPort
+                and  #1  
+BootEntry       phb                 ; restore data bank on exit
                 phk
                 plb                 ; ensure bank 00 data access
+                sta   SCRNHOLE6+7   ; 0 = ProDOS, 1 = SmartPort, 3 = Boot
                 php                 ; carry flag saved along with pre-call state
                 lda   SlotHiAddr
                 sta   ACTIVE_PERIP_SLOT
                 pla                 ; save carry state for boot vs prodos exit
                 sta   SCRNHOLE7+7   ; TODO, offset by ACTIVE_PERIP_SLOT & 0xf0
-                ror                 ; check carry
-                bcc   :prodosCall
+                lda   SCRNHOLE6+7   ; check carry
+                beq   :prodosCall
+                cmp   #3
+                bne   :smartCall
 *
-* Boot mode if carry flag was set initially - which means initialize the
+* Boot mode if SCRNHOLE6+7 == 3, which means initialize the
 * ProDOS command for READ into $0800 here
 *
                 ldx   #5
@@ -93,12 +102,16 @@ DriverEntry     clc
                 sta   IO_CONTROL,x
 ]retry          lda   IO_CONTROL,x  ; wait until ready
                 bmi   ]retry        
-                ror                 ; carry contains error if any
+                bra   :checkResult
+:smartCall      lda   #1            ; error for now
+:checkResult    tay                 
                 lda   IO_COMMAND,x  ; error code
                 pha                 ; store code onto stack
-                lda   SCRNHOLE7+7
-                and   #1            ; carry bit from saved processor status
-                bne   :bootCheck
+                lda   SCRNHOLE6+7
+                cmp   #3            ; boot?
+                beq   :bootCheck
+                tya                 ; result from last IO op shifted to carry
+                ror                 
                 txy
                 lda   IO_RESULT0,y
                 tax                 ; store aux result into X
@@ -118,7 +131,9 @@ DriverEntry     clc
 *                 else jump to $801
 *   On failure, bring up error screen
 *
-:bootCheck      pla                 ; obtain prodos result from stack
+:bootCheck      tya
+                ror                 ; carry <- saved return status from IO op
+                pla                 ; obtain prodos result from stack
                 plb
                 cli
                 bcs   :bootNone
@@ -138,6 +153,9 @@ BootCommand     hex   01,70,00,08,00,00 ; READ BLK 0 S7,D1 TO $800
                 ds    $C7F0-*
 SlotHiAddr      db    $C7
 IOOffset        db    $70
-                ds    $C7FE-*
+                ds    $C7FA-*
+                db    $00
+                db    $00               ; SmartPort ID type Standard
+                ds    $C7FE-* 
                 db    $97               ; 2 volumes, STATUS,READ,WRITE,REMOVEABLE
                 db    DriverEntry-SlotEntry
