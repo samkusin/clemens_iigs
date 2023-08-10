@@ -243,7 +243,9 @@ static void io_read(struct ClemensClock *clock, uint8_t *data, uint8_t addr, uin
             break;
         case CLEM_CARD_HDD_IO_COMMAND:
             *data = context->results[CLEM_CARD_HDD_RES_ERROR];
-            context->results[CLEM_CARD_HDD_RES_ERROR] = CLEM_CARD_HDD_PRODOS_ERR_NONE;
+            if (!(flags & CLEM_OP_IO_NO_OP)) {
+                context->results[CLEM_CARD_HDD_RES_ERROR] = CLEM_CARD_HDD_PRODOS_ERR_NONE;
+            }
             break;
         case CLEM_CARD_HDD_IO_RESULT0:
             *data = context->results[CLEM_CARD_HDD_RES_0];
