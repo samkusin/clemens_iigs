@@ -18,67 +18,74 @@ IO_RESULT1      equ  $C083          ; results for status = Y
 ***************************************************************
 * Entry point for the Boot cycle of this slot
 * Bytes 01, 03, 05, have the appropriate ProDOS signature bytes
-* Some of this is 'inspired' by the existing ROM at $C500, but 
-* will not support SmartPort features on this slot for now...
+* Some of this is 'inspired' by the existing ROM at $C500.
 *
 * 'SlotEntry' - boot cycle
-* 'ProDOSEntry'- device driver entry point
-*           - $42 - command (0 = status, 1 = read, 2 = write, 
+* ':proDOSEntry'- device driver entry point
+*           - $42 - command (0 = status, 1 = read, 2 = write,
 *                            3 = format)
 *           - $43 - unit
 *           - $44, $45 - pointer to data buffer (in/out)
 *           - $46, $47 - block index
 *           (See Table 6.4 Beneath Apple ProDOS)
+* ':SPortEntry' - Smartport interface
+*           - SP + 1   - cmdnum (standard or extended)
+*           - SP + 2,3 - standard command pointer to parameter list
 ***************************************************************
 SlotEntry       equ   *
                 lda   #$20
                 lda   #$00
                 lda   #$03
                 cmp   #$00          ; #$00 would be a smartport device
-                bcs   BootEntry
+                bcs   :bootEntry    ; c=1 for boot
+
+* Some 'clever' use of the carry flag to account for where the different
+* entry points reside in the firmware.  Only a few bytes are available
+* so we leverage processor status and the stack to persist information
 *
-* ProDOS entry point will set carry to 0 indicating a ProDOS 
-* call based on contents of $42, etc.
+* Carry flag is used to differentiate between boot and device driver entry
+* points.  But we also need to differentiate between ProDOS and SmartPort calls
+* all contained within our fixed entry points.  So the Accumulator is set
+* following the CommonEntry point to 0 for ProDOS and 1 for Smarport, reflecting
+* the carry flag set in the those two entry points respectively.
 *
-* Boot entry point will set carry to 1 indicating a preset
-* ProDOS call to read sector 0 into $800
-*
-DriverEntry     clc
-                bcc   CommonEntry
-SPortEntry      sec 
-CommonEntry     php
-                pla                 ; A0 = 0 for ProDOS, 1 = SmartPort
-                and  #1  
-BootEntry       phb                 ; restore data bank on exit
+:proDOSEntry    clc                 ; c=0 for ProDOS
+                bcc   :commonEntry
+:SPortEntry     sec
+:commonEntry    php                 ; Save ProDOS vs SmartPort settings
+                pla                 ; A0: 1 = SmartPort, 0 = ProDOS Driver
+                clc                 ; carry will now be 0 for a entry call
+                eor  #1             ; A0: 1 = ProDOS Driver, 0 = SmartPort
+:bootEntry      and  #1             ; carry will be 1 for boot, A=1 for ProDOS
+                phb                 ; restore data bank on exit
                 phk
                 plb                 ; ensure bank 00 data access
-                sta   SCRNHOLE6+7   ; 0 = ProDOS, 1 = SmartPort, 3 = Boot
+                sta   SCRNHOLE6+7   ; Store SmartPort/ProDOS bool
                 php                 ; carry flag saved along with pre-call state
-                lda   SlotHiAddr
+                lda   :slotHiAddr
                 sta   ACTIVE_PERIP_SLOT
-                pla                 ; save carry state for boot vs prodos exit
-                sta   SCRNHOLE7+7   ; TODO, offset by ACTIVE_PERIP_SLOT & 0xf0
-                lda   SCRNHOLE6+7   ; check carry
-                beq   :prodosCall
-                cmp   #3
-                bne   :smartCall
+                pla                 ; save carry for boot vs entrypoint exit
+                sta   SCRNHOLE7+7
+                bcs   :bootstrap    ; see carry notes above
+                lda   SCRNHOLE6+7   ; 1 = ProDOS, 0 = SmartPort
+                bra   :setupCall
 *
-* Boot mode if SCRNHOLE6+7 == 3, which means initialize the
 * ProDOS command for READ into $0800 here
 *
-                ldx   #5
-]next           lda   BootCommand,x
+:bootstrap      ldx   #5
+]next           lda   :bootCommand,x
                 sta   ZP_PRODOS_CMD,x
                 dex
                 bpl   ]next
+                lda   #1            ; Force ProDOS Call flow
 *
 * Once this emulator specific call finishes, we have two paths to deal with
 * If Boot, then process the boot flow
-* If ProDOS call, then we exit, restoring processor state, result code, carry
+* If EntryPoint call, then we exit, restoring processor state, result code, carry
 *   indicating error or not.
 *
-* Contents on stack: DBR, RTS
-* 
+* Contents on stack at this point: DBR, RTS
+*
 * Control and Command protocol
 * CTL: write $00 to start a command (this will cancel any current command)
 * CTL: read until bit 7 is lo (ready, idle)
@@ -87,10 +94,14 @@ BootEntry       phb                 ; restore data bank on exit
 * CTL: Read where bit 7 is hi for being in progress
 *                 bit 0 is hi if error
 * CMD: Read the error code until CTL is set back $00
-:prodosCall     sei
-                ldx   IOOffset
-                stz   IO_CONTROL,x  ; start the command
-]retry          lda   IO_CONTROL,x  ; wait until ready      
+
+* A = 0 (SmartPort), 1 (ProDOS)
+:setupCall      sei
+                ldx   :IOOffset
+                cmp   #1
+                bne   :smartCall
+:prodosCall     stz   IO_CONTROL,x  ; start the command
+]retry          lda   IO_CONTROL,x  ; wait until ready
                 bmi   ]retry
                 ldy   #0            ; copy command bytes
 ]next           lda   ZP_PRODOS_CMD,y
@@ -98,20 +109,48 @@ BootEntry       phb                 ; restore data bank on exit
                 iny
                 cpy   #6
                 bne   ]next
-                lda   #$80          ; fire the command
+                bra   :execCommand
+:smartCall      lda   #1
+                sta   IO_CONTROL,x  ; Setup a SmartPort call
+]retry          lda   IO_CONTROL,x
+                bmi   ]retry
+* ZP_PRODOS_CMD ($42,$43) will be used for accessing the CMDLIST
+                lda   ZP_PRODOS_CMD
+                pha
+                lda   ZP_PRODOS_CMD+1
+                pha
+                ldy   #0
+                lda   (4,S),y           ; command num
+                sta   IO_COMMAND,x
+                iny
+                lda   (4,S),y           ; cmdlist (lo)
+                sta   ZP_PRODOS_CMD
+                iny
+                lda   (4,S),y           ; cmdlist (hi)
+                sta   ZP_PRODOS_CMD+1
+                ldy   #0
+]next           lda   (ZP_PRODOS_CMD),y ; read command list
+                sta   IO_COMMAND,x      ; write command bytes
+                iny
+                lda   IO_CONTROL,x      ; bit 7 means command is not done
+                bmi   ]next
+                pla
+                sta   ZP_PRODOS_CMD+1
+                pla
+                sta   ZP_PRODOS_CMD
+* common fire and wait for result
+:execCommand    lda   #$80          ; fire the command
                 sta   IO_CONTROL,x
 ]retry          lda   IO_CONTROL,x  ; wait until ready
-                bmi   ]retry        
-                bra   :checkResult
-:smartCall      lda   #1            ; error for now
-:checkResult    tay                 
+                bmi   ]retry
+:checkResult    tay
                 lda   IO_COMMAND,x  ; error code
                 pha                 ; store code onto stack
-                lda   SCRNHOLE6+7
-                cmp   #3            ; boot?
-                beq   :bootCheck
+                lda   SCRNHOLE7+7
+                and   #1            ; boot?
+                bne   :bootCheck
                 tya                 ; result from last IO op shifted to carry
-                ror                 
+                ror
                 txy
                 lda   IO_RESULT0,y
                 tax                 ; store aux result into X
@@ -121,7 +160,7 @@ BootEntry       phb                 ; restore data bank on exit
                 and   #4            ; interrupt flag ON upon entry, then skip CLI
                 bne   :exit1
                 cli
-:exit1          pla                 ; obtain prodos result again
+:exit1          pla                 ; obtain error code again
                 plb
                 rts
 *
@@ -149,13 +188,13 @@ BootEntry       phb                 ; restore data bank on exit
                 bne   :bootExit
                 jmp   SLOOP
 :bootExit       jmp   BASIC
-BootCommand     hex   01,70,00,08,00,00 ; READ BLK 0 S7,D1 TO $800
+:bootCommand    hex   01,70,00,08,00,00 ; READ BLK 0 S7,D1 TO $800
                 ds    $C7F0-*
-SlotHiAddr      db    $C7
-IOOffset        db    $70
+:slotHiAddr     db    $C7
+:IOOffset       db    $70
                 ds    $C7FA-*
                 db    $00
                 db    $00               ; SmartPort ID type Standard
-                ds    $C7FE-* 
+                ds    $C7FE-*
                 db    $97               ; 2 volumes, STATUS,READ,WRITE,REMOVEABLE
-                db    DriverEntry-SlotEntry
+                db    :proDOSEntry-SlotEntry

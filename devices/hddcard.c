@@ -1,5 +1,6 @@
 #include "hddcard.h"
 #include "clem_shared.h"
+#include "clem_smartport.h"
 #include "prodos_hdd32.h"
 #include "slot7hdd_firmware.h"
 
@@ -9,12 +10,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CLEM_CARD_HDD_STATE_IDLE    0x00
-#define CLEM_CARD_HDD_STATE_COMMAND 0x01
-#define CLEM_CARD_HDD_STATE_DMA_W   0x02
-#define CLEM_CARD_HDD_STATE_DMA_R   0x04
-#define CLEM_CARD_HDD_STATE_DMA     (CLEM_CARD_HDD_STATE_DMA_W + CLEM_CARD_HDD_STATE_DMA_R)
-#define CLEM_CARD_HDD_STATE_FORMAT  0x08
+#define CLEM_CARD_HDD_STATE_IDLE      0x00
+#define CLEM_CARD_HDD_STATE_COMMAND   0x01
+#define CLEM_CARD_HDD_STATE_DMA_W     0x02
+#define CLEM_CARD_HDD_STATE_DMA_R     0x04
+#define CLEM_CARD_HDD_STATE_DMA       (CLEM_CARD_HDD_STATE_DMA_W + CLEM_CARD_HDD_STATE_DMA_R)
+#define CLEM_CARD_HDD_STATE_FORMAT    0x08
+#define CLEM_CARD_HDD_STATE_SMARTPORT 0x10
 
 /*
 + 0x70 for slot 7
@@ -56,17 +58,43 @@ CMD: Read the error code until CTL is set back $00
 #define CLEM_CARD_HDD_COMMAND_WRITE  0x02
 #define CLEM_CARD_HDD_COMMAND_FORMAT 0x03
 
+#define CLEM_CARD_HDD_MISC_SMARTPORT_COMMAND_READY 0x80
+
+struct ClemensHddCardSmartPortStatus {
+    uint16_t status_list_ptr;
+    uint8_t status_code;
+};
+
+struct ClemensHddCardSmartPortBlockIO {
+    uint16_t buffer_ptr;
+    unsigned block_num;
+};
+
+struct ClemensHddCardSmartPortControl {
+    uint16_t control_list_ptr;
+    uint8_t code;
+};
+
+union ClemensHddCardSmartPort {
+    struct ClemensHddCardSmartPortStatus status;
+    struct ClemensHddCardSmartPortBlockIO blockio;
+    struct ClemensHddCardSmartPortControl control;
+};
+
 struct ClemensHddCardContext {
     struct ClemensProdosHDD32 *hdd[2];
     unsigned state;
     uint8_t cmd_num;
     uint8_t unit_num;
+    uint8_t smartport_param_cnt;
+    uint8_t smartport_param_byte;
     uint8_t write_prot[2];
     uint8_t drive_index[2];
     uint16_t dma_addr;
     uint16_t dma_offset;
     uint32_t block_num;
     uint8_t results[4]; // used for returning results in IO_RESULT0/1, error code
+    union ClemensHddCardSmartPort smartport; // see cmd_num for selection
     uint8_t block_data[512];
 };
 
@@ -131,6 +159,35 @@ static void _clem_card_hdd_command(struct ClemensHddCardContext *context) {
         break;
     default:
         _clem_card_hdd_fail_idle(context, CLEM_CARD_HDD_PRODOS_ERR_IO);
+        break;
+    }
+}
+
+static void _clem_card_hdd_smartport(struct ClemensHddCardContext *context) {}
+
+static void _clem_card_hdd_setup_smartport(struct ClemensHddCardContext *context, uint8_t data) {
+    switch (context->cmd_num) {
+    case CLEM_SMARTPORT_COMMAND_STATUS:
+        if (context->smartport_param_byte == 0) {
+            context->smartport.status.status_list_ptr = data;
+        } else if (context->smartport_param_byte == 1) {
+            context->smartport.status.status_list_ptr |= ((uint16_t)(data) << 8);
+            context->smartport_param_cnt--;
+        } else if (context->smartport_param_byte == 2) {
+            context->smartport.status.status_code = data;
+            context->smartport_param_cnt--;
+        }
+        context->smartport_param_byte++;
+        break;
+    case CLEM_SMARTPORT_COMMAND_READBLOCK:
+        break;
+    case CLEM_SMARTPORT_COMMAND_WRITEBLOCK:
+        break;
+    case CLEM_SMARTPORT_COMMAND_FORMAT:
+        break;
+    case CLEM_SMARTPORT_COMMAND_CONTROL:
+        break;
+    case CLEM_SMARTPORT_COMMAND_INIT:
         break;
     }
 }
@@ -266,11 +323,16 @@ static void io_write(struct ClemensClock *clock, uint8_t data, uint8_t addr, uin
         switch (addr) {
         case CLEM_CARD_HDD_IO_CONTROL:
             if (context->state == CLEM_CARD_HDD_STATE_IDLE) {
-                context->state = CLEM_CARD_HDD_STATE_COMMAND;
+                context->state =
+                    !data ? CLEM_CARD_HDD_STATE_COMMAND : CLEM_CARD_HDD_STATE_SMARTPORT;
                 context->cmd_num = CLEM_CARD_HDD_COMMAND_STATUS;
                 context->unit_num = 0x00;
+                context->smartport_param_cnt = 0xff;
+                context->smartport_param_byte = 0x00;
                 context->results[CLEM_CARD_HDD_RES_MISC] = 0x00;
             } else if (context->state == CLEM_CARD_HDD_STATE_COMMAND) {
+                //  firmware sets data == 0x80, but since this is a state machine
+                //  we can just handle writes
                 if (context->results[CLEM_CARD_HDD_RES_MISC] == 0x06) {
                     //  fire!
                     _clem_card_hdd_command(context);
@@ -278,6 +340,16 @@ static void io_write(struct ClemensClock *clock, uint8_t data, uint8_t addr, uin
                     //  command not well formed
                     _clem_card_hdd_fail_idle(context, CLEM_CARD_HDD_PRODOS_ERR_IO);
                 }
+            } else if (context->state == CLEM_CARD_HDD_STATE_SMARTPORT) {
+                if (context->results[CLEM_CARD_HDD_RES_MISC] >=
+                    CLEM_CARD_HDD_MISC_SMARTPORT_COMMAND_READY) {
+                    //  fire!
+                    _clem_card_hdd_smartport(context);
+                } else {
+                    //  command not well formed
+                    _clem_card_hdd_fail_idle(context, CLEM_SMARTPORT_STATUS_CODE_BUS_ERR);
+                }
+
             } else {
                 //  can interrupt operation if a command is in progress
                 _clem_card_hdd_ok(context);
@@ -314,6 +386,28 @@ static void io_write(struct ClemensClock *clock, uint8_t data, uint8_t addr, uin
                     break;
                 }
                 ++context->results[CLEM_CARD_HDD_RES_MISC];
+            } else if (context->state == CLEM_CARD_HDD_STATE_SMARTPORT) {
+                switch (context->results[CLEM_CARD_HDD_RES_MISC]) {
+                case 0: //  command
+                    context->cmd_num = data;
+                    break;
+                case 1: //  parameter count
+                    context->smartport_param_cnt = data;
+                    break;
+                case 2: //  unit number
+                    context->unit_num = data;
+                    context->smartport_param_cnt--;
+                    break;
+                default:
+                    _clem_card_hdd_setup_smartport(context, data);
+                    break;
+                }
+                if (context->smartport_param_cnt > 0) {
+                    ++context->results[CLEM_CARD_HDD_RES_MISC];
+                } else {
+                    context->results[CLEM_CARD_HDD_RES_MISC] =
+                        CLEM_CARD_HDD_MISC_SMARTPORT_COMMAND_READY;
+                }
             }
             break;
         case CLEM_CARD_HDD_IO_RESULT0: // nop
