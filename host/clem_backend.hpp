@@ -156,6 +156,8 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     std::unique_ptr<ClemensAppleIIGS> GS_;
     bool gsConfigUpdated_;
 
+    //  TODO: replace interpreter with a language backend... there are options!
+    std::vector<uint8_t> interpreterData_;
     ClemensInterpreter interpreter_;
     std::vector<ClemensBackendOutputText> logOutput_;
     std::vector<ClemensBackendBreakpoint> breakpoints_;

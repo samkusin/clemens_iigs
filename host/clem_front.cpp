@@ -630,6 +630,8 @@ ClemensFrontend::~ClemensFrontend() {
     audio_.stop();
     clem_joystick_close_devices();
 
+    config_.save();
+
     free(frameReadMemory_.getHead());
 }
 
