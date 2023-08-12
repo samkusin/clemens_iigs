@@ -35,7 +35,7 @@ unsigned calculateSlabHeapSize() {
 
 static ClemensCard *findHddCard(ClemensMMIO &mmio, unsigned driveIndex) {
     //  Drive Index maps to a card port device vs smartport?
-    if (driveIndex == 0x00 || driveIndex == CLEM_CARD_HDD_INDEX_NONE)
+    if (driveIndex == 0x00)
         return NULL;
     //  TODO: woe if we support two hdd cards... will need to rethink in that extreme edge case
     for (unsigned i = 0; i < CLEM_CARD_SLOT_COUNT; ++i) {
@@ -84,6 +84,8 @@ bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIn
         smartDiskStatuses_[driveIndex].mountFailed();
         return false;
     }
+
+    ejectSmartPortDisk(mmio, driveIndex);
 
     struct ClemensSmartPortDevice device {};
     smartDiskAssets_[driveIndex] = asset;
@@ -151,9 +153,6 @@ ClemensDrive *ClemensStorageUnit::getDrive(ClemensMMIO &mmio, ClemensDriveType d
     ClemensDrive *drive = clemens_drive_get(&mmio, driveType);
     if (!drive)
         return NULL;
-    if (diskStatuses_[driveType].isMounted()) {
-        ejectDisk(mmio, driveType);
-    }
     return drive;
 }
 
@@ -162,7 +161,7 @@ bool ClemensStorageUnit::insertDisk(ClemensMMIO &mmio, ClemensDriveType driveTyp
     ClemensDrive *drive = getDrive(mmio, driveType);
     if (!drive)
         return false;
-
+    ejectDisk(mmio, driveType);
     std::ifstream input(path, std::ios_base::in | std::ios_base::binary);
     if (!input.is_open()) {
         diskStatuses_[driveType].mountFailed();
@@ -193,6 +192,8 @@ bool ClemensStorageUnit::insertDisk(ClemensMMIO &mmio, ClemensDriveType driveTyp
         return false;
     }
     input.close();
+
+    ejectDisk(mmio, driveType);
 
     return mountDisk(mmio, path, driveType, decodeBuffer_.getRange());
 }
@@ -506,14 +507,9 @@ bool ClemensStorageUnit::unserialize(ClemensMMIO &mmio, mpack_reader_t *reader,
             //  CardPort disks
             ClemensCard *card = findHddCard(mmio, i);
             if (card) {
-                uint8_t cardIndex = clem_card_hdd_drive_index_has_image(card, 1);
-                if (cardIndex != CLEM_CARD_HDD_INDEX_NONE) {
+                uint8_t hasImage = clem_card_hdd_drive_index_has_image(card, i);
+                if (hasImage) {
                     //  don't mount if the image doesn't exist?
-                    if (cardIndex != (uint8_t)i) {
-                        spdlog::warn("ClemensStorageUnit::unserialize() - card_index({}) != "
-                                     "drive_index({}). Using drive index!",
-                                     cardIndex, i);
-                    }
                     clem_card_hdd_mount(card, &smartDisks_[i].getInterface(), (uint8_t)i);
                     smartDiskStatuses_[i].mount(smartDiskAssets_[i].path(),
                                                 ClemensDiskDriveStatus::Origin::CardPort);

@@ -84,7 +84,7 @@ static uint8_t _do_status(struct ClemensSmartPortDevice *context,
         packet->contents[clen++] = ' ';
         packet->contents[clen++] = ' ';
         packet->contents[clen++] = 0x02; /* Pro-File Hard Disk? */
-        packet->contents[clen++] = 0x00; /* that supports ejecting? */
+        packet->contents[clen++] = 0x00; /* TODO: disk switch */
         packet->contents[clen++] = 0x01; /* firmware version */
         packet->contents[clen++] = 0x00;
         packet->contents_length = clen;

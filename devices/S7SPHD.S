@@ -119,8 +119,9 @@ SlotEntry       equ   *
                 pha
                 lda   ZP_PRODOS_CMD+1
                 pha
-                ldy   #0
-                lda   (4,S),y           ; command num
+* S = DBR,$42,$43 (+1) from stack containing the return address
+                ldy   #1
+                lda   (4,S),y           ; command num at (return address + 1)+y
                 sta   IO_COMMAND,x
                 iny
                 lda   (4,S),y           ; cmdlist (lo)
@@ -134,6 +135,13 @@ SlotEntry       equ   *
                 iny
                 lda   IO_CONTROL,x      ; bit 7 means command is not done
                 bmi   ]next
+                lda   4,S               ; +3 to return address to skip params
+                clc
+                adc   #3                ; carry set, then add to hi byte
+                sta   4,S
+                lda   #0
+                adc   5,S
+                sta   5,S
                 pla
                 sta   ZP_PRODOS_CMD+1
                 pla

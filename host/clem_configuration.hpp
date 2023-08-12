@@ -24,7 +24,7 @@ namespace ClemensHostStyle {
     constexpr float kSideBarMinWidth = 160.0f;
     constexpr int kScreenWidth = 720;
     constexpr int kScreenHeight = 480;
-    constexpr int kDiskTrayHeight = 360;
+    constexpr int kDiskTrayHeight = 320;
 }
 
 struct ClemensJoystickBindings {
