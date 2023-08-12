@@ -51,6 +51,7 @@ in the emulation that have not been found yet.
 - Defender of the Crown
 - The Bards Tale I
 - Rastan
+- Where in the World is Carmen Sandiego
 
 ## Roadmap <a name="roadmap"></a>
 
