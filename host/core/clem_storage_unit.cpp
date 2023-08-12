@@ -140,8 +140,8 @@ bool ClemensStorageUnit::ejectSmartPortDisk(ClemensMMIO &mmio, unsigned driveInd
             device.device_id = CLEM_SMARTPORT_DEVICE_ID_PRODOS_HDD32;
         }
     }
-    saveSmartPortDisk(mmio, driveIndex);
     if (device.device_data != NULL) {
+        //  This will save the disk
         smartDisks_[driveIndex].release(device);
     }
     smartDiskStatuses_[driveIndex].unmount();
