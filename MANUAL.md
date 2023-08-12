@@ -40,6 +40,18 @@ with a rich user frontend.
 - Paste text as keyboard input (at the BASIC/Monitor prompts)
 - Debugging facilities (partial)
 
+### Tested
+
+These IIgs titles were tested by frequent use.  There may still be glitches or bugs
+in the emulation that have not been found yet.
+
+- GSOS 5.x, 6.x
+- ProDOS 8/16
+- Kings Quest I, IV
+- Defender of the Crown
+- The Bards Tale I
+- Rastan
+
 ## Roadmap <a name="roadmap"></a>
 
 - Serial/terminal emulation
@@ -282,6 +294,22 @@ Type 'h' to display a list of commands in the console.
 
 ## Troubleshooting <a name="troubleshooting"></a>
 
+### Disk Selection
+> Where do I get disks and ROMs from?
+
+Clemens like all emulators operates on disk image files.  There are several websites that offer such images.  Reputable sites include the long running [Asimov Site](https://mirrors.apple2.org.za/ftp.apple.asimov.net/) and [What is the Apple IIgs](https://www.whatisthe2gs.apple2.org.za/).
+
+You can also find ROM files on these sites.
+
+A collection of IIgs software was released from **What is the Apple IIgs** located at the [Ninjaforce site](https://www.ninjaforce.com/downloads/wita2gs_0_70.zip)
+
+
+### Using the "What is the Apple IIgs" Launcher
+> Clemens only supports two hard drive slots, but WITA has at least seven HDD images.  Is is possible to use the launcher and have access to all of these games?
+
+Yes but it involves some disk switching.  When prompted by the launcher to insert a hard disk, you can just eject any hard disk in a S7 disk slot and insert the image you want.  A later version of Clemens will support more hard drives.
+
+
 ## Missing Features <a name="known-issues"></a>
 
 * ROM 1 support
@@ -294,3 +322,11 @@ Type 'h' to display a list of commands in the console.
 * ROM 3 Mouse ADB Keypad emulation
 * SHK, BXY disk image support
 
+### Titles
+
+* *Ninjaforce Demo*
+  * Bit 17 address shadowing not implemented
+* *Tass Times in Tonetown* crashes at splash screen
+* *Dungeon Master* 
+  * Audio glitches
+  * Partial GUI
