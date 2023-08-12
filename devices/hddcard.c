@@ -155,6 +155,7 @@ static void _clem_card_hdd_command(struct ClemensHddCardContext *context) {
         context->block_num = 0;
         // used to count current line (8 byte string) in 512 byte block
         context->dma_offset = 0;
+        context->dma_size = 512;
         memset(context->block_data, 0, sizeof(context->block_data));
         context->state = CLEM_CARD_HDD_STATE_FORMAT;
         break;
@@ -335,7 +336,13 @@ static void _clem_card_hdd_smartport(struct ClemensHddCardContext *context) {
         break;
     case CLEM_SMARTPORT_COMMAND_FORMAT:
         CLEM_LOG("hddcard: smartport %02x FORMAT", context->unit_num);
-        _clem_card_hdd_fail_idle(context, CLEM_SMARTPORT_STATUS_CODE_BUS_ERR);
+        // used as our block index until we hit block limit
+        context->block_num = 0;
+        // used to count current line (8 byte string) in 512 byte block
+        context->dma_offset = 0;
+        context->dma_size = 512;
+        memset(context->block_data, 0, sizeof(context->block_data));
+        context->state = CLEM_CARD_HDD_STATE_FORMAT;
         break;
     case CLEM_SMARTPORT_COMMAND_INIT:
         CLEM_LOG("hddcard: smartport %02x INIT", context->unit_num);
