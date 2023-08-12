@@ -43,6 +43,7 @@ See [planned features](https://github.com/samkusin/clemens_iigs/issues?q=is%3Ais
 * WOZ CRC generation
 * RTC uses local timezone vs GMT clock
 * WAI fix
+* Removed s2d1 (IWM smartport) GUI (experimental feature still not fully developed)
 
 ### Tested Devices
 

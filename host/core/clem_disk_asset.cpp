@@ -99,7 +99,8 @@ const char *ClemensDiskAsset::imageName(ImageType imageType) {
                                        "PO - ProDOS Order Image",
                                        "DO - DOS Order Image",
                                        "2MG - IIGS Image",
-                                       "WOZ - v2 Applesauce"};
+                                       "WOZ - v2 Applesauce",
+                                       "HDV - Virtual HD (ProDOS)"};
     return imageNames[static_cast<int>(imageType)];
 }
 
@@ -116,6 +117,8 @@ auto ClemensDiskAsset::fromAssetPathUsingExtension(const std::string &assetPath)
         imageType = Image2IMG;
     } else if (extension == ".woz" || extension == ".WOZ") {
         imageType = ImageWOZ;
+    } else if (extension == ".hdv" || extension == ".HDV") {
+        imageType = ImageHDV;
     }
     return imageType;
 }
@@ -231,6 +234,7 @@ cinek::ConstRange<uint8_t> ClemensDiskAsset::createBlankDiskImage(ImageType imag
     case ImageDOS:
     case ImageDSK:
     case ImageProDOS:
+    case ImageHDV:
         break;
     case ImageNone:
         error = true;
@@ -316,7 +320,8 @@ ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveTyp
         }
         break;
     }
-    case ImageProDOS: {
+    case ImageProDOS: 
+    case ImageHDV: {
         struct Clemens2IMGDisk disk {};
         if (clem_2img_generate_header(&disk, CLEM_DISK_FORMAT_PRODOS, sourceDataPtr,
                                       sourceDataPtrEnd, 0, 0)) {
@@ -456,6 +461,7 @@ std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
         }
         break;
     case ImageProDOS:
+    case ImageHDV:
     case ImageDOS:
     case ImageDSK:
         if (std::holds_alternative<Clemens2IMGDisk>(metadata_)) {
@@ -493,7 +499,7 @@ std::pair<size_t, bool> ClemensDiskAsset::decode(uint8_t *out, uint8_t *outEnd,
     return result;
 }
 
-static const char *kImageTypeNames[] = {"None", "DSK", "ProDOS", "DOS", "2IMG", "WOZ", NULL};
+static const char *kImageTypeNames[] = {"None", "DSK", "ProDOS", "DOS", "2IMG", "WOZ", "HDV", NULL};
 static const char *kDiskTypeNames[] = {"None", "525", "35", "HDD", NULL};
 static const char *kErrorTypeNames[] = {"None", "Invalid", "ImageNotSupported",
                                         "VersionNotSupported", NULL};

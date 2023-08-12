@@ -69,6 +69,8 @@ bool ClemensAssetBrowser::onCreateRecord(const std::filesystem::directory_entry 
         } else {
             isSmartPortDrive = true;
         }
+    } else if (extension == ".hdv") {
+        isSmartPortDrive = true;
     } else if (extension == ".2mg") {
         auto cnt =
             readDiskImageHeaderBytes(direntry.path(), headerData, CLEM_2IMG_HEADER_BYTE_SIZE);
@@ -218,6 +220,10 @@ auto ClemensAssetBrowser::onExtraSelectionUI(ImVec2 dimensions,
                         createDiskImageType_ = ClemensDiskAsset::ImageProDOS;
                     }
                     if (ImGui::Selectable(
+                            ClemensDiskAsset::imageName(ClemensDiskAsset::ImageHDV))) {
+                        createDiskImageType_ = ClemensDiskAsset::ImageHDV;
+                    }
+                    if (ImGui::Selectable(
                             ClemensDiskAsset::imageName(ClemensDiskAsset::Image2IMG))) {
                         createDiskImageType_ = ClemensDiskAsset::Image2IMG;
                     }
@@ -251,6 +257,9 @@ auto ClemensAssetBrowser::onExtraSelectionUI(ImVec2 dimensions,
                     break;
                 case ClemensDiskAsset::ImageProDOS:
                     fileName.replace_extension(".po");
+                    break;
+                case ClemensDiskAsset::ImageHDV:
+                    fileName.replace_extension(".hdv");
                     break;
                 case ClemensDiskAsset::ImageWOZ:
                     fileName.replace_extension(".woz");

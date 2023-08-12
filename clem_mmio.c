@@ -136,7 +136,7 @@ static inline void _clem_mmio_newvideo_c029_set(ClemensMMIO *mmio, uint8_t value
         } else {
             clem_vgc_clear_mode(&mmio->vgc, CLEM_VGC_SUPER_HIRES);
         }
-        CLEM_LOG("clem_mem: c029 super hires = %u",
+        CLEM_DEBUG("clem_mem: c029 super hires = %u",
                  (value & CLEM_MMIO_NEWVIDEO_SUPERHIRES_ENABLE) != 0);
         setflags ^= CLEM_MMIO_NEWVIDEO_SUPERHIRES_ENABLE;
     }

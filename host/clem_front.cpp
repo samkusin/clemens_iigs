@@ -630,6 +630,8 @@ ClemensFrontend::~ClemensFrontend() {
     audio_.stop();
     clem_joystick_close_devices();
 
+    config_.save();
+
     free(frameReadMemory_.getHead());
 }
 
@@ -1871,8 +1873,11 @@ void ClemensFrontend::doMachineDiskDisplay(float width) {
     ImGui::Spacing();
     doMachineSmartDriveStatus(1, "s7d1", true, true);
     ImGui::Separator();
-    //  TODO: don't allow hotswapping smartport drives yet.
-    doMachineSmartDriveStatus(0, "smart", !isBackendRunning(), false);
+    doMachineSmartDriveStatus(2, "s7d2", true, true);
+    ImGui::Separator();
+    //  TODO: Support IWM smartport devices once the ProDOSHDD32 can be removeable like
+    //        it's implemented in the hddcard interface
+    // doMachineSmartDriveStatus(0, "s2d1", !isBackendRunning(), false);
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -2222,6 +2227,14 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, const char 
     }
     ImGui::EndGroup();
     ImGui::PopID();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        if (driveStatus.isMounted()) {
+            ImGui::SetTooltip("%s (%s)", label,
+                              driveStatus.assetPath.c_str());
+        } else {
+            ImGui::SetTooltip("%s", label);
+        }
+    }
 }
 
 void ClemensFrontend::doMachineDiskMotorStatus(const ImVec2 &pos, const ImVec2 &size,

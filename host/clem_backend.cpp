@@ -160,7 +160,8 @@ void ClemensRunSampler::update(clem_clocks_duration_t clocksSpent, unsigned cycl
 
 ClemensBackend::ClemensBackend(std::string romPath, const Config &config)
     : config_(config), gsConfigUpdated_(false),
-      interpreter_(cinek::FixedStack(kInterpreterMemorySize, malloc(kInterpreterMemorySize))),
+      interpreterData_(kInterpreterMemorySize),
+      interpreter_(cinek::FixedStack(kInterpreterMemorySize, interpreterData_.data())),
       breakpoints_(std::move(config_.breakpoints)), logLevel_(config_.logLevel),
       debugMemoryPage_(0x00), areInstructionsLogged_(false), stepsRemaining_(0),
       clocksRemainingInTimeslice_(0) {
