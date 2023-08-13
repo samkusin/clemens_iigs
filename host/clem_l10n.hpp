@@ -51,6 +51,11 @@ extern const char* kLabelJoystick2Help[];
 extern const char* kButtonJoystickButton1[];
 extern const char* kButtonJoystickButton2[];
 
+//  shortcuts
+extern const char *kHybridModeShortCutText[];
+extern const char *kLockMouseShortCutText[];
+extern const char *kTogglePauseText[];
+
 constexpr unsigned kLanguageDefault = 0;
 
 } // namespace ClemensL10N
