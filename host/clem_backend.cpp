@@ -144,9 +144,9 @@ void ClemensRunSampler::update(clem_clocks_duration_t clocksSpent, unsigned cycl
     vblsBuffer.push(emulatorVblsPerFrame);
     sampledVblsSpent += emulatorVblsPerFrame;
     if (fastModeEnabled) {
-        if (sampledFramesPerSecond > 45.0) {
+        if (sampledFramesPerSecond > 55.0) {
             emulatorVblsPerFrame += 1;
-        } else if (sampledFramesPerSecond < 35.0) {
+        } else if (sampledFramesPerSecond < 45.0) {
             emulatorVblsPerFrame -= 1;
         }
         if (emulatorVblsPerFrame < 1)
