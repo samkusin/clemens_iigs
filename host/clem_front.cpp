@@ -914,7 +914,8 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         !browseDriveType_.has_value() && !browseSmartDriveIndex_.has_value();
     if (!interop.nativeMenu) {
         doMainMenu(interfaceAnchor, interop);
-        interop.minWindowHeight += ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().WindowBorderSize;
+        interop.minWindowHeight +=
+            ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().WindowBorderSize;
     }
     switch (interop.action) {
     case ClemensHostInterop::About:
@@ -975,7 +976,13 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         break;
     case ClemensHostInterop::ContinueExecution:
         backendQueue_.run();
-        break;           
+        break;
+    case ClemensHostInterop::DisableFastMode:
+        backendQueue_.fastMode(false);
+        break;
+    case ClemensHostInterop::EnableFastMode:
+        backendQueue_.fastMode(true);
+        break;
     case ClemensHostInterop::None:
         break;
     }
@@ -1095,6 +1102,7 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         !mouseInEmulatorScreen_ || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
     interop.debuggerOn = config_.hybridInterfaceEnabled;
     interop.running = frameReadState_.isRunning;
+    interop.fastMode = lastCommandState_.isFastModeOn;
 
     return getViewType();
 }
@@ -1218,7 +1226,7 @@ void ClemensFrontend::processBackendResult(const ClemensBackendResult &result) {
 }
 
 void ClemensFrontend::doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
-                                          ClemensHostInterop& interop,
+                                          ClemensHostInterop &interop,
                                           const ViewToMonitorTranslation &viewToMonitor,
                                           double /*deltaTime*/) {
     const ImGuiStyle &kMainStyle = ImGui::GetStyle();
@@ -1278,8 +1286,6 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
     doSidePanelLayout(kSideBarAnchor, kSideBarSize);
     doInfoStatusLayout(kInfoStatusAnchor, kInfoStatusSize, kMonitorViewAnchor.x);
     ImGui::PopStyleColor(7);
-
-
 }
 
 void ClemensFrontend::doDebuggerLayout(ImVec2 anchor, ImVec2 dimensions,
@@ -1394,15 +1400,15 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
                 }
             } else {
                 if (frameReadState_.isRunning) {
-                     if (ImGui::MenuItem("Pause", CLEM_L10N_LABEL(kTogglePauseText), false,
-                                    !isEmulatorStarting())) {
-                    interop.action = ClemensHostInterop::PauseExecution;
-                }
+                    if (ImGui::MenuItem("Pause", CLEM_L10N_LABEL(kTogglePauseText), false,
+                                        !isEmulatorStarting())) {
+                        interop.action = ClemensHostInterop::PauseExecution;
+                    }
                 } else {
                     if (ImGui::MenuItem("Run", CLEM_L10N_LABEL(kTogglePauseText), false,
-                                    !isEmulatorStarting())) {
-                    interop.action = ClemensHostInterop::ContinueExecution;
-                }
+                                        !isEmulatorStarting())) {
+                        interop.action = ClemensHostInterop::ContinueExecution;
+                    }
                 }
                 if (ImGui::MenuItem("Reboot", NULL, false,
                                     isBackendRunning() && !isEmulatorStarting())) {
@@ -1694,10 +1700,17 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
 
     ImGui::SameLine(anchor.x + dimensions.x - resetStatusWidth - fpsStatusWidth -
                     style.ItemSpacing.x);
-
+    float runSpeedMhz = 0.0f;
+    if (isBackendRunning()) {
+        if (lastCommandState_.isFastEmulationOn) {
+            runSpeedMhz = frameReadState_.emulationSpeedMhz;
+        } else {
+            runSpeedMhz = frameReadState_.machineSpeedMhz;
+        }
+    }
     ClemensHostImGui::StatusBarField(isResetDown ? ClemensHostImGui::StatusBarFlags_Active
                                                  : ClemensHostImGui::StatusBarFlags_Inactive,
-                                     "%5.2f mhz", isBackendRunning() ? frameReadState_.machineSpeedMhz : 0.0f);
+                                     "%5.2f mhz",runSpeedMhz);
 
     ImGui::SameLine(anchor.x + dimensions.x - resetStatusWidth);
     ClemensHostImGui::StatusBarField(isResetDown ? ClemensHostImGui::StatusBarFlags_Active
@@ -2275,8 +2288,7 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, const char 
     ImGui::PopID();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
         if (driveStatus.isMounted()) {
-            ImGui::SetTooltip("%s (%s)", label,
-                              driveStatus.assetPath.c_str());
+            ImGui::SetTooltip("%s (%s)", label, driveStatus.assetPath.c_str());
         } else {
             ImGui::SetTooltip("%s", label);
         }
@@ -3298,7 +3310,8 @@ void ClemensFrontend::doJoystickConfig(ImVec2 anchor, ImVec2 dimensions) {
             auto &bindings = config_.joystickBindings[joystickIndex];
             auto contentAvail = ImGui::GetContentRegionAvail();
             auto textSize = ImGui::CalcTextSize(CLEM_L10N_LABEL(kLabelJoystickButtonBinding));
-            ImGui::SetCursorPos(ImVec2((contentAvail.x - textSize.x) * 0.5f, (contentAvail.y - textSize.y) * 0.5f));
+            ImGui::SetCursorPos(
+                ImVec2((contentAvail.x - textSize.x) * 0.5f, (contentAvail.y - textSize.y) * 0.5f));
             ImGui::PushTextWrapPos();
             ImGui::Text(CLEM_L10N_LABEL(kLabelJoystickButtonBinding), joystickButtonIndex);
             ImGui::PopTextWrapPos();

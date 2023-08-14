@@ -63,6 +63,7 @@ class ClemensCommandQueueListener {
     virtual void onCommandSendText(std::string text) = 0;
     virtual bool onCommandBinaryLoad(std::string pathname, unsigned address) = 0;
     virtual bool onCommandBinarySave(std::string pathname, unsigned address, unsigned length) = 0;
+    virtual void onCommandFastMode(bool enabled) = 0;
 };
 
 class ClemensCommandQueue {
@@ -131,6 +132,8 @@ class ClemensCommandQueue {
     void bsave(std::string pathname, unsigned address, unsigned length);
     //  Load binary from disk
     void bload(std::string pathname, unsigned address);
+    //  Toggle fast mode
+    void fastMode(bool enable);
 
   private:
     bool insertDisk(ClemensCommandQueueListener &listener, const std::string_view &inputParam);

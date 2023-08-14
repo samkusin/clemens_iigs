@@ -71,6 +71,7 @@ void ClemensRunSampler::reset() {
     sampledCyclesSpent = 0;
     sampledFramesPerSecond = 0.0f;
     sampledMachineSpeedMhz = 0.0f;
+    sampledEmulationSpeedMhz = 0.0f;
     avgVBLsPerFrame = 0.0f;
     sampledVblsSpent = 0;
     emulatorVblsPerFrame = 1;
@@ -136,6 +137,8 @@ void ClemensRunSampler::update(clem_clocks_duration_t clocksSpent, unsigned cycl
         sampledMachineSpeedMhz = 1.023 * cyclesPerClock * CLEM_CLOCKS_PHI0_CYCLE;
     }
 
+    sampledEmulationSpeedMhz = sampledCyclesSpent / double(sampledFrameTime.count());
+
     if (vblsBuffer.isFull()) {
         decltype(vblsBuffer)::ValueType lruVbls = 0;
         vblsBuffer.pop(lruVbls);
@@ -144,11 +147,9 @@ void ClemensRunSampler::update(clem_clocks_duration_t clocksSpent, unsigned cycl
     vblsBuffer.push(emulatorVblsPerFrame);
     sampledVblsSpent += emulatorVblsPerFrame;
     if (fastModeEnabled) {
-        if (sampledFramesPerSecond > 55.0) {
+        if (sampledFramesPerSecond > 15.0) {
             emulatorVblsPerFrame += 1;
-        } else if (sampledFramesPerSecond < 45.0) {
-            emulatorVblsPerFrame -= 1;
-        }
+        } 
         if (emulatorVblsPerFrame < 1)
             emulatorVblsPerFrame = 1;
 
@@ -163,8 +164,8 @@ ClemensBackend::ClemensBackend(std::string romPath, const Config &config)
       interpreterData_(kInterpreterMemorySize),
       interpreter_(cinek::FixedStack(kInterpreterMemorySize, interpreterData_.data())),
       breakpoints_(std::move(config_.breakpoints)), logLevel_(config_.logLevel),
-      debugMemoryPage_(0x00), areInstructionsLogged_(false), stepsRemaining_(0),
-      clocksRemainingInTimeslice_(0) {
+      debugMemoryPage_(0x00), areInstructionsLogged_(false), fastModeEnabled_(false), 
+      stepsRemaining_(0), clocksRemainingInTimeslice_(0) {
 
     loggedInstructions_.reserve(10000);
 
@@ -225,7 +226,7 @@ auto ClemensBackend::step(ClemensCommandQueue &commands) -> ClemensCommandQueue:
         // Though if the emulator runs hot (cannot execute the desired cycles in enough time),
         // that shouldn't matter too much given that this 'speed boost' is meant to be
         // temporary, and the emulator should catch up once the IWM is inactive.
-        if (clemens_is_drive_io_active(&GS_->getMMIO()) && config_.enableFastEmulation) {
+        if ((clemens_is_drive_io_active(&GS_->getMMIO()) && config_.enableFastEmulation) || fastModeEnabled_) {
             runSampler_.enableFastMode();
         } else {
             runSampler_.disableFastMode();
@@ -344,8 +345,10 @@ void ClemensBackend::post(ClemensBackendState &backendState) {
     }
     backendState.debugMemoryPage = debugMemoryPage_;
     backendState.machineSpeedMhz = runSampler_.sampledMachineSpeedMhz;
+    backendState.emulationSpeedMhz = runSampler_.sampledEmulationSpeedMhz;
     backendState.avgVBLsPerFrame = runSampler_.avgVBLsPerFrame;
     backendState.fastEmulationOn = runSampler_.emulatorVblsPerFrame > 1;
+    backendState.fastModeEnabled = fastModeEnabled_;
 
     GS_->finishFrame(backendState.frame);
     hitBreakpoint_ = std::nullopt;
@@ -918,4 +921,8 @@ bool ClemensBackend::onCommandBinarySave(std::string pathname, unsigned address,
     }
     localLog(CLEM_DEBUG_LOG_INFO, "Saved {} bytes to '{}'.", length, pathname);
     return true;
+}
+
+void ClemensBackend::onCommandFastMode(bool enabled) {
+    fastModeEnabled_ = enabled;
 }

@@ -39,7 +39,12 @@ struct ClemensRunSampler {
     cinek::CircularBuffer<clem_clocks_duration_t, 60> clocksBuffer;
     cinek::CircularBuffer<clem_clocks_duration_t, 60> cyclesBuffer;
 
+    // sampledMachineSpeedMhz is the speed from the machine's perspective (i.e. 2.8mhz is fast)
+    // sampledEmulationSpeedMhz is the speed from the host's perspective
+    // sampledEmulationSpeedMhz ~ sampledMachineSpeedMhz when running at NTSC frequency
+    // sampledEmulationSpeedMhz should be larger when running at full speed
     double sampledMachineSpeedMhz;
+    double sampledEmulationSpeedMhz;    
     std::chrono::high_resolution_clock::time_point lastFrameTimePoint;
 
     double avgVBLsPerFrame;
@@ -139,6 +144,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     void onCommandSendText(std::string msg) final;
     bool onCommandBinaryLoad(std::string pathname, unsigned address) final;
     bool onCommandBinarySave(std::string pathname, unsigned address, unsigned length) final;
+    void onCommandFastMode(bool enabled) final;
 
     //  internal
     bool isRunning() const;
@@ -172,6 +178,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     bool areInstructionsLogged_;
 
     ClemensRunSampler runSampler_;
+    bool fastModeEnabled_;
 
     std::optional<int> stepsRemaining_;
     int64_t clocksRemainingInTimeslice_;

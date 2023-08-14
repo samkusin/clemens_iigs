@@ -25,6 +25,8 @@ struct ClemensHostInterop {
         MouseUnlock,
         PauseExecution,
         ContinueExecution,
+        EnableFastMode,
+        DisableFastMode,
         About
     } action;
 
@@ -34,6 +36,7 @@ struct ClemensHostInterop {
     bool allowConfigureJoystick;
     bool mouseLock;
     bool running;
+    bool fastMode;
     unsigned viewWidth;         //   0 = no change
     unsigned viewHeight;        //   0 = no change
     unsigned minWindowWidth;

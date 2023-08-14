@@ -169,6 +169,9 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
                 commandFailed = true;
             }
             break;
+        case Command::FastMode:
+            listener.onCommandFastMode(cmd.operand == "1");
+            break;
         case Command::Undefined:
             break;
         }
@@ -540,6 +543,10 @@ void ClemensCommandQueue::bsave(std::string pathname, unsigned address, unsigned
 
 void ClemensCommandQueue::bload(std::string pathname, unsigned address) {
     queue(Command{Command::LoadBinary, fmt::format("{},{:x}", pathname, address)});
+}
+
+void ClemensCommandQueue::fastMode(bool enable) {
+    queue(Command{Command::FastMode, enable ? "1" : "0"});
 }
 
 void ClemensCommandQueue::queue(const Command &cmd, Data data) {

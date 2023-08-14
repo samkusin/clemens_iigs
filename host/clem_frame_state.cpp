@@ -272,8 +272,10 @@ void FrameState::copyState(const ClemensBackendState &state, LastCommandState &c
     }
 
     commandState.isFastEmulationOn = state.fastEmulationOn;
+    commandState.isFastModeOn = state.fastModeEnabled;
 
     machineSpeedMhz = state.machineSpeedMhz;
+    emulationSpeedMhz = state.emulationSpeedMhz;
     avgVBLsPerFrame = state.avgVBLsPerFrame;
     vgcModeFlags = state.mmio->vgc.mode_flags;
     irqs = state.mmio->irq_line;
