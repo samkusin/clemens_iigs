@@ -1374,20 +1374,20 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
         }
         if (ImGui::BeginMenu("View")) {
             if (config_.hybridInterfaceEnabled) {
-                if (ImGui::MenuItem("User Mode", CLEM_L10N_LABEL(kHybridModeShortCutText))) {
+                if (ImGui::MenuItem("User Mode", CLEM_L10N_LABEL(kHybridModeShortcutText))) {
                     config_.hybridInterfaceEnabled = false;
                 }
             } else {
-                if (ImGui::MenuItem("Debugger Mode", CLEM_L10N_LABEL(kHybridModeShortCutText))) {
+                if (ImGui::MenuItem("Debugger Mode", CLEM_L10N_LABEL(kHybridModeShortcutText))) {
                     config_.hybridInterfaceEnabled = true;
                 }
             }
             if (interop.mouseLock) {
-                if (ImGui::MenuItem("Unlock Mouse", CLEM_L10N_LABEL(kLockMouseShortCutText))) {
+                if (ImGui::MenuItem("Unlock Mouse", CLEM_L10N_LABEL(kLockMouseShortcutText))) {
                     interop.action = ClemensHostInterop::MouseUnlock;
                 }
             } else {
-                if (ImGui::MenuItem("Lock Mouse", CLEM_L10N_LABEL(kLockMouseShortCutText))) {
+                if (ImGui::MenuItem("Lock Mouse", CLEM_L10N_LABEL(kLockMouseShortcutText))) {
                     interop.action = ClemensHostInterop::MouseLock;
                 }
             }
@@ -1400,12 +1400,12 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
                 }
             } else {
                 if (frameReadState_.isRunning) {
-                    if (ImGui::MenuItem("Pause", CLEM_L10N_LABEL(kTogglePauseText), false,
+                    if (ImGui::MenuItem("Pause", CLEM_L10N_LABEL(kTogglePauseShortcutText), false,
                                         !isEmulatorStarting())) {
                         interop.action = ClemensHostInterop::PauseExecution;
                     }
                 } else {
-                    if (ImGui::MenuItem("Run", CLEM_L10N_LABEL(kTogglePauseText), false,
+                    if (ImGui::MenuItem("Run", CLEM_L10N_LABEL(kTogglePauseShortcutText), false,
                                         !isEmulatorStarting())) {
                         interop.action = ClemensHostInterop::ContinueExecution;
                     }
@@ -1419,6 +1419,13 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
                 }
             }
             ImGui::Separator();
+            if (ImGui::MenuItem("Fast Mode", CLEM_L10N_LABEL(kFastModeShortCutText), interop.fastMode, isBackendRunning())) {
+                if (interop.fastMode) {
+                    interop.action = ClemensHostInterop::DisableFastMode;
+                } else {
+                    interop.action = ClemensHostInterop::EnableFastMode;    
+                }
+            }
             if (ImGui::MenuItem("Configure Joystick", NULL, false,
                                 interop.allowConfigureJoystick)) {
                 interop.action = ClemensHostInterop::JoystickConfig;
@@ -1463,6 +1470,12 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
                         interop.action = ClemensHostInterop::PauseExecution;
                     } else {
                         interop.action = ClemensHostInterop::ContinueExecution;
+                    }
+                } else if (ImGui::IsKeyPressed(ImGuiKey_F8)) {
+                    if (lastCommandState_.isFastModeOn) {
+                        interop.action = ClemensHostInterop::DisableFastMode;
+                    } else {
+                        interop.action = ClemensHostInterop::EnableFastMode;
                     }
                 }
             }
@@ -2069,8 +2082,6 @@ void ClemensFrontend::doMachineDiskStatus(ClemensDriveType driveType, float /*wi
                         std::filesystem::path(driveStatus.assetPath).parent_path().string());
                 } else if (!savedDiskBrowsePaths_[driveType].empty()) {
                     assetBrowser_.setCurrentDirectory(savedDiskBrowsePaths_[driveType]);
-                } else {
-                    assetBrowser_.setCurrentDirectory(std::filesystem::current_path().string());
                 }
                 assetBrowser_.setDiskType(ClemensDiskAsset::diskTypeFromDriveType(driveType));
             }
@@ -2236,8 +2247,6 @@ void ClemensFrontend::doMachineSmartDriveStatus(unsigned driveIndex, const char 
                         std::filesystem::path(driveStatus.assetPath).parent_path().string());
                 } else if (!savedSmartDiskBrowsePaths_[driveIndex].empty()) {
                     assetBrowser_.setCurrentDirectory(savedSmartDiskBrowsePaths_[driveIndex]);
-                } else {
-                    assetBrowser_.setCurrentDirectory(std::filesystem::current_path().string());
                 }
                 assetBrowser_.setDiskType(ClemensDiskAsset::DiskHDD);
             }

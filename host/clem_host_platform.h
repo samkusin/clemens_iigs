@@ -106,6 +106,15 @@ void clem_host_uuid_gen(ClemensHostUUID *uuid);
 char *get_process_executable_path(char *outpath, size_t *outpath_size);
 
 /**
+ * @brief Get the local user directory object
+ * 
+ * @param outpath 
+ * @param outpath_size 
+ * @return char* 
+ */
+char* get_local_user_directory(char *outpath, size_t outpath_size);
+
+/**
  * @brief Get the local user data directory qualified with identifiers
  *
  * @param outpath

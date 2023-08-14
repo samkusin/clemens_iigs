@@ -23,9 +23,10 @@ The Tux/Super key when combined with number keys will treat them as function key
 )md"};
 const char *kMouseUnlock[] = {"Press Tux, Ctrl, Alt and F10 to unlock mouse"};
 
-const char *kHybridModeShortCutText[]= {"Tux+Ctrl+LAlt+minus"};
-const char *kLockMouseShortCutText[]={"Tux+Ctrl+LAlt+F10"};
-const char *kTogglePauseText[]={"Tux+Ctrl+LAlt+5"};
+const char *kHybridModeShortcutText[]= {"Tux+Ctrl+LAlt+minus"};
+const char *kLockMouseShortcutText[]={"Tux+Ctrl+LAlt+F10"};
+const char *kTogglePauseShortcutText[]={"Tux+Ctrl+LAlt+5"};
+const char *kFastModeShortCutText[] = {"Tux+Ctrl+Lalt+8"};
 
 #elif defined(__APPLE__)
 const char *kGSKeyboardCommands[] = {R"md(
@@ -47,9 +48,10 @@ There may be titles where this mouse emulation does not work.  In those cases, t
 const char *kMouseUnlock[] = {"Press CTRL + Option + F10 to unlock mouse"};
 
 //  UNUSED since these are handled outside of ImGUI
-const char *kHybridModeShortCutText[]= {"Ctrl + Option + F11"};
-const char *kLockMouseShortCutText[]={"Ctrl + Option+ F10"};
-const char *kTogglePauseText[]={"Ctrl + Option + F5"};
+const char *kHybridModeShortcutText[]= {"Ctrl + Option + F11"};
+const char *kLockMouseShortcutText[]={"Ctrl + Option+ F10"};
+const char *kTogglePauseShortcutText[]={"Ctrl + Option + F5"};
+const char *kFastModeShortCutText[] = {"Ctrl + Option + F8"};
 #else
 const char *kGSKeyboardCommands[] = {R"md(
 ## Mouse Control
@@ -65,7 +67,8 @@ To transfer control of the mouse to the IIGS session, click within the view.  To
 - Ctrl-Left ALT-F10 to lock mouse)md"};
 const char *kMouseUnlock[] = {"Press  CTRL + ALT + F10 to unlock mouse"};
 
-const char *kHybridModeShortCutText[]= {"Ctrl + Left Alt + F11"};
-const char *kLockMouseShortCutText[]={"Ctrl + Left Alt + F10"};
-const char *kTogglePauseText[]={"Ctrl + Left Alt + F5"};
+const char *kHybridModeShortcutText[]= {"Ctrl + Left Alt + F11"};
+const char *kLockMouseShortcutText[]={"Ctrl + Left Alt + F10"};
+const char *kTogglePauseShortcutText[]={"Ctrl + Left Alt + F5"};
+const char *kFastModeShortCutText[]={"Ctrl + Left Alt + F8"};
 #endif

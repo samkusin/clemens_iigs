@@ -52,9 +52,10 @@ extern const char* kButtonJoystickButton1[];
 extern const char* kButtonJoystickButton2[];
 
 //  shortcuts
-extern const char *kHybridModeShortCutText[];
-extern const char *kLockMouseShortCutText[];
-extern const char *kTogglePauseText[];
+extern const char *kHybridModeShortcutText[];
+extern const char *kLockMouseShortcutText[];
+extern const char *kTogglePauseShortcutText[];
+extern const char *kFastModeShortCutText[];
 
 constexpr unsigned kLanguageDefault = 0;
 
