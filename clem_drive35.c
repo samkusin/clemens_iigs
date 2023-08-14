@@ -117,6 +117,9 @@ int clem_disk_control_35(struct ClemensDrive *drive, unsigned *io_flags, unsigne
                 CLEM_DEBUG("clem_drive35: step to outward tracks");
                 break;
             case CLEM_IWM_DISK35_CTL_EJECTED_RESET:
+                if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTED) {
+                    CLEM_LOG("clem_drive35: clearing eject status");
+                }
                 drive->status_mask_35 &= ~CLEM_IWM_DISK35_STATUS_EJECTED;
                 break;
             case CLEM_IWM_DISK35_CTL_STEP_ONE:
