@@ -149,17 +149,17 @@ static bool parseAddress(std::string_view &operand, unsigned &address, uint8_t d
         auto bankStr = token.substr(0, bankSepPos);
         uint16_t offset;
         uint8_t bank;
-        if (std::from_chars(bankStr.begin(), bankStr.end(), bank, 16).ec != std::errc{}) {
+        if (std::from_chars(bankStr.data(), bankStr.data() + bankStr.size(), bank, 16).ec != std::errc{}) {
             validAddress = false;
         }
         address = (unsigned)(bank) << 16;
         auto offsetStr = token.substr(bankSepPos + 1);
-        if (std::from_chars(offsetStr.begin(), offsetStr.end(), offset, 16).ec != std::errc{}) {
+        if (std::from_chars(offsetStr.data(), offsetStr.data() + offsetStr.size(), offset, 16).ec != std::errc{}) {
             validAddress = false;
         }
         address |= offset;
     } else {
-        if (std::from_chars(token.begin(), token.end(), address, 16).ec != std::errc{}) {
+        if (std::from_chars(token.data(), token.data() + token.size(), address, 16).ec != std::errc{}) {
             validAddress = false;
         }
         if (token.size() < 5) {
