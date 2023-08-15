@@ -44,8 +44,10 @@ struct ClemensBackendState {
     uint8_t debugMemoryPage = 0;
 
     float machineSpeedMhz = 0.0f;
+    float emulationSpeedMhz = 0.0f;
     float avgVBLsPerFrame = 0.0f;
     bool fastEmulationOn = false;
+    bool fastModeEnabled = false;
 
     // valid if a debugMessage() command was issued from the frontend
     std::optional<std::string> message;
@@ -131,7 +133,8 @@ struct LastCommandState {
     LogOutputNode *logNodeTail = nullptr;
     LogInstructionNode *logInstructionNode = nullptr;
     LogInstructionNode *logInstructionNodeTail = nullptr;
-    bool isFastEmulationOn;
+    bool isFastEmulationOn = false;
+    bool isFastModeOn = false;
 };
 
 // This state comes in for any update to the emulator per frame.  As such
@@ -158,14 +161,15 @@ struct FrameState {
     unsigned breakpointCount = 0;
     int logLevel;
 
-    float machineSpeedMhz;
-    float avgVBLsPerFrame;
-    uint32_t vgcModeFlags;
-    uint32_t irqs, nmis;
+    float machineSpeedMhz = 0.0f;
+    float emulationSpeedMhz = 0.0f;
+    float avgVBLsPerFrame = 0;
+    uint32_t vgcModeFlags = 0;
+    uint32_t irqs = 0, nmis = 0;
     uint8_t memoryViewBank = 0;
 
-    unsigned backendCPUID;
-    float fps;
+    unsigned backendCPUID = 0;
+    float fps = 0.0f;
     bool mmioWasInitialized = false;
     bool isTracing = false;
     bool isIWMTracing = false;

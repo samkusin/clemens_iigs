@@ -115,6 +115,10 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
             if (!programTrace(listener, cmd.operand))
                 commandFailed = true;
             break;
+        case Command::DebugPrintMemory: {
+                //  address, count (parse)
+                //  listener.onCommandDebugMemoryPrint(address, count);
+            } break;
         case Command::SaveMachine:
             commandFailed = true;
             if (!data || data->getType() == ClemensCommandData::Type::MinizPNG) {
@@ -168,6 +172,9 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
             if (!loadBinary(listener, cmd.operand)) {
                 commandFailed = true;
             }
+            break;
+        case Command::FastMode:
+            listener.onCommandFastMode(cmd.operand == "1");
             break;
         case Command::Undefined:
             break;
@@ -540,6 +547,10 @@ void ClemensCommandQueue::bsave(std::string pathname, unsigned address, unsigned
 
 void ClemensCommandQueue::bload(std::string pathname, unsigned address) {
     queue(Command{Command::LoadBinary, fmt::format("{},{:x}", pathname, address)});
+}
+
+void ClemensCommandQueue::fastMode(bool enable) {
+    queue(Command{Command::FastMode, enable ? "1" : "0"});
 }
 
 void ClemensCommandQueue::queue(const Command &cmd, Data data) {

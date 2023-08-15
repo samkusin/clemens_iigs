@@ -1,6 +1,7 @@
 #include "clem_debugger.hpp"
 #include "clem_command_queue.hpp"
 #include "clem_frame_state.hpp"
+#include "clem_host_shared.hpp"
 #include "clem_host_utils.hpp"
 #include "clem_l10n.hpp"
 #include "core/clem_disk_utils.hpp"
@@ -129,6 +130,49 @@ static bool parseInt(const std::string_view &token, int &result) {
         return true;
     }
     return false;
+}
+
+static bool parseAddress(std::string_view &operand, unsigned &address, uint8_t defaultBank, char term = ' ') {
+    //  accept xx/xxxx, xxxxxx (24-bit) or xxxx (16-bit)
+    auto tailPos = operand.find(term);
+    std::string_view token;
+    if (tailPos == std::string_view::npos) {
+        token = operand;
+        operand = std::string_view();
+    } else {
+        token = operand.substr(0, tailPos);
+        operand = operand.substr(tailPos + 1);
+    }
+    bool validAddress = true;
+    auto bankSepPos = token.find('/');
+    if (bankSepPos > 0 && bankSepPos <= 2) {
+        auto bankStr = token.substr(0, bankSepPos);
+        uint16_t offset;
+        uint8_t bank;
+        if (std::from_chars(bankStr.data(), bankStr.data() + bankStr.size(), bank, 16).ec != std::errc{}) {
+            validAddress = false;
+        }
+        address = (unsigned)(bank) << 16;
+        auto offsetStr = token.substr(bankSepPos + 1);
+        if (std::from_chars(offsetStr.data(), offsetStr.data() + offsetStr.size(), offset, 16).ec != std::errc{}) {
+            validAddress = false;
+        }
+        address |= offset;
+    } else {
+        if (std::from_chars(token.data(), token.data() + token.size(), address, 16).ec != std::errc{}) {
+            validAddress = false;
+        }
+        if (token.size() < 5) {
+            //  apply default bank
+            address &= 0x0000ffff;
+            address |= ((unsigned)(defaultBank) << 16);
+        }
+    }
+    if (validAddress && address >= 0x00ffffff) {
+        validAddress = false;
+    }
+
+    return validAddress;
 }
 
 static ImColor getDefaultColor(bool hi) {
@@ -1087,6 +1131,8 @@ void ClemensDebugger::executeCommand(std::string_view command) {
         cmdBload(operand);
     } else if (action == "cwd") {
         cmdPwd(operand);
+    } else if (action == "print" || action == "p") {
+        cmdPrint(operand);
     } else {
         commandQueue_.runScript(std::string(command));
     }
@@ -1167,35 +1213,27 @@ void ClemensDebugger::cmdBreak(std::string_view operand) {
         breakpoint.type = ClemensBackendBreakpoint::Execute;
     }
 
-    char address[16];
-    auto bankSepPos = operand.find('/');
-    if (bankSepPos == std::string_view::npos) {
-        if (operand.size() >= 2) {
-            snprintf(address, sizeof(address), "%02X", frameState_->cpu.regs.PBR);
-            operand.copy(address + 2, 4, 2);
-        } else if (!operand.empty()) {
+    if (operand.empty()) {
+        commandQueue_.breakExecution();
+        return;
+    }
+
+    unsigned address = 0;
+    if (breakpoint.type == ClemensBackendBreakpoint::Execute ||
+        breakpoint.type == ClemensBackendBreakpoint::DataRead ||
+        breakpoint.type == ClemensBackendBreakpoint::Write) {
+        uint8_t defaultBank = frameState_->cpu.regs.PBR;
+        if (breakpoint.type == ClemensBackendBreakpoint::DataRead ||
+            breakpoint.type == ClemensBackendBreakpoint::Write) {
+            defaultBank = frameState_->cpu.regs.DBR;
+        }
+        if (!parseAddress(operand, address, defaultBank)) {
             CLEM_TERM_COUT.format(Error, "Address {} is invalid.", operand);
             return;
         }
-    } else if (bankSepPos == 2 && operand.size() > bankSepPos) {
-        operand.copy(address, bankSepPos, 0);
-        operand.copy(address + bankSepPos, operand.size() - (bankSepPos + 1), bankSepPos + 1);
-    } else {
-        CLEM_TERM_COUT.format(Error, "Address {} is invalid.", operand);
-        return;
     }
-    if (operand.empty()) {
-        commandQueue_.breakExecution();
-    } else {
-        address[6] = '\0';
-        char *addressEnd = NULL;
-        breakpoint.address = std::strtoul(address, &addressEnd, 16);
-        if (addressEnd != address + 6) {
-            CLEM_TERM_COUT.format(Error, "Address format is invalid read from '{}'", operand);
-            return;
-        }
-        commandQueue_.addBreakpoint(breakpoint);
-    }
+    breakpoint.address = address;
+    commandQueue_.addBreakpoint(breakpoint);
 }
 
 void ClemensDebugger::cmdRun(std::string_view /*operand*/) { commandQueue_.run(); }
@@ -1458,6 +1496,96 @@ void ClemensDebugger::cmdPwd(std::string_view) {
     }
 }
 
+void ClemensDebugger::cmdPrint(std::string_view operand) {
+    static const char *kIrqName[32] = {"scan",
+                                       "vbl",
+                                       NULL,
+                                       NULL,
+                                       "rtc_qsec",
+                                       "rtc_1sec",
+                                       NULL,
+                                       NULL,
+                                       "adb_srq_keyb",
+                                       "adb_srq_mouse?!",
+                                       "adb_evt_mouse",
+                                       "adb_data",
+                                       "osc",
+                                       NULL,
+                                       NULL,
+                                       NULL,
+                                       NULL,
+                                       NULL,
+                                       NULL,
+                                       NULL,
+                                       "s1",
+                                       "s2",
+                                       "s3",
+                                       "s4",
+                                       "s5",
+                                       "s6",
+                                       "s7",
+                                       NULL,
+                                       NULL,
+                                       NULL,
+                                       NULL,
+                                       NULL};
+    if (operand.empty()) {
+        CLEM_TERM_COUT.format(Error, "usage: print <addr>:<count>|irq");
+        return;
+    }
+
+    if (operand == "irq") {
+        if (frameState_->cpu.pins.irqbIn) {
+            CLEM_TERM_COUT.format(Info, "There are no IRQs pending.");
+        } else {
+            for (unsigned irqIdx = 0, irqs = frameState_->irqs; irqs && irqIdx < 32;
+                 ++irqIdx, irqs >>= 1) {
+                if (irqs & 1) {
+                    CLEM_TERM_COUT.format(Info, "{:08x}:{}", 1 << irqIdx, kIrqName[irqIdx]);
+                }
+            }
+        }
+        return;
+    }
+    
+    /*
+    //  memory print
+    unsigned address = 0;
+    if (!parseAddress(operand, address, frameState_->cpu.regs.DBR, ':')) {
+        CLEM_TERM_COUT.format(Error, "usage: print <addr>:<count>");
+        return;
+    }
+    int byteCount = -1;
+    if (operand.empty()) {
+        byteCount = 1;
+    } else if (operand[0] == ':') {
+        if (std::from_chars(operand.begin() + 1, operand.end(), byteCount).ec != std::errc{}) {
+            byteCount = -1;
+        }
+    } 
+    if (byteCount < 0) {
+        CLEM_TERM_COUT.format(Error, "usage: print <addr>:<count>");
+        return;
+    }
+
+
+    //  this should be displayed on the backend console log
+    char bytesline[64];
+    unsigned byteslineIndex = 0;
+    unsigned baseAddress = address;
+    while (byteCount > 0) {
+
+        byteCount--;
+        if ((byteCount % 8) == 0) {
+            bytesline[byteslineIndex] = '\0';
+            CLEM_TERM_COUT.format(Debug, "{:08x}: {}", baseAddress, bytesline);
+            baseAddress += 8;
+            byteslineIndex = 0;
+        }
+    }
+    */
+}
+
 void ClemensDebugger::cmdHelp(std::string_view operand) {
     if (!operand.empty()) {
         CLEM_TERM_COUT.print(Warn, "Command specific help not yet supported.");
@@ -1480,6 +1608,8 @@ void ClemensDebugger::cmdHelp(std::string_view operand) {
     CLEM_TERM_COUT.print(Info, "b]reak irq                  - break on IRQ");
     CLEM_TERM_COUT.print(Info, "b]reak brk                  - break on IRQ");
     CLEM_TERM_COUT.print(Info, "b]reak list                 - list all breakpoints");
+    //CLEM_TERM_COUT.print(Info, "p]rint <address>:<count>    - print bytes at address");
+    CLEM_TERM_COUT.print(Info, "p]rint irq                  - print irqs raised");
     CLEM_TERM_COUT.print(Info, "log {DEBUG|INFO|WARN|UNIMPL}- set the emulator log level");
     CLEM_TERM_COUT.print(Info, "dump <bank_begin>,          - dump memory from selected banks\n"
                                "     <bank_end>,              to a file with the specified\n"

@@ -54,6 +54,7 @@ class ClemensCommandQueueListener {
     virtual void onCommandDebugMemoryWrite(uint16_t addr, uint8_t value) = 0;
     virtual void onCommandDebugLogLevel(int logLevel) = 0;
     virtual bool onCommandDebugProgramTrace(std::string_view op, std::string_view path) = 0;
+    virtual void onCommandDebugMemoryPrint(unsigned address, unsigned count) = 0;
     virtual bool onCommandSaveMachine(std::string path,
                                       std::unique_ptr<ClemensCommandMinizPNG> pngData) = 0;
     virtual bool onCommandLoadMachine(std::string path) = 0;
@@ -63,6 +64,7 @@ class ClemensCommandQueueListener {
     virtual void onCommandSendText(std::string text) = 0;
     virtual bool onCommandBinaryLoad(std::string pathname, unsigned address) = 0;
     virtual bool onCommandBinarySave(std::string pathname, unsigned address, unsigned length) = 0;
+    virtual void onCommandFastMode(bool enabled) = 0;
 };
 
 class ClemensCommandQueue {
@@ -131,6 +133,8 @@ class ClemensCommandQueue {
     void bsave(std::string pathname, unsigned address, unsigned length);
     //  Load binary from disk
     void bload(std::string pathname, unsigned address);
+    //  Toggle fast mode
+    void fastMode(bool enable);
 
   private:
     bool insertDisk(ClemensCommandQueueListener &listener, const std::string_view &inputParam);

@@ -345,11 +345,12 @@ unsigned clem_ensoniq_voices(struct ClemensDeviceEnsoniq *doc) {
 //  down convert voices output into 2 channel mono
 void clem_ensoniq_mono(struct ClemensDeviceEnsoniq *doc, unsigned osc_max_channels, float *left,
                        float *right) {
+    unsigned active_osc = 0;
     *left = 0.0f;
     *right = 0.0f;
 
     for (unsigned channel_idx = 0; channel_idx < osc_max_channels; ++channel_idx) {
-        *left += (doc->voice[channel_idx] * 0.50f);
+        *left += doc->voice[channel_idx];
     }
     if (*left > 1.0f)
         *left = 1.0f;

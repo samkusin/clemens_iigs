@@ -283,8 +283,8 @@ struct ClemensNibbleDisk *clem_iwm_eject_disk(struct ClemensDeviceIWM *iwm,
         return NULL;
 
     if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
-        drive->status_mask_35 &=
-            ~(CLEM_IWM_DISK35_STATUS_EJECTING | CLEM_IWM_DISK35_STATUS_EJECTED);
+        drive->status_mask_35 &= ~(CLEM_IWM_DISK35_STATUS_EJECTING);
+        drive->status_mask_35 |= CLEM_IWM_DISK35_STATUS_EJECTED;
     }
     drive->has_disk = false;
     return &drive->disk;
@@ -295,9 +295,10 @@ unsigned clem_iwm_eject_disk_in_progress(struct ClemensDeviceIWM *iwm, struct Cl
         if (drive->disk.disk_type == CLEM_DISK_TYPE_3_5) {
             if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTING)
                 return CLEM_EJECT_DISK_STATUS_IN_PROGRESS;
-            if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTED)
-                return CLEM_EJECT_DISK_STATUS_EJECTED;
         }
+    } else {
+        if (drive->status_mask_35 & CLEM_IWM_DISK35_STATUS_EJECTED)
+            return CLEM_EJECT_DISK_STATUS_EJECTED;
     }
     return CLEM_EJECT_DISK_STATUS_NONE;
 }

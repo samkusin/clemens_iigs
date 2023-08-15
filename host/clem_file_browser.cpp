@@ -1,5 +1,6 @@
 #include "clem_file_browser.hpp"
 
+#include "clem_host_platform.h"
 #include "imgui.h"
 
 #include <cassert>
@@ -48,7 +49,9 @@ ClemensFileBrowser::ClemensFileBrowser() {
 
 void ClemensFileBrowser::setCurrentDirectory(const std::string &directory) {
     if (directory.empty()) {
-        currentDirectoryPath_ = std::filesystem::current_path();
+        char userPath[CLEMENS_PATH_MAX];
+        get_local_user_directory(userPath, sizeof(userPath));
+        currentDirectoryPath_ = userPath;
     } else {
         currentDirectoryPath_ = directory;
     }
@@ -60,7 +63,7 @@ void ClemensFileBrowser::forceRefresh() { nextRefreshTime_ = std::chrono::steady
 void ClemensFileBrowser::frame(ImVec2 size) {
     //  standardize our current working directory
     if (currentDirectoryPath_.empty()) {
-        currentDirectoryPath_ = std::filesystem::current_path();
+        setCurrentDirectory("");
     }
     auto cwd = currentDirectoryPath_.make_preferred();
     if (!cwd.is_absolute()) {

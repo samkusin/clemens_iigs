@@ -732,6 +732,9 @@ uint8_t clem_mmio_read(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint16_
     case CLEM_MMIO_REG_LANGSEL:
         result = clem_vgc_get_region(&mmio->vgc);
         break;
+    case CLEM_MMIO_REG_CHARROM_TEST:
+        result = 0x00;          // TODO: unsure what to do unless we store the character ROM in memory vs font files
+        break;
     case CLEM_MMIO_REG_SLOTROMSEL:
         result = _clem_mmio_slotromsel_c02d(mmio);
         *mega2_access = false;
@@ -1072,6 +1075,9 @@ void clem_mmio_write(ClemensMMIO *mmio, struct ClemensTimeSpec *tspec, uint8_t d
         break;
     case CLEM_MMIO_REG_LANGSEL:
         clem_vgc_set_region(&mmio->vgc, data);
+        break;
+    case CLEM_MMIO_REG_CHARROM_TEST:
+        //  NO-OP - avoid the unimpl warning if done as a 16-bit write to LANGSEL
         break;
     case CLEM_MMIO_REG_SLOTROMSEL:
         _clem_mmio_slotrom_select_c02d(mmio, data);

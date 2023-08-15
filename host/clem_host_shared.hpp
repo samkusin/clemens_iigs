@@ -80,7 +80,9 @@ struct ClemensBackendCommand {
         DebugMessage,
         SendText,
         SaveBinary,
-        LoadBinary
+        LoadBinary,
+        FastMode,
+        DebugPrintMemory
     };
     Type type = Undefined;
     std::string operand;

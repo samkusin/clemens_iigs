@@ -37,6 +37,14 @@ char *get_process_executable_path(char *outpath, size_t *outpath_size) {
   return outpath;
 }
 
+char* get_local_user_directory(char *outpath, size_t outpath_size) {
+  NSString *user_directory = NSHomeDirectory();
+  const char *dir_cstr = [user_directory UTF8String];
+  strncpy(outpath, dir_cstr, outpath_size - 1);
+  outpath[outpath_size - 1] = '\0';
+  return outpath; 
+}
+
 char *get_local_user_data_directory(char *outpath, size_t outpath_size,
                                     const char *company_name,
                                     const char *app_name) {

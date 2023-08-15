@@ -6,7 +6,6 @@ struct ClemensHostInterop {
     bool mouseShow;
 
     //  system/menu notifications to the main app
-    bool mouseLock;
     bool nativeMenu;
     enum {
         None,
@@ -22,6 +21,12 @@ struct ClemensHostInterop {
         Standard,
         AspectView,
         JoystickConfig,
+        MouseLock,
+        MouseUnlock,
+        PauseExecution,
+        ContinueExecution,
+        EnableFastMode,
+        DisableFastMode,
         About
     } action;
 
@@ -29,6 +34,9 @@ struct ClemensHostInterop {
     bool poweredOn;
     bool debuggerOn;
     bool allowConfigureJoystick;
+    bool mouseLock;
+    bool running;
+    bool fastMode;
     unsigned viewWidth;         //   0 = no change
     unsigned viewHeight;        //   0 = no change
     unsigned minWindowWidth;

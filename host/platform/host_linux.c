@@ -69,6 +69,13 @@ char *get_process_executable_path(char *outpath, size_t *outpath_size) {
     return outpath;
 }
 
+char* get_local_user_directory(char *outpath, size_t outpath_size) {
+    const char *user_home_dir = getpwuid(getuid())->pw_dir;
+    strncpy(outpath, user_home_dir, outpath_size - 1);
+    outpath[outpath_size - 1] = '\0';
+    return outpath;
+}
+
 char *get_local_user_config_directory(char *outpath, size_t outpath_size, const char *company_name,
                                     const char *app_name) {
     //  retrieve $XDG_CONFIG_HOME or if not found ~/.config/<company_name>

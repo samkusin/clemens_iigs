@@ -62,6 +62,25 @@ char *get_process_executable_path(char *outpath, size_t *outpath_size) {
     return outpath;
 }
 
+char* get_local_user_directory(char *outpath, size_t outpath_size) {
+    char *current_path = outpath;
+    char *tail_path = outpath + outpath_size - 1;
+    int state = 0;
+    PWSTR directoryString;
+    HRESULT hr = SHGetKnownFolderPath(&FOLDERID_Profile, 0, NULL, &directoryString);
+    if (SUCCEEDED(hr)) {
+        int cnt = WideCharToMultiByte(CP_UTF8, 0, directoryString, wcslen(directoryString), outpath,
+                                      outpath_size, NULL, NULL);
+        if (cnt <= 0) {
+            return NULL;
+        }
+        current_path += cnt;
+    }
+    CoTaskMemFree(directoryString);
+    *current_path = '\0';
+    return outpath;
+}
+
 char *get_local_user_data_directory(char *outpath, size_t outpath_size, const char *company_name,
                                     const char *app_name) {
     char *current_path = outpath;

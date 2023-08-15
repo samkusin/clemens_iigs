@@ -31,6 +31,9 @@
   NSMenuItem *shutdownMenuItem;
   NSMenuItem *debuggerMenuItem;
   NSMenuItem *joysickMenuItem;
+  NSMenuItem *lockMouseItem;
+  NSMenuItem *pauseItem;
+  NSMenuItem *fastMode;
 }
 
 + (id)instance {
@@ -98,8 +101,35 @@
   }
 }
 
+- (void)menuLockMouse:(id)sender {
+  if (hostInterop->mouseLock) {
+    hostInterop->action = ClemensHostInterop::MouseUnlock;
+  } else {
+    hostInterop->action = ClemensHostInterop::MouseLock;
+  }
+}
+
+- (void)menuPauseEmulator:(id)sender {
+  if (!hostInterop->poweredOn)
+    return;
+  if (hostInterop->running) {
+    hostInterop->action = ClemensHostInterop::PauseExecution;
+  } else {
+    hostInterop->action = ClemensHostInterop::ContinueExecution;
+  }
+}
+
+- (void)menuFastMode:(id)sender {
+  if (hostInterop->fastMode) {
+    hostInterop->action = ClemensHostInterop::DisableFastMode;
+  } else {
+    hostInterop->action = ClemensHostInterop::EnableFastMode;
+  }
+}
+
 //  TODO: localized strings!
 - (void)buildMenus {
+  unichar keyEquivalentChar = 0;
   NSMenu *menubar = [NSMenu new];
 
   // Application Menu
@@ -160,7 +190,27 @@
                                                 action:@selector(menuDebugger:)
                                          keyEquivalent:@""];
   [debuggerMenuItem setTarget:self];
+  keyEquivalentChar = NSF11FunctionKey;
+  [debuggerMenuItem setKeyEquivalentModifierMask:NSEventModifierFlagControl |
+                                                 NSEventModifierFlagOption |
+                                                 NSEventModifierFlagFunction];
+  [debuggerMenuItem
+      setKeyEquivalent:[NSString stringWithCharacters:&keyEquivalentChar
+                                               length:1]];
   [viewmenu addItem:debuggerMenuItem];
+
+  lockMouseItem = [[NSMenuItem alloc] initWithTitle:@"Lock Mouse"
+                                             action:@selector(menuLockMouse:)
+                                      keyEquivalent:@""];
+  [lockMouseItem setTarget:self];
+  keyEquivalentChar = NSF10FunctionKey;
+  [lockMouseItem setKeyEquivalentModifierMask:NSEventModifierFlagControl |
+                                              NSEventModifierFlagOption |
+                                              NSEventModifierFlagFunction];
+  [lockMouseItem
+      setKeyEquivalent:[NSString stringWithCharacters:&keyEquivalentChar
+                                               length:1]];
+  [viewmenu addItem:lockMouseItem];
 
   NSMenuItem *viewMenuItem = [menubar addItemWithTitle:@""
                                                 action:nil
@@ -174,6 +224,18 @@
                                       keyEquivalent:@""];
   [powerMenuItem setTarget:self];
   [machmenu addItem:powerMenuItem];
+
+  pauseItem = [[NSMenuItem alloc] initWithTitle:@"Pause"
+                                         action:@selector(menuPauseEmulator::)
+                                  keyEquivalent:@""];
+  [pauseItem setTarget:self];
+  keyEquivalentChar = NSF5FunctionKey;
+  [pauseItem setKeyEquivalentModifierMask:NSEventModifierFlagControl |
+                                          NSEventModifierFlagOption |
+                                          NSEventModifierFlagFunction];
+  [pauseItem setKeyEquivalent:[NSString stringWithCharacters:&keyEquivalentChar
+                                                      length:1]];
+  [machmenu addItem:pauseItem];
 
   rebootMenuItem = [[NSMenuItem alloc] initWithTitle:@"Reboot"
                                               action:@selector(menuReboot:)
@@ -189,11 +251,25 @@
 
   [machmenu addItem:[NSMenuItem separatorItem]];
 
-  joysickMenuItem = [[NSMenuItem alloc] initWithTitle:@"Configure Joystick"
-                                                action:@selector(menuConfigureJoystick:)
-                                         keyEquivalent:@""];
-  [joysickMenuItem setTarget: self];
-  [machmenu addItem: joysickMenuItem];
+  fastMode = [[NSMenuItem alloc] initWithTitle:@"Fast Mode"
+                                        action:@selector(menuFastMode:)
+                                 keyEquivalent:@""];
+  [fastMode setTarget:self];
+  keyEquivalentChar = NSF8FunctionKey;
+  [fastMode setKeyEquivalentModifierMask:NSEventModifierFlagControl |
+                                                 NSEventModifierFlagOption |
+                                                 NSEventModifierFlagFunction];
+  [fastMode
+      setKeyEquivalent:[NSString stringWithCharacters:&keyEquivalentChar
+                                               length:1]];
+  [machmenu addItem:fastMode];
+
+  joysickMenuItem =
+      [[NSMenuItem alloc] initWithTitle:@"Configure Joystick"
+                                 action:@selector(menuConfigureJoystick:)
+                          keyEquivalent:@""];
+  [joysickMenuItem setTarget:self];
+  [machmenu addItem:joysickMenuItem];
 
   NSMenuItem *machMenuItem = [menubar addItemWithTitle:@""
                                                 action:nil
@@ -239,6 +315,13 @@
     [shutdownMenuItem setAction:@selector(menuShutdown:)];
     [powerMenuItem setEnabled:FALSE];
     [powerMenuItem setAction:nil];
+    [lockMouseItem setEnabled:TRUE];
+    [lockMouseItem setAction:@selector(menuLockMouse:)];
+    [pauseItem setEnabled:TRUE];
+    [pauseItem setAction:@selector(menuPauseEmulator:)];
+    [fastMode setEnabled:TRUE];
+    [fastMode setAction:@selector(menuFastMode:)];
+    [fastMode setState: hostInterop->fastMode ? NSControlStateValueOn : NSControlStateValueOff];
   } else {
     [rebootMenuItem setEnabled:FALSE];
     [rebootMenuItem setAction:nil];
@@ -246,11 +329,27 @@
     [shutdownMenuItem setAction:nil];
     [powerMenuItem setEnabled:TRUE];
     [powerMenuItem setAction:@selector(menuPower:)];
+    [lockMouseItem setEnabled:FALSE];
+    [lockMouseItem setAction:nil];
+    [pauseItem setEnabled:FALSE];
+    [pauseItem setAction:nil];
+    [fastMode setEnabled:FALSE];
+    [fastMode setAction:nil];
   }
   if (hostInterop->debuggerOn) {
     [debuggerMenuItem setTitle:@"User Mode"];
   } else {
     [debuggerMenuItem setTitle:@"Debugger Mode"];
+  }
+  if (hostInterop->mouseLock) {
+    [lockMouseItem setTitle:@"Unlock Mouse"];
+  } else {
+    [lockMouseItem setTitle:@"Lock Mouse"];
+  }
+  if (hostInterop->running) {
+    [pauseItem setTitle:@"Pause"];
+  } else {
+    [pauseItem setTitle:@"Continue"];
   }
   if (hostInterop->allowConfigureJoystick) {
     [joysickMenuItem setEnabled:TRUE];
@@ -262,7 +361,7 @@
   NSSize minSize;
   minSize.width = hostInterop->minWindowWidth;
   minSize.height = hostInterop->minWindowHeight;
-  NSWindow* mainWindow = [NSApp mainWindow];
+  NSWindow *mainWindow = [NSApp mainWindow];
   mainWindow.contentMinSize = minSize;
 }
 
