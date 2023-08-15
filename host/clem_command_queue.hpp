@@ -54,6 +54,7 @@ class ClemensCommandQueueListener {
     virtual void onCommandDebugMemoryWrite(uint16_t addr, uint8_t value) = 0;
     virtual void onCommandDebugLogLevel(int logLevel) = 0;
     virtual bool onCommandDebugProgramTrace(std::string_view op, std::string_view path) = 0;
+    virtual void onCommandDebugMemoryPrint(unsigned address, unsigned count) = 0;
     virtual bool onCommandSaveMachine(std::string path,
                                       std::unique_ptr<ClemensCommandMinizPNG> pngData) = 0;
     virtual bool onCommandLoadMachine(std::string path) = 0;

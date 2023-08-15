@@ -744,6 +744,10 @@ bool ClemensBackend::onCommandDebugProgramTrace(std::string_view op, std::string
     return ok;
 }
 
+void ClemensBackend::onCommandDebugMemoryPrint(unsigned /*address */, unsigned /* count */) {
+    // TODO
+}
+
 bool ClemensBackend::onCommandSaveMachine(std::string path, std::unique_ptr<ClemensCommandMinizPNG> pngData) {
     auto outputPath = std::filesystem::path(config_.snapshotRootPath) / path;
 

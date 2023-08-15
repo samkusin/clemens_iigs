@@ -626,10 +626,16 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration &config,
 }
 
 ClemensFrontend::~ClemensFrontend() {
+    bool poweredOn = config_.poweredOn;
+
     stopBackend();
     audio_.stop();
     clem_joystick_close_devices();
 
+    //  we want to use the same power status as it was right before termination,
+    //  since stopping the backend will always clear poweredOn (requiring manual
+    //  powering on every time the user launches the app)
+    config_.poweredOn = poweredOn;
     config_.save();
 
     free(frameReadMemory_.getHead());

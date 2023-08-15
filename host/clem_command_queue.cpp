@@ -115,6 +115,10 @@ auto ClemensCommandQueue::dispatchAll(ClemensCommandQueueListener &listener) -> 
             if (!programTrace(listener, cmd.operand))
                 commandFailed = true;
             break;
+        case Command::DebugPrintMemory: {
+                //  address, count (parse)
+                //  listener.onCommandDebugMemoryPrint(address, count);
+            } break;
         case Command::SaveMachine:
             commandFailed = true;
             if (!data || data->getType() == ClemensCommandData::Type::MinizPNG) {

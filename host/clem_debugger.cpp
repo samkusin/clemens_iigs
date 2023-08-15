@@ -1,6 +1,7 @@
 #include "clem_debugger.hpp"
 #include "clem_command_queue.hpp"
 #include "clem_frame_state.hpp"
+#include "clem_host_shared.hpp"
 #include "clem_host_utils.hpp"
 #include "clem_l10n.hpp"
 #include "core/clem_disk_utils.hpp"
@@ -132,9 +133,9 @@ static bool parseInt(const std::string_view &token, int &result) {
     return false;
 }
 
-static bool parseAddress(std::string_view &operand, unsigned &address) {
+static bool parseAddress(std::string_view &operand, unsigned &address, uint8_t defaultBank, char term = ' ') {
     //  accept xx/xxxx, xxxxxx (24-bit) or xxxx (16-bit)
-    auto tailPos = operand.find(' ');
+    auto tailPos = operand.find(term);
     std::string_view token;
     if (tailPos == std::string_view::npos) {
         token = operand;
@@ -161,6 +162,11 @@ static bool parseAddress(std::string_view &operand, unsigned &address) {
     } else {
         if (std::from_chars(token.begin(), token.end(), address, 16).ec != std::errc{}) {
             validAddress = false;
+        }
+        if (token.size() < 5) {
+            //  apply default bank
+            address &= 0x0000ffff;
+            address |= ((unsigned)(defaultBank) << 16);
         }
     }
     if (validAddress && address >= 0x00ffffff) {
@@ -1214,9 +1220,18 @@ void ClemensDebugger::cmdBreak(std::string_view operand) {
     }
 
     unsigned address = 0;
-    if (!parseAddress(operand, address)) {
-        CLEM_TERM_COUT.format(Error, "Address {} is invalid.", operand);
-        return;
+    if (breakpoint.type == ClemensBackendBreakpoint::Execute ||
+        breakpoint.type == ClemensBackendBreakpoint::DataRead ||
+        breakpoint.type == ClemensBackendBreakpoint::Write) {
+        uint8_t defaultBank = frameState_->cpu.regs.PBR;
+        if (breakpoint.type == ClemensBackendBreakpoint::DataRead ||
+            breakpoint.type == ClemensBackendBreakpoint::Write) {
+            defaultBank = frameState_->cpu.regs.DBR;
+        }
+        if (!parseAddress(operand, address, defaultBank)) {
+            CLEM_TERM_COUT.format(Error, "Address {} is invalid.", operand);
+            return;
+        }
     }
     breakpoint.address = address;
     commandQueue_.addBreakpoint(breakpoint);
@@ -1533,6 +1548,43 @@ void ClemensDebugger::cmdPrint(std::string_view operand) {
         }
         return;
     }
+    
+    /*
+    //  memory print
+    unsigned address = 0;
+    if (!parseAddress(operand, address, frameState_->cpu.regs.DBR, ':')) {
+        CLEM_TERM_COUT.format(Error, "usage: print <addr>:<count>");
+        return;
+    }
+    int byteCount = -1;
+    if (operand.empty()) {
+        byteCount = 1;
+    } else if (operand[0] == ':') {
+        if (std::from_chars(operand.begin() + 1, operand.end(), byteCount).ec != std::errc{}) {
+            byteCount = -1;
+        }
+    } 
+    if (byteCount < 0) {
+        CLEM_TERM_COUT.format(Error, "usage: print <addr>:<count>");
+        return;
+    }
+
+
+    //  this should be displayed on the backend console log
+    char bytesline[64];
+    unsigned byteslineIndex = 0;
+    unsigned baseAddress = address;
+    while (byteCount > 0) {
+
+        byteCount--;
+        if ((byteCount % 8) == 0) {
+            bytesline[byteslineIndex] = '\0';
+            CLEM_TERM_COUT.format(Debug, "{:08x}: {}", baseAddress, bytesline);
+            baseAddress += 8;
+            byteslineIndex = 0;
+        }
+    }
+    */
 }
 
 void ClemensDebugger::cmdHelp(std::string_view operand) {
@@ -1557,7 +1609,7 @@ void ClemensDebugger::cmdHelp(std::string_view operand) {
     CLEM_TERM_COUT.print(Info, "b]reak irq                  - break on IRQ");
     CLEM_TERM_COUT.print(Info, "b]reak brk                  - break on IRQ");
     CLEM_TERM_COUT.print(Info, "b]reak list                 - list all breakpoints");
-    CLEM_TERM_COUT.print(Info, "p]rint <address>:<count>    - print bytes at address");
+    //CLEM_TERM_COUT.print(Info, "p]rint <address>:<count>    - print bytes at address");
     CLEM_TERM_COUT.print(Info, "p]rint irq                  - print irqs raised");
     CLEM_TERM_COUT.print(Info, "log {DEBUG|INFO|WARN|UNIMPL}- set the emulator log level");
     CLEM_TERM_COUT.print(Info, "dump <bank_begin>,          - dump memory from selected banks\n"

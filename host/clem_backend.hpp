@@ -136,6 +136,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     void onCommandDebugMemoryWrite(uint16_t addr, uint8_t value) final;
     void onCommandDebugLogLevel(int logLevel) final;
     bool onCommandDebugProgramTrace(std::string_view op, std::string_view path) final;
+    void onCommandDebugMemoryPrint(unsigned address, unsigned count) final;
     bool onCommandSaveMachine(std::string path, std::unique_ptr<ClemensCommandMinizPNG> pngData) final;
     bool onCommandLoadMachine(std::string path) final;
     bool onCommandRunScript(std::string command) final;
