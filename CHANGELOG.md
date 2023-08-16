@@ -14,6 +14,7 @@ See [planned features](https://github.com/samkusin/clemens_iigs/issues?q=is%3Ais
 * macOS Catalina and above support
 * Gamepad support on all supported platforms
 * Fast disk emulation where the machine is sped up during read and write operations
+* Fast emulation mode (not the most optimal, but it works to get 10-20x speed)
 * Partial SCC emluation to pass diagnostic tests
 * IIgs GSOS/Finder/Toolbox mouse to host desktop tracking
 * Paste text as keyboard input (does not work correctly on GSOS)
@@ -40,6 +41,7 @@ See [planned features](https://github.com/samkusin/clemens_iigs/issues?q=is%3Ais
 * Clear key strobe on write to c010-1f
 * Ensure shadow map on writes is valid based on the final write page (bank 0,1 relevant)
 * 3.5" read/write bit cell timing fix for copy protection on certain titles
+* Disk switch detection for 3.5 and hard drives improved
 * WOZ CRC generation
 * RTC uses local timezone vs GMT clock
 * WAI fix
