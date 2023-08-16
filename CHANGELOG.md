@@ -65,10 +65,12 @@ All 60 fps emulation when not in Fast disk mode
   * Under investigation
 * Textfunk results in MAME-like results vs KEGS and Crossrunner
 * Mockingboard emulation may slow down the system due to an inefficient VIA implementation
+* ROM detection is not friendly - make sure you find a valid ROM 3 file or else the system will not warn you and likely the emulated machine will hang (not the emulator itself.)
 
-### Planned for 0.7
+### Planned for Next Release
 
 * French keyboards
+* Unmounted disk failures will save a backup to the disk library
 * Debugger improvements
 * General GUI cleanup
 
