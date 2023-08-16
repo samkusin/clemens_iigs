@@ -30,7 +30,8 @@ constexpr unsigned kDecodingBufferSize = 4 * 1024 * 1024;
 constexpr unsigned kSmartPortDiskSize = 32 * 1024 * 1024;
 
 unsigned calculateSlabHeapSize() {
-    return kSmartPortDiskSize * kClemensSmartPortDiskLimit + kDecodingBufferSize + kClemensSmartPortDiskLimit * 4096;
+    return kSmartPortDiskSize * kClemensSmartPortDiskLimit + kDecodingBufferSize +
+           kClemensSmartPortDiskLimit * 4096;
 }
 
 static ClemensCard *findHddCard(ClemensMMIO &mmio, unsigned driveIndex) {
@@ -49,8 +50,9 @@ static ClemensCard *findHddCard(ClemensMMIO &mmio, unsigned driveIndex) {
 
 } // namespace
 
-ClemensStorageUnit::ClemensStorageUnit()
-    : slab_(calculateSlabHeapSize(), malloc(calculateSlabHeapSize())) {
+ClemensStorageUnit::ClemensStorageUnit(const std::string &diskLibraryPath)
+    : slab_(calculateSlabHeapSize(), malloc(calculateSlabHeapSize())),
+      diskLibraryPath_(diskLibraryPath) {
 
     allocateBuffers();
 }
@@ -79,7 +81,7 @@ bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIn
                                              const std::string &imagePath) {
     auto asset = ClemensDiskAsset(imagePath);
     if (asset.imageType() != ClemensDiskAsset::Image2IMG &&
-        asset.imageType() != ClemensDiskAsset::ImageProDOS && 
+        asset.imageType() != ClemensDiskAsset::ImageProDOS &&
         asset.imageType() != ClemensDiskAsset::ImageHDV) {
         smartDiskStatuses_[driveIndex].mountFailed();
         return false;
@@ -96,7 +98,7 @@ bool ClemensStorageUnit::assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIn
         return false;
     }
     auto origin = ClemensDiskDriveStatus::Origin::None;
-    //  TODO: if CLEM_SMARTPORT_DRIVE_LIMIT needs to go up 
+    //  TODO: if CLEM_SMARTPORT_DRIVE_LIMIT needs to go up
     if (driveIndex < CLEM_SMARTPORT_DRIVE_LIMIT) {
         if (clemens_assign_smartport_disk(&mmio, driveIndex, &device)) {
             origin = ClemensDiskDriveStatus::Origin::DiskPort;
@@ -350,40 +352,66 @@ void ClemensStorageUnit::saveDisk(ClemensDriveType driveType, ClemensNibbleDisk 
         return;
 
     decodeBuffer_.reset();
+    bool saveOk = false;
     auto writeOut = decodeBuffer_.forwardSize(decodeBuffer_.getCapacity());
     auto decodedDisk = diskAssets_[driveType].decode(writeOut.first, writeOut.second, disk);
     if (decodedDisk.second) {
-        auto imagePath = diskAssets_[driveType].path();
-        std::ofstream out(imagePath, std::ios_base::out | std::ios_base::binary);
-        if (!out.fail()) {
-            out.write((char *)writeOut.first, decodedDisk.first);
-            if (!out.fail() && !out.bad()) {
-                disk.is_dirty = false;
-                diskStatuses_[driveType].saved();
-                spdlog::info("ClemensStorageUnit - {}: {} saved",
-                             ClemensDiskUtilities::getDriveName(driveType),
-                             diskStatuses_[driveType].assetPath);
-                return;
-            }
+        saveOk = saveImage(diskAssets_[driveType].path(), ClemensDiskUtilities::getDriveName(driveType), writeOut.first, decodedDisk.first);
+        if (saveOk) {
+            diskStatuses_[driveType].saved();
+        } else {
+            diskStatuses_[driveType].saveFailed();
+            diskAssets_[driveType].path()
+            saveOk = backupToLibrary(diskAssets_[driveType].path(), ClemensDiskUtilities::getDriveName(driveType),
+                                                       writeOut.first, decodedDisk.first);         
         }
-    }
-    spdlog::error("{}: {} failed to save", ClemensDiskUtilities::getDriveName(driveType),
+    } 
+    if (!saveOk) {
+        diskStatuses_[driveType].saveFailed();
+        spdlog::error("{}: {} failed to save", ClemensDiskUtilities::getDriveName(driveType),
                   diskStatuses_[driveType].assetPath);
-    diskStatuses_[driveType].saveFailed();
-}
+        return;
+    }
+    diskStatuses_[driveType].isSaved = saveOk;
+ }
 
 void ClemensStorageUnit::saveHardDisk(unsigned driveIndex, ClemensProDOSDisk &disk) {
     if (!smartDiskStatuses_[driveIndex].isMounted())
         return;
-    if (!disk.save()) {
-        spdlog::error("ClemensStorageUnit - Smart{}: {} failed to save", driveIndex,
+    bool saveOk = disk.save();
+    if (!saveOk) {
+        spdlog::error("ClemensStorageUnit - Smart{}: save image {} failed", driveIndex,
                       smartDiskStatuses_[driveIndex].assetPath);
         smartDiskStatuses_[driveIndex].saveFailed();
-        return;
+        auto originalPath = smartDiskAssets_[driveIndex].path();
+        smartDiskAssets_[driveIndex].relocatePath(getBackupLocation(originalPath, fmt::format("smart{}", driveIndex)));
+        smartDiskStatuses_[driveIndex].isSaved = disk.save(smartDiskAssets_[driveIndex].path());
+    } else {
+        smartDiskStatuses_[driveIndex].saved();
     }
-    spdlog::error("ClemensStorageUnit - Smart{}: {} saved", driveIndex,
-                  smartDiskStatuses_[driveIndex].assetPath);
-    smartDiskStatuses_[driveIndex].saved();
+    if (!saveOk) {
+        spdlog::error("ClemensStorageUnit - Smart{}: relocated image to", driveIndex,
+                      smartDiskStatuses_[driveIndex].assetPath);
+    }
+}
+
+std::string ClemensStorageUnit::getBackupLocation(const std::string &imagePath, std::string_view driveName) {
+    // from image path, extract the stem and parent directory (if a windows drive, then ignore)
+    // our eventual path will be library/timestamp/<driveName>/subdir/stem
+}
+
+bool ClemensStorageUnit::saveImage(const std::string &imagePath, std::string_view driveName,
+                                       const uint8_t *data, size_t dataSize) {
+
+    std::ofstream out(imagePath, std::ios_base::out | std::ios_base::binary);
+    if (!out.fail()) {
+        out.write((char *)data, dataSize);
+        if (!out.fail() && !out.bad()) {
+            spdlog::info("ClemensStorageUnit - {}: {} saved", driveName, imagePath);
+            return true;
+        }
+    }
+    return false;
 }
 
 bool ClemensStorageUnit::serialize(ClemensMMIO &mmio, mpack_writer_t *writer) {

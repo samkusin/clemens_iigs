@@ -372,6 +372,12 @@ ClemensDiskAsset::ClemensDiskAsset(const std::string &assetPath, ClemensDriveTyp
     }
 }
 
+void ClemensDiskAsset::relocatePath(const std::string& assetLocation) {
+    //  preserve the filename but the parent path changes
+    auto path = std::filesystem::path(assetLocation) / std::filesystem::path(path_).filename();
+    path_ = path.string();
+}
+
 bool ClemensDiskAsset::nibblizeDisk(struct Clemens2IMGDisk &disk) {
     unsigned diskType = diskType_ == Disk35    ? CLEM_DISK_TYPE_3_5
                         : diskType_ == Disk525 ? CLEM_DISK_TYPE_5_25

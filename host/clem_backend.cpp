@@ -616,6 +616,14 @@ void ClemensBackend::onClemensInstruction(struct ClemensInstruction *inst, const
     loggedInst.operand[sizeof(loggedInst.operand) - 1] = '\0';
 }
 
+std::string ClemensBackend::onClemensDiskLibraryPathMounted() {
+    // NOTE: this listener method is called in the constructor!  fortunately config_
+    //       is already initialized by this point (don't change the ordering of member vars without
+    //       taking this requirement into account)
+
+    return config_.imageRootPath;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // ClemensCommandQueue handlers
 //

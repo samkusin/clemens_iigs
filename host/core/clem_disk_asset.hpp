@@ -59,6 +59,7 @@ struct ClemensDiskAsset {
     DiskType diskType() const { return diskType_; }
     const std::string &path() const { return path_; }
     size_t getEstimatedEncodedSize() const { return estimatedEncodedSize_; }
+    void relocatePath(const std::string& assetLocation);
 
     //  Decodes the nibblized disk into the supplied buffer, in combination with
     //  any image specific data left in the asset's processed data buffer.  The

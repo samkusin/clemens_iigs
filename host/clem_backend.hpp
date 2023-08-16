@@ -118,6 +118,7 @@ class ClemensBackend : public ClemensSystemListener, ClemensCommandQueueListener
     void onClemensSystemLocalLog(int logLevel, const char *msg) final;
     void onClemensSystemWriteConfig(const ClemensAppleIIGS::Config &config) final;
     void onClemensInstruction(struct ClemensInstruction *inst, const char *operand);
+    std::string onClemensDiskLibraryPathMounted() final;
 
     //  ClemensCommandQueueListener
     void onCommandReset() final;

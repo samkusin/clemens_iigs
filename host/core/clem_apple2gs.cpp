@@ -100,7 +100,7 @@ ClemensAppleIIGS::ClemensAppleIIGS(const std::string &romPath, const Config &con
     : listener_(listener), status_(Status::Offline),
       slab_(calculateSlabMemoryRequirements(config),
             malloc(calculateSlabMemoryRequirements(config))),
-      machine_{}, mmio_{}, storage_(), mockingboard_(nullptr), hddcard_(nullptr) {
+      machine_{}, mmio_{}, storage_(listener_.onClemensDiskLibraryPathMounted()), mockingboard_(nullptr), hddcard_(nullptr) {
 
     // Ensure a valid ROM buffer regardless of whether a valid ROM was loaded
     // In the error case, we'll want to have a placeholder ROM.
@@ -201,7 +201,7 @@ ClemensAppleIIGS::ClemensAppleIIGS(const std::string &romPath, const Config &con
 }
 
 ClemensAppleIIGS::ClemensAppleIIGS(mpack_reader_t *reader, ClemensSystemListener &listener)
-    : listener_(listener), status_(Status::Offline), machine_{}, mmio_{}, storage_(),
+    : listener_(listener), status_(Status::Offline), machine_{}, mmio_{}, storage_(listener_.onClemensDiskLibraryPathMounted()),
       mockingboard_(nullptr), hddcard_(nullptr) {
 
     std::string componentName = "root";

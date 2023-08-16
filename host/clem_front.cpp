@@ -1184,6 +1184,7 @@ bool ClemensFrontend::syncBackend(bool copyState) {
             lastCommandState_.gsConfig = std::nullopt;
             config_.setDirty();
         }
+
         newFrame = true;
     }
 

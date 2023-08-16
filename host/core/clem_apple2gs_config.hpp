@@ -28,7 +28,7 @@ struct ClemensAppleIIGSConfig {
     //  Drive images (can be empty)
     std::array<std::string, kClemensDrive_Count> diskImagePaths;
     std::array<std::string, kClemensSmartPortDiskLimit> smartPortImagePaths;
-    //  Card namaes
+    //  Card names
     std::array<std::string, CLEM_CARD_SLOT_COUNT> cardNames;
 };
 

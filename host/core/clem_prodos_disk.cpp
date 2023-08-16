@@ -90,9 +90,13 @@ bool ClemensProDOSDisk::bind(ClemensSmartPortDevice &device, const ClemensDiskAs
     return true;
 }
 
-bool ClemensProDOSDisk::save() {
+bool ClemensProDOSDisk::save(std::string assetPath) {
+    if (!assetPath.empty() && assetPath != assetPath_) {
+        spdlog::info("ClemensProDOSDisk - asset path changed to {} ", assetPath);
+        assetPath_ = assetPath;
+    }
     if (assetPath_.empty())
-        return true;
+        return false;
     assert(!storage_.isEmpty());
     const uint8_t *dataStart = nullptr;
     const uint8_t *dataEnd = nullptr;

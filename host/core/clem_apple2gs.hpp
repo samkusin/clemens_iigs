@@ -49,6 +49,8 @@ class ClemensAppleIIGS {
     //  Destructor (saves state)
     ~ClemensAppleIIGS();
 
+    void setDiskLibraryPath(const std::string& diskLibraryPath);
+
     //  If construction was successful, returns true.  This should be checked
     //  after creating the object.
     bool isOk() const {
@@ -141,6 +143,7 @@ class ClemensSystemListener {
     virtual void onClemensSystemLocalLog(int logLevel, const char *msg) = 0;
     virtual void onClemensSystemWriteConfig(const ClemensAppleIIGS::Config &config) = 0;
     virtual void onClemensInstruction(struct ClemensInstruction *inst, const char *operand) = 0;
+    virtual std::string onClemensDiskLibraryPathMounted() = 0;
 };
 
 inline ClemensAppleIIGS::ResultFlags operator|(ClemensAppleIIGS::ResultFlags l,

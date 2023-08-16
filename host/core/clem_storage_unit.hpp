@@ -32,9 +32,8 @@ struct ClemensMMIO;
 //
 class ClemensStorageUnit {
   public:
-    ClemensStorageUnit();
+    ClemensStorageUnit(const std::string &diskLibraryPath);
     ~ClemensStorageUnit();
-    
 
     bool assignSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex, const std::string &imagePath);
     void saveSmartPortDisk(ClemensMMIO &mmio, unsigned driveIndex);
@@ -65,6 +64,10 @@ class ClemensStorageUnit {
 
     ClemensDrive *getDrive(ClemensMMIO &mmio, ClemensDriveType driveType);
 
+    std::string getBackupLocation(const std::string &imagePath,  std::string_view driveName);
+    bool saveImage(const std::string& imagePath, std::string_view driveName,
+                       const uint8_t *data, size_t dataSize);
+
   private:
     std::array<ClemensDiskAsset, kClemensDrive_Count> diskAssets_;
     std::array<ClemensDiskDriveStatus, kClemensDrive_Count> diskStatuses_;
@@ -78,6 +81,7 @@ class ClemensStorageUnit {
     //  and are reset in unserialize()
     cinek::FixedStack slab_;
     cinek::ByteBuffer decodeBuffer_;
+    std::string diskLibraryPath_;
 };
 
 #endif

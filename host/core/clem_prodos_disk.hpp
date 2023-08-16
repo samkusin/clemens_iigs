@@ -29,7 +29,7 @@ class ClemensProDOSDisk {
     ClemensProDOSDisk(cinek::ByteBuffer backingBuffer);
 
     bool bind(ClemensSmartPortDevice &device, const ClemensDiskAsset &asset);
-    bool save();
+    bool save(std::string assetPath="");
     void release(ClemensSmartPortDevice &device);
 
     bool serialize(mpack_writer_t *writer, ClemensSmartPortDevice &device);
