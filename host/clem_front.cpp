@@ -1425,11 +1425,12 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
                 }
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Fast Mode", CLEM_L10N_LABEL(kFastModeShortCutText), interop.fastMode, isBackendRunning())) {
+            if (ImGui::MenuItem("Fast Mode", CLEM_L10N_LABEL(kFastModeShortCutText),
+                                interop.fastMode, isBackendRunning())) {
                 if (interop.fastMode) {
                     interop.action = ClemensHostInterop::DisableFastMode;
                 } else {
-                    interop.action = ClemensHostInterop::EnableFastMode;    
+                    interop.action = ClemensHostInterop::EnableFastMode;
                 }
             }
             if (ImGui::MenuItem("Configure Joystick", NULL, false,
@@ -1462,22 +1463,23 @@ void ClemensFrontend::doMainMenu(ImVec2 &anchor, ClemensHostInterop &interop) {
     if (guiMode_ == GUIMode::Emulator) {
         if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
             if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl)) {
-                if (ImGui::IsKeyPressed(ImGuiKey_F10)) {
+                if (ImGui::IsKeyPressed(ImGuiKey_F10) || ImGui::IsKeyPressed(ImGuiKey_0)) {
                     if (interop.mouseLock) {
                         interop.action = ClemensHostInterop::MouseUnlock;
                     } else {
                         interop.action = ClemensHostInterop::MouseLock;
                     }
-                } else if (ImGui::IsKeyPressed(ImGuiKey_F11)) {
+                } else if (ImGui::IsKeyPressed(ImGuiKey_F11) ||
+                           ImGui::IsKeyPressed(ImGuiKey_Minus)) {
                     config_.hybridInterfaceEnabled = !config_.hybridInterfaceEnabled;
                     config_.setDirty();
-                } else if (ImGui::IsKeyPressed(ImGuiKey_F5)) {
+                } else if (ImGui::IsKeyPressed(ImGuiKey_F5) || ImGui::IsKeyPressed(ImGuiKey_5)) {
                     if (frameReadState_.isRunning) {
                         interop.action = ClemensHostInterop::PauseExecution;
                     } else {
                         interop.action = ClemensHostInterop::ContinueExecution;
                     }
-                } else if (ImGui::IsKeyPressed(ImGuiKey_F8)) {
+                } else if (ImGui::IsKeyPressed(ImGuiKey_F8) || ImGui::IsKeyPressed(ImGuiKey_8)) {
                     if (lastCommandState_.isFastModeOn) {
                         interop.action = ClemensHostInterop::DisableFastMode;
                     } else {
@@ -1729,7 +1731,7 @@ void ClemensFrontend::doInfoStatusLayout(ImVec2 anchor, ImVec2 dimensions, float
     }
     ClemensHostImGui::StatusBarField(isResetDown ? ClemensHostImGui::StatusBarFlags_Active
                                                  : ClemensHostImGui::StatusBarFlags_Inactive,
-                                     "%5.2f mhz",runSpeedMhz);
+                                     "%5.2f mhz", runSpeedMhz);
 
     ImGui::SameLine(anchor.x + dimensions.x - resetStatusWidth);
     ClemensHostImGui::StatusBarField(isResetDown ? ClemensHostImGui::StatusBarFlags_Active
@@ -3188,7 +3190,7 @@ void ClemensFrontend::doJoystickConfig(ImVec2 anchor, ImVec2 dimensions) {
             //  two rows, one per joystick
             //  buttons 1 and 2 require mapping controls
             for (unsigned joystickIndex = 0; joystickIndex < joystickSlotCount_; joystickIndex++) {
-                char joyId[8];
+                char joyId[16];
                 snprintf(joyId, sizeof(joyId) - 1, "joy%u", joystickIndex);
                 auto &bindings = config_.joystickBindings[joystickIndex];
                 auto &joystick = joysticks_[joystickIndex];

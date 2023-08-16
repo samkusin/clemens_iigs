@@ -56,9 +56,9 @@ static ClemensHostInterop g_interop{};
 #if defined(CLEMENS_APP_ICONS_ARE_RESIDENT)
 #include "images/app_icons_png.h"
 
-void loadAppIcon(sapp_image_desc* desc, const uint8_t *src, const unsigned srcLen) {
-    desc->pixels.ptr = ClemensHostAssets::loadBitmapFromPNG(
-        src, srcLen, &desc->width, &desc->height);
+void loadAppIcon(sapp_image_desc *desc, const uint8_t *src, const unsigned srcLen) {
+    desc->pixels.ptr =
+        ClemensHostAssets::loadBitmapFromPNG(src, srcLen, &desc->width, &desc->height);
     if (!desc->pixels.ptr) {
         return;
     }
@@ -128,31 +128,33 @@ static sapp_keycode onKeyUp(const sapp_event *evt, bool *doDownEvent) {
     return evt->key_code;
 }
 #elif defined(CLEMENS_PLATFORM_LINUX)
-//  The Super/Tux key seems special-cased in Linux to bypass X Windows keyboard
-//  shortcuts involving CTRL and ALT.  To prevent accidental triggering of
-//  disruptive shortcut keys like ALT-Fx, the Super Key must be used in-tandem
-//  with CTRL or ALT key down events before passing the event to the emulator.
-//  As a side effect, ALT-Fx cannot be supported on X Windows -
+//  Linux, Alt and function keys makes emulation tricky
+//      Solution:  When either Ctrl or ALt are pressed, number keys are translated
+//                 to function keys and remain so until the number key is released
+//                 (g_fnKeys[n] = 0 for up, 1 = down)
 //
-//  SO: if Super Key is Down, Fx keys are remapped to 1 - 0, to avoid
-//      conflicts between CTRL+ALT+Fx key presses.
-//      delete key also maps to F12
 //
-static bool g_leftSuperKeyDown = false;
-static bool g_rightSuperKeyDown = false;
+static bool g_leftAltKeyDown = false;
+static bool g_leftCtrlKeyDown = false;
+static bool g_rightAltKeyDown = false;
+static bool g_rightCtrlKeyDown = false;
 static bool g_escapeKeyDown = false;
 static bool g_fnKeys[12];
 
 static sapp_keycode onKeyDown(const sapp_event *evt) {
     sapp_keycode outKeyCode = evt->key_code;
 
-    if (!g_leftSuperKeyDown && evt->key_code == SAPP_KEYCODE_LEFT_SUPER)
-        g_leftSuperKeyDown = true;
-    if (!g_rightSuperKeyDown && evt->key_code == SAPP_KEYCODE_RIGHT_SUPER)
-        g_rightSuperKeyDown = true;
+    if (!g_leftAltKeyDown && evt->key_code == SAPP_KEYCODE_LEFT_ALT)
+        g_leftAltKeyDown = true;
+    if (!g_rightAltKeyDown && evt->key_code == SAPP_KEYCODE_RIGHT_ALT)
+        g_rightAltKeyDown = true;
+    if (!g_leftCtrlKeyDown && evt->key_code == SAPP_KEYCODE_LEFT_CONTROL)
+        g_leftCtrlKeyDown = true;
+    if (!g_rightCtrlKeyDown && evt->key_code == SAPP_KEYCODE_RIGHT_CONTROL)
+        g_rightCtrlKeyDown = true;
 
     int fnKey = xlatToFnKey(evt);
-    if (g_leftSuperKeyDown || g_rightSuperKeyDown) {
+    if (g_leftAltKeyDown || g_leftCtrlKeyDown || g_rightAltKeyDown || g_rightCtrlKeyDown) {
         if (fnKey > 0) {
             g_fnKeys[fnKey - 1] = true;
             outKeyCode = static_cast<sapp_keycode>(static_cast<int>(SAPP_KEYCODE_F1) + (fnKey - 1));
@@ -174,13 +176,17 @@ static sapp_keycode onKeyDown(const sapp_event *evt) {
 static sapp_keycode onKeyUp(const sapp_event *evt, bool *doDownEvent) {
     sapp_keycode outKeyCode = evt->key_code;
 
-    if (g_leftSuperKeyDown && evt->key_code == SAPP_KEYCODE_LEFT_SUPER)
-        g_leftSuperKeyDown = false;
-    else if (g_rightSuperKeyDown && evt->key_code == SAPP_KEYCODE_RIGHT_SUPER)
-        g_leftSuperKeyDown = false;
+    if (g_leftAltKeyDown && evt->key_code == SAPP_KEYCODE_LEFT_ALT)
+        g_leftAltKeyDown = false;
+    else if (g_rightAltKeyDown && evt->key_code == SAPP_KEYCODE_RIGHT_ALT)
+        g_rightAltKeyDown = false;
+    if (g_leftCtrlKeyDown && evt->key_code == SAPP_KEYCODE_LEFT_CONTROL)
+        g_leftCtrlKeyDown = false;
+    else if (g_rightAltKeyDown && evt->key_code == SAPP_KEYCODE_RIGHT_CONTROL)
+        g_rightCtrlKeyDown = false;
 
     int fnKey = xlatToFnKey(evt);
-    if (fnKey > 0) {
+    if (fnKey > 0 && g_fnKeys[fnKey - 1]) {
         g_fnKeys[fnKey - 1] = false;
         outKeyCode = static_cast<sapp_keycode>(static_cast<int>(SAPP_KEYCODE_F1) + (fnKey - 1));
     }
@@ -626,10 +632,14 @@ sapp_desc sokol_main(int argc, char *argv[]) {
     sapp.logger.func = sokolLogger;
     sapp.clipboard_size = kClipboardTextLimit;
 
-    loadAppIcon(&sapp.icon.images[0], app_icon_cinekine_Clemens_16_png, app_icon_cinekine_Clemens_16_png_len);
-    loadAppIcon(&sapp.icon.images[1], app_icon_cinekine_Clemens_32_png, app_icon_cinekine_Clemens_32_png_len);
-    loadAppIcon(&sapp.icon.images[2], app_icon_cinekine_Clemens_64_png, app_icon_cinekine_Clemens_64_png_len);
-    loadAppIcon(&sapp.icon.images[3], app_icon_cinekine_Clemens_128_png, app_icon_cinekine_Clemens_128_png_len);
+    loadAppIcon(&sapp.icon.images[0], app_icon_cinekine_Clemens_16_png,
+                app_icon_cinekine_Clemens_16_png_len);
+    loadAppIcon(&sapp.icon.images[1], app_icon_cinekine_Clemens_32_png,
+                app_icon_cinekine_Clemens_32_png_len);
+    loadAppIcon(&sapp.icon.images[2], app_icon_cinekine_Clemens_64_png,
+                app_icon_cinekine_Clemens_64_png_len);
+    loadAppIcon(&sapp.icon.images[3], app_icon_cinekine_Clemens_128_png,
+                app_icon_cinekine_Clemens_128_png_len);
 
     return sapp;
 }
