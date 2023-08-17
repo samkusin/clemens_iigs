@@ -598,8 +598,8 @@ ClemensFrontend::ClemensFrontend(ClemensConfiguration &config,
       emulatorHasMouseFocus_(false), mouseInEmulatorScreen_(false),
       pasteClipboardToEmulator_(false), debugIOMode_(DebugIOMode::Core), vgcDebugMinScanline_(0),
       vgcDebugMaxScanline_(0), joystickSlotCount_(0), guiMode_(GUIMode::None),
-      guiPrevMode_(GUIMode::None), appTime_(0.0), nextUIFlashCycleAppTime_(0.0),
-      uiFlashAlpha_(1.0f), debugger_(backendQueue_, *this), settingsView_(config_) {
+      helpMode_(HelpMode::None), appTime_(0.0), nextUIFlashCycleAppTime_(0.0), uiFlashAlpha_(1.0f),
+      debugger_(backendQueue_, *this), settingsView_(config_) {
 
     ClemensTraceExecutedInstruction::initialize();
 
@@ -923,15 +923,25 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
         interop.minWindowHeight +=
             ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().WindowBorderSize;
     }
+    if (interop.action != ClemensHostInterop::None) {
+        //  leave the help interface.
+        helpMode_ = HelpMode::None;
+        //  prevent low-priority operations if in a modal state
+
+        if (guiMode_ == GUIMode::LoadSnapshot || guiMode_ == GUIMode::LoadSnapshotAfterPowerOn ||
+            guiMode_ == GUIMode::SaveSnapshot) {
+            interop.action = ClemensHostInterop::None;
+        }
+    }
     switch (interop.action) {
     case ClemensHostInterop::About:
-        setGUIMode(GUIMode::Help);
+        helpMode_ = HelpMode::General;
         break;
     case ClemensHostInterop::Help:
-        setGUIMode(GUIMode::HelpShortcuts);
+        helpMode_ = HelpMode::Shortcuts;
         break;
     case ClemensHostInterop::DiskHelp:
-        setGUIMode(GUIMode::HelpDisk);
+        helpMode_ = HelpMode::Disk;
         break;
     case ClemensHostInterop::LoadSnapshot:
         if (isBackendRunning()) {
@@ -994,6 +1004,9 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     }
     emulatorHasMouseFocus_ = emulatorHasMouseFocus_ && isBackendRunning();
     doEmulatorInterface(interfaceAnchor, ImVec2(width, height), interop, viewToMonitor, deltaTime);
+    if (helpMode_ != HelpMode::None) {
+        doHelpScreen(width, height);
+    }
 
     switch (guiMode_) {
     case GUIMode::None:
@@ -1031,11 +1044,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
             setGUIMode(GUIMode::LoadSnapshot);
         }
         break;
-    case GUIMode::Help:
-    case GUIMode::HelpShortcuts:
-    case GUIMode::HelpDisk:
-        doHelpScreen(width, height);
-        break;
     case GUIMode::JoystickConfig:
         // this is handled above
         break;
@@ -1057,8 +1065,6 @@ auto ClemensFrontend::frame(int width, int height, double deltaTime, ClemensHost
     default:
         break;
     }
-
-    guiPrevMode_ = guiMode_;
 
     if (delayRebootTimer_.has_value()) {
         delayRebootTimer_ = *delayRebootTimer_ + (float)deltaTime;
@@ -1278,17 +1284,24 @@ void ClemensFrontend::doEmulatorInterface(ImVec2 anchor, ImVec2 dimensions,
         if (guiMode_ == GUIMode::JoystickConfig)
             guiMode_ = GUIMode::None;
         doMachineSmartDiskBrowserInterface(kMonitorViewAnchor, kMonitorViewSize);
-    } else if (guiMode_ == GUIMode::Setup) {
-        doSetupUI(kMonitorViewAnchor, kMonitorViewSize);
-    } else if (guiMode_ == GUIMode::JoystickConfig) {
-        doJoystickConfig(kMonitorViewAnchor, kMonitorViewSize);
     } else {
-        if (config_.hybridInterfaceEnabled) {
-            doDebuggerLayout(kMonitorViewAnchor, kMonitorViewSize, viewToMonitor);
-        } else {
-            doMachineViewLayout(kMonitorViewAnchor, kMonitorViewSize, viewToMonitor);
+        switch (guiMode_) {
+        case GUIMode::Setup:
+            doSetupUI(kMonitorViewAnchor, kMonitorViewSize);
+            break;
+        case GUIMode::JoystickConfig:
+            doJoystickConfig(kMonitorViewAnchor, kMonitorViewSize);
+            break;
+        default:
+            if (config_.hybridInterfaceEnabled) {
+                doDebuggerLayout(kMonitorViewAnchor, kMonitorViewSize, viewToMonitor);
+            } else {
+                doMachineViewLayout(kMonitorViewAnchor, kMonitorViewSize, viewToMonitor);
+            }
+            break;
         }
     }
+
     doSidePanelLayout(kSideBarAnchor, kSideBarSize);
     doInfoStatusLayout(kInfoStatusAnchor, kInfoStatusSize, kMonitorViewAnchor.x);
     ImGui::PopStyleColor(7);
@@ -3123,15 +3136,15 @@ void ClemensFrontend::doHelpScreen(int width, int height) {
                 ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kEmulatorHelp));
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem(
-                    "Hotkeys", NULL,
-                    guiMode_ == GUIMode::HelpShortcuts ? ImGuiTabItemFlags_SetSelected : 0)) {
+            if (ImGui::BeginTabItem("Hotkeys", NULL,
+                                    helpMode_ == HelpMode::Shortcuts ? ImGuiTabItemFlags_SetSelected
+                                                                     : 0)) {
                 ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kGSKeyboardCommands));
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Disk Selection", NULL,
-                                    guiMode_ == GUIMode::HelpDisk ? ImGuiTabItemFlags_SetSelected
-                                                                  : 0)) {
+                                    helpMode_ == HelpMode::Disk ? ImGuiTabItemFlags_SetSelected
+                                                                : 0)) {
                 ClemensHostImGui::Markdown(CLEM_L10N_LABEL(kDiskSelectionHelp));
                 ImGui::EndTabItem();
             }
@@ -3144,13 +3157,7 @@ void ClemensFrontend::doHelpScreen(int width, int height) {
 
         ImGui::EndPopup();
     }
-    if (guiMode_ == GUIMode::HelpShortcuts || guiMode_ == GUIMode::HelpDisk) {
-        //  hacky method to automatically trigger the shortcuts tab from the main menu
-        setGUIMode(GUIMode::Help);
-    }
-    if (!isOpen) {
-        setGUIMode(GUIMode::Emulator);
-    }
+    helpMode_ = isOpen ? HelpMode::General : HelpMode::None;
 }
 
 void ClemensFrontend::doJoystickConfig(ImVec2 anchor, ImVec2 dimensions) {

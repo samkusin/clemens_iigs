@@ -2,6 +2,13 @@
 
 See [planned features](https://github.com/samkusin/clemens_iigs/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement) for a list of TODOs.   Feel free to add to the list.
 
+### Known Issues
+
+* No 640 mode dithering - size of window really dictates how this mode looks and artifacts are obvious here
+* Textfunk scanline text effects do not work
+* Mockingboard emulation may slow down the system due to an inefficient VIA implementation
+* ROM detection is not friendly - make sure you find a valid ROM 3 file or else the system will not warn you and likely the emulated machine will hang (not the emulator itself.)
+
 ## Version 0.6
 
 ### Features
@@ -14,6 +21,7 @@ See [planned features](https://github.com/samkusin/clemens_iigs/issues?q=is%3Ais
 * macOS Catalina and above support
 * Gamepad support on all supported platforms
 * Fast disk emulation where the machine is sped up during read and write operations
+* Fast emulation mode (not the most optimal, but it works to get 10-20x speed)
 * Partial SCC emluation to pass diagnostic tests
 * IIgs GSOS/Finder/Toolbox mouse to host desktop tracking
 * Paste text as keyboard input (does not work correctly on GSOS)
@@ -40,6 +48,7 @@ See [planned features](https://github.com/samkusin/clemens_iigs/issues?q=is%3Ais
 * Clear key strobe on write to c010-1f
 * Ensure shadow map on writes is valid based on the final write page (bank 0,1 relevant)
 * 3.5" read/write bit cell timing fix for copy protection on certain titles
+* Disk switch detection for 3.5 and hard drives improved
 * WOZ CRC generation
 * RTC uses local timezone vs GMT clock
 * WAI fix
@@ -55,21 +64,12 @@ All 60 fps emulation when not in Fast disk mode
 * i7-10750H 6 core 2.6 Ghz (Windows 11, 2021 Dell XPS 15 9500, 16GB)
 * M2 Macbook Air (macOS Ventura, 16GB)
 
-### Known Issues
+### Planned for Next Releases
 
-* GSOS boot on freshly installed hard drive images may crash to the monitor on
-  first couple startups
-  * The problem "goes away" after this  
-  * Under investigation
-* Textfunk results in MAME-like results vs KEGS and Crossrunner
-* Mockingboard emulation may slow down the system due to an inefficient VIA implementation
-
-### Planned for 0.7
-
-* French keyboards
+* 640 mode dithering effects 
+* French keyboards (possibly other layouts)
+* Unmounted disk failures will save a backup to the disk library
 * Debugger improvements
-* General GUI cleanup
-
 
 ## Version 0.5
 
