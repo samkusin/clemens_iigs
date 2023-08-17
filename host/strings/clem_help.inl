@@ -30,12 +30,16 @@ First time users will be prompted to set a location where the emulator will stor
 const char *kDiskSelectionHelp[] = {R"md(
 ## Disk Selection
 
-Disk images are loaded by 'importing' them into the Emulator's library folder.
+The disk tray resides on the top left most section of the interface.
 
-* Choose a drive from the four drive widgets in the top left of the Emulator view
-* Select 'import' to import one or more disk images as a set (.DSK, .2MG, .PO, .DO, .WOZ)
-* Enter the desired disk set name
-* A folder will be created in the library folder for the disk set containing the imported images
+Each widget represents a physical disk slot.
+
+* **s5d1** and **s5d2** disks were 800K 3.5" disk images used to distribute most Apple IIgs titles
+* **s6d1** and **s6d2** disks were 140K 5.25" disk images used to legacy Apple II titles
+* **s7d1** and **s7d2** are disks that can support up to 32MB hard drive images
+
+All disk widgets have eject buttons.  Currently s7d1 and s7d2 do not support write protection.
+
 )md"};
 
 const char *kDebuggerHelp[] = {R"md(

@@ -200,9 +200,6 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
         LoadSnapshot,
         LoadSnapshotAfterPowerOn,
         SaveSnapshot,
-        Help,
-        HelpShortcuts,
-        HelpDisk,
         JoystickConfig,
         RebootEmulator,
         StartingEmulator,
@@ -210,8 +207,15 @@ class ClemensFrontend : public ClemensHostView, ClemensDebuggerListener {
     };
     void setGUIMode(GUIMode guiMode);
 
+    enum class HelpMode {
+      None,
+      General,
+      Shortcuts,
+      Disk
+    };
+
     GUIMode guiMode_;
-    GUIMode guiPrevMode_;
+    HelpMode helpMode_;
     double appTime_;
     double nextUIFlashCycleAppTime_;
     float uiFlashAlpha_;
