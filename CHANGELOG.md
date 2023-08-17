@@ -2,6 +2,13 @@
 
 See [planned features](https://github.com/samkusin/clemens_iigs/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement) for a list of TODOs.   Feel free to add to the list.
 
+### Known Issues
+
+* No 640 mode dithering - size of window really dictates how this mode looks and artifacts are obvious here
+* Textfunk scanline text effects do not work
+* Mockingboard emulation may slow down the system due to an inefficient VIA implementation
+* ROM detection is not friendly - make sure you find a valid ROM 3 file or else the system will not warn you and likely the emulated machine will hang (not the emulator itself.)
+
 ## Version 0.6
 
 ### Features
@@ -57,23 +64,12 @@ All 60 fps emulation when not in Fast disk mode
 * i7-10750H 6 core 2.6 Ghz (Windows 11, 2021 Dell XPS 15 9500, 16GB)
 * M2 Macbook Air (macOS Ventura, 16GB)
 
-### Known Issues
+### Planned for Next Releases
 
-* GSOS boot on freshly installed hard drive images may crash to the monitor on
-  first couple startups
-  * The problem "goes away" after this  
-  * Under investigation
-* Textfunk results in MAME-like results vs KEGS and Crossrunner
-* Mockingboard emulation may slow down the system due to an inefficient VIA implementation
-* ROM detection is not friendly - make sure you find a valid ROM 3 file or else the system will not warn you and likely the emulated machine will hang (not the emulator itself.)
-
-### Planned for Next Release
-
-* French keyboards
+* 640 mode dithering effects 
+* French keyboards (possibly other layouts)
 * Unmounted disk failures will save a backup to the disk library
 * Debugger improvements
-* General GUI cleanup
-
 
 ## Version 0.5
 
